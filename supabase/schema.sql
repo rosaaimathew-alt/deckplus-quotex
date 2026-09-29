@@ -210,3 +210,22 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ── Hardening (Supabase security advisor) ───────────────────────────────────
+-- Pin search_path on every function so a caller can't shadow public objects.
+-- Policies call auth_org()/auth_role() as the signed-in user, so
+-- `authenticated` keeps EXECUTE; `anon` never belongs to an org, so revoke it.
+alter function record_tables()                 set search_path = public;
+alter function set_updated_at()                set search_path = public;
+alter function sync_proposal_cols()            set search_path = public;
+alter function patch_record(text, text, jsonb) set search_path = public;
+alter function delete_record(text, text)       set search_path = public;
+alter function patch_settings(jsonb)           set search_path = public;
+alter function reserve_ids()                   set search_path = public;
+
+revoke execute on function auth_org()                       from public, anon;
+revoke execute on function auth_role()                      from public, anon;
+revoke execute on function patch_record(text, text, jsonb)  from public, anon;
+revoke execute on function delete_record(text, text)        from public, anon;
+revoke execute on function patch_settings(jsonb)            from public, anon;
+revoke execute on function reserve_ids()                    from public, anon;
