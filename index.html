@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, max-age=0" />
+    <title>QUOTEX — Smart Contractor Pricing</title>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Static fallback — React replaces this immediately on mount.
+           If you see this for more than a few seconds the JS bundle
+           failed to load. Try a hard refresh (hold Reload on mobile). -->
+      <div id="static-fallback" style="display:flex;min-height:100vh;align-items:center;justify-content:center;background:#f9fafb;font-family:sans-serif;">
+        <div style="text-align:center;padding:2rem;max-width:360px;">
+          <div style="font-size:2.5rem;margin-bottom:.75rem;">📄</div>
+          <p style="font-size:1.1rem;font-weight:600;color:#374151;margin:0 0 .5rem;">Loading…</p>
+          <p style="font-size:.8rem;color:#9ca3af;margin:0;" id="fallback-msg">Connecting to QuoteX</p>
+        </div>
+      </div>
+    </div>
+    <script>
+      // If React hasn't replaced the root content within 6 seconds,
+      // show a clear error instead of a blank screen.
+      setTimeout(function() {
+        var fb = document.getElementById('static-fallback')
+        if (fb && fb.parentNode === document.getElementById('root')) {
+          document.getElementById('fallback-msg').textContent =
+            'App failed to load. Please hard-refresh: hold the reload button and choose "Reload Without Content Blockers" on Safari, or open in a Private tab.'
+          fb.style.color = '#dc2626'
+        }
+      }, 6000)
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

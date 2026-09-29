@@ -1,0 +1,33 @@
+{
+  "functions": {
+    "api/analyze.js":                   { "maxDuration": 60 },
+    "api/inbound-email.js":             { "maxDuration": 10 },
+    "api/email.js":                     { "maxDuration": 15 },
+    "api/messages.js":                  { "maxDuration": 10 },
+    "api/ai-chat.js":                   { "maxDuration": 30 },
+    "api/store.js":                     { "maxDuration": 10 },
+    "api/auth/login.js":                { "maxDuration": 10 },
+    "api/google-auth/[action].js":      { "maxDuration": 10 },
+    "api/drive/upload.js":              { "maxDuration": 60 },
+    "api/drive/backup.js":              { "maxDuration": 30 },
+    "api/sign/[token].js":              { "maxDuration": 10 },
+    "api/co/[token].js":                { "maxDuration": 10 }
+  },
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, max-age=0" }
+      ]
+    },
+    {
+      "source": "/((?!assets/).*\\.(?:html)$)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, max-age=0" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

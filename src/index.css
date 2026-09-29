@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+.print-only { display: none; }
+
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  /* Fix overflow clipping — allows full document to print, not just the scrollable viewport */
+  html, body, #root,
+  .flex-1, main, aside,
+  [class*="overflow"] {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Ensure the full page width prints correctly */
+  body { width: 100% !important; }
+
+  /* ── Always print in light mode regardless of dark mode theme ── */
+  html, body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    color-scheme: light !important;
+  }
+
+  /* Reset dark-mode background overrides */
+  html.dark .bg-white,
+  html.dark .bg-gray-50,
+  html.dark .bg-gray-100,
+  html.dark .bg-blue-50,
+  html.dark .bg-green-50,
+  html.dark .bg-red-50,
+  html.dark .bg-amber-50,
+  html.dark .bg-purple-50,
+  html.dark .bg-sky-50  { background-color: #ffffff !important; }
+
+  /* Reset dark-mode text overrides */
+  html.dark .text-gray-900 { color: #111827 !important; }
+  html.dark .text-gray-800 { color: #1f2937 !important; }
+  html.dark .text-gray-700 { color: #374151 !important; }
+  html.dark .text-gray-600 { color: #4b5563 !important; }
+  html.dark .text-gray-500 { color: #6b7280 !important; }
+  html.dark .text-gray-400 { color: #9ca3af !important; }
+  html.dark .text-gray-300 { color: #d1d5db !important; }
+
+  /* Reset dark-mode border overrides */
+  html.dark .border-gray-100 { border-color: #f3f4f6 !important; }
+  html.dark .border-gray-200 { border-color: #e5e7eb !important; }
+  html.dark .border-gray-300 { border-color: #d1d5db !important; }
+  html.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]) { border-color: #f9fafb !important; }
+
+  /* Reset dark-mode input overrides */
+  html.dark input, html.dark textarea, html.dark select {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border-color: #e5e7eb !important;
+  }
+
+  * { box-shadow: none !important; }
+
+  /* ── Contract page-break rules ─────────────────────────────────────── */
+
+  /* Explicit page-break divs used in ContractViewFull and ContractView.
+     Both modern and legacy properties are set for broadest browser support. */
+  .pdf-page-break {
+    break-after: page !important;
+    page-break-after: always !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Within any contract page, keep paragraphs, list items, table rows, and
+     signature blocks from splitting mid-element across a page boundary. */
+  .contract-doc p,
+  .contract-doc li,
+  .contract-doc tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Prevent a table from being separated from its header row. */
+  .contract-doc table {
+    break-inside: auto !important;
+  }
+
+  /* Keep section headings attached to the content immediately below them. */
+  .contract-doc h2,
+  .contract-doc h3 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  /* Signature blocks (name line + date line + label) must stay together. */
+  .contract-sig {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Strip screen-only chrome from the contract wrapper. */
+  .contract-doc {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROTOTYPE DESIGN-LANGUAGE SKIN — screen only, pure paint.
+   Applies the previewed look (serif display headings, warm paper neutrals,
+   softer surfaces) across the whole app WITHOUT touching any component, handler,
+   field, or data. Wrapped in @media screen so every PDF/print output — signed
+   contracts included — renders exactly as before. The legal contract document
+   (.contract-doc) also keeps its original typography.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media screen {
+
+  /* App ground — a deeper, more neutral warm paper (not bright beige) so white
+     cards get real contrast. Replaces the light --brand-50 tint. */
+  .qx-ground            { background-color: #ebe5d8; }
+  html.dark .qx-ground  { background-color: #1c1c20; }
+
+  /* Serif display headings — the signature of the look */
+  h1, h2 {
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    letter-spacing: -0.01em;
+  }
+  /* Keep the legal contract document in its original sans typography */
+  .contract-doc h1, .contract-doc h2, .contract-doc h3 {
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: normal;
+  }
+
+  /* Warm paper neutrals (light mode only; dark mode keeps its own palette) */
+  html:not(.dark) .bg-gray-50   { background-color: #f1ede4 !important; }
+  html:not(.dark) .bg-gray-100  { background-color: #eae4d8 !important; }
+  html:not(.dark) .border-gray-200 { border-color: #e7e1d4 !important; }
+  html:not(.dark) .border-gray-100 { border-color: #efe9df !important; }
+  html:not(.dark) .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #efe9df !important; }
+
+  /* Softer, warmer surfaces + slightly more generous corners */
+  .shadow-sm { box-shadow: 0 1px 2px rgba(38,38,43,.05), 0 1px 1px rgba(38,38,43,.04) !important; }
+  .shadow-md { box-shadow: 0 2px 10px rgba(38,38,43,.06) !important; }
+  .rounded-xl  { border-radius: 14px; }
+  .rounded-2xl { border-radius: 18px; }
+}

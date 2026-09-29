@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ebony Outdoor Living — Contract Preview | EOL-082501</title>
+  <style>
+    /* ============================================================
+       BASE STYLES
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Georgia, 'Times New Roman', Times, serif;
+      font-size: 11pt;
+      line-height: 1.55;
+      color: #1a1a1a;
+      background: #e5e7eb;
+    }
+
+    /* ============================================================
+       COLOR-CODE SYSTEM
+    ============================================================ */
+    .auto {
+      background: #dbeafe;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-style: italic;
+    }
+    .auto::after {
+      content: " (auto)";
+      font-size: 8pt;
+      color: #1d4ed8;
+      font-style: normal;
+    }
+
+    .manual {
+      background: #fef9c3;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .manual::after {
+      content: " (manual)";
+      font-size: 8pt;
+      color: #854d0e;
+    }
+
+    .sig-field {
+      background: #dcfce7;
+      display: inline-block;
+      min-width: 220px;
+      border-bottom: 1.5px solid #16a34a;
+      padding: 2px 6px;
+      border-radius: 3px 3px 0 0;
+    }
+    .sig-field.wide {
+      min-width: 320px;
+    }
+    .sig-field.medium {
+      min-width: 160px;
+    }
+
+    /* ============================================================
+       LEGEND (screen only)
+    ============================================================ */
+    #legend {
+      background: #fff;
+      border: 2px solid #374151;
+      border-radius: 6px;
+      padding: 14px 20px;
+      max-width: 860px;
+      margin: 24px auto 16px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10pt;
+    }
+    #legend h2 {
+      font-size: 11pt;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    #legend ul {
+      list-style: none;
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    #legend ul li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-swatch {
+      display: inline-block;
+      width: 22px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid rgba(0,0,0,0.15);
+    }
+    .swatch-blue  { background: #dbeafe; }
+    .swatch-yellow{ background: #fef9c3; }
+    .swatch-green { background: #dcfce7; border-bottom: 2px solid #16a34a; }
+
+    /* ============================================================
+       PAGE LAYOUT
+    ============================================================ */
+    .page {
+      background: #ffffff;
+      width: 8.5in;
+      min-height: 11in;
+      margin: 0 auto 24px;
+      padding: 0.75in 0.85in 0.75in;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+      position: relative;
+      page-break-after: always;
+    }
+    .page:last-child {
+      page-break-after: auto;
+    }
+
+    /* ============================================================
+       TYPOGRAPHY
+    ============================================================ */
+    h1 { font-size: 18pt; font-weight: bold; text-align: center; margin-bottom: 4px; letter-spacing: 0.04em; }
+    h2 { font-size: 13pt; font-weight: bold; text-align: center; margin: 14px 0 10px; letter-spacing: 0.03em; }
+    h3 { font-size: 11pt; font-weight: bold; margin: 10px 0 6px; }
+
+    p { margin-bottom: 9px; text-align: justify; }
+
+    .clause { margin-bottom: 10px; }
+    .clause-num { font-weight: bold; }
+
+    /* ============================================================
+       PAGE HEADER BAND
+    ============================================================ */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #1a1a1a;
+    }
+    .logo-box {
+      border: 1.5px dashed #9ca3af;
+      padding: 8px 18px;
+      text-align: center;
+      color: #6b7280;
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      min-width: 120px;
+      line-height: 1.3;
+    }
+    .logo-box strong { display: block; font-size: 11pt; color: #374151; }
+    .contract-title { font-size: 20pt; font-weight: bold; letter-spacing: 0.06em; }
+    .contract-number { text-align: right; font-size: 10pt; }
+    .contract-number span { font-size: 11pt; font-weight: bold; }
+
+    /* ============================================================
+       PAYMENT TABLE
+    ============================================================ */
+    .payment-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 12px;
+      font-size: 10.5pt;
+    }
+    .payment-table th {
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      padding: 5px 10px;
+      text-align: left;
+      font-weight: bold;
+    }
+    .payment-table td {
+      border: 1px solid #d1d5db;
+      padding: 5px 10px;
+    }
+    .payment-table tr:nth-child(even) td { background: #f9fafb; }
+
+    /* ============================================================
+       CHECKBOXES / CHOICE ROWS
+    ============================================================ */
+    .checkbox-row {
+      background: #fef9c3;
+      border: 1px solid #fde68a;
+      border-radius: 4px;
+      padding: 7px 12px;
+      margin: 8px 0;
+      font-size: 10.5pt;
+      letter-spacing: 0.03em;
+    }
+    .checkbox-row::before {
+      content: "(manual) ";
+      font-size: 8pt;
+      color: #854d0e;
+    }
+    .cb { margin-right: 4px; font-size: 11pt; }
+
+    /* ============================================================
+       SIGNATURE BLOCKS
+    ============================================================ */
+    .sig-block {
+      margin-top: 18px;
+    }
+    .sig-columns {
+      display: flex;
+      gap: 40px;
+      margin-top: 12px;
+    }
+    .sig-col {
+      flex: 1;
+    }
+    .sig-col h3 {
+      font-size: 10pt;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 3px;
+      margin-bottom: 12px;
+    }
+    .sig-row {
+      margin-bottom: 16px;
+    }
+    .sig-row .sig-label {
+      font-size: 9pt;
+      color: #374151;
+      margin-top: 2px;
+      display: block;
+    }
+    .sig-row-inline {
+      display: flex;
+      align-items: flex-end;
+      gap: 30px;
+      margin-bottom: 18px;
+    }
+    .sig-row-inline > div { flex: 1; }
+    .sig-row-inline .sig-label {
+      font-size: 9pt;
+      color: #374151;
+      margin-top: 2px;
+      display: block;
+    }
+    .sig-date-pair {
+      display: flex;
+      align-items: flex-end;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+    .sig-date-pair .date-block { min-width: 120px; }
+
+    /* ============================================================
+       SCOPE OF WORK BULLETS
+    ============================================================ */
+    ul.scope-list {
+      margin: 8px 0 12px 20px;
+    }
+    ul.scope-list li {
+      margin-bottom: 6px;
+    }
+    ul.scope-list li strong { font-weight: bold; }
+
+    /* ============================================================
+       PROCESSING FORM
+    ============================================================ */
+    .proc-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 10.5pt;
+    }
+    .proc-table td {
+      padding: 5px 8px;
+      border: 1px solid #d1d5db;
+      vertical-align: top;
+    }
+    .proc-table td:first-child {
+      font-weight: bold;
+      width: 24%;
+      white-space: nowrap;
+      background: #f9fafb;
+    }
+    .proc-table .section-header td {
+      background: #374151;
+      color: #fff;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .manual-box {
+      background: #fef9c3;
+      border: 1px solid #fde68a;
+      border-radius: 4px;
+      padding: 6px 10px;
+      min-height: 52px;
+      width: 100%;
+    }
+    .manual-box::after {
+      content: "(manual)";
+      font-size: 8pt;
+      color: #854d0e;
+      display: block;
+    }
+
+    /* ============================================================
+       HOUSE DIAGRAM
+    ============================================================ */
+    .house-diagram-wrap {
+      display: flex;
+      justify-content: center;
+      margin: 16px 0;
+    }
+    .house-diagram {
+      position: relative;
+      width: 220px;
+    }
+    .house-roof {
+      width: 0;
+      height: 0;
+      border-left: 110px solid transparent;
+      border-right: 110px solid transparent;
+      border-bottom: 70px solid #6b7280;
+      margin: 0 auto;
+    }
+    .house-body {
+      width: 180px;
+      height: 100px;
+      background: #fff;
+      border: 2px solid #6b7280;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .house-door {
+      width: 28px;
+      height: 44px;
+      background: #fff;
+      border: 2px solid #6b7280;
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .house-window {
+      width: 26px;
+      height: 22px;
+      border: 2px solid #6b7280;
+      position: absolute;
+      top: 18px;
+    }
+    .house-window.left { left: 20px; }
+    .house-window.right { right: 20px; }
+    .compass-label {
+      font-family: Arial, sans-serif;
+      font-size: 8pt;
+      color: #6b7280;
+      text-align: center;
+      margin-top: 4px;
+    }
+    .compass-directions {
+      display: flex;
+      justify-content: center;
+      gap: 70px;
+      font-family: Arial, sans-serif;
+      font-size: 9pt;
+      font-weight: bold;
+      color: #374151;
+      margin-top: 4px;
+    }
+
+    /* ============================================================
+       DUAL LOGO
+    ============================================================ */
+    .dual-logo {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    /* ============================================================
+       PAGE FOOTER
+    ============================================================ */
+    .page-footer {
+      position: absolute;
+      bottom: 0.4in;
+      left: 0.85in;
+      right: 0.85in;
+      display: flex;
+      justify-content: space-between;
+      font-size: 8pt;
+      color: #6b7280;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 4px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #d1d5db;
+      margin: 14px 0;
+    }
+
+    .bold-notice {
+      font-weight: bold;
+      text-align: center;
+      margin: 12px 0;
+      font-size: 11pt;
+    }
+
+    /* ============================================================
+       PRINT STYLESHEET
+    ============================================================ */
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      #legend {
+        display: none !important;
+      }
+
+      .page {
+        box-shadow: none;
+        margin: 0;
+        padding: 0.6in 0.75in 0.6in;
+        width: 100%;
+        min-height: auto;
+      }
+
+      .auto {
+        background: #e5e5e5 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .manual, .checkbox-row, .manual-box {
+        background: #efefef !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .sig-field {
+        background: #e8f0e8 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .page-footer {
+        position: fixed;
+        bottom: 0;
+      }
+
+      @page {
+        size: letter;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     LEGEND (screen only)
+============================================================ -->
+<div id="legend">
+  <h2>Color Key — Contract Field Types</h2>
+  <ul>
+    <li>
+      <span class="legend-swatch swatch-blue"></span>
+      <strong>Blue</strong> — Auto-filled from proposal data (no manual entry needed)
+    </li>
+    <li>
+      <span class="legend-swatch swatch-yellow"></span>
+      <strong>Yellow</strong> — Manual entry required before signing
+    </li>
+    <li>
+      <span class="legend-swatch swatch-green"></span>
+      <strong>Green</strong> — Signature / date field (must be completed at signing)
+    </li>
+  </ul>
+</div>
+
+
+<!-- ============================================================
+     PAGE 1 — CONTRACT
+============================================================ -->
+<div class="page" id="page-1">
+
+  <div class="page-header">
+    <div>
+      <div class="logo-box"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+    </div>
+    <div style="text-align:center; padding-top:6px;">
+      <div class="contract-title">CONTRACT</div>
+    </div>
+    <div class="contract-number">
+      Contract #<br>
+      <span class="auto">EOL-082501</span>
+    </div>
+  </div>
+
+  <p>
+    THIS CONTRACT made effective on the <span class="auto">13th</span> day of <span class="auto">May</span>, <span class="auto">2026</span> In City of <span class="auto">Charlotte</span> and the State of <span class="auto">North Carolina</span> by and Between <span class="auto">John &amp; Jane Smith</span> (PURCHASER), At <span class="auto">123 Oak Lane, Charlotte, NC 28205</span> and Ebony Outdoor Living (BUILDER), for work to be performed at <span class="auto">123 Oak Lane, Charlotte, NC 28205</span> (the PREMISES) in accordance with the written terms and specifications of this CONTRACT (the WORK). THE WORK shall include the following:
+  </p>
+
+  <div class="checkbox-row">
+    <span class="cb">&#9744;</span> Deck &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Screened Porch &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Sunroom &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Pergola &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Gazebo &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Open Porch &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Other: ________________________
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">1.</span> BUILDER shall furnish the services and material for performance of the WORK on the PREMISES described on the SCOPE OF WORK each attached to and made part of this CONTRACT, for and in consideration of the payment to BUILDER by the PURCHASER of <span class="auto">$59,750.00</span> for the WORK. Together with any amounts set forth in any addenda hereto (TOTAL CONTRACT SUM).
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">2.</span> THE TOTAL CONTRACT SUM shall be paid to BUILDER as follows:
+  </div>
+
+  <table class="payment-table">
+    <thead>
+      <tr>
+        <th>Payment Milestone</th>
+        <th>Percentage</th>
+        <th>Amount</th>
+        <th>Due When</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Down Payment</strong></td>
+        <td>20%</td>
+        <td><span class="auto">$11,950.00</span></td>
+        <td>Due at signing</td>
+      </tr>
+      <tr>
+        <td><strong>Progress Payment 1</strong></td>
+        <td>30%</td>
+        <td><span class="auto">$17,925.00</span></td>
+        <td>Due after footing inspection / material drop</td>
+      </tr>
+      <tr>
+        <td><strong>Progress Payment 2</strong></td>
+        <td>40%</td>
+        <td><span class="auto">$23,900.00</span></td>
+        <td>Due upon roof completion</td>
+      </tr>
+      <tr>
+        <td><strong>Progress Payment 3</strong></td>
+        <td>5%</td>
+        <td><span class="auto">$2,987.50</span></td>
+        <td>Due at painting stage</td>
+      </tr>
+      <tr>
+        <td><strong>Progress Payment 4 / Final</strong></td>
+        <td>5%</td>
+        <td><span class="auto">$2,987.50</span></td>
+        <td>Due upon substantial completion</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="margin-bottom:4px;"><strong>Payment Method:</strong></p>
+  <div class="checkbox-row">
+    <span class="cb">&#9744;</span> Electronic Wire Transfer / ACH &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Cash &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Check &nbsp;&nbsp;
+    <span class="cb">&#9744;</span> Zelle
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">3.</span> <strong>OTHER TERMS:</strong><br>
+    <div class="manual-box" style="margin-top:6px; min-height:60px;">&nbsp;</div>
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">4.</span> THE Down Payment may be used to purchase material necessary for performance of the WORK. BUILDER shall be entitled to final payment upon substantial completion of the WORK. The WORK is substantially complete when all items described in this CONTRACT have been constructed or installed. Substantial completion shall not include adjustment, repair, replacement or cleaning of any item so constructed or installed or final inspection by code official. PURCHASER shall be entitled to one punch list prior to final payment. Requests for adjustment, repair, replacement or cleaning of any constructed or installed item shall not be cause for delay of final payment, but rather shall be considered warranty items. After five business days from substantial completion, the unpaid balance of the TOTAL CONTRACT SUM may be subject to interest charges as allowed by applicable state law. PURCHASER acknowledges and agrees that this CONTRACT shall serve as the invoice for the TOTAL CONTRACT SUM and that no additional invoice will be provided to PURCHASER for any part thereof.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">5.</span> Modification to the WORK or CONTRACT will be made only when a written addendum describing such modification has been signed by both PURCHASER and BUILDER. There may be an additional charge for any changes.
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — Contract</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 1 of 9</span>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     PAGE 2 — CONTRACT CONTINUED + FIRST SIGNATURE BLOCK
+============================================================ -->
+<div class="page" id="page-2">
+
+  <div class="page-header">
+    <div class="logo-box"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+    <div class="contract-title" style="font-size:16pt;">CONTRACT — Continued</div>
+    <div class="contract-number">Contract # <span class="auto">EOL-082501</span></div>
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">6a.</span> <strong>Warranty.</strong> BUILDER warrants to PURCHASER that all materials furnished shall be free of defects in material and workmanship for a period of one (1) year from substantial completion ("Warranty Period"), subject to the exclusions and limitations set forth herein. BUILDER's warranty obligations shall be limited to the repair or replacement of defective materials or workmanship at BUILDER's sole discretion. This warranty does not cover damage resulting from acts of God, misuse, abuse, neglect, accident, modification, unsuitable physical or operating environment, improper maintenance, or unauthorized repair. Manufacturer warranties for installed materials, fixtures, and equipment are assigned to PURCHASER at substantial completion and are governed solely by the terms of those separate manufacturer warranties. This warranty is non-transferable and applies only to the original PURCHASER. BUILDER's liability under this warranty shall not exceed the original TOTAL CONTRACT SUM. THE FOREGOING WARRANTY IS IN LIEU OF ALL OTHER WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">6b.</span> <strong>All-In-One Solutions — Role as General Contractor.</strong> PURCHASER acknowledges and agrees that All-In-One Solutions serves as the General Contractor (GC) for the WORK performed under this CONTRACT. In this capacity, All-In-One Solutions is responsible for obtaining all required permits and ensuring that the WORK complies with applicable building codes and regulations. All-In-One Solutions shall coordinate all subcontractor and trade activities on behalf of BUILDER. PURCHASER agrees to grant all-In-One Solutions reasonable access to the PREMISES for the purpose of fulfilling its obligations as General Contractor. Any communications regarding permits, inspections, or code compliance should be directed to All-In-One Solutions.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">7.</span> PURCHASER represents and warrants that PURCHASER has full authority to enter into this CONTRACT and to grant BUILDER access to the PREMISES for the purpose of performing the WORK. If the PREMISES is subject to a homeowner's association (HOA) or other governing body, PURCHASER is solely responsible for obtaining any required approvals or permits from such entity prior to the commencement of WORK. BUILDER shall not be responsible for any fines, penalties, or delays resulting from PURCHASER's failure to obtain such approvals. PURCHASER agrees to indemnify, defend, and hold harmless BUILDER and All-In-One Solutions from any claims, damages, losses, or expenses, including reasonable attorneys' fees, arising out of or relating to PURCHASER's failure to comply with any HOA or governing body requirements.
+  </div>
+
+  <div class="bold-notice">ADDITIONAL TERMS ON NEXT PAGE</div>
+  <hr class="divider" />
+
+  <!-- SIGNATURE BLOCK 1 -->
+  <div class="sig-block">
+    <h3 style="text-align:center; text-transform:uppercase; letter-spacing:0.05em; border-bottom:2px solid #1a1a1a; padding-bottom:6px; margin-bottom:16px;">Signatures</h3>
+
+    <div class="sig-columns">
+
+      <!-- PURCHASER Column -->
+      <div class="sig-col">
+        <h3>PURCHASER</h3>
+
+        <div class="sig-row">
+          <span class="sig-field wide">&nbsp;</span>
+          <span class="sig-label">Signature</span>
+        </div>
+        <div class="sig-row">
+          <span class="sig-field wide">&nbsp;</span>
+          <span class="sig-label">Print Name</span>
+        </div>
+        <div class="sig-row">
+          <span class="sig-field wide">&nbsp;</span>
+          <span class="sig-label">Co-Purchaser Signature — if applicable</span>
+        </div>
+        <div class="sig-row">
+          <span class="sig-field wide">&nbsp;</span>
+          <span class="sig-label">Co-Purchaser Print Name — if applicable</span>
+        </div>
+      </div>
+
+      <!-- BUILDER Column -->
+      <div class="sig-col">
+        <h3>BUILDER: EBONY OUTDOOR LIVING</h3>
+
+        <div class="sig-row">
+          <span class="sig-field wide">&nbsp;</span>
+          <span class="sig-label">Signature</span>
+        </div>
+        <div class="sig-row">
+          <span class="sig-field wide">&nbsp;</span>
+          <span class="sig-label">Print Name</span>
+        </div>
+
+        <div style="margin-top:18px;">
+          <h3 style="border-bottom:1px solid #374151; padding-bottom:3px; margin-bottom:12px;">GENERAL CONTRACTOR: ALL IN ONE SOLUTIONS</h3>
+          <div class="sig-row">
+            <span class="sig-field wide">&nbsp;</span>
+            <span class="sig-label">Signature</span>
+          </div>
+          <div class="sig-row">
+            <span class="sig-field wide">&nbsp;</span>
+            <span class="sig-label">Print Name</span>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; font-size:10pt; color:#374151;">
+          <strong>Builder Address:</strong><br>
+          <span class="auto">115 Unionville Indian Trail Road, Indian Trail, NC 28079 Unit B15</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — Contract</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 2 of 9</span>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     PAGE 3 — CONTRACT CLAUSES 8–18
+============================================================ -->
+<div class="page" id="page-3">
+
+  <div class="page-header">
+    <div class="logo-box"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+    <div class="contract-title" style="font-size:16pt;">CONTRACT — Clauses 8–18</div>
+    <div class="contract-number">Contract # <span class="auto">EOL-082501</span></div>
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">8.</span> <strong>Insurance.</strong> BUILDER shall maintain general liability insurance and workers' compensation insurance as required by applicable law during the performance of the WORK. Upon request, BUILDER shall provide PURCHASER with evidence of such insurance. PURCHASER is encouraged to maintain their own homeowner's or property insurance during the course of the WORK. BUILDER shall not be responsible for damage to existing structures, landscaping, utilities, or property not directly caused by BUILDER's negligence. PURCHASER shall notify BUILDER immediately of any damage believed to be caused by the WORK.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">9.</span> <strong>Permits and Inspections.</strong> All-In-One Solutions, as General Contractor, shall be responsible for obtaining all required building permits for the WORK, unless otherwise agreed in writing. PURCHASER shall cooperate fully with all required inspections and shall not interfere with the inspection process. Permit fees are included in the TOTAL CONTRACT SUM unless otherwise stated in a written addendum. PURCHASER acknowledges that permit approval and inspection scheduling are subject to the timelines of the applicable government authority and may cause delays outside of BUILDER's control.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">10.</span> <strong>Delays.</strong> BUILDER shall not be liable for any delay in performance due to causes beyond BUILDER's reasonable control, including without limitation: acts of God, fire, flood, earthquake, epidemic, pandemic, war, terrorism, labor disputes, governmental actions, supply chain disruptions, material shortages, or unusually severe weather conditions. In the event of such delay, the performance schedule shall be extended by a period of time equal to the duration of the cause of delay. BUILDER shall notify PURCHASER as soon as reasonably practicable of any anticipated delay and its expected duration.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">11.</span> <strong>Site Access and Conditions.</strong> PURCHASER shall ensure that BUILDER has clear and unobstructed access to the PREMISES during normal working hours, Monday through Saturday, 7:00 a.m. to 6:00 p.m., unless otherwise agreed. PURCHASER shall identify the location of all underground utilities, irrigation systems, septic tanks, and other subsurface improvements prior to commencement of WORK. BUILDER shall not be liable for damage to any underground improvements not disclosed by PURCHASER. If site conditions are found to be materially different from those represented, BUILDER reserves the right to adjust the scope and price of the WORK by written addendum.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">12.</span> <strong>Material Selection and Substitution.</strong> All materials shall be as specified in the SCOPE OF WORK. If specified materials are unavailable due to supply chain conditions or discontinuation, BUILDER may substitute materials of equal or greater quality and value, subject to PURCHASER's reasonable approval. PURCHASER-requested substitutions may result in additional charges or delays and shall be addressed by written addendum. BUILDER shall not be responsible for color variation, grain variation, or natural characteristics of wood, stone, composite, or other natural or semi-natural materials.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">13.</span> <strong>Cleanup and Debris Removal.</strong> BUILDER shall maintain a reasonably clean work site during the WORK and shall remove construction debris from the PREMISES upon substantial completion. BUILDER shall not be responsible for cleanup or restoration of landscaping, sod, or plantings that are disturbed as a reasonably necessary part of performing the WORK. PURCHASER is responsible for relocating or protecting any personal property, patio furniture, vehicles, or other items in or near the work area prior to the commencement of WORK.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">14.</span> <strong>Dispute Resolution.</strong> In the event of a dispute arising out of or relating to this CONTRACT or the WORK, the parties agree to first attempt to resolve the dispute through good-faith negotiation. If negotiation is unsuccessful, the parties agree to submit the dispute to non-binding mediation before a mutually agreed mediator, with costs shared equally. If mediation is unsuccessful, the dispute shall be resolved by binding arbitration administered under the rules of the American Arbitration Association. Judgment upon the arbitration award may be entered in any court of competent jurisdiction.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">15.</span> <strong>Governing Law.</strong> This CONTRACT shall be governed by and construed in accordance with the laws of the State of North Carolina, without regard to its conflict of laws provisions. Any legal proceedings arising under this CONTRACT shall be conducted in the county in which the PREMISES is located.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">16.</span> <strong>Lien Rights.</strong> PURCHASER acknowledges that BUILDER and any subcontractors or material suppliers engaged in the WORK may have lien rights against the PREMISES as provided by applicable state law. BUILDER shall provide PURCHASER with a Lien Waiver upon receipt of each payment installment corresponding to the work covered by that payment. Final Lien Waiver shall be provided upon receipt of final payment.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">17.</span> <strong>Termination.</strong> Either party may terminate this CONTRACT upon material breach by the other party, provided that written notice of the breach is delivered and the breaching party fails to cure the breach within fifteen (15) business days of receipt of such notice. In the event PURCHASER terminates this CONTRACT without cause, PURCHASER shall be liable to BUILDER for all costs incurred to the date of termination, including materials ordered and labor performed, plus a restocking and administrative fee of fifteen percent (15%) of the unearned contract balance. In the event BUILDER terminates this CONTRACT without cause, BUILDER shall refund any advance payments for work not yet performed, less costs incurred.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">18.</span> <strong>Entire Agreement.</strong> This CONTRACT, including all attached SCOPE OF WORK documents, addenda, and exhibits, constitutes the entire agreement between the parties with respect to the WORK and supersedes all prior negotiations, representations, warranties, or agreements, whether oral or written. No modification of this CONTRACT shall be effective unless made in writing and signed by both parties. The failure of either party to enforce any provision of this CONTRACT shall not constitute a waiver of that party's right to enforce the same or any other provision in the future.
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — Contract</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 3 of 9</span>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     PAGE 4 — CONTRACT CLAUSES 19–22 + FINAL SIGNATURE BLOCK
+============================================================ -->
+<div class="page" id="page-4">
+
+  <div class="page-header">
+    <div class="logo-box"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+    <div class="contract-title" style="font-size:16pt;">CONTRACT — Clauses 19–22</div>
+    <div class="contract-number">Contract # <span class="auto">EOL-082501</span></div>
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">19.</span> <strong>Severability.</strong> If any provision of this CONTRACT is found to be invalid, illegal, or unenforceable under applicable law, such provision shall be modified to the minimum extent necessary to make it enforceable, or if modification is not possible, it shall be severed from this CONTRACT, and the remaining provisions of this CONTRACT shall continue in full force and effect. The parties agree that the remaining provisions of this CONTRACT shall be interpreted to give maximum effect to the original intent of the parties.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">20.</span> <strong>Assignment.</strong> PURCHASER may not assign this CONTRACT or any rights hereunder without the prior written consent of BUILDER. BUILDER may assign this CONTRACT or subcontract any portion of the WORK to qualified subcontractors without PURCHASER's consent; provided, however, that BUILDER shall remain responsible for the performance of all subcontracted WORK. Any purported assignment by PURCHASER without BUILDER's written consent shall be null and void.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">21.</span> <strong>Notices.</strong> All notices required or permitted under this CONTRACT shall be in writing and shall be deemed delivered when: (a) personally delivered to the recipient; (b) sent by certified mail, return receipt requested, to the address set forth in this CONTRACT; or (c) sent by nationally recognized overnight courier service. PURCHASER's address for notice purposes is the CLIENT ADDRESS set forth on page 1 of this CONTRACT. BUILDER's address for notice purposes is 115 Unionville Indian Trail Road, Indian Trail, NC 28079, Unit B15.
+  </div>
+
+  <div class="clause">
+    <span class="clause-num">22.</span> <strong>Acknowledgment.</strong> THE PARTIES ACKNOWLEDGE THAT THEY HAVE EACH READ THIS CONTRACT IN ITS ENTIRETY, UNDERSTAND ITS TERMS AND CONDITIONS, HAVE HAD THE OPPORTUNITY TO CONSULT WITH LEGAL COUNSEL OF THEIR CHOOSING, AND AGREE TO BE BOUND BY THIS CONTRACT. PURCHASER FURTHER ACKNOWLEDGES THAT NO ORAL REPRESENTATIONS HAVE BEEN MADE BY BUILDER OR ITS AGENTS THAT ARE NOT REFLECTED IN THIS CONTRACT OR THE ATTACHED SCOPE OF WORK.
+  </div>
+
+  <hr class="divider" />
+
+  <!-- FINAL SIGNATURE BLOCK -->
+  <div class="sig-block">
+    <h3 style="text-align:center; text-transform:uppercase; letter-spacing:0.05em; border-bottom:2px solid #1a1a1a; padding-bottom:6px; margin-bottom:20px;">Final Signatures</h3>
+
+    <div class="sig-date-pair">
+      <div style="flex:2;">
+        <span class="sig-field wide">&nbsp;</span>
+        <span class="sig-label" style="font-size:9pt; color:#374151; margin-top:3px; display:block;">Client Signature</span>
+      </div>
+      <div class="date-block">
+        <span class="sig-field medium">&nbsp;</span>
+        <span class="sig-label" style="font-size:9pt; color:#374151; margin-top:3px; display:block;">Date</span>
+      </div>
+    </div>
+
+    <div class="sig-date-pair">
+      <div style="flex:2;">
+        <span class="sig-field wide">&nbsp;</span>
+        <span class="sig-label" style="font-size:9pt; color:#374151; margin-top:3px; display:block;">Builder Signature — Ebony Outdoor Living</span>
+      </div>
+      <div class="date-block">
+        <span class="sig-field medium">&nbsp;</span>
+        <span class="sig-label" style="font-size:9pt; color:#374151; margin-top:3px; display:block;">Date</span>
+      </div>
+    </div>
+
+    <div class="sig-date-pair">
+      <div style="flex:2;">
+        <span class="sig-field wide">&nbsp;</span>
+        <span class="sig-label" style="font-size:9pt; color:#374151; margin-top:3px; display:block;">GC Signature — All In One Solutions</span>
+      </div>
+      <div class="date-block">
+        <span class="sig-field medium">&nbsp;</span>
+        <span class="sig-label" style="font-size:9pt; color:#374151; margin-top:3px; display:block;">Date</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — Contract</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 4 of 9</span>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     PAGE 5 — SCOPE OF WORK & FINAL PAYMENT CLARIFICATION
+============================================================ -->
+<div class="page" id="page-5">
+
+  <div style="text-align:center; margin-bottom:14px;">
+    <div class="logo-box" style="display:inline-block;"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+  </div>
+
+  <h2>SCOPE OF WORK &amp; FINAL PAYMENT CLARIFICATION</h2>
+  <div style="text-align:center; font-size:10pt; margin-bottom:14px;">
+    Contract # <span class="auto">EOL-082501</span> &nbsp;|&nbsp; Client: <span class="auto">John &amp; Jane Smith</span> &nbsp;|&nbsp; Date: <span class="auto">May 13, 2026</span>
+  </div>
+
+  <ul class="scope-list">
+    <li><strong>Project Description:</strong> Design, supply, and construction of a custom screened porch addition at the project address, as detailed in the architectural drawings and material specifications incorporated herein by reference.</li>
+    <li><strong>Foundation &amp; Footings:</strong> Excavation and installation of concrete footings per engineered specifications and local code requirements. All footing depths and diameters to comply with applicable frost-depth and load-bearing requirements.</li>
+    <li><strong>Framing:</strong> Structural framing using pressure-treated lumber per applicable building codes. All posts, beams, joists, and ledger boards sized per engineering specifications. Ledger attachment to existing structure per IRC standards with proper flashing and waterproofing.</li>
+    <li><strong>Decking / Flooring:</strong> Installation of client-selected composite or pressure-treated decking per manufacturer specifications. All fastening systems and spacing to meet manufacturer and code requirements.</li>
+    <li><strong>Roofing:</strong> Roof system to match or complement existing home roofline. Includes structural roof framing, sheathing, underlayment, and shingles (or metal roofing as specified). All roof penetrations properly flashed and sealed.</li>
+    <li><strong>Screening System:</strong> Installation of aluminum screen framing system with heavy-duty fiberglass or aluminum screen mesh. Screen door(s) with self-closing hardware included per plan.</li>
+    <li><strong>Electrical (Rough-In Only):</strong> Licensed electrician subcontractor to provide rough-in wiring for specified outlets, fan boxes, and lighting per plan. All final trim-out and fixture installation by electrician at finish stage.</li>
+    <li><strong>Painting / Finishing:</strong> All exposed wood surfaces primed and painted with two coats of exterior-grade paint or stain per client-selected color. Touch-up included at final walkthrough.</li>
+    <li><strong>Permits &amp; Inspections:</strong> All required permits pulled by All-In-One Solutions as General Contractor. All inspections scheduled and passed prior to final payment request.</li>
+    <li><strong>Site Cleanup:</strong> Removal of all construction debris upon substantial completion. Driveway, yard, and landscaping restored to pre-construction condition to the extent reasonably practicable.</li>
+    <li><strong>Exclusions:</strong> The following items are expressly excluded from this SCOPE OF WORK unless added by signed written addendum: furniture, decorative lighting fixtures, ceiling fans (supply only), HVAC, plumbing, landscaping modifications beyond construction access, and any work inside the existing home structure.</li>
+  </ul>
+
+  <hr class="divider" />
+
+  <h3>Final Payment Clarification</h3>
+  <ul class="scope-list">
+    <li>Final payment of <span class="auto">$2,987.50</span> (5% of total contract sum) is due upon substantial completion of the WORK, as defined in Clause 4 of this CONTRACT.</li>
+    <li>Substantial completion is defined as the point at which the WORK is sufficiently complete that PURCHASER can use or occupy the PREMISES for its intended purpose, even if minor punch list items remain.</li>
+    <li>Final payment is NOT contingent upon completion of punch list items. Punch list items shall be addressed by BUILDER within a reasonable time after final payment is received.</li>
+    <li>Failure to tender final payment within five (5) business days of substantial completion may result in interest charges and/or suspension of punch list work until payment is received.</li>
+    <li>PURCHASER's execution of this page constitutes acknowledgment and agreement to the scope and final payment terms described herein.</li>
+  </ul>
+
+  <p style="font-weight:bold; margin-top:16px;">I HAVE READ AND UNDERSTAND THE ABOVE SCOPE OF WORK AND FINAL PAYMENT CLARIFICATION.</p>
+
+  <div class="sig-row" style="margin-top:18px;">
+    <span class="sig-field wide">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    <span class="sig-label">Client Signature</span>
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — Scope of Work</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 5 of 9</span>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     PAGE 6 — PRESSURE-TREATED WOOD INFORMATION
+============================================================ -->
+<div class="page" id="page-6">
+
+  <div style="text-align:center; margin-bottom:14px;">
+    <div class="logo-box" style="display:inline-block;"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+  </div>
+
+  <div style="margin-bottom:14px;">
+    <p style="font-size:9pt; color:#374151; margin-bottom:4px;">Signature carried from Page 5 (Scope of Work acknowledgment):</p>
+    <span class="sig-field wide">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    <span class="sig-label">Client Signature</span>
+  </div>
+
+  <hr class="divider" />
+
+  <h2>PRESSURE-TREATED WOOD INFORMATION</h2>
+
+  <p>Pressure-treated (PT) lumber is a wood product that has been infused with chemical preservatives under pressure to resist rot, decay, and insect damage. It is commonly used in outdoor construction applications including decks, pergolas, screen porches, and structural framing. Purchaser acknowledges and agrees to the following characteristics of pressure-treated wood:</p>
+
+  <ul class="scope-list">
+    <li><strong>Natural Cracking (Checking):</strong> Pressure-treated wood is kiln-dried or air-dried after treatment. As the wood dries and acclimates to its environment, it will naturally crack along the grain. These cracks, known as "checks," are a normal and expected characteristic of pressure-treated lumber and are not a defect. Checking does not affect the structural integrity of the lumber.</li>
+    <li><strong>Warping and Twisting:</strong> Individual pieces of pressure-treated lumber may warp, cup, bow, or twist over time as the wood dries and responds to changes in temperature and humidity. This is a natural characteristic of wood and is not considered a defect. Builder will use best practices to minimize the visual impact of warping, but cannot guarantee that individual boards will remain perfectly straight after installation.</li>
+    <li><strong>Color Variation:</strong> Pressure-treated wood is typically greenish-brown or tan in color at the time of installation due to the chemical treatment process. Over time, untreated wood will weather to a silver-gray color if left unfinished. Color variation between individual boards is normal and expected. Staining or painting can be applied to achieve a more uniform appearance, but Builder cannot guarantee uniform color absorption due to the natural variation in wood grain and treatment levels.</li>
+    <li><strong>Knots and Grain Variation:</strong> Pressure-treated lumber is a natural material and will contain knots, grain variations, and other natural characteristics. These are not defects and are expected in structural and finish-grade lumber used in outdoor construction.</li>
+    <li><strong>Shrinkage:</strong> As pressure-treated wood dries after installation, it will shrink. This may cause gaps between decking boards to widen over time, and fasteners may slightly protrude or "pop" as the wood shrinks around them. This is normal and not considered a warranty item. Deck boards should be installed with appropriate spacing to accommodate shrinkage.</li>
+    <li><strong>Chemical Treatment:</strong> Current pressure-treated lumber uses copper-based preservatives (such as MCA or CA-C) that are safer for residential use than older formulations. However, Purchaser should be aware that pressure-treated wood should not be used in applications where it will be in direct contact with food, and hands should be washed after extended handling of PT lumber. Builder recommends sealing or painting all cut ends of PT lumber to maximize longevity.</li>
+    <li><strong>Maintenance:</strong> To maximize the lifespan and appearance of pressure-treated wood, Builder recommends applying a penetrating water-repellent sealer or exterior stain within 6 to 12 months of installation, once the wood has fully dried. Periodic reapplication (every 1 to 3 years) is recommended. Failure to maintain the wood is not a warranty item and will not be covered under Builder's one-year warranty.</li>
+    <li><strong>Not a Structural Defect:</strong> None of the above-described characteristics — checking, warping, color variation, knots, shrinkage, or grain variation — shall be considered a defect in materials or workmanship under the warranty provided in this CONTRACT. Warranty claims related solely to these natural wood characteristics will not be honored.</li>
+  </ul>
+
+  <p style="font-weight:bold; margin-top:14px;">I HAVE READ AND UNDERSTAND THE ABOVE CHARACTERISTICS OF PRESSURE TREATED WOOD.</p>
+
+  <div class="sig-date-pair" style="margin-top:18px;">
+    <div style="flex:2;">
+      <span class="sig-field wide">&nbsp;</span>
+      <span class="sig-label">Client Signature</span>
+    </div>
+    <div class="date-block">
+      <span class="sig-field medium">&nbsp;</span>
+      <span class="sig-label">Date</span>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — PT Wood Information</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 6 of 9</span>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     PAGE 7 — UNFORESEEN SITE CONDITIONS POLICY
+============================================================ -->
+<div class="page" id="page-7">
+
+  <div style="text-align:center; margin-bottom:14px;">
+    <div class="logo-box" style="display:inline-block;"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+  </div>
+
+  <h2>UNFORESEEN SITE CONDITIONS POLICY</h2>
+
+  <p>Ebony Outdoor Living and All-In-One Solutions (collectively, "Builder") strive to provide accurate and complete project estimates based on the information available at the time of contract execution. However, construction projects are subject to conditions that cannot always be anticipated before work commences. This policy describes how unforeseen site conditions are handled and the Purchaser's responsibilities related thereto.</p>
+
+  <ul class="scope-list">
+    <li><strong>Definition of Unforeseen Site Conditions:</strong> Unforeseen site conditions are physical conditions at the project site that differ materially from those indicated in the contract documents, or that are of an unusual nature, not ordinarily encountered and generally recognized as inherent in the type of work described in this contract. Examples include, but are not limited to: subsurface rock, unstable soil, unmarked underground utilities, buried debris or concrete, unexpected root systems, undisclosed fill material, high groundwater, existing structural deficiencies, concealed rot or pest damage, and non-compliant prior construction.</li>
+    <li><strong>Purchaser Disclosure Obligation:</strong> Purchaser represents and warrants that, to Purchaser's knowledge, all material site conditions have been disclosed to Builder prior to execution of this contract. Purchaser is responsible for providing accurate information regarding the location of underground utilities, irrigation systems, septic systems, underground tanks, and any other subsurface improvements. Builder shall not be liable for damage to any undisclosed underground improvements.</li>
+    <li><strong>Discovery and Notification:</strong> If Builder encounters conditions at the project site that appear to be unforeseen site conditions, Builder will stop work in the affected area and notify Purchaser promptly. Builder will provide Purchaser with a description of the condition encountered, a preliminary assessment of the impact on the project, and a proposed written addendum for any additional work required.</li>
+    <li><strong>Additional Cost and Time:</strong> Work required to address unforeseen site conditions is not included in the original TOTAL CONTRACT SUM. Any additional work required shall be priced separately and presented to Purchaser in a written addendum. Builder shall not proceed with additional work to address unforeseen site conditions without a signed written addendum from Purchaser. If Purchaser elects not to authorize the additional work, Builder reserves the right to suspend or terminate the project, and Purchaser shall be responsible for payment for all work completed to the point of suspension or termination, plus any demobilization costs.</li>
+    <li><strong>Permit and Code Compliance:</strong> If unforeseen site conditions require modifications to the project design or scope to achieve code compliance, such modifications shall be addressed by written addendum and may result in additional cost and time. Builder shall not be penalized for delays caused by permit revisions or additional inspections required as a result of unforeseen site conditions.</li>
+    <li><strong>Footing Depth Adjustments:</strong> Building codes require footings to extend below the frost line and into stable, load-bearing soil. If soil conditions at the project site require footings to be excavated deeper than originally planned, this additional excavation and concrete will be billed at Builder's standard unit rate for footing extensions. Purchaser will be notified and must approve additional footing costs before work proceeds.</li>
+    <li><strong>Existing Structure Interface:</strong> Where the new construction interfaces with the existing home structure (e.g., ledger attachment, tie-ins to existing rooflines, connections to existing electrical or drainage systems), concealed conditions may be discovered that require additional work. Examples include: rot or pest damage discovered behind siding or sheathing, out-of-plumb or out-of-level existing construction, non-standard framing, and existing water intrusion. Such conditions are unforeseen and shall be addressed by written addendum.</li>
+    <li><strong>No Guarantee of Pre-existing Conditions:</strong> Builder makes no warranty with respect to the condition of any pre-existing structure, system, or improvement at the project site. Builder's work under this contract does not include inspection, repair, or warranty of any pre-existing conditions unless specifically listed in the Scope of Work.</li>
+  </ul>
+
+  <p>Purchaser acknowledges that the construction industry regularly encounters unforeseen conditions and that this policy is a fair and reasonable allocation of risk between the parties. By signing below, Purchaser agrees to the terms of this Unforeseen Site Conditions Policy.</p>
+
+  <p style="font-weight:bold; margin-top:14px;">I HAVE READ THE ABOVE UNFORESEEN SITE CONDITIONS POLICY AND AGREE TO ITS TERMS AND CONDITIONS.</p>
+
+  <div class="sig-row" style="margin-top:18px;">
+    <span class="sig-field wide">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    <span class="sig-label">Client Signature</span>
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — Unforeseen Site Conditions</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 7 of 9</span>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     PAGE 8 — PROCESSING FORM
+============================================================ -->
+<div class="page" id="page-8">
+
+  <div style="text-align:center; margin-bottom:14px;">
+    <div class="logo-box" style="display:inline-block;"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+  </div>
+
+  <h2>PROCESSING FORM</h2>
+  <p style="text-align:center; font-size:10pt; margin-bottom:12px; color:#374151;">Internal Use — To Be Completed by Sales / Office at Time of Contract Execution</p>
+
+  <table class="proc-table">
+    <tr>
+      <td>Date Sold</td>
+      <td><span class="auto">May 13, 2026</span></td>
+      <td style="font-weight:bold; background:#f9fafb; width:22%;">Salesperson</td>
+      <td><span class="auto">Mathew Rosa</span></td>
+    </tr>
+    <tr>
+      <td>Job Name</td>
+      <td><span class="auto">John &amp; Jane Smith</span></td>
+      <td style="font-weight:bold; background:#f9fafb;">Contract #</td>
+      <td><span class="auto">EOL-082501</span></td>
+    </tr>
+    <tr>
+      <td>Address</td>
+      <td colspan="3"><span class="auto">123 Oak Lane, Charlotte, NC 28205</span></td>
+    </tr>
+    <tr>
+      <td>Lot #</td>
+      <td><span class="manual">_________________</span></td>
+      <td style="font-weight:bold; background:#f9fafb;">Permit #</td>
+      <td><span class="manual">_________________</span></td>
+    </tr>
+    <tr>
+      <td>Telephone</td>
+      <td><span class="auto">(704) 555-0192</span></td>
+      <td style="font-weight:bold; background:#f9fafb;">Email</td>
+      <td><span class="auto">jsmith@email.com</span></td>
+    </tr>
+    <tr>
+      <td>HOA</td>
+      <td>
+        <span class="manual">
+          <span class="cb">&#9744;</span> Yes &nbsp;&nbsp; <span class="cb">&#9744;</span> No
+        </span>
+      </td>
+      <td style="font-weight:bold; background:#f9fafb;">Permit Required</td>
+      <td>
+        <span class="manual">
+          <span class="cb">&#9744;</span> Yes &nbsp;&nbsp; <span class="cb">&#9744;</span> No
+        </span>
+      </td>
+    </tr>
+  </table>
+
+  <div style="margin-bottom:12px;">
+    <p style="font-weight:bold; margin-bottom:4px;">Special Instructions:</p>
+    <div class="manual-box" style="min-height:54px;">&nbsp;</div>
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <p style="font-weight:bold; margin-bottom:4px;">Directions to Job Site:</p>
+    <div class="manual-box" style="min-height:54px;">&nbsp;</div>
+  </div>
+
+  <div style="display:flex; gap:40px; margin-bottom:12px; flex-wrap:wrap;">
+    <div>
+      <p style="font-weight:bold; margin-bottom:4px;">Lumber Drop:</p>
+      <span class="manual">
+        <span class="cb">&#9744;</span> On Driveway &nbsp;&nbsp; <span class="cb">&#9744;</span> Off Driveway
+      </span>
+    </div>
+    <div>
+      <p style="font-weight:bold; margin-bottom:4px;">Power Available:</p>
+      <span class="manual">
+        <span class="cb">&#9744;</span> Yes &nbsp;&nbsp; <span class="cb">&#9744;</span> No &nbsp;&nbsp; — Mark location with "P"
+      </span>
+    </div>
+    <div>
+      <p style="font-weight:bold; margin-bottom:4px;">Gate Code:</p>
+      <span class="manual">_____________________</span>
+    </div>
+  </div>
+
+  <!-- HOUSE DIAGRAM -->
+  <div class="house-diagram-wrap">
+    <div class="house-diagram">
+      <div style="text-align:center; font-size:9pt; color:#6b7280; font-family:Arial,sans-serif; margin-bottom:4px;">&#9650; NORTH</div>
+      <div class="house-roof"></div>
+      <div class="house-body">
+        <div class="house-window left"></div>
+        <div class="house-window right"></div>
+        <div class="house-door"></div>
+      </div>
+      <div class="compass-directions">
+        <span>W</span>
+        <span>E</span>
+      </div>
+      <div style="text-align:center; font-size:9pt; color:#6b7280; font-family:Arial,sans-serif; margin-top:2px;">&#9660; SOUTH</div>
+      <div class="compass-label" style="margin-top:6px;">(Mark project location with arrow or note)</div>
+    </div>
+  </div>
+
+  <div class="sig-date-pair" style="margin-top:10px;">
+    <div style="flex:2;">
+      <span class="sig-field wide">&nbsp;</span>
+      <span class="sig-label">Client Signature</span>
+    </div>
+    <div class="date-block">
+      <span class="sig-field medium">&nbsp;</span>
+      <span class="sig-label">Date</span>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — Processing Form</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 8 of 9</span>
+  </div>
+</div>
+
+
+<!-- ============================================================
+     PAGE 9 — CLIENT ACKNOWLEDGMENT AND AGREEMENT
+============================================================ -->
+<div class="page" id="page-9">
+
+  <div class="dual-logo">
+    <div class="logo-box"><strong>EBONY</strong>Outdoor Living<br><span style="font-size:8pt;">[ Logo ]</span></div>
+    <div style="font-family:Arial,sans-serif; font-size:10pt; font-weight:bold; color:#6b7280; letter-spacing:0.03em;">+</div>
+    <div class="logo-box"><strong>ALL IN ONE</strong>Solutions<br><span style="font-size:8pt;">[ Logo ]</span></div>
+  </div>
+
+  <h2>Client Acknowledgment and Agreement</h2>
+  <div style="text-align:center; font-size:10pt; margin-bottom:14px;">
+    Contract # <span class="auto">EOL-082501</span> &nbsp;|&nbsp; Date: <span class="auto">May 13, 2026</span>
+  </div>
+
+  <p>By signing this Client Acknowledgment and Agreement, the undersigned Client(s) confirm that they have received, reviewed, and fully understand all documents constituting the agreement between Client(s) and Ebony Outdoor Living / All-In-One Solutions (collectively, "Builder") for the construction project described herein.</p>
+
+  <p>Client acknowledges that the following documents have been provided and reviewed in their entirety prior to signing:</p>
+
+  <ul class="scope-list" style="margin-bottom:12px;">
+    <li>The Contract (Pages 1–4), including all numbered clauses and the payment schedule</li>
+    <li>The Scope of Work and Final Payment Clarification (Page 5)</li>
+    <li>The Pressure-Treated Wood Information disclosure (Page 6)</li>
+    <li>The Unforeseen Site Conditions Policy (Page 7)</li>
+    <li>The Processing Form (Page 8)</li>
+  </ul>
+
+  <p>Client further acknowledges and agrees to the following:</p>
+
+  <ul class="scope-list" style="margin-bottom:12px;">
+    <li><strong>Payment Obligations:</strong> Client agrees to make all payments in accordance with the payment schedule set forth in the Contract and understands that failure to make timely payments may result in work stoppage and/or interest charges.</li>
+    <li><strong>Scope Understanding:</strong> Client understands the scope of work as described and acknowledges that any changes to the scope must be made by signed written addendum.</li>
+    <li><strong>Natural Material Characteristics:</strong> Client understands and accepts the natural characteristics of pressure-treated wood, including checking, warping, color variation, and shrinkage, as described in the Pressure-Treated Wood Information disclosure.</li>
+    <li><strong>Unforeseen Conditions:</strong> Client understands that unforeseen site conditions may result in additional costs and time and agrees to the process described in the Unforeseen Site Conditions Policy.</li>
+    <li><strong>Permit and HOA Responsibility:</strong> Client acknowledges responsibility for obtaining any required HOA approvals and for providing accurate information regarding site conditions, underground utilities, and other improvements.</li>
+    <li><strong>No Oral Modifications:</strong> Client understands that no oral representations, promises, or agreements not reflected in the written contract documents are binding.</li>
+    <li><strong>Right to Review:</strong> Client has had the opportunity to review all contract documents and to consult with legal counsel of Client's choosing prior to signing. Client has not been pressured or coerced into signing and does so freely and voluntarily.</li>
+    <li><strong>Duplicate Originals:</strong> Client acknowledges receipt of a fully-executed copy of all contract documents for Client's records.</li>
+  </ul>
+
+  <div style="background:#f3f4f6; border:1px solid #d1d5db; border-radius:4px; padding:10px 14px; margin-bottom:14px; font-size:10pt;">
+    <strong>Project Address:</strong> <span class="auto">123 Oak Lane, Charlotte, NC 28205</span>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="sig-date-pair">
+    <div style="flex:2;">
+      <span class="sig-field wide">&nbsp;</span>
+      <span class="sig-label">Client Signature — <span class="auto">John &amp; Jane Smith</span></span>
+    </div>
+    <div class="date-block">
+      <span class="sig-field medium">&nbsp;</span>
+      <span class="sig-label">Date</span>
+    </div>
+  </div>
+
+  <div class="sig-date-pair">
+    <div style="flex:2;">
+      <span class="sig-field wide">&nbsp;</span>
+      <span class="sig-label">Builder Signature — Ebony Outdoor Living</span>
+    </div>
+    <div class="date-block">
+      <span class="sig-field medium">&nbsp;</span>
+      <span class="sig-label">Date</span>
+    </div>
+  </div>
+
+  <div class="sig-row" style="margin-top:6px;">
+    <span class="sig-field wide">&nbsp;</span>
+    <span class="sig-label">General Contractor Signature — All In One Solutions</span>
+  </div>
+
+  <div class="page-footer">
+    <span>Ebony Outdoor Living — Client Acknowledgment</span>
+    <span>Contract # <strong>EOL-082501</strong></span>
+    <span>Page 9 of 9</span>
+  </div>
+</div>
+
+</body>
+</html>
