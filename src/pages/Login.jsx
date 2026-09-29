@@ -1,11 +1,20 @@
 import { useState } from 'react'
 import { signIn, supabaseReady } from '../supabase'
 
+// The login page renders before sign-in, so it can't read the org's branding
+// row (RLS). It shows the company logo from a static file instead, and falls
+// back to the company name in text until that file is added.
+//   public/brand/logo.png  → shown when present
+//   VITE_COMPANY_NAME      → text fallback (defaults to QuoteX)
+const COMPANY_NAME = import.meta.env.VITE_COMPANY_NAME || 'QuoteX'
+const LOGO_URL     = '/brand/logo.png'
+
 export default function Login() {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  const [logoOk, setLogoOk]     = useState(true)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -25,8 +34,11 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">QuoteX</h1>
-          <p className="text-sm text-gray-500 mt-1">Sign in to continue</p>
+          {logoOk
+            ? <img src={LOGO_URL} alt={COMPANY_NAME} onError={() => setLogoOk(false)}
+                className="mx-auto h-16 max-w-[260px] object-contain" />
+            : <h1 className="text-2xl font-bold text-gray-900 tracking-wide">{COMPANY_NAME}</h1>}
+          <p className="text-sm text-gray-500 mt-2">Sign in to continue</p>
         </div>
         {!supabaseReady && (
           <p className="mb-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
