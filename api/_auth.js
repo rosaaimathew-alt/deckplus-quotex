@@ -1,13 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Verifies the Supabase session token the app sends on every /api/ request.
-// Supabase Auth mints the token; we ask Supabase (with the service key) who it
-// belongs to. Returns { email, sub } or null.
+// Supabase Auth mints the token; we ask Supabase who it belongs to. Returns
+// { email, sub } or null. getUser(jwt) only needs an API key to reach Auth —
+// the user's own JWT is what gets verified — so the anon key is enough here,
+// and the service key stays optional (it is only required by the seed scripts).
 let _admin = null
 function admin() {
   if (_admin) return _admin
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_KEY
+  const key = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
   if (!url || !key) return null
   _admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
   return _admin
@@ -16,7 +18,7 @@ function admin() {
 export async function verifyToken(token) {
   if (!token || typeof token !== 'string') return null
   const sb = admin()
-  if (!sb) return null   // fail closed: no service key configured → nobody is authorized
+  if (!sb) return null   // fail closed: no Supabase key configured → nobody is authorized
   try {
     const { data, error } = await sb.auth.getUser(token)
     if (error || !data?.user) return null
