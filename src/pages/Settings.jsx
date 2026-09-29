@@ -384,7 +384,12 @@ export default function Settings() {
   const fileRef = useRef()
 
   const plan     = branding.plan || 'enterprise'
-  const canBrand = canCustomizeBranding(plan)
+  // Branding and the plan are org settings; the database only lets office and
+  // admin write them (RLS). Hide the editors from other roles so a rep never
+  // makes changes that look saved but only exist in their own browser tab.
+  const me         = useStore(s => s.me)
+  const canManage  = DEMO || !me || me.role === 'office' || me.role === 'admin'
+  const canBrand   = canCustomizeBranding(plan) && canManage
 
   // Keep preview in sync
   useEffect(() => {
@@ -462,6 +467,14 @@ export default function Settings() {
 
           {/* ── Branding ───────────────────────────────────────────── */}
           <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Branding</h3>
+
+          {!canManage && (
+            <div className="bg-gray-50 rounded-xl border border-dashed border-gray-300 p-5 text-center">
+              <Lock size={18} className="text-gray-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-gray-700">Branding is managed by the office</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">Logo, colors and company details are shared by everyone in {branding.companyName || 'the company'} and can only be changed by an office or admin login.</p>
+            </div>
+          )}
 
           {/* Company identity */}
           {canBrand && (
@@ -614,13 +627,13 @@ export default function Settings() {
                 ))}
               </div>
             </div>
-          ) : (
+          ) : canManage ? (
             <div className="bg-gray-50 rounded-xl border border-dashed border-gray-300 p-5 text-center">
               <Lock size={18} className="text-gray-400 mx-auto mb-2" />
               <p className="text-sm font-semibold text-gray-700">Custom theming is a Professional feature</p>
               <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">Your workspace uses the standard Charcoal &amp; Brass identity. Upgrade to Professional to pick your own colors, logo accent, and sidebar.</p>
             </div>
-          )}
+          ) : null}
 
           {/* Action buttons */}
           {canBrand && (
@@ -673,7 +686,8 @@ export default function Settings() {
             </div>
             )}
 
-            {/* Plan / subscription tier */}
+            {/* Plan / subscription tier (org setting: office/admin only) */}
+            {canManage && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles size={16} className="text-gray-400" />
@@ -696,6 +710,7 @@ export default function Settings() {
                 })}
               </div>
             </div>
+            )}
           </div>
 
           {/* ── Connections & Data ─────────────────────────────────── */}
