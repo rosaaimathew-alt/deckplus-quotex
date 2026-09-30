@@ -71,6 +71,28 @@ Hip: the LVL and engineering are in addition to the 3000 (to be double-checked).
 - The "Pavilion on patio" row (67/SF) = Open / Patio base; a pavilion is
   Open + Patio + Freestanding (+ gable rules). "Extra electrical" **?** which item.
 
+## Eze-Breeze porch (third porch type)
+A new-build porch enclosed with Eze-Breeze window units. The structure is
+priced like the other porch types (base SF rate × floor area, tie-in, roof and
+add-on rules all apply); the enclosure follows **the same reasoning as the
+porch-conversion calculator** already in the quote builder:
+
+- Window unit max 54″ wide, 2.5″ frame grab on each column, 6×6 columns 5.5″
+  wide → each window+column module fills 54.5″ of wall.
+- Fewest windows that fit per wall, all sized equally; a column bounds every
+  opening, so N openings need N+1 columns; corner columns are shared.
+- Wall height over 105″ → one transom per window.
+- 36″ exit doors, on the front wall; rep chooses the count.
+- Enclosed walls: Front + 2 sides (default), All 4 walls, or Front only.
+- Per-unit rates come from Settings → Formulas (column, window, transom, door,
+  finishing), the same slice the conversion tool reads.
+
+**?** Which base SF rate does the structure use: the Open porch rows, the
+ScreenEze rows, or its own column in the matrix?
+**?** The structure base already includes columns; the conversion tool also
+prices a column line. Count columns once (structure) and price only windows,
+transoms, doors and finishing on top — or keep the column line?
+
 ## ScreenEze shown separately
 The ScreenEze upcharge ($3/SF) is a **presentation option**: when the customer
 wants to see the screen cost on its own line, price the porch as an Open porch
@@ -92,6 +114,7 @@ placeholder scope text that the office edits in Settings → Formulas, the same
 way the deck and porch-conversion scope templates work today.
 
 ## Open questions
+- Eze-Breeze: base SF rate row, and whether columns are priced again (see above).
 - Pavilion / freestanding "extra electrical": which item and price?
 - Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
 - ScreenEze separate line on Wall tie / Patio: $3 or $5 per SF?
