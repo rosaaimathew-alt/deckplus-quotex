@@ -133,6 +133,115 @@ transoms, doors and finishing on top — or keep the column line?
   rate (or is it PT deck rate + a decking upgrade line)?
 - **?** Trex rail painting per LF: LF of railing? Applies to the deck tool too?
 
+## Price catalog (as supplied; units verbatim)
+
+Items marked ⚠ have a unit that looks off — see the note under each table.
+
+### Porch extras
+| Item | Unit | Price |
+| --- | --- | ---: |
+| Roof membrane / flat roof | per SF | 10.50 |
+| Metal roof | per SF | 13 |
+| T&G ceiling 1×6 | per SF | 12 |
+| Flat ceiling | per SF | 5 |
+| Coffered ceiling | per SF | 18 |
+| Corbels ⚠ | per SF (sheet) | 500 |
+| Wagon-wheel gable trim | LS | 800 |
+| Skylight 4′×2′ | each | 1250 |
+| Faux beam | per LF | 28 |
+| Gable dormer | LS | 3200 |
+| Shiplap wood 1×6 wall | per SF | 12 |
+| Shiplap MDF 1×6 wall | per SF | 10 |
+| Knee wall, Hardie / ply-beaded | per SF | 29 |
+| TV wall, shiplap/siding/paint, 5′×9′ | LS | 2700 |
+
+⚠ Corbels at 500/SF is almost certainly **per each** (or per pair). **?**
+Flat ceiling at $5/SF is the line the hip roof requires; roof SF vs floor SF **?**
+(assume porch floor SF unless told otherwise).
+
+### Flooring upgrades
+| Item | Unit | Price |
+| --- | --- | ---: |
+| Trex Enhance upgrade | per LF | 3.85 |
+| Trex Transcend upgrade | per LF | 8.80 |
+| PT plywood | per SF | 4.50 |
+| LVT flooring only | per SF | 26 |
+| LVT on concrete | per SF | 23 |
+| Tile flooring only | per SF | 29 |
+| Tile flooring on deck | per SF | 36 |
+| Tile with plywood / membrane upgrade | per SF | 44 |
+
+Trex upgrades are per LF of decking board, matching how the deck tool prices
+decking collections. **?** confirm they are upgrades over the PT deck floor
+included in the "on PT deck" base.
+
+### Concrete
+| Item | Unit | Price |
+| --- | --- | ---: |
+| Concrete + hill / driveway / house access | per SF | 20 |
+| Reinforced concrete 4″ (mesh / flooring underlayment) | per SF | 20 |
+| Concrete 4″ | per SF | 17 |
+| Concrete slab less than 200 SF | per SF | 30 |
+
+Rule: slab under 200 SF → 30/SF instead of 17/SF.
+
+### Steps and landings
+| Product | Steps | Landing | Unit |
+| --- | ---: | ---: | --- |
+| PT wood | 33 | 33 | per SF |
+| Trex Enhance ⚠ | 24.20 | 24.20 | per LF (sheet) |
+| Trex Transcend | 61.60 | 61.60 | per SF |
+| Trex Lineage | 61.60 | 61.60 | per SF |
+| Trex Signature | 73.70 | 73.70 | per SF |
+| TimberTech Prime / Prime+ | 48.40 | 48.40 | per SF |
+| TimberTech Terrain / Terrain+ | 52.80 | 52.80 | per SF |
+| TimberTech Reserve | 56.10 | 56.10 | per SF |
+| TimberTech Harvest PVC | 62.70 | 62.70 | per SF |
+| TimberTech Landmark PVC | 62.70 | 62.70 | per SF |
+| TimberTech Vintage PVC | 66 | 66 | per SF |
+| TimberTech Vintage T&G | 80.30 | 80.30 | per SF |
+
+⚠ Trex Enhance is the only row in LF; every other row is SF. **?** typo?
+
+### Railing (per LF)
+| Item | Price |
+| --- | ---: |
+| 2×2 pickets wood rail | 17 |
+| Hybrid railing, wood cap | 19 |
+| Hybrid railing, Trex cap | 30.80 |
+| Trex Transcend railing | 170.50 |
+| Trex Select railing (white only) | 121 |
+| Trex Signature aluminum railing | 142 |
+| Trex Signature aluminum, between posts only | 86 |
+| TimberTech aluminum railing | 145.20 |
+| TimberTech railing, between posts only | 78.10 |
+
+### Deck fascia (per LF)
+| Item | Price |
+| --- | ---: |
+| PVC white fascia | 13 |
+| Trex Enhance / Transcend / Lineage fascia | 27.50 |
+| Trex Signature fascia | 35.20 |
+| TimberTech composite fascia | 22 |
+| TimberTech PVC fascia | 33 |
+
+### Deck upgrades
+| Item | Unit | Price |
+| --- | --- | ---: |
+| Box steps | per step | 100 |
+| 8×8 solid posts | each | 350 |
+| Trex aluminum gate | each | 1375 |
+| Privacy wall | per SF | 21 |
+| Engineered lattice, stained, 4×8 sheet | each | 270 |
+| PT skirt, vertical/horizontal, stained | per SF | 10 |
+| Trex skirt, vertical/horizontal | per SF | 33 |
+| 1-board border | per LF | 3 |
+| 2-board border | per LF | 6 |
+
+Most of the steps, railing, fascia and deck-upgrade prices also belong to the
+**deck tool**, whose Formulas rates are still placeholders. Plan: load them
+into one shared price list both tools read, so a number is entered once.
+
 ## ScreenEze shown separately
 The ScreenEze upcharge ($3/SF) is a **presentation option**: when the customer
 wants to see the screen cost on its own line, price the porch as an Open porch
@@ -154,6 +263,8 @@ placeholder scope text that the office edits in Settings → Formulas, the same
 way the deck and porch-conversion scope templates work today.
 
 ## Open questions
+- Catalog ⚠ units: corbels (500/SF?), Trex Enhance steps (LF vs SF).
+- Flat ceiling: roof SF or floor SF?
 - Doors: which porch types use the Larsen list; what "glass in openings" counts.
 - Floor type "composite / PVC deck": base rate?
 - Eze-Breeze: base SF rate row, and whether columns are priced again (see above).
