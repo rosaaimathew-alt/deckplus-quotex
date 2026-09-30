@@ -88,11 +88,13 @@ porch-conversion calculator** already in the quote builder:
   same slice the conversion tool reads. **No "paint, seal & refinish" line** on
   a new-build Eze-Breeze porch (that line stays on the conversion tool only).
 
+**Columns (confirmed):** every Eze-Breeze porch automatically adds the
+**6×6 laminated column package (2000 LS)**. There is **no per-column line**;
+the layout math still counts columns to size the windows, but only windows,
+transoms and doors are priced on top of the structure.
+
 **?** Which base SF rate does the structure use: the Open porch rows, the
 ScreenEze rows, or its own column in the matrix?
-**?** The structure base already includes columns; the conversion tool also
-prices a column line. Count columns once (structure) and price only windows,
-transoms, doors and finishing on top — or keep the column line?
 
 ## Doors, windows, glass (per unit)
 
@@ -268,6 +270,7 @@ screen − open is $3/SF except Wall tie on Patio, where it is $5/SF (72 vs 67).
 - Metal bracing plates → bracing letter (1250 LS) required.
 - Hip roof → flat ceiling required.
 - Freestanding → gable roof forced → LVL + engineering.
+- Eze-Breeze porch → 6×6 laminated column package (2000 LS) added automatically.
 - Gable wider than 19′ (dimension along the house) → +1000 LS.
 
 ## What the base rate includes (drives proposal scope text)
@@ -280,7 +283,7 @@ way the deck and porch-conversion scope templates work today.
 - Catalog ⚠ units: corbels (500/SF?), Trex Transcend steps (17.60?), TimberTech Prime (SF vs LF); what LF measures on steps/landings.
 - Flat ceiling: roof SF or floor SF?
 - Floor type "composite / PVC deck": base rate?
-- Eze-Breeze: base SF rate row, and whether columns are priced again (see above).
+- Eze-Breeze: which base SF rate row.
 - Pavilion / freestanding "extra electrical": which item and price?
 - Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
 - ScreenEze separate line on Wall tie / Patio: $3 or $5 per SF?
