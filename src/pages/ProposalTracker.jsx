@@ -1256,7 +1256,7 @@ export default function ProposalTracker() {
       // if a stale contract draft exists — so a re-selection of items is honored.
       freshSelection,
       contractNumber,
-      salesperson: 'Mathew Rosa',
+      salesperson: me?.displayName || '',
     }))
     navigate('/contract')
   }

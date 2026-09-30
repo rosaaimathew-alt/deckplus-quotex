@@ -366,7 +366,7 @@ export default function ContractsList() {
       projectTypes:   p.projectTypes || [],
       projectSummary: p.projectSummary || '',
       contractNumber,
-      salesperson:    p.salesperson || 'Mathew Rosa',
+      salesperson:    p.salesperson || '',
     }))
     navigate('/contract')
   }
