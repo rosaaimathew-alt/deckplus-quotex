@@ -87,7 +87,9 @@ screen − open is $3/SF except Wall tie on Patio, where it is $5/SF (72 vs 67).
 
 ## What the base rate includes (drives proposal scope text)
 Two different inclusion lists, one for **open porch** and one for **ScreenEze
-porch**. **?** lists to come.
+porch**. **Deferred**: the real bullets come later; the builder ships with
+placeholder scope text that the office edits in Settings → Formulas, the same
+way the deck and porch-conversion scope templates work today.
 
 ## Open questions
 - Pavilion / freestanding "extra electrical": which item and price?
