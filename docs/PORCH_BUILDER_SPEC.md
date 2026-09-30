@@ -243,6 +243,11 @@ Enhance steps (24.20) — **?** typo for 30.80?
 | TimberTech railing, between posts only | 78.10 |
 
 ### Deck fascia (per LF)
+**Quantity rule (confirmed):** fascia LF auto-populates from the deck's exposed
+perimeter — width + 2 × depth (the house side has none), or the full perimeter
+2 × (width + depth) when freestanding. Only offered when the porch sits on a
+deck. The rep can type an override.
+
 | Item | Price |
 | --- | ---: |
 | PVC white fascia | 13 |

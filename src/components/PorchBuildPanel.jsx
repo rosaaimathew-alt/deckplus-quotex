@@ -264,15 +264,21 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
             <input type="number" min="0" title="Linear feet" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.railing?.lf ?? 0} onChange={e => setSub('railing', { lf: e.target.value })} />
           </div>
         </Field>
-        <Field label="Fascia (LF)">
-          <div className="flex gap-2">
-            <select className={selCls} value={inp.fascia?.product || ''} onChange={e => setSub('fascia', { product: e.target.value })}>
-              <option value="">None</option>
-              {fasciaKeys.map(k => <option key={k} value={k}>{rates[k].label} — {rates[k].rate}/LF</option>)}
-            </select>
-            <input type="number" min="0" title="Linear feet" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.fascia?.lf ?? 0} onChange={e => setSub('fascia', { lf: e.target.value })} />
-          </div>
-        </Field>
+        {inp.floor === 'deck' && (
+          <Field label="Deck fascia" hint={inp.fascia?.lf == null || inp.fascia.lf === ''
+              ? `Auto: ${result.fasciaLF} LF, the deck's exposed perimeter (${inp.tie === 'free' ? 'all four sides' : 'front + two sides'}). Type a number to override.`
+              : 'Overridden. Clear the box to go back to the automatic perimeter.'}>
+            <div className="flex gap-2">
+              <select className={selCls} value={inp.fascia?.product || ''} onChange={e => setSub('fascia', { product: e.target.value })}>
+                <option value="">None</option>
+                {fasciaKeys.map(k => <option key={k} value={k}>{rates[k].label} — {rates[k].rate}/LF</option>)}
+              </select>
+              <input type="number" min="0" title="Linear feet (blank = automatic)" placeholder={String(result.fasciaLF)}
+                className="w-20 text-sm border border-gray-300 rounded-lg px-2 py-1"
+                value={inp.fascia?.lf ?? ''} onChange={e => setSub('fascia', { lf: e.target.value === '' ? null : e.target.value })} />
+            </div>
+          </Field>
+        )}
       </div>
 
       {/* ── Options with a quantity ───────────────────────────────────── */}

@@ -245,12 +245,19 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   steps: { product: '', stairWidthFt: 4 },
   landings: { product: '', count: 0 },
   railing: { product: '', lf: 0 },
-  fascia:  { product: '', lf: 0 },
+  fascia:  { product: '', lf: null },   // null = auto: the deck's exposed perimeter
   extras: {},                           // { key: qty } for any option: true item
 }
 
 const n = (v) => Number(v) || 0
 export const boardLF = (sf) => sf * (12 / BOARD_FACE_IN)
+
+// Exposed deck perimeter: the house side has no fascia, so front + two sides;
+// a freestanding porch is open on all four sides.
+export function exposedPerimeterFt(inp) {
+  const W = n(inp.width), D = n(inp.depth)
+  return inp.tie === 'free' ? 2 * (W + D) : W + 2 * D
+}
 
 // Build the priced line list from the rep's inputs and the org's rate table.
 export function computePorchBuild(input, ratesIn) {
@@ -333,7 +340,10 @@ export function computePorchBuild(input, ratesIn) {
     if (key) add(key, boardLF(n(inp.landings.count) * LANDING_SF), `${n(inp.landings.count)} × ${LANDING_SF} SF of board`)
   }
   if (inp.railing?.product && n(inp.railing.lf) > 0 && rates[inp.railing.product]?.rail) add(inp.railing.product, n(inp.railing.lf))
-  if (inp.fascia?.product  && n(inp.fascia.lf)  > 0 && rates[inp.fascia.product]?.fascia) add(inp.fascia.product,  n(inp.fascia.lf))
+  // Fascia follows the deck's exposed perimeter unless the rep overrides the LF.
+  const fasciaLF = inp.fascia?.lf == null || inp.fascia.lf === '' ? exposedPerimeterFt(inp) : n(inp.fascia.lf)
+  if (inp.floor === 'deck' && inp.fascia?.product && fasciaLF > 0 && rates[inp.fascia.product]?.fascia)
+    add(inp.fascia.product, fasciaLF, inp.fascia?.lf == null || inp.fascia.lf === '' ? 'exposed perimeter' : undefined)
 
   // Manual-qty options (ceilings, trim, walls, deck upgrades…). Hip already added the flat ceiling.
   for (const [k, q] of Object.entries(inp.extras || {})) {
@@ -350,7 +360,7 @@ export function computePorchBuild(input, ratesIn) {
     .filter(g => g.lines.length)
   const total = lines.reduce((s, l) => s + l.total, 0)
   const cost  = lines.reduce((s, l) => s + l.costTotal, 0)
-  return { lines, groups, total, cost, area, roof, layout, risers }
+  return { lines, groups, total, cost, area, roof, layout, risers, fasciaLF: exposedPerimeterFt(inp) }
 }
 
 // Customer-facing scope: the office's template for the type, then the lines
