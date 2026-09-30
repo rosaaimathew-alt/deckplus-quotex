@@ -54,7 +54,7 @@ export const PORCH_BUILD_DEFAULTS = {
   // Enclosure
   screeneze_upcharge: R('ScreenEze screens (shown separately)',             'SF', 3,    'enclosure'),
   lam_column_pkg:     R('6×6 laminated column package',                     'LS', 2000, 'enclosure'),
-  eze_window:         R('Eze-Breeze window unit',                           'EA', 750,  'enclosure'),
+  eze_window:         R('Eze-Breeze window unit',                           'EA', 700,  'enclosure'),
   eze_transom:        R('Eze-Breeze transom (wall over 105″)',              'EA', 130,  'enclosure'),
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
   door_tradewinds_premium: R('Larsen Tradewinds Premium door',              'EA', 850,  'enclosure', { door: true }),

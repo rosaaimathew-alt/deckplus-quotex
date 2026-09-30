@@ -103,7 +103,7 @@ pricing columns individually, because on a conversion the columns are new work.
 
 **Base rate (confirmed):** the structure uses the **Open porch rows** of the
 matrix for its tie-in and floor. The Eze-Breeze items are added on top:
-window units (750 each), transoms (130 each, when wall height > 105″), Larsen
+window units (700 each), transoms (130 each, when wall height > 105″), Larsen
 doors (per model), and the 6×6 laminated column package (2000 LS).
 
 ## Doors, windows, glass (per unit)
@@ -115,12 +115,12 @@ doors (per model), and the 6×6 laminated column package (2000 LS).
 | Larsen Savannah door                         |  650 |
 | Larsen Savannah Pet door                     |  815 |
 | Glass in openings — **gable porches only**   |  975 |
-| Eze-Breeze window unit                       |  750 |
+| Eze-Breeze window unit                       |  700 |
 | Transom                                      |  130 |
 
 - The rep picks a **door model** and a count; each door is one line.
-- Eze-Breeze unit 750 and transom 130 replace the conversion tool's
-  placeholder rates (650 / 300) in Settings → Formulas.
+- Eze-Breeze unit **700** (was quoted 750, changed to 700 going forward) and
+  transom 130 replace the conversion tool's placeholder rates (650 / 300).
 - **"Glass in openings" = glazing the gable ends.** Offered only when the roof
   is gable; the rep enters the count of gable ends to glaze (typically 1 or 2).
   The actual glass size depends on roof pitch but the price is a flat 975 per

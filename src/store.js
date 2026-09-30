@@ -68,7 +68,7 @@ export const DECK_COMPONENT_DEFAULTS = {
 // real numbers in Item Catalog → Formulas. Layout math lives in the builder.
 export const PORCH_COMPONENT_DEFAULTS = {
   column:    { label: 'Plates & 6×6 columns',       unit: 'EA', rate: 250,  cost: 150 },  // per column (plates rolled in)
-  window:    { label: 'Eze-Breeze window unit',     unit: 'EA', rate: 750,  cost: 0 },    // per window (Deck Plus sheet)
+  window:    { label: 'Eze-Breeze window unit',     unit: 'EA', rate: 700,  cost: 0 },    // per window (Deck Plus, 700 going forward)
   transom:   { label: 'Transom unit (wall > 105″)', unit: 'EA', rate: 130,  cost: 0 },    // per transom (Deck Plus sheet)
   door:      { label: 'Exit / storm door (36″)',    unit: 'EA', rate: 900,  cost: 560 },  // per door
   finishing: { label: 'Paint, seal & refinish',     unit: 'LS', rate: 1500, cost: 800 },  // flat per porch
