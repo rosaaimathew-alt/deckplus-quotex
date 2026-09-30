@@ -283,6 +283,22 @@ porch**. **Deferred**: the real bullets come later; the builder ships with
 placeholder scope text that the office edits in Settings → Formulas, the same
 way the deck and porch-conversion scope templates work today.
 
+## What the customer sees (confirmed)
+The proposal shows a **short list of grouped lines**, not every internal rule:
+
+| Group | Contains |
+| --- | --- |
+| Porch structure | base SF rate × area, freestanding add, deck-height add, roof-style adders (LVL, engineering, hip, gable > 19′), reinforce / bracing / wrap / cricket / seed & straw |
+| Enclosure | ScreenEze line (when shown separately), Eze-Breeze windows, transoms, doors, glass in gable ends, 6×6 lam column package |
+| Roof & ceiling options | metal roof / membrane, T&G / flat / coffered ceiling, skylights, faux beams, dormer, gable trim, corbels |
+| Walls & finishes | shiplap, knee wall, TV wall, paint / stain |
+| Flooring | Trex porch floor upgrades, LVT, tile, PT plywood, concrete |
+| Steps, landings & railing | steps, landings, railing, fascia, deck upgrades |
+
+Each group is one line with one price on the proposal; the itemized detail
+stays in the builder for the office. Empty groups are omitted. The existing
+itemized / lump-sum display toggle still applies on top of this.
+
 ## Open questions
 - Catalog ⚠ units: corbels (500/SF?), Trex Transcend steps (17.60?), TimberTech Prime (SF vs LF); what LF measures on steps/landings.
 - Flat ceiling: roof SF or floor SF?
@@ -291,5 +307,4 @@ way the deck and porch-conversion scope templates work today.
 - Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
 - ScreenEze separate line on Wall tie / Patio: $3 or $5 per SF?
 - Inclusion lists for open vs ScreenEze porches (for scope text).
-- Which items does the customer see vs internal only?
 - Cost side: internal cost per line for margin tracking, or sell price only?
