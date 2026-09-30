@@ -31,25 +31,25 @@ electrical (see add-ons). **?** which LVL length / which electrical item.
 
 ## Add-ons
 
+Every add-on is a **fixed amount** except the three per-SF adders, the LVL
+(per linear foot) and the bracing plate (per post).
+
 | Add-on                                              | Unit     | Price |
 | --------------------------------------------------- | -------- | ----: |
 | ScreenEze upcharge                                  | per SF   |     3 |
-| 6×6 laminated column package                        | flat     |  2000 |
 | Freestanding structure add                          | per SF   |     7 |
 | Deck above 8′ high add                              | per SF   |     5 |
 | PT LVL (framing)                                    | per LF   |   150 |
-| Gable wider than 19′ add                            | flat     |  1000 |
-| Reinforce deck for hot tub / porch                  | flat     |  2000 |
-| LVL engineering (required on every LVL project)     | flat     |  1000 |
 | Engineered metal bracing plate (per post; add letter)| per post|   750 |
-| Engineered metal bracing letter                     | flat     |  1250 |
-| Open porch wrap / LVL engineer charge               | flat     |  3000 |
-| Hip roof (must add flat ceiling)                    | flat     |  3000 |
-| Roof cricket                                        | flat     |   865 |
-| Seed and straw                                      | flat     |   250 |
-
-Units above are my reading of the sheet (small numbers = per SF, 150 = per LF,
-750 = per post, the rest flat). **?** confirm.
+| 6×6 laminated column package                        | fixed    |  2000 |
+| Gable wider than 19′ add                            | fixed    |  1000 |
+| Reinforce deck for hot tub / porch                  | fixed    |  2000 |
+| LVL engineering (required on every LVL project)     | fixed    |  1000 |
+| Engineered metal bracing letter                     | fixed    |  1250 |
+| Open porch wrap / LVL engineer charge               | fixed    |  3000 |
+| Hip roof (must add flat ceiling)                    | fixed    |  3000 |
+| Roof cricket                                        | fixed    |   865 |
+| Seed and straw                                      | fixed    |   250 |
 
 ### Dependency rules implied by the sheet
 - Any PT LVL line → add LVL engineering ($1000) automatically.
@@ -64,8 +64,8 @@ Units above are my reading of the sheet (small numbers = per SF, 150 = per LF,
 - Is SF the porch **floor area** (width × depth)? Any minimum SF or minimum job?
 - What is in the base rate: roofing, ceiling, standard electrical, screen,
   doors, columns, footings, permit? What is always extra?
-- ScreenEze upcharge: the screen rows already say ScreenEze — is the $3/SF for
-  ScreenEze over a standard spline screen, or something else?
+- ScreenEze upcharge ($3/SF): the screen rows already say ScreenEze — is this
+  for ScreenEze over a standard spline screen, or something else?
 - Freestanding add ($7/SF) vs Pavilion row ($67/SF): when does each apply?
 - Roof style: gable vs shed vs hip — is gable/shed a choice with no price
   difference, and hip the only priced one?
