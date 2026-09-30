@@ -88,10 +88,12 @@ porch-conversion calculator** already in the quote builder:
   same slice the conversion tool reads. **No "paint, seal & refinish" line** on
   a new-build Eze-Breeze porch (that line stays on the conversion tool only).
 
-**Columns (confirmed):** every Eze-Breeze porch automatically adds the
-**6×6 laminated column package (2000 LS)**. There is **no per-column line**;
-the layout math still counts columns to size the windows, but only windows,
-transoms and doors are priced on top of the structure.
+**Columns (confirmed):** in the **porch builder** (new build), every Eze-Breeze
+porch automatically adds the **6×6 laminated column package (2000 LS)** and has
+**no per-column line**; the layout math still counts columns to size the
+windows, but only windows, transoms and doors are priced on top of the structure.
+The existing **porch-conversion tool is unchanged**: it keeps calculating and
+pricing columns individually, because on a conversion the columns are new work.
 
 **?** Which base SF rate does the structure use: the Open porch rows, the
 ScreenEze rows, or its own column in the matrix?
