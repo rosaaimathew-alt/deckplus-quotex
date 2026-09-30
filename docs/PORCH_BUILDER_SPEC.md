@@ -58,33 +58,41 @@ Every add-on is a **fixed amount** except the three per-SF adders, the LVL
 | Roof  | Price                                                                  |
 | ----- | ---------------------------------------------------------------------- |
 | Shed  | base SF rate only (the standard roof)                                  |
-| Gable | base + **PT LVL × porch depth** (150/LF) + LVL engineering (1000 LS); if wider than 19′ also +1000 LS |
-| Hip   | base + 3000 LS + LVL engineering (1000 LS) + **required flat ceiling** |
+| Gable | base + **PT LVL × porch depth** (150/LF) + LVL engineering (1000 LS); if wider than 19′ (along the house wall) also +1000 LS |
+| Hip   | base + 3000 LS + **PT LVL × porch depth** (150/LF) + LVL engineering (1000 LS) + **required flat ceiling** |
+
+Hip: the LVL and engineering are in addition to the 3000 (to be double-checked).
+**?** flat ceiling price.
 
 ## Freestanding
-Freestanding is a tie-in choice: use the type/floor base rate and add the
-**Freestanding structure add, $7/SF**. The "Pavilion on patio" row (67/SF)
-equals the Open / Patio base rate, so a pavilion = Open porch, Patio, Freestanding.
-Pavilion rule still applies: extra LVL + extra electrical. **?** confirm.
+- Freestanding is a tie-in choice: type/floor base rate + **$7/SF**.
+- **Freestanding porches can only have a gable roof**, so the gable rules
+  apply: PT LVL × porch depth + LVL engineering (+1000 if wider than 19′).
+- The "Pavilion on patio" row (67/SF) = Open / Patio base; a pavilion is
+  Open + Patio + Freestanding (+ gable rules). "Extra electrical" **?** which item.
+
+## ScreenEze shown separately
+The ScreenEze upcharge ($3/SF) is a **presentation option**: when the customer
+wants to see the screen cost on its own line, price the porch as an Open porch
+and add a "ScreenEze screens" line at $3/SF. Note: the matrix difference
+screen − open is $3/SF except Wall tie on Patio, where it is $5/SF (72 vs 67).
+**?** which number wins in that one case.
 
 ## Dependency rules
 - Any PT LVL line → LVL engineering (1000 LS) added automatically.
 - Metal bracing plates → bracing letter (1250 LS) required.
 - Hip roof → flat ceiling required.
-- Freestanding / pavilion → extra LVL + extra electrical.
-- Gable wider than 19′ → +1000 LS. **?** "wide" = the dimension along the house.
+- Freestanding → gable roof forced → LVL + engineering.
+- Gable wider than 19′ (dimension along the house) → +1000 LS.
 
 ## What the base rate includes (drives proposal scope text)
 Two different inclusion lists, one for **open porch** and one for **ScreenEze
 porch**. **?** lists to come.
 
 ## Open questions
-- Freestanding modelling above: correct? Does the pavilion's "extra LVL" mean a
-  PT LVL line for the porch **width**, or something else? Which electrical item?
-- Hip roof: is a PT LVL length (like gable's depth) also added, or only the
-  engineering fee? Does "flat ceiling" have its own price?
-- ScreenEze upcharge ($3/SF): the screen rows already say ScreenEze — when is it applied?
-- Gable > 19′: which dimension is "wide"?
+- Pavilion / freestanding "extra electrical": which item and price?
+- Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
+- ScreenEze separate line on Wall tie / Patio: $3 or $5 per SF?
 - Inclusion lists for open vs ScreenEze porches (for scope text).
 - Which items does the customer see vs internal only?
 - Cost side: internal cost per line for margin tracking, or sell price only?
