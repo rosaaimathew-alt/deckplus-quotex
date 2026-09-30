@@ -201,10 +201,19 @@ Rule: slab under 200 SF → 30/SF instead of 17/SF.
 | TimberTech Vintage PVC | 33 | 33 |
 | TimberTech Vintage T&G | 40.15 | 40.15 |
 
+**Why LF, not SF (confirmed):** steps, landings and porch floors follow the
+deck tool's **decking-board logic** — quantities are linear feet of board from
+the takeoff (board lengths, no butt joints, spline rules), not area. Per-SF
+pricing rounds differently from the boards actually bought, and over a deep
+porch the gap grows to hundreds or thousands of dollars. So:
+- Porch floor upgrades, steps and landings are priced per **LF of decking board**
+  produced by the same takeoff the deck tool uses (treads = risers × stair width
+  × 2 boards; landings from their board layout, not a flat 16 SF).
+- The deck tool's current landing math (count × 16 SF) must move to LF too.
+
 ⚠ Trex Transcend steps (17.60) are far below its landing (30.80) and below
 Enhance steps (24.20) — **?** typo for 30.80?
 ⚠ TimberTech Prime is the only SF row; every other row is LF — **?** typo?
-**?** LF of what: step tread length (per riser) and landing perimeter/board LF?
 
 ### Railing (per LF)
 | Item | Price |
