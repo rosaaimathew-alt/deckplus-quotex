@@ -84,8 +84,9 @@ porch-conversion calculator** already in the quote builder:
 - Wall height over 105″ → one transom per window.
 - 36″ exit doors, on the front wall; rep chooses the count.
 - Enclosed walls: Front + 2 sides (default), All 4 walls, or Front only.
-- Per-unit rates come from Settings → Formulas (column, window, transom, door,
-  finishing), the same slice the conversion tool reads.
+- Per-unit rates come from Settings → Formulas (window, transom, door), the
+  same slice the conversion tool reads. **No "paint, seal & refinish" line** on
+  a new-build Eze-Breeze porch (that line stays on the conversion tool only).
 
 **?** Which base SF rate does the structure use: the Open porch rows, the
 ScreenEze rows, or its own column in the matrix?
