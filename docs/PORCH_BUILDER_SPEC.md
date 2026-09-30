@@ -95,8 +95,10 @@ windows, but only windows, transoms and doors are priced on top of the structure
 The existing **porch-conversion tool is unchanged**: it keeps calculating and
 pricing columns individually, because on a conversion the columns are new work.
 
-**?** Which base SF rate does the structure use: the Open porch rows, the
-ScreenEze rows, or its own column in the matrix?
+**Base rate (confirmed):** the structure uses the **Open porch rows** of the
+matrix for its tie-in and floor. The Eze-Breeze items are added on top:
+window units (750 each), transoms (130 each, when wall height > 105″), Larsen
+doors (per model), and the 6×6 laminated column package (2000 LS).
 
 ## Doors, windows, glass (per unit)
 
@@ -285,7 +287,6 @@ way the deck and porch-conversion scope templates work today.
 - Catalog ⚠ units: corbels (500/SF?), Trex Transcend steps (17.60?), TimberTech Prime (SF vs LF); what LF measures on steps/landings.
 - Flat ceiling: roof SF or floor SF?
 - Floor type "composite / PVC deck": base rate?
-- Eze-Breeze: which base SF rate row.
 - Pavilion / freestanding "extra electrical": which item and price?
 - Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
 - ScreenEze separate line on Wall tie / Patio: $3 or $5 per SF?
