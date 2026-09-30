@@ -5,9 +5,11 @@ the source of truth for the porch tool; the code follows this file. Anything
 marked **?** is still an open question. All rates are sell price unless noted.
 
 ## Primary cost drivers (in order)
-1. **Size** — width × depth of the porch, priced per square foot (SF).
-2. **Roof connection** — wall tie vs roof tie into the house.
-3. **Structure / floor** — what the porch sits on: PT deck vs patio (slab).
+1. **Size** — SF = floor area, width × depth. No minimum size or minimum job.
+2. **Roof connection** — wall tie vs roof tie into the house, or freestanding.
+3. **Structure / floor** — what the porch sits on. **"On PT deck" includes
+   building a new pressure-treated deck** under the porch. "On patio" is an
+   existing slab.
 
 ## Base rate matrix ($/SF of porch floor area)
 
@@ -51,24 +53,38 @@ Every add-on is a **fixed amount** except the three per-SF adders, the LVL
 | Roof cricket                                        | fixed    |   865 |
 | Seed and straw                                      | fixed    |   250 |
 
-### Dependency rules implied by the sheet
-- Any PT LVL line → add LVL engineering ($1000) automatically.
-- Metal bracing plates → require the bracing letter ($1250).
-- Hip roof → require a flat ceiling. **?** is the flat ceiling its own priced line.
-- Pavilion → extra LVL + extra electrical.
-- Gable width > 19′ → +$1000. **?** "wide" = dimension along the house wall.
+## Roof style rules (confirmed)
+
+| Roof  | Price                                                                  |
+| ----- | ---------------------------------------------------------------------- |
+| Shed  | base SF rate only (the standard roof)                                  |
+| Gable | base + **PT LVL × porch depth** (150/LF) + LVL engineering (1000 LS); if wider than 19′ also +1000 LS |
+| Hip   | base + 3000 LS + LVL engineering (1000 LS) + **required flat ceiling** |
+
+## Freestanding
+Freestanding is a tie-in choice: use the type/floor base rate and add the
+**Freestanding structure add, $7/SF**. The "Pavilion on patio" row (67/SF)
+equals the Open / Patio base rate, so a pavilion = Open porch, Patio, Freestanding.
+Pavilion rule still applies: extra LVL + extra electrical. **?** confirm.
+
+## Dependency rules
+- Any PT LVL line → LVL engineering (1000 LS) added automatically.
+- Metal bracing plates → bracing letter (1250 LS) required.
+- Hip roof → flat ceiling required.
+- Freestanding / pavilion → extra LVL + extra electrical.
+- Gable wider than 19′ → +1000 LS. **?** "wide" = the dimension along the house.
+
+## What the base rate includes (drives proposal scope text)
+Two different inclusion lists, one for **open porch** and one for **ScreenEze
+porch**. **?** lists to come.
 
 ## Open questions
-- Does "on PT deck" **include building a new PT deck**, or is it a porch on an
-  existing deck? If new, how is deck height handled beyond the 8′ adder?
-- Is SF the porch **floor area** (width × depth)? Any minimum SF or minimum job?
-- What is in the base rate: roofing, ceiling, standard electrical, screen,
-  doors, columns, footings, permit? What is always extra?
-- ScreenEze upcharge ($3/SF): the screen rows already say ScreenEze — is this
-  for ScreenEze over a standard spline screen, or something else?
-- Freestanding add ($7/SF) vs Pavilion row ($67/SF): when does each apply?
-- Roof style: gable vs shed vs hip — is gable/shed a choice with no price
-  difference, and hip the only priced one?
-- Which items does the **customer see** vs internal only?
-- Cost side: do you want internal cost (materials/sub) per line for margin
-  tracking, like the deck builder has?
+- Freestanding modelling above: correct? Does the pavilion's "extra LVL" mean a
+  PT LVL line for the porch **width**, or something else? Which electrical item?
+- Hip roof: is a PT LVL length (like gable's depth) also added, or only the
+  engineering fee? Does "flat ceiling" have its own price?
+- ScreenEze upcharge ($3/SF): the screen rows already say ScreenEze — when is it applied?
+- Gable > 19′: which dimension is "wide"?
+- Inclusion lists for open vs ScreenEze porches (for scope text).
+- Which items does the customer see vs internal only?
+- Cost side: internal cost per line for margin tracking, or sell price only?
