@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdBlock } from './supabase'
 import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
+import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 // Real data lives in Supabase as one row per record (see src/supabase.js).
@@ -67,8 +68,8 @@ export const DECK_COMPONENT_DEFAULTS = {
 // real numbers in Item Catalog → Formulas. Layout math lives in the builder.
 export const PORCH_COMPONENT_DEFAULTS = {
   column:    { label: 'Plates & 6×6 columns',       unit: 'EA', rate: 250,  cost: 150 },  // per column (plates rolled in)
-  window:    { label: 'Eze-Breeze window unit',     unit: 'EA', rate: 650,  cost: 420 },  // per window
-  transom:   { label: 'Transom unit (wall > 105″)', unit: 'EA', rate: 300,  cost: 190 },  // per transom
+  window:    { label: 'Eze-Breeze window unit',     unit: 'EA', rate: 750,  cost: 0 },    // per window (Deck Plus sheet)
+  transom:   { label: 'Transom unit (wall > 105″)', unit: 'EA', rate: 130,  cost: 0 },    // per transom (Deck Plus sheet)
   door:      { label: 'Exit / storm door (36″)',    unit: 'EA', rate: 900,  cost: 560 },  // per door
   finishing: { label: 'Paint, seal & refinish',     unit: 'LS', rate: 1500, cost: 800 },  // flat per porch
 }
@@ -285,6 +286,25 @@ export const useStore = create(
 
       porchScopeTemplate: PORCH_SCOPE_DEFAULT,
       setPorchScopeTemplate: (t) => set({ porchScopeTemplate: t }),
+
+      // ── Porch Builder (new-build open / ScreenEze / Eze-Breeze porches) ─────
+      // Rules in docs/PORCH_BUILDER_SPEC.md; engine in src/porchBuild.js.
+      // Rates are stored sparsely: only keys the office changed are kept, so new
+      // defaults still flow in and a rate the office set never gets overwritten.
+      porchBuildRates: {},
+      setPorchBuildRate: (key, changes) =>
+        set((s) => ({
+          porchBuildRates: {
+            ...(s.porchBuildRates || {}),
+            [key]: { ...PORCH_BUILD_DEFAULTS[key], ...(s.porchBuildRates?.[key] || {}), ...changes },
+          },
+        })),
+      porchBuildLocked: false,
+      setPorchBuildLocked: (locked) => set({ porchBuildLocked: !!locked }),
+      // Scope text per porch type: { open, screen, ezebreeze }
+      porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
+      setPorchBuildScope: (type, text) =>
+        set((s) => ({ porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS, ...(s.porchBuildScopes || {}), [type]: text } })),
 
       // ── Catalog categories (user-editable) ───────────────────────────────
       catalogCategories: [
@@ -1317,6 +1337,7 @@ const SETTINGS_DEFAULTS = () => ({
   deckScopeTemplate: DECK_SCOPE_DEFAULT, porchScopeTemplate: PORCH_SCOPE_DEFAULT,
   paymentScheduleLearning: {}, scopeExamples: [], historyImported: false, calendarHiddenJobs: [],
   contractPrefix: 'DP',
+  porchBuildRates: {}, porchBuildLocked: false, porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
 })
 const ID_COUNTERS = ['nextProposalId', 'nextCatalogId', 'nextTemplateId', 'nextScopeTemplateId', 'nextPaymentScheduleId', 'nextSubId']
 

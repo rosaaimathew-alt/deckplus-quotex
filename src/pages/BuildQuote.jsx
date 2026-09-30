@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader } from 'lucide-react'
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { parseBuildSpec } from '../buildParse'
+import PorchBuildPanel from '../components/PorchBuildPanel'
 
 const MARGIN_DEFAULT = 30
 
@@ -743,6 +744,8 @@ export default function BuildQuote() {
     const extra = []
     if (!catalogRaw.some(c => c.assembly === 'deck'))
       extra.push({ id: 'deck-builder', name: 'Deck — Build to Spec (formula)', category: 'Decks', assembly: 'deck', unit: 'EA', unitPrice: 0, description: 'Configure framing, decking, steps, landings, height and difficulty; price, cost and scope auto-calculate.' })
+    if (!catalogRaw.some(c => c.assembly === 'porchbuild'))
+      extra.push({ id: 'porch-build', name: 'Porch — Build to Spec (formula)', category: 'Screen Porches', assembly: 'porchbuild', unit: 'EA', unitPrice: 0, description: 'New open, ScreenEze or Eze-Breeze porch: size, roof connection, floor, roof style and options — price, cost and scope auto-calculate.' })
     if (!catalogRaw.some(c => c.assembly === 'porch'))
       extra.push({ id: 'porch-builder', name: 'Porch Conversion — Build to Spec (formula)', category: 'Screen Porches', assembly: 'porch', unit: 'EA', unitPrice: 0, description: 'Eze-Breeze porch conversion: enter width, depth, wall height and doors — windows, columns, transoms, price, cost and scope auto-calculate.' })
     return extra.length ? [...extra, ...catalogRaw] : catalogRaw
@@ -838,6 +841,7 @@ export default function BuildQuote() {
     // Formula/assembly items open their inline builder instead of adding a flat line.
     if (item.assembly === 'deck') { setActiveAssembly('deck'); return }
     if (item.assembly === 'porch') { setActiveAssembly('porch'); return }
+    if (item.assembly === 'porchbuild') { setActiveAssembly('porchbuild'); return }
     setLines(prev => {
       const existing = prev.find(l => l.catalogId === item.id)
       if (existing) return prev.map(l => l.catalogId === item.id ? { ...l, qty: l.qty + 1 } : l)
@@ -1258,6 +1262,13 @@ export default function BuildQuote() {
             initial={assemblyInitial}
             onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
             onAdd={line => { addAssemblyLine(line); setActiveAssembly(null); setAssemblyInitial(null) }}
+          />
+        )}
+        {activeAssembly === 'porchbuild' && (
+          <PorchBuildPanel
+            initial={assemblyInitial?.porchBuild || null}
+            onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
+            onAdd={newLines => { setLines(prev => [...prev, ...newLines]); setActiveAssembly(null); setAssemblyInitial(null) }}
           />
         )}
         {activeAssembly === 'porch' && (

@@ -77,6 +77,7 @@ export const SETTINGS_KEYS = [
   'deckFormulaLocked', 'porchFormulaLocked', 'deckScopeTemplate', 'porchScopeTemplate',
   'paymentScheduleLearning', 'scopeExamples', 'historyImported', 'calendarHiddenJobs',
   'contractPrefix',
+  'porchBuildRates', 'porchBuildLocked', 'porchBuildScopes',
 ]
 const TABLE_TO_KEY = Object.fromEntries(
   [...Object.entries(RECORD_TABLES), ...Object.entries(MAP_TABLES)].map(([k, t]) => [t, k])

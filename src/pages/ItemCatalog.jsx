@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { runOverCatalog } from '../aiCatalog'
+import PorchBuildFormulaCard from '../components/PorchBuildFormulas'
 
 const AI_CHAT_SYSTEM = `You are a pricing catalog assistant for a contractor estimating tool called QUOTEX.
 Your job is to help contractors bulk-edit their pricing catalog using plain English commands.
@@ -540,6 +541,7 @@ function FormulasView() {
   return (
     <div className="space-y-6">
       <FormulaCard {...deck} />
+      <PorchBuildFormulaCard />
       <FormulaCard {...porch} />
     </div>
   )

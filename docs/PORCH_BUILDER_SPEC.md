@@ -4,6 +4,12 @@ Notes captured while Deck Plus explains how porches are priced. Rules here are
 the source of truth for the porch tool; the code follows this file. Anything
 marked **?** is still an open question. All rates are sell price unless noted.
 
+## Where it lives in the code
+- `src/porchBuild.js` — rate defaults, Eze-Breeze layout math, `computePorchBuild()`, `buildPorchScope()`.
+- `src/components/PorchBuildPanel.jsx` — the builder the rep uses (Build Quote → catalog → "Porch — Build to Spec").
+- `src/components/PorchBuildFormulas.jsx` — Item Catalog → Tools: every rate with price/cost, lock, per-type scope text.
+- Store slices `porchBuildRates` (only edited keys), `porchBuildLocked`, `porchBuildScopes`; persisted in `org_settings`.
+
 ## Primary cost drivers (in order)
 1. **Size** — SF = floor area, width × depth. No minimum size or minimum job.
 2. **Roof connection** — wall tie vs roof tie into the house, or freestanding.
