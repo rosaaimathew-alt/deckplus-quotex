@@ -94,6 +94,45 @@ ScreenEze rows, or its own column in the matrix?
 prices a column line. Count columns once (structure) and price only windows,
 transoms, doors and finishing on top — or keep the column line?
 
+## Doors, windows, glass (per unit)
+
+| Item                                         | Each |
+| -------------------------------------------- | ---: |
+| Larsen Tradewinds door                       |  750 |
+| Larsen Tradewinds Premium door               |  850 |
+| Larsen Savannah door                         |  650 |
+| Larsen Savannah Pet door                     |  815 |
+| Glass in openings — **gable porches only**   |  975 |
+| Eze-Breeze window unit                       |  750 |
+| Transom                                      |  130 |
+
+- The rep picks a **door model** and a count; each door is one line.
+- Eze-Breeze unit 750 and transom 130 replace the conversion tool's
+  placeholder rates (650 / 300) in Settings → Formulas.
+- "Glass in openings" is only offered when the roof is gable. **?** what an
+  "opening" is here (the gable-end triangles?) and how the count is chosen.
+- **?** Are the Larsen doors the door choices for ScreenEze porches, Eze-Breeze
+  porches, or both? Does the conversion tool's generic "exit / storm door"
+  (900) get replaced by this list?
+
+## Painting / staining
+
+| Item                                           | Unit   | Price |
+| ---------------------------------------------- | ------ | ----: |
+| Paint/stain porch on patio                     | per SF |    12 |
+| Paint/stain porch on upgraded composite/PVC deck | per SF |  14 |
+| Paint/stain porch on PT deck                   | per SF |    15 |
+| Paint/stain PT deck (deck only)                | per SF |    13 |
+| Paint/stain Trex deck, hybrid rail             | per LF |  8.12 |
+| Paint/stain Trex deck, Trex rail               | per LF |  6.16 |
+
+- Porch painting is an optional add-on; the rate follows the **floor type**
+  automatically (patio / composite-PVC deck / PT deck) × porch floor SF.
+- **?** "Upgraded composite or PVC deck" appears here as a floor type but not
+  in the base rate matrix — is it a third floor option, and what is its base
+  rate (or is it PT deck rate + a decking upgrade line)?
+- **?** Trex rail painting per LF: LF of railing? Applies to the deck tool too?
+
 ## ScreenEze shown separately
 The ScreenEze upcharge ($3/SF) is a **presentation option**: when the customer
 wants to see the screen cost on its own line, price the porch as an Open porch
@@ -115,6 +154,8 @@ placeholder scope text that the office edits in Settings → Formulas, the same
 way the deck and porch-conversion scope templates work today.
 
 ## Open questions
+- Doors: which porch types use the Larsen list; what "glass in openings" counts.
+- Floor type "composite / PVC deck": base rate?
 - Eze-Breeze: base SF rate row, and whether columns are priced again (see above).
 - Pavilion / freestanding "extra electrical": which item and price?
 - Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
