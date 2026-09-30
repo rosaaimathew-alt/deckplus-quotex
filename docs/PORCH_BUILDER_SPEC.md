@@ -109,8 +109,10 @@ transoms, doors and finishing on top — or keep the column line?
 - The rep picks a **door model** and a count; each door is one line.
 - Eze-Breeze unit 750 and transom 130 replace the conversion tool's
   placeholder rates (650 / 300) in Settings → Formulas.
-- "Glass in openings" is only offered when the roof is gable. **?** what an
-  "opening" is here (the gable-end triangles?) and how the count is chosen.
+- **"Glass in openings" = glazing the gable ends.** Offered only when the roof
+  is gable; the rep enters the count of gable ends to glaze (typically 1 or 2).
+  The actual glass size depends on roof pitch but the price is a flat 975 per
+  end regardless — pitch is not an input.
 - **Confirmed:** the Larsen door list is the door choice for **both** ScreenEze
   and Eze-Breeze porches. The porch-conversion tool's generic "exit / storm
   door" (900) is replaced by the same list.
@@ -277,7 +279,6 @@ way the deck and porch-conversion scope templates work today.
 ## Open questions
 - Catalog ⚠ units: corbels (500/SF?), Trex Transcend steps (17.60?), TimberTech Prime (SF vs LF); what LF measures on steps/landings.
 - Flat ceiling: roof SF or floor SF?
-- Doors: what "glass in openings" counts (gable only).
 - Floor type "composite / PVC deck": base rate?
 - Eze-Breeze: base SF rate row, and whether columns are priced again (see above).
 - Pavilion / freestanding "extra electrical": which item and price?
