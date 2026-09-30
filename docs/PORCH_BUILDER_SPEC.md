@@ -162,8 +162,8 @@ Flat ceiling at $5/SF is the line the hip roof requires; roof SF vs floor SF **?
 ### Flooring upgrades
 | Item | Unit | Price |
 | --- | --- | ---: |
-| Trex Enhance upgrade | per LF | 3.85 |
-| Trex Transcend upgrade | per LF | 8.80 |
+| Trex Enhance porch floor upgrade | per LF | 3.85 |
+| Trex Transcend porch floor upgrade | per LF | 8.80 |
 | PT plywood | per SF | 4.50 |
 | LVT flooring only | per SF | 26 |
 | LVT on concrete | per SF | 23 |
@@ -171,9 +171,9 @@ Flat ceiling at $5/SF is the line the hip roof requires; roof SF vs floor SF **?
 | Tile flooring on deck | per SF | 36 |
 | Tile with plywood / membrane upgrade | per SF | 44 |
 
-Trex upgrades are per LF of decking board, matching how the deck tool prices
-decking collections. **?** confirm they are upgrades over the PT deck floor
-included in the "on PT deck" base.
+Trex porch-floor upgrades are per LF of decking board over the PT floor
+included in the "on PT deck" base, matching how the deck tool prices decking
+collections.
 
 ### Concrete
 | Item | Unit | Price |
@@ -185,23 +185,26 @@ included in the "on PT deck" base.
 
 Rule: slab under 200 SF → 30/SF instead of 17/SF.
 
-### Steps and landings
-| Product | Steps | Landing | Unit |
-| --- | ---: | ---: | --- |
-| PT wood | 33 | 33 | per SF |
-| Trex Enhance ⚠ | 24.20 | 24.20 | per LF (sheet) |
-| Trex Transcend | 61.60 | 61.60 | per SF |
-| Trex Lineage | 61.60 | 61.60 | per SF |
-| Trex Signature | 73.70 | 73.70 | per SF |
-| TimberTech Prime / Prime+ | 48.40 | 48.40 | per SF |
-| TimberTech Terrain / Terrain+ | 52.80 | 52.80 | per SF |
-| TimberTech Reserve | 56.10 | 56.10 | per SF |
-| TimberTech Harvest PVC | 62.70 | 62.70 | per SF |
-| TimberTech Landmark PVC | 62.70 | 62.70 | per SF |
-| TimberTech Vintage PVC | 66 | 66 | per SF |
-| TimberTech Vintage T&G | 80.30 | 80.30 | per SF |
+### Steps and landings (per LF)
+| Product | Steps | Landing |
+| --- | ---: | ---: |
+| PT wood | 17.50 | 17.50 |
+| Trex Enhance | 24.20 | 24.20 |
+| Trex Transcend ⚠ | 17.60 | 30.80 |
+| Trex Lineage | 30.80 | 30.80 |
+| Trex Signature | 30.80 | 36.85 |
+| TimberTech Prime / Prime+ ⚠ | 24.20 (sheet says SF) | 24.20 (sheet says SF) |
+| TimberTech Terrain / Terrain+ | 26.40 | 26.40 |
+| TimberTech Reserve | 28.05 | 28.05 |
+| TimberTech Harvest PVC | 29.50 | 29.50 |
+| TimberTech Landmark PVC | 31.35 | 31.35 |
+| TimberTech Vintage PVC | 33 | 33 |
+| TimberTech Vintage T&G | 40.15 | 40.15 |
 
-⚠ Trex Enhance is the only row in LF; every other row is SF. **?** typo?
+⚠ Trex Transcend steps (17.60) are far below its landing (30.80) and below
+Enhance steps (24.20) — **?** typo for 30.80?
+⚠ TimberTech Prime is the only SF row; every other row is LF — **?** typo?
+**?** LF of what: step tread length (per riser) and landing perimeter/board LF?
 
 ### Railing (per LF)
 | Item | Price |
@@ -263,7 +266,7 @@ placeholder scope text that the office edits in Settings → Formulas, the same
 way the deck and porch-conversion scope templates work today.
 
 ## Open questions
-- Catalog ⚠ units: corbels (500/SF?), Trex Enhance steps (LF vs SF).
+- Catalog ⚠ units: corbels (500/SF?), Trex Transcend steps (17.60?), TimberTech Prime (SF vs LF); what LF measures on steps/landings.
 - Flat ceiling: roof SF or floor SF?
 - Doors: which porch types use the Larsen list; what "glass in openings" counts.
 - Floor type "composite / PVC deck": base rate?
