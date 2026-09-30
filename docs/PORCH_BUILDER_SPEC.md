@@ -299,6 +299,12 @@ Each group is one line with one price on the proposal; the itemized detail
 stays in the builder for the office. Empty groups are omitted. The existing
 itemized / lump-sum display toggle still applies on top of this.
 
+## Internal cost (confirmed)
+Every rate carries a **cost field next to the sell price**, like the deck tool,
+so the office sees margin per line. Costs are **not known yet**: all cost
+fields start at 0 and the office fills them in Settings → Formulas later.
+Margin displays read "cost not set" rather than 100% while a cost is 0.
+
 ## Open questions
 - Catalog ⚠ units: corbels (500/SF?), Trex Transcend steps (17.60?), TimberTech Prime (SF vs LF); what LF measures on steps/landings.
 - Flat ceiling: roof SF or floor SF?
@@ -307,4 +313,3 @@ itemized / lump-sum display toggle still applies on top of this.
 - Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
 - ScreenEze separate line on Wall tie / Patio: $3 or $5 per SF?
 - Inclusion lists for open vs ScreenEze porches (for scope text).
-- Cost side: internal cost per line for margin tracking, or sell price only?
