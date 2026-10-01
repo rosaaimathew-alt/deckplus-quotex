@@ -50,7 +50,7 @@ Every add-on is a **fixed amount** except the three per-SF adders, the LVL
 | PT LVL (framing)                                    | per LF   |   150 |
 | Engineered metal bracing plate (per post; add letter)| per post|   750 |
 | 6×6 laminated column package                        | fixed    |  2000 |
-| Gable wider than 19′ add                            | fixed    |  1000 |
+| Gable / semi-vaulted wider than 19′ add             | fixed    |  1000 |
 | Reinforce deck for hot tub / porch                  | fixed    |  2000 |
 | LVL engineering (required on every LVL project)     | fixed    |  1000 |
 | Engineered metal bracing letter                     | fixed    |  1250 |
@@ -65,6 +65,7 @@ Every add-on is a **fixed amount** except the three per-SF adders, the LVL
 | ----- | ---------------------------------------------------------------------- |
 | Shed  | base SF rate only (the standard roof)                                  |
 | Gable | base + **PT LVL × porch depth** (150/LF) + LVL engineering (1000 LS); if wider than 19′ (along the house wall) also +1000 LS |
+| Semi Vaulted | base; if wider than 19′ (along the house wall) +1000 LS — the same flat fee as a gable |
 | Hip   | base + 3000 LS + **PT LVL × porch depth** (150/LF) + LVL engineering (1000 LS) + **required flat ceiling** |
 
 Hip: the LVL and engineering are in addition to the 3000 (to be double-checked).
@@ -273,12 +274,11 @@ Most of the steps, railing, fascia and deck-upgrade prices also belong to the
 **deck tool**, whose Formulas rates are still placeholders. Plan: load them
 into one shared price list both tools read, so a number is entered once.
 
-## ScreenEze shown separately
-The ScreenEze upcharge ($3/SF) is a **presentation option**: when the customer
-wants to see the screen cost on its own line, price the porch as an Open porch
-and add a "ScreenEze screens" line at $3/SF. Note: the matrix difference
-screen − open is $3/SF except Wall tie on Patio, where it is $5/SF (72 vs 67).
-**?** which number wins in that one case.
+## ScreenEze screens
+**Confirmed:** a ScreenEze porch is priced at the Screen porch base rate above
+**plus** a separate "ScreenEze screens" line at $3/SF of porch floor area,
+always shown on its own line. (This replaced the earlier "shown separately"
+option, which re-priced the porch as an Open porch + screens.)
 
 ## Dependency rules
 - Any PT LVL line → LVL engineering (1000 LS) added automatically.
@@ -286,7 +286,7 @@ screen − open is $3/SF except Wall tie on Patio, where it is $5/SF (72 vs 67).
 - Hip roof → flat ceiling required.
 - Freestanding → gable roof forced → LVL + engineering.
 - Eze-Breeze porch → 6×6 laminated column package (2000 LS) added automatically.
-- Gable wider than 19′ (dimension along the house) → +1000 LS.
+- Gable or Semi Vaulted wider than 19′ (dimension along the house) → +1000 LS.
 
 ## What the base rate includes (drives proposal scope text)
 Two different inclusion lists, one for **open porch** and one for **ScreenEze
@@ -300,7 +300,7 @@ The proposal shows a **short list of grouped lines**, not every internal rule:
 | Group | Contains |
 | --- | --- |
 | Porch structure | base SF rate × area, freestanding add, deck-height add, roof-style adders (LVL, engineering, hip, gable > 19′), reinforce / bracing / wrap / cricket / seed & straw |
-| Enclosure | ScreenEze line (when shown separately), Eze-Breeze windows, transoms, doors, glass in gable ends, 6×6 lam column package |
+| Enclosure | ScreenEze screens line, Eze-Breeze windows, transoms, doors, glass in gable ends, 6×6 lam column package |
 | Roof & ceiling options | metal roof / membrane, T&G / flat / coffered ceiling, skylights, faux beams, dormer, gable trim, corbels |
 | Walls & finishes | shiplap, knee wall, TV wall, paint / stain |
 | Flooring | Trex porch floor upgrades, LVT, tile, PT plywood, concrete |
@@ -322,5 +322,4 @@ Margin displays read "cost not set" rather than 100% while a cost is 0.
 - Floor type "composite / PVC deck": base rate?
 - Pavilion / freestanding "extra electrical": which item and price?
 - Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
-- ScreenEze separate line on Wall tie / Patio: $3 or $5 per SF?
 - Inclusion lists for open vs ScreenEze porches (for scope text).

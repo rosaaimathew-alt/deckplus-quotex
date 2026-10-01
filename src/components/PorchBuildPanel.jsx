@@ -149,7 +149,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
           )}
         </Field>
         <Field label="Roof connection"><Seg options={PORCH_TIES} value={inp.tie} onChange={v => set({ tie: v, roof: v === 'free' ? 'gable' : inp.roof })} /></Field>
-        <Field label="Roof style" hint={inp.tie === 'free' ? 'Freestanding porches are always gable.' : result.roof !== 'shed' ? 'Adds PT LVL for the depth + LVL engineering.' : undefined}>
+        <Field label="Roof style" hint={inp.tie === 'free' ? 'Freestanding porches are always gable.' : result.roof === 'gable' || result.roof === 'hip' ? 'Adds PT LVL for the depth + LVL engineering.' : result.roof === 'semivault' ? 'Over 19′ wide adds the same flat fee as a gable.' : undefined}>
           <Seg options={PORCH_ROOFS} value={result.roof} onChange={v => set({ roof: v })} disabledKeys={inp.tie === 'free' ? ['shed', 'hip'] : []} />
         </Field>
       </div>
@@ -159,7 +159,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
         <div className="rounded-xl border border-gray-200 p-4 space-y-3">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Enclosure</p>
           {inp.type === 'screen' && (
-            <Check label="Show ScreenEze screens as a separate line (prices the structure as an open porch + screens)" checked={inp.screenSeparate} onChange={v => set({ screenSeparate: v })} />
+            <p className="text-xs text-gray-500">ScreenEze screens are added as their own line at the Builder rate per SF of porch, on top of the screen-porch price.</p>
           )}
           {inp.type === 'ezebreeze' && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

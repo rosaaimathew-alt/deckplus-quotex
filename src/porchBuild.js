@@ -42,7 +42,7 @@ export const PORCH_BUILD_DEFAULTS = {
   deck_over_8:        R('Deck above 8′ high add',                          'SF', 5,    'structure'),
   pt_lvl:             R('PT LVL framing (porch depth)',                     'LF', 150,  'structure'),
   lvl_engineering:    R('LVL engineering (every LVL project)',              'LS', 1000, 'structure'),
-  gable_over_19:      R('Gable wider than 19′ add',                        'LS', 1000, 'structure'),
+  gable_over_19:      R('Gable / semi-vaulted wider than 19′ add',         'LS', 1000, 'structure'),
   hip_roof:           R('Hip roof',                                         'LS', 3000, 'structure'),
   hot_tub_reinforce:  R('Reinforce deck for hot tub / porch',               'LS', 2000, 'structure'),
   bracing_plate:      R('Engineered metal bracing plate (per post)',        'EA', 750,  'structure'),
@@ -52,7 +52,7 @@ export const PORCH_BUILD_DEFAULTS = {
   seed_straw:         R('Seed and straw',                                   'LS', 250,  'structure'),
 
   // Enclosure
-  screeneze_upcharge: R('ScreenEze screens (shown separately)',             'SF', 3,    'enclosure'),
+  screeneze_upcharge: R('ScreenEze screens',                               'SF', 3,    'enclosure'),
   lam_column_pkg:     R('6×6 laminated column package',                     'LS', 2000, 'enclosure'),
   eze_window:         R('Eze-Breeze window unit',                           'EA', 700,  'enclosure'),
   eze_transom:        R('Eze-Breeze transom (wall over 105″)',              'EA', 130,  'enclosure'),
@@ -195,6 +195,7 @@ export const PORCH_FLOORS = [
 export const PORCH_ROOFS  = [
   { key: 'shed',  label: 'Shed (standard)' },
   { key: 'gable', label: 'Gable' },
+  { key: 'semivault', label: 'Semi Vaulted' },
   { key: 'hip',   label: 'Hip' },
 ]
 
@@ -234,7 +235,6 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   width: 16, depth: 14,                 // ft; width runs along the house wall
   type: 'screen', tie: 'wall', floor: 'deck', roof: 'shed',
   deckHeightFt: 3,                      // only when floor = deck
-  screenSeparate: false,                // ScreenEze porch shown as open + screens line
   wallHeightIn: 96, sides: 'Front + 2 sides',   // Eze-Breeze layout
   doors: {},                            // { door_key: qty }
   glassEnds: 0,                         // gable roofs only
@@ -270,14 +270,15 @@ export function computePorchBuild(input, ratesIn) {
     const r = rates[key] || PORCH_BUILD_DEFAULTS[key]
     if (!r || !(qty > 0)) return
     const q = Math.round(qty * 100) / 100
-    lines.push({ key, label: r.label, unit: r.unit, qty: q, rate: n(r.rate), cost: n(r.cost),
+    // Labels aren't editable in Formulas — always use the current wording
+    lines.push({ key, label: PORCH_BUILD_DEFAULTS[key]?.label || r.label, unit: r.unit, qty: q, rate: n(r.rate), cost: n(r.cost),
                  total: q * n(r.rate), costTotal: q * n(r.cost), group: r.group, note })
   }
 
   // Freestanding forces a gable roof (confirmed rule).
   const tie  = inp.tie
   const roof = tie === 'free' ? 'gable' : inp.roof
-  const typeForBase = (inp.type === 'ezebreeze' || (inp.type === 'screen' && inp.screenSeparate)) ? 'open' : inp.type
+  const typeForBase = inp.type === 'ezebreeze' ? 'open' : inp.type
   const tieForBase  = tie === 'free' ? 'wall' : tie
   add(`base_${typeForBase}_${tieForBase}_${inp.floor}`, area)
 
@@ -289,7 +290,8 @@ export function computePorchBuild(input, ratesIn) {
     add('pt_lvl', D, 'porch depth')
     add('lvl_engineering', 1)
   }
-  if (roof === 'gable' && W > 19) add('gable_over_19', 1)
+  // Same over-19′ flat fee for gable and semi-vaulted roofs
+  if ((roof === 'gable' || roof === 'semivault') && W > 19) add('gable_over_19', 1)
   if (roof === 'hip') {
     add('hip_roof', 1)
     add('flat_ceiling', area, 'required with hip roof')
@@ -298,7 +300,9 @@ export function computePorchBuild(input, ratesIn) {
   // Enclosure
   const doorQty = Object.values(inp.doors || {}).reduce((s, q) => s + n(q), 0)
   let layout = null
-  if (inp.type === 'screen' && inp.screenSeparate) add('screeneze_upcharge', area)
+  // ScreenEze porches: screens are charged on their own line, on top of the
+  // screen-porch base rate
+  if (inp.type === 'screen') add('screeneze_upcharge', area)
   if (inp.type === 'ezebreeze') {
     layout = porchLayout(W, D, { doors: doorQty, sides: inp.sides })
     add('lam_column_pkg', 1)
@@ -373,7 +377,7 @@ export function buildPorchScope(input, result, templates) {
   out.push(`Build a ${n(inp.width)}′ × ${n(inp.depth)}′ ${typeLabel.toLowerCase()} (${result.area} SF)${inp.floor === 'deck' ? ` on a new pressure-treated deck${n(inp.deckHeightFt) ? ` approximately ${n(inp.deckHeightFt)}′ above grade` : ''}` : ' on the existing patio'}.`)
   out.push(inp.tie === 'free'
     ? 'Freestanding structure with a gable roof.'
-    : `${result.roof === 'hip' ? 'Hip' : result.roof === 'gable' ? 'Gable' : 'Shed'} roof, ${inp.tie === 'roof' ? 'tied into the existing house roof' : 'tied to the house wall'}.`)
+    : `${PORCH_ROOFS.find(r => r.key === result.roof)?.label.replace(/ \(.*\)$/, '') || 'Shed'} roof, ${inp.tie === 'roof' ? 'tied into the existing house roof' : 'tied to the house wall'}.`)
   out.push(...String(tpl).split('\n').map(s => s.trim()).filter(Boolean))
   if (result.layout) {
     out.push(`Enclose with ${result.layout.totalWindows} Eze-Breeze window unit${result.layout.totalWindows !== 1 ? 's' : ''} between ${result.layout.totalColumns} laminated 6×6 columns.`)
