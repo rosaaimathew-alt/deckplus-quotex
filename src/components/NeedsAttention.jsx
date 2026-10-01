@@ -1,17 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, Clock, Info, CheckCircle2, ArrowRight, ChevronDown } from 'lucide-react'
+import { CheckCircle2, ArrowRight, ChevronDown } from 'lucide-react'
 
 // ── "Needs your attention" ───────────────────────────────────────────────────
 // The first thing on Home: a short, ranked list of what to do next, each with
 // one button that goes straight to the right place. Nothing to do → a calm
 // "all caught up". Items come from src/lib/attention.js.
 
-const TONE = {
-  alert: { icon: AlertCircle, dot: 'bg-red-500',   ring: 'text-red-600 bg-red-50' },
-  warn:  { icon: Clock,       dot: 'bg-amber-500', ring: 'text-amber-600 bg-amber-50' },
-  info:  { icon: Info,        dot: 'bg-sky-500',   ring: 'text-[var(--brand-600)] bg-[var(--brand-50)]' },
-}
+const DOT = { alert: 'bg-red-500', warn: 'bg-amber-500', info: 'bg-[var(--brand-400)]' }
 
 export default function NeedsAttention({ items, limit = 5, title = 'Needs your attention' }) {
   const navigate = useNavigate()
@@ -33,39 +29,35 @@ export default function NeedsAttention({ items, limit = 5, title = 'Needs your a
 
   return (
     <section className="bg-white rounded-xl border border-gray-200 overflow-hidden" aria-label={title}>
-      <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+      <div className="px-5 py-3.5 flex items-center gap-2">
         <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <span className="text-xs text-gray-400">{items.length} thing{items.length !== 1 ? 's' : ''}</span>
+        <span className="text-[11px] font-semibold rounded-full px-1.5 min-w-[18px] text-center bg-amber-400 text-white">{items.length}</span>
       </div>
-      <ul className="divide-y divide-gray-100">
+      <ul className="border-t border-gray-100 divide-y divide-gray-100">
         {shown.map(it => {
-          const t = TONE[it.tone] || TONE.info
-          const Icon = t.icon
           const expanded = open === it.key
           const names = it.people || []
+          const toggle = () => setOpen(expanded ? null : it.key)
           return (
             <li key={it.key}>
               <div className="flex items-center gap-3 px-5 py-3">
-                <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${t.ring}`}><Icon size={16} /></span>
-                <button className="flex-1 min-w-0 text-left" onClick={() => names.length ? setOpen(expanded ? null : it.key) : navigate(it.to)}>
-                  <p className="text-sm font-medium text-gray-900">{it.title}</p>
+                <span className={`w-2 h-2 rounded-full shrink-0 self-start mt-2 ${DOT[it.tone] || DOT.info}`} />
+                <button className="flex-1 min-w-0 text-left group" onClick={() => names.length ? toggle() : navigate(it.to)}>
+                  <p className="text-sm font-medium text-gray-900 leading-snug flex items-center gap-1">
+                    <span>{it.title}</span>
+                    {names.length > 0 && <ChevronDown size={14} className={`shrink-0 text-gray-300 group-hover:text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />}
+                  </p>
                   <p className="text-xs text-gray-500 truncate">
                     {names.length ? names.slice(0, 3).map(n => n.name).join(', ') + (names.length > 3 ? ` +${names.length - 3} more` : '') : it.detail}
                   </p>
                 </button>
-                {names.length > 0 && (
-                  <button onClick={() => setOpen(expanded ? null : it.key)} aria-label={expanded ? 'Hide names' : 'Show names'}
-                    className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100 hidden sm:block">
-                    <ChevronDown size={15} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
-                  </button>
-                )}
                 <button onClick={() => navigate(it.to)}
-                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-700 hover:border-[var(--brand-400)] hover:text-[var(--brand-700)] transition-colors">
+                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--brand-700)] bg-[var(--brand-50)] hover:bg-[var(--brand-100)] transition-colors">
                   {it.cta} <ArrowRight size={12} />
                 </button>
               </div>
               {expanded && (
-                <div className="px-5 pb-3 -mt-1 pl-16">
+                <div className="px-5 pb-3 -mt-1 pl-10">
                   <p className="text-xs text-gray-400 mb-1.5">{it.detail}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {names.slice(0, 12).map((n, i) => (
