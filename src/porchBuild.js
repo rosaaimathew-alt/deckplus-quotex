@@ -58,7 +58,6 @@ export const PORCH_BUILD_DEFAULTS = {
   eze_window:         R('Eze-Breeze window unit',                           'EA', 700,  'enclosure'),
   eze_transom:        R('Eze-Breeze transom (wall over 105″)',              'EA', 130,  'enclosure'),
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
-  door_tradewinds_premium: R('Larsen Tradewinds Premium door',              'EA', 850,  'enclosure', { door: true }),
   door_savannah:      R('Larsen Savannah door',                             'EA', 650,  'enclosure', { door: true }),
   door_savannah_pet:  R('Larsen Savannah Pet door',                         'EA', 815,  'enclosure', { door: true }),
   glass_gable_end:    R('Glass in gable end (gable roofs only)',            'EA', 975,  'enclosure'),

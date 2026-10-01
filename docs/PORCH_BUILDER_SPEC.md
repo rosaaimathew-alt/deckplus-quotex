@@ -112,7 +112,6 @@ doors (per model), and the 6×6 laminated column package (2000 LS).
 | Item                                         | Each |
 | -------------------------------------------- | ---: |
 | Larsen Tradewinds door                       |  750 |
-| Larsen Tradewinds Premium door               |  850 |
 | Larsen Savannah door                         |  650 |
 | Larsen Savannah Pet door                     |  815 |
 | Glass in openings — **gable porches only**   |  975 |
