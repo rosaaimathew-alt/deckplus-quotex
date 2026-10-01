@@ -4,6 +4,7 @@ import { Search, Plus, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, BookTemplate
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { parseBuildSpec } from '../buildParse'
 import PorchBuildPanel from '../components/PorchBuildPanel'
+import UnderDeckPanel from '../components/UnderDeckPanel'
 
 const MARGIN_DEFAULT = 30
 
@@ -106,7 +107,10 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const [depth, setDepth]       = useState(initial?.depth ?? 16)
   const [height, setHeight]     = useState(initial?.height ?? 3)      // ft above grade
   const [stairWidth, setStairWidth] = useState(4)  // ft, 1-ft increments
-  const [landings, setLandings] = useState(0)
+  // Each landing is sized by the rep on site (W × D ft)
+  const [landingList, setLandingList] = useState(() =>
+    Array.from({ length: Number(initial?.landings) || 0 }, (_, i) => ({ id: i + 1, width: 4, depth: 4 })))
+  const [boxSteps, setBoxSteps] = useState(initial?.boxSteps ?? 0)
   const [brand, setBrand]       = useState(seeded?.brand || brandNames[0])
   const [collection, setCollection] = useState(seeded?.collection || Object.keys(brands[seeded?.brand || brandNames[0]] || {})[0])
   const [difficulty, setDifficulty] = useState('Standard')
@@ -117,7 +121,9 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const [extraSections, setExtraSections] = useState(initial?.extraSections ?? [])
 
   const n = (v) => Number(v) || 0
-  const W = n(width), D = n(depth), Hft = n(height), SW = n(stairWidth), LA = n(landings)
+  const W = n(width), D = n(depth), Hft = n(height), SW = n(stairWidth), LA = landingList.length, BX = n(boxSteps)
+  const landingSF = landingList.reduce((s, l) => s + n(l.width) * n(l.depth), 0)
+  const ftIn = (v) => `${n(v)}′`
   // Each attached section adds its own area (framing + decking) and its exposed
   // edges (railing + fascia). Width = the side meeting the deck (not exposed);
   // the net added edge is the far end + two sides − the shared edge = 2 × depth.
@@ -177,7 +183,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
       case 'stairs':     return unit === 'EA' ? stepCount : unit === 'LF' ? treadLF : unit === 'SF' ? 1 : 1
       case 'treads':     return unit === 'LF' ? treadDeckingLF : unit === 'EA' ? stepCount * DECK_TREAD_BOARDS : 1  // decking on stair treads
       case 'railing':    return unit === 'LF' ? perimeter : unit === 'EA' ? 4 : 1
-      case 'landing':    return unit === 'EA' ? LA : unit === 'SF' ? LA * 16 : 1
+      case 'landing':    return unit === 'EA' ? LA : unit === 'SF' ? landingSF : unit === 'LF' ? landingSF * (12 / DECK_BOARD_FACE_IN) : 1
+      case 'boxstep':    return unit === 'EA' ? BX : 1
       case 'border':     return unit === 'LF' ? borderLF : unit === 'EA' ? borderCourses : 1
       case 'blocking':   return unit === 'LF' ? perimeter : 1
       case 'borderlabor':return unit === 'LF' ? borderLF : 1
@@ -202,7 +209,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
     { key: 'stairs',     label: 'Stairs (framing per step)', unit: r('stairs').unit, rate: r('stairs').rate, cost: r('stairs').cost, qty: null, fromRates: true },
     { key: 'treads',     label: 'Stair tread decking',       unit: 'LF', rate: brandRate, cost: brandCost, qty: null, fromBrand: true, stepOnly: true },
     { key: 'railing',    label: 'Railing',            unit: r('railing').unit, rate: r('railing').rate, cost: r('railing').cost, qty: null, fromRates: true },
-    { key: 'landing',    label: 'Landing',            unit: r('landing').unit, rate: r('landing').rate, cost: r('landing').cost, qty: null, fromRates: true },
+    { key: 'landing',    label: 'Landings',           unit: r('landing').unit, rate: r('landing').rate, cost: r('landing').cost, qty: null, fromRates: true, landingOnly: true },
+    { key: 'boxstep',    label: 'Box steps',          unit: r('boxstep').unit, rate: r('boxstep').rate, cost: r('boxstep').cost, qty: null, fromRates: true, boxOnly: true },
     { key: 'risers',     label: 'Step fascia — fronts + sides (16′ boards)', unit: 'EA', rate: fasciaRate, cost: fasciaCost, qty: null, stepOnly: true, fromFascia: true },
     { key: 'fascia',     label: 'Rim fascia — 3 sides (16′ boards)',         unit: 'EA', rate: fasciaRate, cost: fasciaCost, qty: null, fasciaOnly: true, fromFascia: true },
     { key: 'border',     label: 'Border decking',         unit: 'LF', rate: brandRate, cost: brandCost, qty: null, fromBrand: true, borderOnly: true },
@@ -253,7 +261,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
     setComps(cs => cs.map(c => c.key === 'difficulty' ? { ...c, rate: DECK_DIFFICULTY_FLAT[difficulty] ?? 0 } : c))
   }, [difficulty])
 
-  const rows = comps.filter(c => (!c.borderOnly || borderCourses > 0) && (!c.splineOnly || splines > 0) && (!c.stepOnly || stepCount > 0) && (!c.fasciaOnly || fasciaOn)).map(c => {
+  const rows = comps.filter(c => (!c.borderOnly || borderCourses > 0) && (!c.splineOnly || splines > 0) && (!c.stepOnly || stepCount > 0) && (!c.fasciaOnly || fasciaOn)
+    && (!c.landingOnly || LA > 0) && (!c.boxOnly || BX > 0)).map(c => {
     const qty  = c.qty != null ? c.qty : autoQty(c.key, c.unit)
     return { ...c, qty, line: qty * c.rate, lineCost: qty * c.cost }
   })
@@ -277,7 +286,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
     if (fasciaOn)          lines.push('Wrap the deck rim and step risers in matching 1×12 fascia.')
     if (stepCount > 0)     lines.push(`Build a ${stepCount}-step staircase, ${SW}′ wide, with matching fascia risers and skirt boards.`)
     if (railQty > 0)       lines.push('Install hybrid composite railing system.')
-    if (LA > 0)            lines.push(`Build ${LA} landing${LA > 1 ? 's' : ''}.`)
+    if (LA > 0)            lines.push(`Build ${LA} landing${LA > 1 ? 's' : ''} (${landingList.map(l => `${ftIn(l.width)}×${ftIn(l.depth)}`).join(', ')}).`)
+    if (BX > 0)            lines.push(`Build ${BX} box step${BX > 1 ? 's' : ''}.`)
     if (difficulty !== 'Standard') lines.push(`Work includes ${difficulty.toLowerCase()} framing conditions.`)
     return lines.join('\n')
   })()
@@ -334,7 +344,39 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
         {dim('Depth (ft)', depth, e => setDepth(e.target.value), { min: 0 })}
         {dim('Height (ft)', height, e => setHeight(e.target.value), { min: 0 })}
         {dim('Stair width (ft)', stairWidth, e => setStairWidth(e.target.value), { min: 3, step: 1 })}
-        {dim('# Landings', landings, e => setLandings(e.target.value), { min: 0 })}
+        {dim('Box steps (#)', boxSteps, e => setBoxSteps(e.target.value), { min: 0 })}
+      </div>
+
+      {/* Landings — the rep sets each size */}
+      <div className="mb-3 border border-gray-100 rounded-lg p-3 bg-gray-50/50">
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-xs font-semibold text-gray-600">Landings{LA > 0 ? ` · ${landingSF} SF total` : ''}</label>
+          <button type="button" onClick={() => setLandingList(l => [...l, { id: Date.now(), width: 4, depth: 4 }])}
+            className="flex items-center gap-1 text-xs font-medium text-[var(--brand-600)] hover:text-[var(--brand-700)]">
+            <Plus size={12} /> Add landing
+          </button>
+        </div>
+        {LA === 0 ? (
+          <p className="text-xs text-gray-400">No landings. Add one and enter its size.</p>
+        ) : (
+          <div className="space-y-2">
+            {landingList.map((l, i) => (
+              <div key={l.id} className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 w-16">Landing {i + 1}</span>
+                <input type="number" min="0" aria-label={`Landing ${i + 1} width (ft)`} value={l.width}
+                  onChange={e => setLandingList(cur => cur.map(x => x.id === l.id ? { ...x, width: e.target.value } : x))}
+                  className="w-16 text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white" />
+                <span className="text-xs text-gray-400">W ×</span>
+                <input type="number" min="0" aria-label={`Landing ${i + 1} depth (ft)`} value={l.depth}
+                  onChange={e => setLandingList(cur => cur.map(x => x.id === l.id ? { ...x, depth: e.target.value } : x))}
+                  className="w-16 text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white" />
+                <span className="text-xs text-gray-400">D ft</span>
+                <span className="text-xs text-gray-500">= {n(l.width) * n(l.depth)} SF</span>
+                <button type="button" onClick={() => setLandingList(cur => cur.filter(x => x.id !== l.id))} aria-label={`Remove landing ${i + 1}`} className="ml-auto text-gray-300 hover:text-red-500"><X size={14} /></button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Odd shapes — bump-outs & walkways attached to the main deck */}
@@ -381,7 +423,7 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-        {drop('Picture-frame border', border, e => setBorder(e.target.value), ['None', 'Single', 'Double'])}
+        {drop('Picture frame (border)', border, e => setBorder(e.target.value), ['None', 'Single', 'Double'])}
         {drop('Matching fascia (1×12)', fascia, e => setFascia(e.target.value), ['None', 'Matching'])}
         {borderCourses > 0 && dim('Field waste %', fieldWastePct, e => setFieldWastePct(e.target.value), { min: 0 })}
       </div>
@@ -746,6 +788,8 @@ export default function BuildQuote() {
       extra.push({ id: 'deck-builder', name: 'Deck — Build to Spec (formula)', category: 'Decks', assembly: 'deck', unit: 'EA', unitPrice: 0, description: 'Configure framing, decking, steps, landings, height and difficulty; price, cost and scope auto-calculate.' })
     if (!catalogRaw.some(c => c.assembly === 'porchbuild'))
       extra.push({ id: 'porch-build', name: 'Porch — Build to Spec (formula)', category: 'Screen Porches', assembly: 'porchbuild', unit: 'EA', unitPrice: 0, description: 'New open, ScreenEze or Eze-Breeze porch: size, roof connection, floor, roof style and options — price, cost and scope auto-calculate.' })
+    if (!catalogRaw.some(c => c.assembly === 'underdeck'))
+      extra.push({ id: 'underdeck-builder', name: 'Under Deck — Build to Spec (formula)', category: 'Under Deck Ceiling', assembly: 'underdeck', unit: 'EA', unitPrice: 0, description: 'Dry under-deck ceiling: enter the size, pick the style and count the lights, fans and heaters — priced from the catalog.' })
     if (!catalogRaw.some(c => c.assembly === 'porch'))
       extra.push({ id: 'porch-builder', name: 'Porch Conversion — Build to Spec (formula)', category: 'Screen Porches', assembly: 'porch', unit: 'EA', unitPrice: 0, description: 'Eze-Breeze porch conversion: enter width, depth, wall height and doors — windows, columns, transoms, price, cost and scope auto-calculate.' })
     return extra.length ? [...extra, ...catalogRaw] : catalogRaw
@@ -860,6 +904,7 @@ export default function BuildQuote() {
     if (item.assembly === 'deck') { setActiveAssembly('deck'); return }
     if (item.assembly === 'porch') { setActiveAssembly('porch'); return }
     if (item.assembly === 'porchbuild') { setActiveAssembly('porchbuild'); return }
+    if (item.assembly === 'underdeck') { setActiveAssembly('underdeck'); return }
     setLines(prev => {
       const existing = prev.find(l => l.catalogId === item.id)
       if (existing) return prev.map(l => l.catalogId === item.id ? { ...l, qty: l.qty + 1 } : l)
@@ -1297,6 +1342,13 @@ export default function BuildQuote() {
         {activeAssembly === 'porchbuild' && (
           <PorchBuildPanel
             initial={assemblyInitial?.porchBuild || null}
+            onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
+            onAdd={newLines => { setLines(prev => [...prev, ...newLines]); setActiveAssembly(null); setAssemblyInitial(null) }}
+          />
+        )}
+        {activeAssembly === 'underdeck' && (
+          <UnderDeckPanel
+            initial={assemblyInitial?.underDeck || null}
             onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
             onAdd={newLines => { setLines(prev => [...prev, ...newLines]); setActiveAssembly(null); setAssemblyInitial(null) }}
           />

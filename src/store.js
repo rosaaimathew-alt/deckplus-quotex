@@ -56,7 +56,8 @@ export const DECK_COMPONENT_DEFAULTS = {
   framing:     { label: 'Framing',                unit: 'SF', rate: 14,   cost: 9 },
   stairs:      { label: 'Stairs (per step)',      unit: 'EA', rate: 145,  cost: 90 },
   railing:     { label: 'Railing',                unit: 'LF', rate: 52,   cost: 30 },
-  landing:     { label: 'Landing',                unit: 'EA', rate: 1200, cost: 700 },
+  landing:     { label: 'Landing',                unit: 'SF', rate: 75,   cost: 43.75 },  // per SF of landing (the rep sets each size)
+  boxstep:     { label: 'Box steps (per step)',   unit: 'EA', rate: 100,  cost: 0 },
   blocking:    { label: 'Picture-frame blocking', unit: 'LF', rate: 3.5,  cost: 2.2 },
   borderlabor: { label: 'Border labor / miters',  unit: 'LF', rate: 4,    cost: 2 },
   splinejoist: { label: 'Spline sister joist',    unit: 'LF', rate: 9,    cost: 6 },
