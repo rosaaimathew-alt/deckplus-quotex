@@ -338,7 +338,7 @@ export default function Analyze() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-5">
+      <div className="qx-hide-embedded mb-5">
         <h2 className="text-2xl font-bold text-gray-900">Analyze</h2>
         <p className="text-sm text-gray-500 mt-0.5">Extract pricing from estimates and spreadsheets, then save directly to your catalog.</p>
       </div>

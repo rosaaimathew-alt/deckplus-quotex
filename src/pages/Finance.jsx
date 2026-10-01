@@ -314,7 +314,7 @@ export default function Finance() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2"><Wallet size={22} className="text-gray-400" /> Finance</h1>
+          <h1 className="qx-hide-embedded text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2"><Wallet size={22} className="text-gray-400" /> Finance</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Track card spend by employee and tie expenses to jobs for automatic P&amp;L.</p>
         </div>
         <div className="flex gap-2">

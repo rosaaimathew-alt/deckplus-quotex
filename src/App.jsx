@@ -1,188 +1,35 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutGrid, User, FileText, Cloud, Package, ListChecks, LineChart, Tag, UserCog, Wrench, Calendar, BarChart3, TrendingUp, Wallet, Mail, Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, CheckSquare } from 'lucide-react'
-import { Component, useEffect, useState, useRef } from 'react'
+import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, Mail, ListChecks, Wallet, ClipboardList, Wrench } from 'lucide-react'
+import { Component, useEffect, useMemo, useState } from 'react'
 import Dashboard from './pages/Dashboard'
-import Analyze from './pages/Analyze'
-import ItemCatalog from './pages/ItemCatalog'
+import PMHome from './pages/PMHome'
 import BuildQuote from './pages/BuildQuote'
-import Analytics from './pages/Analytics'
 import ProposalView from './pages/ProposalView'
-import ProposalTracker from './pages/ProposalTracker'
 import InboxPage from './pages/Inbox'
-import AiChat from './pages/AiChat'
 import SettingsPage from './pages/Settings'
-import ClientList from './pages/ClientList'
 import ContractView from './pages/ContractView'
-import ContractsList from './pages/ContractsList'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
-import PMCalendar from './pages/PMCalendar'
-import Finance from './pages/Finance'
 import SignPage from './pages/SignPage'
 import COSignPage from './pages/COSignPage'
 import ContractViewFull from './pages/ContractViewFull'
-import ProfitabilityTracker from './pages/ProfitabilityTracker'
-import Jobs from './pages/Jobs'
-import Subcontractors from './pages/Subcontractors'
-import Scheduler from './pages/Scheduler'
-import Checklists from './pages/Checklists'
 import PublicProposal from './pages/PublicProposal'
 import Legal from './pages/Legal'
+import { SalesHub, ProjectsHub, InsightsHub, CatalogHub } from './pages/hubs/Hubs'
+import CommandPalette from './components/CommandPalette'
 import AuthGuard, { logout } from './components/AuthGuard'
 import { useStore, bootstrapOrg } from './store'
 import { applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR } from './brand'
 import { canAccessRoute, landingRoute } from './plans'
 import { canRoleAccess, roleLanding } from './roles'
+import { useNav, LEGACY_REDIRECTS } from './nav'
+import { nextReminderDate, contractStatusOf, isJobClosed } from './lib/attention'
+import { useUnread } from './lib/unread'
 import { TodoDock } from './components/TodoPanel'
 import { DEMO, DEMO_BASENAME, resetDemo } from './demo'
 
-// Nav grouped into labeled sections. Same routes and order of use as before —
-// only chunked so the sidebar reads as four short lists instead of one wall.
-const NAV_SECTIONS = [
-  { section: 'Sales', items: [
-    { to: '/',        label: 'Dashboard',       icon: LayoutGrid },
-    { to: '/clients', label: 'Clients',          icon: User },
-    { to: '/analyze', label: 'Analyze',          icon: FileText },
-    { to: '/ai',      label: 'AI Assistant',     icon: Cloud },
-    { to: '/catalog', label: 'Item Catalog',     icon: Package },
-    { to: '/quote',   label: 'Build Quote',      icon: ListChecks },
-    { to: '/tracker', label: 'Proposal Tracker', icon: LineChart },
-  ] },
-  { section: 'Operations', items: [
-    { to: '/contracts', label: 'Contracts',      icon: Tag },
-    { to: '/jobs',      label: 'Job Management',  icon: UserCog },
-    { to: '/subs',      label: 'Subcontractors',  icon: Wrench },
-    { to: '/scheduler', label: 'Scheduler',       icon: Calendar },
-    { to: '/checklists',label: 'Checklists',       icon: CheckSquare },
-  ] },
-  { section: 'Financials', items: [
-    { to: '/analytics',     label: 'Analytics',     icon: BarChart3 },
-    { to: '/profitability', label: 'Profitability', icon: TrendingUp },
-    { to: '/finance',       label: 'Finance',       icon: Wallet },
-  ] },
-  { section: 'Comms', items: [
-    { to: '/inbox', label: 'Inbox', icon: Mail },
-  ] },
-]
-// Flat list preserved for lookups (page title, etc.)
-const NAV = NAV_SECTIONS.flatMap(s => s.items)
-
-const STATUS_BADGE = {
-  Won:           'bg-green-100 text-green-700',
-  Lost:          'bg-red-100 text-red-700',
-  Draft:         'bg-gray-100 text-gray-600',
-  Sent:          'bg-blue-100 text-blue-700',
-  'Followed Up': 'bg-purple-100 text-purple-700',
-  Negotiating:   'bg-amber-100 text-amber-700',
-  MIA:           'bg-slate-100 text-slate-500',
-}
-
-const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
+const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
 const UNREAD_POLL = 60_000
-
-// ── Global Search ────────────────────────────────────────────────────────────
-function GlobalSearch() {
-  const navigate  = useNavigate()
-  const proposals = useStore(s => s.proposals)
-  const catalog   = useStore(s => s.catalog)
-  const [query, setQuery] = useState('')
-  const [open, setOpen]   = useState(false)
-  const ref = useRef(null)
-
-  useEffect(() => {
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
-
-  const q = query.toLowerCase().trim()
-
-  const matchedProposals = q.length < 2 ? [] : proposals
-    .filter(p => [p.client, p.email, p.phone, p.address, p.status]
-      .some(v => v?.toLowerCase().includes(q)))
-    .slice(0, 6)
-
-  const matchedCatalog = q.length < 2 ? [] : catalog
-    .filter(c => [c.name, c.description, c.category]
-      .some(v => v?.toLowerCase().includes(q)))
-    .slice(0, 4)
-
-  const hasResults = matchedProposals.length > 0 || matchedCatalog.length > 0
-  const showEmpty  = q.length >= 2 && !hasResults
-
-  const openProposal = (p) => {
-    sessionStorage.setItem('proposal', JSON.stringify({
-      client: p.client, email: p.email, phone: p.phone,
-      address: p.address, expiration: p.expiration,
-      lines: p.lines || [], margin: 0, proposalId: p.id,
-    }))
-    setQuery(''); setOpen(false)
-    navigate('/proposal')
-  }
-
-  const goToCatalog = () => { setQuery(''); setOpen(false); navigate('/catalog') }
-
-  return (
-    <div ref={ref} className="relative">
-      <div className={`flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-white w-64 transition-all ${
-        open ? 'border-[var(--brand-400)] ring-1 ring-[var(--brand-300)]' : 'border-gray-200'
-      }`}>
-        <Search size={14} className="text-gray-400 shrink-0" />
-        <input
-          className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
-          placeholder="Search clients or items…"
-          value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-        />
-        {query && (
-          <button onClick={() => { setQuery(''); setOpen(false) }} className="text-gray-300 hover:text-gray-500">
-            <X size={13} />
-          </button>
-        )}
-      </div>
-
-      {open && (hasResults || showEmpty) && (
-        <div className="absolute top-full right-0 mt-1.5 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
-          {matchedProposals.length > 0 && (
-            <div>
-              <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-gray-400 bg-gray-50">Clients / Proposals</p>
-              {matchedProposals.map(p => (
-                <button key={p.id} onClick={() => openProposal(p)}
-                  className="w-full text-left px-4 py-2.5 hover:bg-[var(--brand-50)] border-t border-gray-50 transition-colors">
-                  <p className="text-sm font-medium text-gray-900">{p.client || <span className="italic text-gray-400">Unnamed</span>}</p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${STATUS_BADGE[p.status] || 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
-                    <span className="text-xs text-gray-400">${fmt(p.total || 0)}</span>
-                    {p.email && <span className="text-xs text-gray-400 truncate max-w-[120px]">{p.email}</span>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          {matchedCatalog.length > 0 && (
-            <div>
-              <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-gray-400 bg-gray-50 border-t border-gray-100">Catalog Items</p>
-              {matchedCatalog.map(c => (
-                <button key={c.id} onClick={goToCatalog}
-                  className="w-full text-left px-4 py-2.5 hover:bg-[var(--brand-50)] border-t border-gray-50 transition-colors">
-                  <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                  <p className="text-xs text-gray-400">{c.category} · ${c.unitPrice}/{c.unit}</p>
-                </button>
-              ))}
-            </div>
-          )}
-          {showEmpty && (
-            <div className="px-4 py-5 text-center">
-              <p className="text-sm text-gray-400">No results for "<span className="font-medium text-gray-600">{query}</span>"</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // Loads the signed-in user's org rows into the store (once) before the shell
 // renders, so every page starts from real data. Demo builds skip it.
@@ -214,10 +61,10 @@ function BootGate({ children }) {
   )
 }
 
-// The home screen ('/') depends on role: PMs get the job calendar.
+// Home depends on role: project managers plan from the job calendar.
 function RoleHome() {
   const role = useStore(s => s.role || 'manager')
-  return role === 'pm' ? <PMCalendar /> : <Dashboard />
+  return role === 'pm' ? <PMHome /> : <Dashboard />
 }
 
 // Blocks a route the current plan OR role can't reach, redirecting home.
@@ -229,26 +76,75 @@ function Gated({ path, children }) {
   return children
 }
 
+// A destination opens when at least one of its tabs is allowed.
+function GatedDestination({ dkey, children }) {
+  const { destinations, plan } = useNav()
+  if (!destinations.some(d => d.key === dkey)) return <Navigate to={destinations[0]?.to || landingRoute(plan)} replace />
+  return children
+}
+
+// Old page address → its tab in the new layout (keeps bookmarks working)
+function LegacyRedirect({ to }) {
+  const location = useLocation()
+  const extra = new URLSearchParams(location.search)
+  const [path, q] = to.split('?')
+  const params = new URLSearchParams(q)
+  extra.forEach((v, k) => params.set(k, v))
+  return <Navigate to={`${path}?${params.toString()}`} replace />
+}
+
+// Counts shown as badges in the sidebar — the same rules as Home's list.
+function useBadges() {
+  const proposals = useStore(s => s.proposals)
+  const unread = useUnread(s => s.unread)
+  const { can } = useNav()
+  return useMemo(() => {
+    const today = new Date()
+    let followUps = 0
+    for (const p of proposals) for (const r of p.reminders || []) {
+      const d = nextReminderDate(r)
+      if (d && new Date(d + 'T00:00:00') <= today) followUps++
+    }
+    const won = proposals.filter(p => p.status === 'Won')
+    const projects = (can('/contracts') ? won.filter(p => contractStatusOf(p) === 'not-started').length : 0)
+      + (can('/scheduler') ? won.filter(p => !isJobClosed(p) && !p.jobData?.startDate).length : 0)
+    return { sales: followUps, projects, inbox: unread }
+  }, [proposals, unread, can])
+}
+
+function NavItem({ d, badge, onClick }) {
+  const Icon = d.icon
+  return (
+    <NavLink to={d.to} end={d.to === '/'} onClick={onClick} title={d.hint}
+      className={({ isActive }) => `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-colors ${isActive ? 'brand-nav-active shadow-sm' : 'brand-nav-inactive'}`}>
+      <Icon size={19} className="shrink-0" />
+      <span className="flex-1 truncate">{d.label}</span>
+      {badge > 0 && (
+        <span className="bg-amber-400 text-[#1f1300] text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center leading-none">{badge > 99 ? '99+' : badge}</span>
+      )}
+    </NavLink>
+  )
+}
+
 // ── App Shell ────────────────────────────────────────────────────────────────
 function AppShell() {
-  const proposals      = useStore(s => s.proposals)
   const readMessageIds = useStore(s => s.readMessageIds)
   const branding       = useStore(s => s.branding)
   const theme          = useStore(s => s.theme)
   const setTheme       = useStore(s => s.setTheme)
-  const [inboxUnread, setInboxUnread] = useState(0)
+  const me             = useStore(s => s.me)
+  const todoPin        = useStore(s => s.todoPin)
+  const setTodoPin     = useStore(s => s.setTodoPin)
+  const openTodos      = useStore(s => (s.todos || []).filter(t => !t.done).length)
+  const setUnread      = useUnread(s => s.setUnread)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const navigate = useNavigate()
 
-  const location  = useLocation()
-  const pageTitle = location.pathname === '/settings'
-    ? 'Settings'
-    : (NAV.find(i => i.to === location.pathname)?.label || '')
-
+  const { destinations, can, role } = useNav()
+  const badges = useBadges()
   const isDark = theme === 'dark'
   const closeSidebar = () => setSidebarOpen(false)
-
-  const plan = branding?.plan || 'enterprise'
-  const role = useStore(s => s.role || 'manager')
   const autoExpireStaleSent = useStore(s => s.autoExpireStaleSent)
 
   // Flag proposals that have sat in 'Sent' for 90+ days (no new iteration,
@@ -262,200 +158,218 @@ function AppShell() {
     })
   }, [branding?.primaryColor, branding?.sidebarColor, branding?.accentColor])
 
-  useEffect(() => {
-    applyTheme(isDark)
-  }, [isDark])
+  useEffect(() => { applyTheme(isDark) }, [isDark])
 
-  // Close sidebar on resize to desktop
+  // Close the drawer when the screen grows to desktop
   useEffect(() => {
     const onResize = () => { if (window.innerWidth >= 1024) setSidebarOpen(false) }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  const dueCount = proposals.reduce((count, p) => {
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const due = (p.reminders || []).filter(r => !r.dismissed && new Date(r.date + 'T00:00:00') <= today)
-    return count + due.length
-  }, 0)
-
+  // Ctrl/⌘ + K opens search from anywhere
   useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Unread inbox count — checked on load, then every minute
+  useEffect(() => {
+    if (!can('/inbox')) return
+    let alive = true
     const check = async () => {
       try {
         const res = await fetch('/api/messages')
         if (!res.ok) return
         const { messages } = await res.json()
         const readSet = new Set(readMessageIds || [])
-        setInboxUnread(messages.filter(m => m.direction === 'inbound' && !readSet.has(m.id)).length)
-      } catch {}
+        if (alive) setUnread((messages || []).filter(m => m.direction === 'inbound' && !readSet.has(m.id)).length)
+      } catch { /* offline or not configured */ }
     }
-    const timer = setInterval(async () => { try { await check() } catch {} }, UNREAD_POLL)
-    return () => clearInterval(timer)
-  }, [readMessageIds])
-
-  // Live sync is Realtime now (see src/supabase.js): every committed row change
-  // is pushed to this device the moment it happens. Nothing to poll.
+    check()
+    const timer = setInterval(check, UNREAD_POLL)
+    return () => { alive = false; clearInterval(timer) }
+  }, [readMessageIds, can, setUnread])
 
   const companyName = branding?.companyName || 'QUOTEX'
   const logo        = branding?.logo        || null
+  const canQuote    = can('/quote')
+
+  // Actions the search box can run directly
+  const actions = useMemo(() => {
+    const a = []
+    if (canQuote) a.push({ label: 'New quote', hint: 'Build a proposal from your catalog', keywords: 'create estimate proposal build', icon: Plus, to: '/quote' })
+    if (can('/finance')) a.push({ label: 'Add an expense', hint: 'Insights › Expenses', keywords: 'card spend receipt statement', icon: Wallet, to: '/insights?tab=expenses' })
+    if (can('/jobs')) a.push({ label: 'Log a daily report', hint: 'Projects › Jobs — open a job, then Daily Log', keywords: 'daily log crew weather', icon: ClipboardList, to: '/projects?tab=jobs' })
+    if (can('/subs')) a.push({ label: 'Add a subcontractor', hint: 'Projects › Subcontractors', keywords: 'sub crew coi', icon: Wrench, to: '/projects?tab=crews' })
+    a.push({ label: isDark ? 'Switch to light mode' : 'Switch to dark mode', keywords: 'theme dark light', icon: isDark ? Sun : Moon, run: () => setTheme(isDark ? 'light' : 'dark') })
+    a.push({ label: 'Settings', hint: 'Branding, email account, backups', keywords: 'branding logo colors email backup', icon: SettingsIcon, to: '/settings' })
+    return a
+  }, [canQuote, can, isDark, setTheme])
+
+  // Phone tab bar: the first destinations, with New quote in the middle
+  const mobileTabs = destinations.filter(d => d.key !== 'inbox').slice(0, canQuote ? 2 : 3)
+  const mobileTabsRight = destinations.filter(d => d.key !== 'inbox' && !mobileTabs.includes(d)).slice(0, canQuote ? 1 : 1)
 
   return (
-    <div className="min-h-screen flex qx-ground">
+    <div className="h-screen flex qx-ground overflow-hidden">
 
       {/* Mobile backdrop */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={closeSidebar} />
-      )}
+      {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={closeSidebar} />}
 
-      {/* Sidebar — fixed drawer on mobile, inline on desktop */}
+      {/* Sidebar — drawer on phones/tablets, fixed column on desktop */}
       <aside
-        className={`w-64 flex flex-col no-print shrink-0 shadow-lg
+        className={`w-64 flex flex-col no-print shrink-0
           fixed lg:relative inset-y-0 left-0 z-50 h-full
           transition-transform duration-200 ease-in-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
         style={{ backgroundColor: 'var(--sidebar)' }}
+        aria-label="Main navigation"
       >
-        {/* Logo + close button on mobile */}
-        <div className="px-5 py-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--sidebar-border)' }}>
-          <div className="flex-1 flex justify-center">
+        <div className="px-5 pt-5 pb-4 flex items-center justify-between">
+          <button onClick={() => navigate('/')} className="flex-1 flex justify-center" aria-label="Home">
             {logo
-              ? <img src={logo} alt="logo" className="h-12 object-contain" />
-              : <h1 className="text-xl font-black text-white tracking-widest leading-tight">{companyName}</h1>}
-          </div>
-          <button onClick={closeSidebar} className="lg:hidden text-white/60 hover:text-white ml-2">
-            <X size={18} />
+              ? <img src={logo} alt={companyName} className="h-11 object-contain" />
+              : <span className="text-xl font-black text-white tracking-widest leading-tight">{companyName}</span>}
           </button>
+          <button onClick={closeSidebar} className="lg:hidden text-white/60 hover:text-white ml-2" aria-label="Close menu"><X size={18} /></button>
         </div>
 
-        {/* Nav links — grouped into labeled sections */}
-        <nav className="flex-1 py-3 space-y-4 px-2 overflow-y-auto">
-          {NAV_SECTIONS.map(({ section, items }) => {
-            const visible = items.filter(({ to }) => canAccessRoute(plan, to) && canRoleAccess(role, to))
-            if (visible.length === 0) return null
-            return (
-              <div key={section}>
-                <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider brand-footer opacity-60">{section}</p>
-                <div className="space-y-0.5">
-                  {visible.map(({ to, label, icon: Icon }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      end={to === '/'}
-                      onClick={closeSidebar}
-                      className={({ isActive }) =>
-                        `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                          isActive ? 'brand-nav-active' : 'brand-nav-inactive'
-                        }`
-                      }
-                    >
-                      <Icon size={16} />
-                      <span className="flex-1">{label}</span>
-                      {to === '/tracker' && dueCount > 0 && (
-                        <span className="bg-amber-400 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                          {dueCount}
-                        </span>
-                      )}
-                      {to === '/inbox' && inboxUnread > 0 && (
-                        <span className="brand-badge bg-white text-xs font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center leading-none">
-                          {inboxUnread}
-                        </span>
-                      )}
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
+        {canQuote && (
+          <div className="px-3 pb-3">
+            <button onClick={() => { navigate('/quote'); closeSidebar() }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-transform active:scale-[0.98]"
+              style={{ background: 'var(--accent)' }}>
+              <Plus size={17} /> New quote
+            </button>
+          </div>
+        )}
+
+        <nav className="flex-1 px-3 py-1 space-y-1 overflow-y-auto">
+          {destinations.map(d => (
+            <NavItem key={d.key} d={d} badge={badges[d.key] || 0} onClick={closeSidebar} />
+          ))}
         </nav>
 
-        <div className="px-2 pb-2">
-          <NavLink
-            to="/settings"
-            onClick={closeSidebar}
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? 'brand-nav-active' : 'brand-nav-inactive'
-              }`
-            }
-          >
-            <SettingsIcon size={16} />
-            <span>Settings</span>
+        <div className="px-3 pb-2 space-y-1">
+          <button onClick={() => { setPaletteOpen(true); closeSidebar() }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm brand-nav-inactive">
+            <Search size={17} /> <span className="flex-1 text-left">Search</span>
+            <kbd className="text-[10px] opacity-60 border border-current rounded px-1">Ctrl K</kbd>
+          </button>
+          <NavLink to="/settings" onClick={closeSidebar}
+            className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${isActive ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
+            <SettingsIcon size={17} /> <span>Settings</span>
           </NavLink>
         </div>
 
-        <div className="px-4 py-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--brand-600)' }}>
-          <p className="text-xs brand-footer">© 2025 {companyName}</p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setTheme(isDark ? 'light' : 'dark')}
-              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors brand-nav-inactive hover:bg-white/10"
-            >
-              {isDark ? <Sun size={15} /> : <Moon size={15} />}
-            </button>
-            <button onClick={DEMO ? resetDemo : logout} title={DEMO ? 'Reset demo data' : 'Log out'} className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors brand-nav-inactive hover:bg-white/10">
-              <LogOut size={15} />
-            </button>
+        <div className="px-4 py-3 border-t flex items-center gap-2" style={{ borderColor: 'var(--sidebar-border)' }}>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-white/90 truncate">{me?.displayName || (DEMO ? 'Demo user' : companyName)}</p>
+            <p className="text-[11px] brand-footer opacity-70 truncate">{ROLE_LABEL[role] || role}</p>
           </div>
+          <button onClick={() => setTheme(isDark ? 'light' : 'dark')} title={isDark ? 'Light mode' : 'Dark mode'}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors brand-nav-inactive">
+            {isDark ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+          <button onClick={DEMO ? resetDemo : logout} title={DEMO ? 'Reset demo data' : 'Log out'}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors brand-nav-inactive">
+            <LogOut size={15} />
+          </button>
         </div>
       </aside>
 
       {/* Main column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Demo banner */}
         {DEMO && (
           <div className="bg-[var(--brand-600)] text-white text-xs px-4 py-1.5 flex items-center justify-center gap-3 no-print shrink-0">
             <span className="font-medium">🎬 Demo — sample data only. Your changes stay in this browser and never affect real accounts.</span>
-            <button onClick={resetDemo} className="underline underline-offset-2 hover:opacity-80 font-medium shrink-0">
-              Reset demo
-            </button>
+            <button onClick={resetDemo} className="underline underline-offset-2 hover:opacity-80 font-medium shrink-0">Reset demo</button>
           </div>
         )}
-        {/* Top header */}
-        <header className="h-12 bg-white border-b border-gray-200 flex items-center gap-3 px-4 no-print shrink-0">
-          {/* Hamburger — mobile only */}
-          <button
-            className="lg:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors shrink-0"
-            onClick={() => setSidebarOpen(true)}
-          >
+
+        {/* Top bar: search everything, to-do, inbox */}
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 no-print shrink-0">
+          <button className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
             <Menu size={20} />
           </button>
-          {pageTitle && <span className="text-sm font-semibold text-gray-800 truncate">{pageTitle}</span>}
-          <div className="ml-auto hidden sm:block">
-            <GlobalSearch />
+          <button onClick={() => setPaletteOpen(true)}
+            className="flex-1 min-w-0 max-w-xl flex items-center gap-2.5 h-10 px-3.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-400 hover:border-[var(--brand-300)] hover:bg-white transition-colors text-left">
+            <Search size={16} className="shrink-0" />
+            <span className="flex-1 truncate"><span className="sm:hidden">Search…</span><span className="hidden sm:inline">Search clients, jobs, or jump to a page…</span></span>
+            <kbd className="hidden md:inline text-[10px] font-semibold text-gray-400 border border-gray-200 rounded px-1.5 py-0.5 bg-white">Ctrl K</kbd>
+          </button>
+          <div className="ml-auto flex items-center gap-1 shrink-0">
+            <button onClick={() => setTodoPin(todoPin === 'right' ? 'off' : 'right')} title={todoPin === 'right' ? 'Hide to-do list' : 'Show to-do list'}
+              className={`relative p-2 rounded-lg transition-colors ${todoPin === 'right' ? 'bg-[var(--brand-50)] text-[var(--brand-700)]' : 'text-gray-500 hover:bg-gray-100'}`}>
+              <ListChecks size={19} />
+              {openTodos > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[var(--brand-600)] text-white text-[10px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{openTodos}</span>}
+            </button>
+            {can('/inbox') && (
+              <button onClick={() => navigate('/inbox')} title="Inbox"
+                className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
+                <Mail size={19} />
+                {badges.inbox > 0 && <span className="absolute -top-0.5 -right-0.5 bg-amber-400 text-[#1f1300] text-[10px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badges.inbox}</span>}
+              </button>
+            )}
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto print:overflow-visible print:h-auto">
+        <main className="flex-1 overflow-auto print:overflow-visible print:h-auto pb-16 lg:pb-0">
           <Routes>
-            <Route path="/"         element={<Gated path="/"><RoleHome /></Gated>} />
-            <Route path="/analyze"  element={<Gated path="/analyze"><Analyze /></Gated>} />
-            <Route path="/ai"       element={<Gated path="/ai"><AiChat /></Gated>} />
-            <Route path="/catalog"  element={<Gated path="/catalog"><ItemCatalog /></Gated>} />
+            <Route path="/"          element={<Gated path="/"><RoleHome /></Gated>} />
+            <Route path="/sales"     element={<GatedDestination dkey="sales"><SalesHub /></GatedDestination>} />
+            <Route path="/projects"  element={<GatedDestination dkey="projects"><ProjectsHub /></GatedDestination>} />
+            <Route path="/insights"  element={<GatedDestination dkey="insights"><InsightsHub /></GatedDestination>} />
+            <Route path="/catalog"   element={<GatedDestination dkey="catalog"><CatalogHub /></GatedDestination>} />
+            <Route path="/inbox"     element={<Gated path="/inbox"><InboxPage /></Gated>} />
             <Route path="/quote"     element={<Gated path="/quote"><BuildQuote /></Gated>} />
-            <Route path="/analytics" element={<Gated path="/analytics"><Analytics /></Gated>} />
             <Route path="/proposal"  element={<Gated path="/proposal"><ProposalView /></Gated>} />
-            <Route path="/clients"  element={<Gated path="/clients"><ClientList /></Gated>} />
-            <Route path="/tracker"  element={<Gated path="/tracker"><ProposalTracker /></Gated>} />
-            <Route path="/inbox"    element={<Gated path="/inbox"><InboxPage /></Gated>} />
-            <Route path="/settings" element={<Gated path="/settings"><SettingsPage /></Gated>} />
-            <Route path="/contracts"     element={<Gated path="/contracts"><ContractsList /></Gated>} />
-            <Route path="/contract"      element={<Gated path="/contract"><ContractView /></Gated>} />
-            <Route path="/jobs"          element={<Gated path="/jobs"><Jobs /></Gated>} />
-            <Route path="/subs"          element={<Gated path="/subs"><Subcontractors /></Gated>} />
-            <Route path="/scheduler"     element={<Gated path="/scheduler"><Scheduler /></Gated>} />
-            <Route path="/checklists"    element={<Gated path="/checklists"><Checklists /></Gated>} />
-            <Route path="/profitability" element={<Gated path="/profitability"><ProfitabilityTracker /></Gated>} />
-            <Route path="/finance"       element={<Gated path="/finance"><Finance /></Gated>} />
-            {/* Pipeline folded into the Proposal Tracker's Pipeline tab */}
-            <Route path="/pipeline"      element={<Navigate to="/tracker" replace />} />
+            <Route path="/contract"  element={<Gated path="/contract"><ContractView /></Gated>} />
+            <Route path="/settings"  element={<Gated path="/settings"><SettingsPage /></Gated>} />
+            {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
+              <Route key={from} path={from} element={<LegacyRedirect to={to} />} />
+            ))}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
+
+        {/* Phone tab bar */}
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 flex items-stretch justify-around no-print pb-[env(safe-area-inset-bottom)]" aria-label="Quick navigation">
+          {mobileTabs.map(d => <MobileTab key={d.key} d={d} badge={badges[d.key] || 0} />)}
+          {canQuote && (
+            <button onClick={() => navigate('/quote')} className="flex flex-col items-center justify-center px-3 -mt-4" aria-label="New quote">
+              <span className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg" style={{ background: 'var(--accent)' }}><Plus size={22} /></span>
+            </button>
+          )}
+          {mobileTabsRight.map(d => <MobileTab key={d.key} d={d} badge={badges[d.key] || 0} />)}
+          <button onClick={() => setSidebarOpen(true)} className="flex-1 flex flex-col items-center justify-center py-2 text-gray-500">
+            <Menu size={20} /><span className="text-[10px] font-medium mt-0.5">More</span>
+          </button>
+        </nav>
       </div>
 
-      {/* Pinned daily to-do — floats on every page when pinned */}
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} destinations={destinations} actions={actions} />}
+
+      {/* Pinned to-do — floats on every page when pinned */}
       <TodoDock />
     </div>
+  )
+}
+
+function MobileTab({ d, badge }) {
+  const Icon = d.icon
+  return (
+    <NavLink to={d.to} end={d.to === '/'}
+      className={({ isActive }) => `relative flex-1 flex flex-col items-center justify-center py-2 ${isActive ? 'text-[var(--brand-700)]' : 'text-gray-500'}`}>
+      <Icon size={20} />
+      <span className="text-[10px] font-medium mt-0.5">{d.label}</span>
+      {badge > 0 && <span className="absolute top-1 right-1/2 translate-x-4 bg-amber-400 text-[#1f1300] text-[9px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badge}</span>}
+    </NavLink>
   )
 }
 

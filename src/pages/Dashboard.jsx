@@ -6,10 +6,15 @@ import {
   Plus, ArrowRight, AlertCircle, Clock, ChevronRight, CalendarDays,
   ChevronLeft,
 } from 'lucide-react'
+import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { TodoCard } from '../components/TodoPanel'
 import { getPeriodRange, shiftPeriod, getPeriodSegments, isCurrentPeriod } from '../periodUtils'
+import NeedsAttention from '../components/NeedsAttention'
+import { attentionItems } from '../lib/attention'
+import { useNav } from '../nav'
+import { useUnread } from '../lib/unread'
 
 const fmt   = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtSh = (n) => { const v = Number(n); if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`; if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}k`; return `$${v.toFixed(0)}` }
@@ -82,49 +87,14 @@ function KpiCard({ icon: Icon, label, value, sub, color, onClick }) {
   )
 }
 
-// ── Quick Action Card ─────────────────────────────────────────────────────────
-function ActionCard({ icon: Icon, label, description, color, action, actionLabel, secondaryAction, secondaryLabel, primary }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-3 hover:border-gray-300 hover:shadow-sm transition-all">
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
-          <Icon size={17} className="text-gray-500" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900">{label}</p>
-          <p className="text-xs text-gray-400 leading-snug truncate">{description}</p>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={action}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-            primary
-              ? 'bg-[var(--brand-600)] text-white border border-[var(--brand-600)] hover:bg-[var(--brand-700)]'
-              : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          {actionLabel} <ArrowRight size={11} />
-        </button>
-        {secondaryAction && (
-          <button
-            onClick={secondaryAction}
-            className="px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            {secondaryLabel}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate   = useNavigate()
   const proposals  = useStore(s => s.proposals)
-  const catalog    = useStore(s => s.catalog)
-  const templates  = useStore(s => s.templates)
+  const jobCosts   = useStore(s => s.jobCosts) || {}
+  const { can, role } = useNav()
+  const unread     = useUnread(s => s.unread)
+  const attention  = attentionItems({ proposals, jobCosts, can, unread, role })
 
   // ── Period filter state ───────────────────────────────────────────────────
   const [period,  setPeriod]  = useState('year')
@@ -214,14 +184,7 @@ export default function Dashboard() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-  const openProposal = (p) => {
-    sessionStorage.setItem('proposal', JSON.stringify({
-      client: p.client, email: p.email, phone: p.phone,
-      address: p.address, expiration: p.expiration,
-      lines: p.lines || [], margin: 0, proposalId: p.id,
-    }))
-    navigate('/proposal')
-  }
+  const openProposal = (p) => showProposal(p, navigate)
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl space-y-4 sm:space-y-6">
@@ -232,39 +195,52 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-gray-900">{greeting}!</h1>
           <p className="text-sm text-gray-400 mt-0.5">{dateStr}</p>
         </div>
-        <button
-          onClick={() => navigate('/quote')}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] transition-colors shadow-sm"
-        >
-          <Plus size={15} /> New Quote
-        </button>
       </div>
 
-      {/* KPI strip */}
+      {/* What to do next */}
+      <NeedsAttention items={attention} />
+
+      {/* KPI strip — one period control, right here, for all four numbers */}
+      <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Your numbers · {pLabel}</p>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setRefDate(shiftPeriod(period, refDate, -1))} aria-label="Previous period"
+            className="p-1 rounded-md text-gray-400 hover:bg-white hover:text-gray-700"><ChevronLeft size={15} /></button>
+          <div className="flex rounded-lg border border-gray-200 bg-white overflow-hidden text-xs font-medium">
+            {[['month', 'Month'], ['quarter', 'Quarter'], ['year', 'Year']].map(([k, label]) => (
+              <button key={k} onClick={() => { setPeriod(k); setRefDate(new Date()) }}
+                className={`px-3 py-1.5 transition-colors ${period === k ? 'bg-[var(--brand-600)] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>{label}</button>
+            ))}
+          </div>
+          <button onClick={() => setRefDate(shiftPeriod(period, refDate, 1))} disabled={isCurrent} aria-label="Next period"
+            className="p-1 rounded-md text-gray-400 hover:bg-white hover:text-gray-700 disabled:opacity-30"><ChevronRight size={15} /></button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         <KpiCard
           icon={DollarSign} label="Won Revenue" color="bg-green-500"
           value={`$${fmt(wonRevenue)}`}
           sub={`${won.length} job${won.length !== 1 ? 's' : ''} won · ${pLabel}`}
-          onClick={() => navigate('/tracker')}
+          onClick={() => navigate(can('/analytics') ? '/insights?tab=overview' : '/sales?tab=proposals&status=Won')}
         />
         <KpiCard
           icon={TrendingUp} label="Open Pipeline" color="bg-green-600"
           value={fmtSh(pipeline)}
           sub={`${active.length} active proposal${active.length !== 1 ? 's' : ''} · all time`}
-          onClick={() => navigate('/tracker')}
+          onClick={() => navigate('/sales?tab=pipeline')}
         />
         <KpiCard
           icon={Award} label="Win Rate" color="bg-[var(--brand-500)]"
           value={winRate !== null ? `${winRate}%` : '—'}
           sub={`${wonClients.length} won of ${outcomes.length} · ${pLabel}`}
-          onClick={() => navigate('/tracker')}
+          onClick={() => navigate(can('/analytics') ? '/insights?tab=winloss' : '/sales?tab=proposals')}
         />
         <KpiCard
           icon={Award} label="Avg Deal" color="bg-[var(--brand-400)]"
           value={won.length ? `$${Math.round(wonRevenue / won.length).toLocaleString('en-US')}` : '—'}
           sub="per won job"
-          onClick={() => navigate('/tracker')}
+          onClick={() => navigate(can('/analytics') ? '/insights?tab=overview' : '/sales?tab=proposals&status=Won')}
         />
       </div>
 
@@ -275,7 +251,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-800">Recent Proposals</p>
-            <button onClick={() => navigate('/tracker')} className="text-xs text-[var(--brand-600)] hover:underline font-medium">
+            <button onClick={() => navigate('/sales')} className="text-xs text-[var(--brand-600)] hover:underline font-medium">
               View all →
             </button>
           </div>
@@ -315,18 +291,18 @@ export default function Dashboard() {
             {reminders.length === 0 ? (
               <div className="text-center py-4">
                 <p className="text-xs text-gray-400 italic">No reminders set.</p>
-                <button onClick={() => navigate('/tracker')} className="mt-2 text-xs text-sky-600 hover:underline">
+                <button onClick={() => navigate('/sales')} className="mt-2 text-xs text-sky-600 hover:underline">
                   Add one in the tracker →
                 </button>
               </div>
             ) : (
               <div className="space-y-2">
-                {reminders.map(r => {
+                {reminders.map((r, ri) => {
                   const overdue = isOverdue(r.nextDate)
                   return (
                     <div
-                      key={r.id}
-                      onClick={() => navigate('/tracker')}
+                      key={`${r.proposalId}-${r.id}-${ri}`}
+                      onClick={() => navigate('/sales')}
                       className={`flex items-start gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
                         overdue ? 'bg-red-50 hover:bg-red-100' : 'bg-gray-50 hover:bg-sky-50'
                       }`}
@@ -346,42 +322,6 @@ export default function Dashboard() {
                 })}
               </div>
             )}
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div>
-        <p className="text-sm font-semibold text-gray-700 mb-3">Quick Actions</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <ActionCard
-            icon={ClipboardList}
-            label="New Quote"
-            description="Build a new proposal from your catalog"
-            actionLabel="Start"
-            primary
-            action={() => navigate('/quote')}
-          />
-          <ActionCard
-            icon={BookOpen}
-            label="Item Catalog"
-            description={`${catalog.length} items across ${new Set(catalog.map(c => c.category)).size} categories`}
-            actionLabel="Open"
-            action={() => navigate('/catalog')}
-          />
-          <ActionCard
-            icon={BarChart2}
-            label="Proposal Tracker"
-            description="Manage your pipeline from quote to close"
-            actionLabel="Open"
-            action={() => navigate('/tracker')}
-          />
-          <ActionCard
-            icon={FileCheck}
-            label="Contracts"
-            description="View and send contracts from won deals"
-            actionLabel="Open"
-            action={() => navigate('/contracts')}
-          />
         </div>
       </div>
 
@@ -416,7 +356,7 @@ export default function Dashboard() {
                   </div>
                   <div className="space-y-2">
                     {aging.map(p => (
-                      <div key={p.id} onClick={() => navigate('/tracker')}
+                      <div key={p.id} onClick={() => navigate('/sales')}
                         className="flex items-center justify-between gap-3 bg-white rounded-lg px-3 py-2 cursor-pointer hover:bg-amber-50 transition-colors border border-amber-100">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{p.client || 'Unnamed'}</p>
@@ -432,7 +372,7 @@ export default function Dashboard() {
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => navigate('/tracker')} className="mt-3 text-xs text-amber-700 hover:underline font-medium">
+                  <button onClick={() => navigate('/sales')} className="mt-3 text-xs text-amber-700 hover:underline font-medium">
                     View all in tracker →
                   </button>
                 </div>
@@ -525,7 +465,7 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-sm font-semibold text-gray-800">Pipeline</p>
-                <button onClick={() => navigate('/tracker')} className="text-xs text-sky-600 hover:underline font-medium">
+                <button onClick={() => navigate('/sales')} className="text-xs text-sky-600 hover:underline font-medium">
                   Kanban →
                 </button>
               </div>

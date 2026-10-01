@@ -596,7 +596,7 @@ export default function Inbox() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
+    <div className="flex h-[calc(100dvh-3.5rem)] overflow-hidden bg-white">
       {/* Left pane — thread list */}
       <div className={`w-full sm:w-72 shrink-0 border-r border-gray-100 flex flex-col ${selectedEmail ? 'hidden sm:flex' : 'flex'}`}>
         {/* Header */}

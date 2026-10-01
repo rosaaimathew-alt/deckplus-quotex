@@ -191,14 +191,14 @@ function LinksModal({ links, onClose }) {
   )
 }
 
-export default function ContractsList() {
+export default function ContractsList({ initialFilter } = {}) {
   const navigate             = useNavigate()
   const proposals            = useStore(s => s.proposals)
   const markContractSigned   = useStore(s => s.markContractSigned)
   const saveContractDraft    = useStore(s => s.saveContractDraft)
   const markSignedOffPlatform = useStore(s => s.markContractsSignedOffPlatform)
 
-  const [filter, setFilter]  = useState('All')
+  const [filter, setFilter]  = useState(FILTERS.includes(initialFilter) ? initialFilter : 'All')
   const [query,  setQuery]   = useState('')
   const [viewingRecordId, setViewingRecordId] = useState(null)
   const [viewingLinks,    setViewingLinks]    = useState(null)
@@ -394,7 +394,7 @@ export default function ContractsList() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-5 gap-3">
-        <div>
+        <div className="qx-hide-embedded">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Contracts</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">All contracts from won proposals</p>
         </div>

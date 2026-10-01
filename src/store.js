@@ -479,10 +479,16 @@ export const useStore = create(
         return id
       },
 
+      // Sending or printing moves a Draft to Sent. A proposal that is already
+      // further along (Followed Up, Negotiating, Won, Lost…) keeps its status —
+      // re-printing a Won proposal must never knock it back to Sent.
       markProposalSent: (id) =>
         set((s) => ({
           proposals: s.proposals.map((p) =>
-            p.id === id ? { ...p, status: 'Sent', sentAt: new Date().toISOString() } : p
+            p.id !== id ? p
+              : (!p.status || p.status === 'Draft')
+                ? { ...p, status: 'Sent', sentAt: new Date().toISOString() }
+                : { ...p, sentAt: p.sentAt || new Date().toISOString() }
           ),
         })),
 

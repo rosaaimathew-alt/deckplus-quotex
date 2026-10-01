@@ -26,7 +26,8 @@ function score(text, q) {
   return 0
 }
 
-export default function CommandPalette({ open, onClose, destinations = [], actions = [] }) {
+// Mounted only while open, so every opening starts with an empty search.
+export default function CommandPalette({ onClose, destinations = [], actions = [] }) {
   const navigate  = useNavigate()
   const proposals = useStore(s => s.proposals)
   const catalog   = useStore(s => s.catalog)
@@ -35,7 +36,6 @@ export default function CommandPalette({ open, onClose, destinations = [], actio
   const inputRef = useRef(null)
   const listRef = useRef(null)
 
-  useEffect(() => { if (open) { setQ(''); setSel(0); setTimeout(() => inputRef.current?.focus(), 0) } }, [open])
 
   const query = q.trim().toLowerCase()
   const results = useMemo(() => {
@@ -79,13 +79,10 @@ export default function CommandPalette({ open, onClose, destinations = [], actio
     return out.sort((a, b) => b.s - a.s).slice(0, query ? 12 : 9)
   }, [destinations, actions, proposals, catalog, query])
 
-  useEffect(() => { setSel(0) }, [query])
   useEffect(() => {
     const el = listRef.current?.querySelector(`[data-idx="${sel}"]`)
     el?.scrollIntoView({ block: 'nearest' })
   }, [sel])
-
-  if (!open) return null
 
   const go = (r) => {
     if (!r) return
@@ -106,7 +103,7 @@ export default function CommandPalette({ open, onClose, destinations = [], actio
       <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
           <Search size={18} className="text-gray-400 shrink-0" />
-          <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)} onKeyDown={onKey}
+          <input ref={inputRef} autoFocus value={q} onChange={e => { setQ(e.target.value); setSel(0) }} onKeyDown={onKey}
             placeholder="Search clients, pages, or type what you want to do…"
             className="flex-1 text-[15px] bg-transparent outline-none placeholder:text-gray-400" aria-label="Search" />
           <kbd className="hidden sm:inline text-[10px] font-semibold text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">ESC</kbd>

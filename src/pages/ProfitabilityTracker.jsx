@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { Fragment, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DollarSign, TrendingUp, TrendingDown, Target, ChevronDown, ChevronUp, ChevronRight,
   Edit3, Check, X, Trash2, Eye, AlertCircle, BarChart2, ArrowUpRight,
   Package, Users, Hammer, MoreHorizontal,
 } from 'lucide-react'
+import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 
@@ -318,21 +319,14 @@ export default function ProfitabilityTracker() {
       : sortDir === 'asc' ? <ChevronUp size={11} className="ml-0.5" />
       : <ChevronDown size={11} className="ml-0.5" />
 
-  const openProposal = (p) => {
-    sessionStorage.setItem('proposal', JSON.stringify({
-      client: p.client, email: p.email, phone: p.phone,
-      address: p.address, expiration: p.expiration,
-      lines: p.lines || [], margin: 0, proposalId: p.id,
-    }))
-    navigate('/proposal')
-  }
+  const openProposal = (p) => showProposal(p, navigate)
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Profitability Tracker</h2>
+          <h2 className="qx-hide-embedded text-xl sm:text-2xl font-bold text-gray-900">Profitability Tracker</h2>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Enter actual job costs to see your real margins.</p>
         </div>
         {stats.jobsPending > 0 && (
@@ -485,7 +479,7 @@ export default function ProfitabilityTracker() {
             </thead>
             <tbody>
               {sorted.map(job => (
-                <>
+                <Fragment key={job.id}>
                   <tr
                     key={job.id}
                     className={`border-t border-gray-50 hover:bg-gray-50 align-top ${editingId === job.id ? 'bg-blue-50/30' : ''}`}
@@ -583,7 +577,7 @@ export default function ProfitabilityTracker() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

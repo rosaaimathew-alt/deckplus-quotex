@@ -281,3 +281,12 @@
 .dp-sign-btn.ready { border-color: #3b82f6; background: #eff6ff; color: #2563eb; }
 .dp-sign-btn:hover { background: #dbeafe; }
 .dp-init .dp-sign-btn { font-size: 8px; }
+
+/* ── Tabbed destinations (src/components/Hub.jsx) ─────────────────────────
+   Pages shown inside a destination drop their own big title (the destination
+   header already names them) and line up under the tabs. */
+.qx-embedded .qx-hide-embedded { display: none !important; }
+.qx-embedded .qx-nested-pad { padding: 0 !important; }
+.qx-embedded > * { margin-left: auto; margin-right: auto; max-width: 80rem; }
+.qx-scroll-x { scrollbar-width: none; }
+.qx-scroll-x::-webkit-scrollbar { display: none; }

@@ -36,8 +36,21 @@ export default function ProposalView() {
     if (raw) {
       const parsed = JSON.parse(raw)
       setData(parsed)
-      // Auto-save as Draft to the proposals log (idempotent — uses existing id if set)
-      if (!parsed.proposalId) {
+      // Auto-save as Draft to the proposals log (idempotent — uses existing id if set).
+      // Coming back from Build Quote with the same draft updates it in place
+      // (as long as it is still a Draft) instead of saving a duplicate.
+      const existing = parsed.proposalId ? useStore.getState().proposals.find(p => p.id === parsed.proposalId) : null
+      if (parsed.fromBuilder && existing && (existing.status || 'Draft') === 'Draft') {
+        saveProposal({
+          id: existing.id,
+          client: parsed.client, email: parsed.email, phone: parsed.phone, address: parsed.address,
+          expiration: parsed.expiration,
+          total: parsed.lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0),
+          lines: parsed.lines, isAlaCarte: parsed.isAlaCarte || false, showBreakdown: parsed.showBreakdown,
+          margin: parsed.margin, projectTypes: parsed.projectTypes || [], projectSummary: parsed.projectSummary || '',
+        })
+        proposalIdRef.current = existing.id
+      } else if (!parsed.proposalId || (parsed.fromBuilder && !existing) || (parsed.fromBuilder && existing && existing.status !== 'Draft')) {
         const id = saveProposal({
           client: parsed.client,
           email: parsed.email,
@@ -57,6 +70,13 @@ export default function ProposalView() {
         proposalIdRef.current = id
         // Persist id back into sessionStorage so repeated views don't duplicate
         sessionStorage.setItem('proposal', JSON.stringify({ ...parsed, proposalId: id }))
+        // …and into the Build Quote draft, so editing and previewing again updates this one
+        if (parsed.fromBuilder) {
+          try {
+            const draft = JSON.parse(localStorage.getItem('quotex:draft-proposal') || 'null')
+            if (draft) localStorage.setItem('quotex:draft-proposal', JSON.stringify({ ...draft, draftProposalId: id }))
+          } catch { /* ignore */ }
+        }
       } else {
         proposalIdRef.current = parsed.proposalId
       }
@@ -200,6 +220,7 @@ export default function ProposalView() {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed to send.')
       if (proposalIdRef.current) markProposalSent(proposalIdRef.current)
+      if (data?.fromBuilder) localStorage.removeItem('quotex:draft-proposal')
       setSendSuccess(true)
     } catch (err) {
       setSendError(err.message)
@@ -232,8 +253,8 @@ export default function ProposalView() {
     <div className="min-h-screen bg-gray-100">
       {/* Toolbar */}
       <div className="no-print bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
-        <button onClick={() => navigate('/quote')} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
-          <ArrowLeft size={15} /> Back to Quote
+        <button onClick={() => (data.fromBuilder ? navigate('/quote') : navigate(-1))} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
+          <ArrowLeft size={15} /> {data.fromBuilder ? 'Back to quote' : 'Back'}
         </button>
         <div className="flex-1" />
         <button
@@ -246,6 +267,7 @@ export default function ProposalView() {
         <button
           onClick={() => {
             if (proposalIdRef.current) markProposalSent(proposalIdRef.current)
+            if (data?.fromBuilder) localStorage.removeItem('quotex:draft-proposal')
             window.print()
           }}
           className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50"

@@ -26,7 +26,7 @@ export default function Checklists() {
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       <div className="mb-5">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Checklists</h1>
+        <h1 className="qx-hide-embedded text-xl sm:text-2xl font-bold text-gray-900">Checklists</h1>
         <p className="text-xs sm:text-sm text-gray-500 mt-0.5 flex items-center gap-1.5">
           <Users size={13} className="text-gray-400" /> Shared with everyone in your organization — checks update live for your whole team.
         </p>

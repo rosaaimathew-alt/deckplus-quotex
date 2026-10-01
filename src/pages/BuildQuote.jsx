@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader } from 'lucide-react'
+import { Search, Plus, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw } from 'lucide-react'
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { parseBuildSpec } from '../buildParse'
 import PorchBuildPanel from '../components/PorchBuildPanel'
@@ -448,7 +448,7 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
         </table>
         {priceLocked && (
           <p className="flex items-center gap-1.5 text-xs text-amber-600 mt-2">
-            <Lock size={12} /> Pricing locked by your manager — set in Item Catalog → Tools.
+            <Lock size={12} /> Pricing locked by your manager — set in Catalog → Builder rates.
           </p>
         )}
       </div>
@@ -709,7 +709,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
         </table>
         {priceLocked && (
           <p className="flex items-center gap-1.5 text-xs text-amber-600 mt-2">
-            <Lock size={12} /> Pricing locked by your manager — set in Item Catalog → Tools.
+            <Lock size={12} /> Pricing locked by your manager — set in Catalog → Builder rates.
           </p>
         )}
       </div>
@@ -782,6 +782,10 @@ export default function BuildQuote() {
   const [templateName, setTemplateName] = useState('')
   const [templateDesc, setTemplateDesc] = useState('')
   const [revisingParentId, setRevisingParentId] = useState(null)
+  // The Draft proposal this quote already saved when previewed, so previewing
+  // again updates it instead of creating a duplicate.
+  const [draftProposalId, setDraftProposalId] = useState(null)
+  const [restoredFrom, setRestoredFrom] = useState(null)   // banner: "picked up where you left off"
 
   const DRAFT_KEY = 'quotex:draft-proposal'
 
@@ -799,6 +803,9 @@ export default function BuildQuote() {
         setExpiration(d.expiration || '')
         setLines((d.lines || []).map(l => ({ ...l, id: Date.now() + Math.random() })))
         if (d.showBreakdown !== undefined) setShowBreakdown(d.showBreakdown)
+        if (d.isAlaCarte !== undefined) setIsAlaCarte(!!d.isAlaCarte)
+        if (d.projectTypes) setProjectTypes(d.projectTypes)
+        if (d.projectSummary) setProjectSummary(d.projectSummary)
         setRevisingParentId(d.parentId || null)
         return
       } catch {}
@@ -819,8 +826,19 @@ export default function BuildQuote() {
       setProjectTypes(d.projectTypes || [])
       setProjectSummary(d.projectSummary || '')
       setRevisingParentId(d.revisingParentId || null)
+      setDraftProposalId(d.draftProposalId || null)
+      if (d.client || (d.lines || []).length) setRestoredFrom(d.client || 'your last quote')
     } catch {}
   }, [])
+
+  // Clear everything for a brand-new quote (the unsent one is dropped).
+  const startFresh = () => {
+    localStorage.removeItem(DRAFT_KEY)
+    setClient(''); setEmail(''); setPhone(''); setAddress(''); setExpiration('')
+    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(true)
+    setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
+    setDraftProposalId(null); setRestoredFrom(null)
+  }
 
   // Auto-save draft to localStorage whenever form state changes
   useEffect(() => {
@@ -828,9 +846,9 @@ export default function BuildQuote() {
     if (isEmpty) return
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
-      isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId,
+      isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId,
     }))
-  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId])
+  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId])
 
   const cats = ['All', ...new Set(catalog.map(c => c.category))]
   const filtered = catalog
@@ -1052,12 +1070,15 @@ export default function BuildQuote() {
   const subtotal = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const cost = showMargin ? subtotal / (1 + margin / 100) : null
 
+  // Preview keeps this quote's draft, so "Back to quote" returns to exactly
+  // this screen. The draft is cleared once the proposal is sent or printed.
   const goToProposal = () => {
     sessionStorage.setItem('proposal', JSON.stringify({
       client, email, phone, address, expiration, lines, margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
       ...(revisingParentId ? { parentId: revisingParentId } : {}),
+      ...(draftProposalId ? { proposalId: draftProposalId } : {}),
+      fromBuilder: true,
     }))
-    localStorage.removeItem(DRAFT_KEY)
     navigate('/proposal')
   }
 
@@ -1123,6 +1144,15 @@ export default function BuildQuote() {
             <Copy size={13} className="shrink-0" />
             <span>Creating a <strong>new revision</strong> — client info and lines are pre-filled. Edit as needed, then preview.</span>
             <button onClick={() => setRevisingParentId(null)} className="ml-auto text-amber-400 hover:text-amber-700"><X size={13} /></button>
+          </div>
+        )}
+        {restoredFrom && !revisingParentId && (
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--brand-50)] border border-[var(--brand-200)] rounded-lg text-sm text-gray-700">
+            <RotateCcw size={13} className="shrink-0 text-[var(--brand-600)]" />
+            <span>Picked up where you left off{restoredFrom !== 'your last quote' ? <> — <strong>{restoredFrom}</strong></> : ''}.</span>
+            <button onClick={() => { if (window.confirm('Start a new quote? The unsent quote on screen will be cleared.')) startFresh() }}
+              className="ml-auto text-xs font-semibold text-[var(--brand-700)] hover:underline whitespace-nowrap">Start a new quote</button>
+            <button onClick={() => setRestoredFrom(null)} aria-label="Dismiss" className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
           </div>
         )}
         <div className="flex items-center justify-between gap-2 flex-wrap">

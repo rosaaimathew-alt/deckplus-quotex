@@ -1093,7 +1093,7 @@ export default function Analytics() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
+      <div className="qx-hide-embedded mb-6">
         <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
         <p className="text-sm text-gray-400 mt-0.5">Business performance &amp; seasonality across all proposals</p>
       </div>

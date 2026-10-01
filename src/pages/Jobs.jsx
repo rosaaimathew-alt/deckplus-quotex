@@ -2065,6 +2065,7 @@ export default function Jobs() {
   const proposals = useStore(s => s.proposals)
   const [filter, setFilter] = useState('active')
   const [query,  setQuery]  = useState('')
+  const [stageFilter, setStageFilter] = useState(null)   // current-stage chip (from the old Scheduler view)
 
   // A job's phase: closed, in-progress (≥1 stage done, not closed), or not-started.
   const phaseOf = (p) => {
@@ -2075,9 +2076,26 @@ export default function Jobs() {
     return done > 0 ? 'in-progress' : 'not-started'
   }
 
+  // Where each open job is right now: its first unfinished stage
+  const currentStageOf = (p) => {
+    const stages = getStages(p) || []
+    const done = p.jobData?.completedStages || []
+    // Only the close-out left counts as "Ready to close", not as a stage of its own
+    return stages.length === 0 ? 'Needs setup' : (stages.find(s => !done.includes(s.key) && s.key !== 'closed')?.label || 'Ready to close')
+  }
+
   const wonJobs = proposals.filter(p => p.status === 'Won')
+  const stageGroups = (() => {
+    const map = new Map()
+    wonJobs.filter(p => phaseOf(p) !== 'closed').forEach(p => {
+      const label = currentStageOf(p)
+      map.set(label, (map.get(label) || 0) + 1)
+    })
+    return [...map.entries()].sort((a, b) => b[1] - a[1])
+  })()
   const filtered = wonJobs.filter(p => {
     const phase = phaseOf(p)
+    if (stageFilter && (phase === 'closed' || currentStageOf(p) !== stageFilter)) return false
     if (filter === 'active'      && phase === 'closed')        return false
     if (filter === 'in-progress' && phase !== 'in-progress')   return false
     if (filter === 'not-started' && phase !== 'not-started')   return false
@@ -2099,7 +2117,7 @@ export default function Jobs() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-5 gap-3">
+      <div className="qx-hide-embedded flex items-center justify-between mb-5 gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Job Management</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Stages · Change orders · Daily logs · Warranty</p>
@@ -2131,11 +2149,26 @@ export default function Jobs() {
         </div>
       </div>
 
+      {stageGroups.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap mb-4 -mt-1">
+          <span className="text-xs font-medium text-gray-500 mr-1">Current stage:</span>
+          {stageGroups.map(([label, n]) => (
+            <button key={label} onClick={() => setStageFilter(stageFilter === label ? null : label)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${stageFilter === label
+                ? 'bg-[var(--brand-600)] border-[var(--brand-600)] text-white'
+                : label === 'Needs setup' ? 'bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-300' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+              {label} <span className="opacity-70">{n}</span>
+            </button>
+          ))}
+          {stageFilter && <button onClick={() => setStageFilter(null)} className="text-xs text-gray-400 hover:text-gray-600 underline ml-1">clear</button>}
+        </div>
+      )}
+
       {wonJobs.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
           <FileSignature size={36} className="text-gray-200 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">No won jobs yet</p>
-          <p className="text-sm text-gray-400 mt-1">Mark a proposal as Won in the Proposal Tracker to create a job.</p>
+          <p className="text-sm text-gray-400 mt-1">Mark a proposal as Won in Sales → Proposals and it shows up here.</p>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { openProposal } from '../lib/openProposal'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
@@ -1177,7 +1178,10 @@ function AnalyticsView({ proposals: allProposals }) {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────
-export default function ProposalTracker() {
+// Inside the Sales destination the hub picks the view (list / pipeline /
+// activity) and this page hides its own title and tab switcher. `initialStatus`
+// pre-filters the list (e.g. links from Home's "needs attention").
+export default function ProposalTracker({ view, initialStatus } = {}) {
   const {
     proposals: allProposals, updateProposalStatus, setWinLossReason,
     addReminder, dismissReminder,
@@ -1194,8 +1198,9 @@ export default function ProposalTracker() {
     ? allProposals.filter(p => p.ownerId === me.id)
     : allProposals
 
-  const [tab, setTab] = useState('list')
-  const [filterStatus, setFilterStatus] = useState('All')
+  const [ownTab, setTab] = useState('list')
+  const tab = view || ownTab
+  const [filterStatus, setFilterStatus] = useState(initialStatus || 'All')
   const [periodFilter, setPeriodFilter] = useState('this-year')
   const [statsHidden, setStatsHidden] = useState(() => {
     // Collapsed by default — only expanded if the user explicitly chose to show it.
@@ -1215,19 +1220,7 @@ export default function ProposalTracker() {
   const today = new Date().toISOString().split('T')[0]
 
   // Open a proposal in read-only view
-  const handleOpen = (proposal) => {
-    sessionStorage.setItem('proposal', JSON.stringify({
-      client: proposal.client,
-      email: proposal.email,
-      phone: proposal.phone,
-      address: proposal.address,
-      expiration: proposal.expiration,
-      lines: proposal.lines || [],
-      margin: 0,
-      proposalId: proposal.id,
-    }))
-    navigate('/proposal')
-  }
+  const handleOpen = (proposal) => openProposal(proposal, navigate)
 
   // A la carte item selection modal state
   const [aLaCarteProposal, setALaCarteProposal] = useState(null)
@@ -1282,6 +1275,10 @@ export default function ProposalTracker() {
       expiration: proposal.expiration,
       lines: proposal.lines || [],
       parentId: rootId,
+      showBreakdown: proposal.showBreakdown,
+      isAlaCarte: !!proposal.isAlaCarte,
+      projectTypes: proposal.projectTypes || [],
+      projectSummary: proposal.projectSummary || '',
     }))
     navigate('/quote')
   }
@@ -1332,7 +1329,7 @@ export default function ProposalTracker() {
     <div className="p-4 sm:p-6 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-        <div>
+        <div className="qx-hide-embedded">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Proposal Tracker</h2>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Manage your pipeline from quote to close.</p>
         </div>
@@ -1344,7 +1341,7 @@ export default function ProposalTracker() {
             </div>
           )}
           <button onClick={toggleStats}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors">
+            className={`${tab === 'list' ? '' : 'hidden'} flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors`}>
             {statsHidden ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
             {statsHidden ? 'Show stats' : 'Hide stats'}
           </button>
@@ -1352,7 +1349,7 @@ export default function ProposalTracker() {
       </div>
 
       {/* Stats strip */}
-      {!statsHidden && (() => {
+      {!statsHidden && tab === 'list' && (() => {
         const now = new Date()
         const inPeriod = (p) => {
           const d = new Date(p.closedAt || p.createdAt || p.sentAt || Date.now())
@@ -1434,7 +1431,7 @@ export default function ProposalTracker() {
 
       {/* Tabs + Filter */}
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className={`${view ? 'hidden' : 'flex'} gap-1 bg-gray-100 rounded-lg p-1`}>
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -1457,7 +1454,7 @@ export default function ProposalTracker() {
             ))}
           </div>
         )}
-        {tab !== 'analytics' && (
+        {tab !== 'analytics' && tab !== 'activity' && (
           <div className="flex gap-1 flex-wrap">
             {['All', ...PROPOSAL_STATUSES].map(s => (
               <button

@@ -9,7 +9,7 @@ import { useSearchParams } from 'react-router-dom'
 //
 //   <Hub title="Projects" subtitle="…" tabs={[{ key, label, icon, count, render }]} />
 
-export function useHubTab(tabs, fallback) {
+function useHubTab(tabs, fallback) {
   const [params, setParams] = useSearchParams()
   const keys = tabs.map(t => t.key)
   const requested = params.get('tab')
@@ -39,7 +39,8 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
   if (!current) return null
   return (
     <div className="min-h-full flex flex-col">
-      <div className="no-print px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 bg-white/70 border-b border-gray-200 backdrop-blur-sm">
+      <div className="no-print bg-white/80 border-b border-gray-200 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 sm:pt-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-gray-900 leading-tight">{title}</h1>
@@ -67,8 +68,10 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
             })}
           </nav>
         )}
+        {visible.length <= 1 && <div className="h-4" />}
+        </div>
       </div>
-      <div className="flex-1 qx-hub-body" key={current.key}>
+      <div className="flex-1 qx-embedded" key={current.key}>
         {current.render()}
       </div>
     </div>

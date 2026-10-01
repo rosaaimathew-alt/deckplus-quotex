@@ -709,14 +709,17 @@ function FormulaCard({ title, defaults, rates, setRate, customComponents, addCus
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────
-export default function ItemCatalog() {
+// `mode` lets the Catalog destination open straight to Items or Builder rates;
+// left undefined, the page keeps its own Items | Tools switch.
+export default function ItemCatalog({ mode: forcedMode } = {}) {
   const catalog             = useStore(s => s.catalog)
   const CATEGORIES          = useStore(s => s.catalogCategories)
   const updateCatalogItem   = useStore(s => s.updateCatalogItem)
   const deleteCatalogItem   = useStore(s => s.deleteCatalogItem)
   const addCatalogItems     = useStore(s => s.addCatalogItems)
 
-  const [mode, setMode]           = useState('catalog') // 'catalog' | 'formulas'
+  const [ownMode, setMode]        = useState('catalog') // 'catalog' | 'formulas'
+  const mode = forcedMode || ownMode
   const [view, setView]           = useState('table')   // 'table' | 'sections'
   const [search, setSearch]       = useState('')
   const [catFilter, setCatFilter] = useState('All')
@@ -792,22 +795,22 @@ export default function ItemCatalog() {
 
   return (
     <div className="p-6">
-      {/* Top-level sections */}
-      <div className="flex bg-gray-100 rounded-lg p-1 mb-4 w-fit">
+      {/* Top-level sections (hidden when the Catalog destination picks the mode) */}
+      <div className={`${forcedMode ? 'hidden' : 'flex'} bg-gray-100 rounded-lg p-1 mb-4 w-fit`}>
         <button onClick={() => setMode('catalog')}
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'catalog' ? 'bg-white text-[var(--brand-700)] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
           <LayoutList size={14} /> Items
         </button>
         <button onClick={() => setMode('formulas')}
           className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'formulas' ? 'bg-white text-[var(--brand-700)] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-          <Settings2 size={14} /> Tools
+          <Settings2 size={14} /> Builder rates
         </button>
       </div>
 
       {mode === 'formulas' ? (
         <>
           <div className="mb-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-0.5">Tools</h2>
+            <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-0.5">Builder rates</h2>
             <p className="text-sm text-gray-500">Manager-set pricing the builders use — set the rates, then lock them so sales must follow.</p>
           </div>
           <FormulasView />
@@ -817,7 +820,7 @@ export default function ItemCatalog() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-0.5">Item Catalog</h2>
+          <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-0.5">Item Catalog</h2>
           <p className="text-sm text-gray-500">{catalog.length} items · AI-learned pricing from your estimates</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

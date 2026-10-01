@@ -204,8 +204,8 @@ export default function ImportPricing() {
   const unmappedRequired = FIELDS.filter(f => f.required && !mapping[f.key])
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-900 mb-1">Import Pricing Spreadsheet</h2>
+    <div className="qx-nested-pad p-6 max-w-7xl mx-auto">
+      <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-1">Import Pricing Spreadsheet</h2>
       <p className="text-gray-500 text-sm mb-6">
         Upload an Excel or CSV pricing sheet. We'll detect the columns and import everything straight to your catalog — no AI needed.
       </p>

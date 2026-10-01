@@ -301,7 +301,7 @@ export default function AiChat() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-[calc(100dvh-17rem)] min-h-[460px] overflow-hidden bg-gray-50 sm:m-6 sm:rounded-2xl border border-gray-200">
       {/* Left sidebar — stats + suggestions */}
       <div className="hidden lg:flex w-64 shrink-0 flex-col gap-4 p-4 border-r border-gray-200 bg-white overflow-y-auto">
         <div>

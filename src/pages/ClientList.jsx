@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import {
@@ -20,11 +21,11 @@ const STATUS_BADGE = {
 
 const STATUS_PRIORITY = { Won: 0, Negotiating: 1, 'Followed Up': 2, Sent: 3, Draft: 4, Lost: 5 }
 
-export default function ClientList() {
+export default function ClientList({ initialQuery = '' } = {}) {
   const navigate  = useNavigate()
   const proposals = useStore(s => s.proposals)
   const [expanded, setExpanded] = useState({})
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialQuery)
 
   // Group all proposals by client name
   const clientMap = {}
@@ -60,14 +61,7 @@ export default function ClientList() {
 
   const toggle = (name) => setExpanded(e => ({ ...e, [name]: !e[name] }))
 
-  const openProposal = (p) => {
-    sessionStorage.setItem('proposal', JSON.stringify({
-      client: p.client, email: p.email, phone: p.phone,
-      address: p.address, expiration: p.expiration,
-      lines: p.lines || [], margin: 0, proposalId: p.id,
-    }))
-    navigate('/proposal')
-  }
+  const openProposal = (p) => showProposal(p, navigate)
 
   const bestStatus = (proposals) => {
     return proposals.reduce((best, p) => {
@@ -80,12 +74,12 @@ export default function ClientList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
+          <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900">Clients</h2>
           <p className="text-sm text-gray-500 mt-0.5">{clients.length} client{clients.length !== 1 ? 's' : ''} · {proposals.length} total proposals</p>
         </div>
         <button
           onClick={() => navigate('/quote')}
-          className="flex items-center gap-2 px-4 py-2 text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
+          className="qx-hide-embedded flex items-center gap-2 px-4 py-2 text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
           style={{ backgroundColor: 'var(--brand-600)' }}
         >
           <Plus size={15} /> New Quote
