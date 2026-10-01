@@ -64,13 +64,38 @@ export function paymentsToSlots(payments = []) {
   return out
 }
 
+// "123 Maple Lane, Waxhaw, NC 28173" → street / city / state / zip
+export function parseAddress(addr = '') {
+  const m = /^(.*?),\s*([^,]+?),\s*([A-Za-z]{2}|North Carolina|South Carolina)\s*(\d{5}(?:-\d{4})?)?\s*$/i.exec(String(addr).trim())
+  if (!m) return { street: addr || '', city: '', state: '', zip: '' }
+  const st = /north/i.test(m[3]) ? 'NC' : /south/i.test(m[3]) ? 'SC' : m[3].toUpperCase()
+  return { street: m[1].trim(), city: m[2].trim(), state: st, zip: m[4] || '' }
+}
+// The contract number without its prefix, for the "DP-____" blanks in the Release.
+export const contractNumDigits = (num = '') => String(num).replace(/^[A-Za-z]+[-\s]?/, '')
+
+export const STATES = ['NC', 'SC']
+export const COUNTIES = {
+  NC: ['Mecklenburg', 'Union', 'Cabarrus', 'Gaston', 'Iredell', 'Lincoln', 'Rowan', 'Stanly', 'Catawba', 'Cleveland', 'Anson'],
+  SC: ['York', 'Lancaster', 'Chester', 'Chesterfield'],
+}
+
 // Values the packet fills in on its own when the contract is generated. The
 // sales rep can overwrite any of them; `overrides` wins where set.
-export function autoContractValues({ data = {}, total = 0, payments = [], projectTypes = [], contractNum = '', me = null, saleDate = null, specialInstructions = '', directions = '', overrides = {} }) {
+export function autoContractValues({ data = {}, total = 0, payments = [], projectTypes = [], contractNum = '', me = null, saleDate = null, specialInstructions = '', directions = '', projectSummary = '', overrides = {} }) {
   const today = new Date()
   const client = data.client || ''
   const types = (projectTypes || []).join(', ')
+  const addr = parseAddress(data.address || '')
+  const jobState = (overrides.jobState || addr.state || '').toUpperCase()
   const auto = {
+    jobState,
+    propertyStreet: addr.street, propertyCity: addr.city, propertyState: addr.state, propertyZip: addr.zip,
+    companyStreet: '2225 Coronation Blvd', companyCity: 'Charlotte', companyState: 'NC', companyZip: '',
+    contractNumDigits: contractNumDigits(contractNum || data.contractNumber || ''),
+    releaseState: jobState === 'SC' ? 'SOUTH' : jobState === 'NC' ? 'NORTH' : '',
+    capitalImprovement: [types, projectSummary].filter(Boolean).join(' — '),
+    signerTitle: 'Owner',
     effectiveDate:      fmtDate(today),
     clientName:         client,
     propertyAddress:    data.address || '',
@@ -90,6 +115,7 @@ export function autoContractValues({ data = {}, total = 0, payments = [], projec
   }
   const out = { ...auto }
   for (const [k, v] of Object.entries(overrides || {})) if (v !== undefined && v !== null && v !== '') out[k] = v
+  if (overrides.contractNum) out.contractNumDigits = contractNumDigits(overrides.contractNum)
   return out
 }
 
@@ -109,21 +135,23 @@ export function requiredSignFields(role, packet = []) {
       ...INITIAL_ITEM_IDS.map(id => `init:${id}`),
       'client-initials',
       'client-unforeseen',
-      ...forms.map(k => `client-${k}`),
+      ...forms.filter(k => !['e589', 'york'].includes(k)).map(k => `client-${k}`),
       'client-processing',
+      'client-release',
+      ...forms.filter(k => ['e589', 'york'].includes(k)).map(k => `client-${k}`),
     ]
   }
   if (role === 'builder') {
-    return ['contractor-agreement', 'contractor-initials', 'contractor-unforeseen', ...forms.map(k => `contractor-${k}`)]
+    return ['contractor-agreement', 'contractor-initials', 'contractor-unforeseen', ...forms.filter(k => !['e589', 'york'].includes(k)).map(k => `contractor-${k}`)]
   }
   return []
 }
 
 // Trade forms a job gets by default, from its project types and whether the
 // quote includes electrical.
-export function defaultPacket({ projectTypes = [], scopeLines = [], hasElectrical = false }) {
+export function defaultPacket({ projectTypes = [], scopeLines = [], hasElectrical = false, state = '', county = '' }) {
   const types = (projectTypes || []).join(' ') + ' ' + (scopeLines || []).map(l => l?.name || '').join(' ')
-  return defaultPacketForms({ types, hasElectrical })
+  return defaultPacketForms({ types, hasElectrical, state, county })
 }
 
 // Checkbox ids the app can pre-tick from data it already knows.

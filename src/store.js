@@ -22,13 +22,12 @@ const nullStorage = { getItem: () => null, setItem: () => {}, removeItem: () => 
 
 export { currentUserEmail } from './supabase'
 
-// Contract numbers: <prefix> + 6 digits. The prefix is per org
-// (org_settings.contractPrefix, e.g. "DP" → DP071042).
+// Contract numbers: the packet starts at "<prefix>-0000" (DP-0000) and the
+// office types the real number before the contract goes out. The prefix is per
+// org (org_settings.contractPrefix, default "DP").
 export function contractNumberFor(id, prefix) {
   const pre = prefix || useStore.getState().contractPrefix || 'DP'
-  const n = Number(id)
-  const body = Number.isFinite(n) ? String(70000 + n).padStart(6, '0') : String(id)
-  return `${pre}${body}`
+  return `${pre}-0000`
 }
 
 const SEED_CATALOG = [

@@ -103,6 +103,30 @@ while (i < srcWords.length && j < modWords.length) {
 if (i < srcWords.length && diffs < 25) { diffs++; console.log('\nSOURCE has extra words at the end: ' + srcWords.slice(i, i + 20).join(' ')) }
 if (j < modWords.length && diffs < 25) { diffs++; console.log('\nMODULE has extra words at the end: ' + modWords.slice(j, j + 20).join(' ')) }
 
+// ── General Release of Liability (separate source PDF, optional 2nd arg) ────
+const releasePdf = process.argv[3]
+if (releasePdf) {
+  const rdoc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(releasePdf)) }).promise
+  const rpage = await rdoc.getPage(1); const rtc = await rpage.getTextContent()
+  let rt = '', rlast = null
+  for (const it of rtc.items) { if (it.str === undefined) continue; if (rlast && Math.abs(it.transform[5] - rlast.transform[5]) > 2) rt += '\n'; else if (rlast && it.transform[4] - (rlast.transform[4] + rlast.width) > 2) rt += ' '; rt += it.str; rlast = it }
+  rt = rt.replace(/Docusign Envelope ID: [0-9A-F-]+/g, '')
+  // The source's "Page 1 of 1" sits in the text layer before the body; the module prints it last.
+  const rsrc = norm(rt.replace(/^\s*Page 1 of 1/, '') + ' Page 1 of 1')
+  const R = A.RELEASE
+  const rmod = norm([R.heading, R.heading2, ...R.paras, R.subject, ...R.paras2, R.executed, R.signature, R.printName, R.footer].join('\n'))
+  let ri = 0, rj = 0, rdiffs = 0
+  while (ri < rsrc.length && rj < rmod.length) {
+    if (rsrc[ri] === rmod[rj]) { ri++; rj++; continue }
+    rdiffs++; console.log(`\nRELEASE DIVERGENCE #${rdiffs}\n  source: …${rsrc.slice(Math.max(0, ri - 6), ri + 8).join(' ')}…\n  module: …${rmod.slice(Math.max(0, rj - 6), rj + 8).join(' ')}…`)
+    if (rsrc[ri + 1] === rmod[rj]) ri++; else if (rsrc[ri] === rmod[rj + 1]) rj++; else { ri++; rj++ }
+    if (rdiffs >= 10) break
+  }
+  if (ri < rsrc.length || rj < rmod.length) { rdiffs++; console.log('RELEASE length mismatch', rsrc.slice(ri, ri + 12).join(' '), '|', rmod.slice(rj, rj + 12).join(' ')) }
+  console.log(`release — source words: ${rsrc.length}   module words: ${rmod.length}   ${rdiffs ? 'divergences: ' + rdiffs : 'OK'}`)
+  diffs += rdiffs
+}
+
 console.log(`\npages 1–8 — source words: ${srcWords.length}   module words: ${modWords.length}   divergences: ${diffs}`)
 
 // ── Grid forms: same words, same counts, per page ───────────────────────────
@@ -127,4 +151,5 @@ for (const [pg, name, imageBoxes] of GRID_PAGES) {
   if (extra.length) console.log('  extra in module:     ' + extra.join(' '))
 }
 if (diffs === 0) console.log('OK — module text matches the source word for word.')
+// usage: node scripts/verify-contract-text.mjs <agreement.pdf> [release.pdf]
 process.exit(diffs === 0 ? 0 : 1)

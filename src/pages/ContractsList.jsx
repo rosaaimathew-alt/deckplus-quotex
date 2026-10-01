@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileSignature, FilePen, CheckCircle2, Clock, Search, X, FileX, ExternalLink, Eye, Loader2, Copy, MoreHorizontal } from 'lucide-react'
-import { useStore } from '../store'
+import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf } from '../contractTotal'
 
 const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -213,7 +213,7 @@ export default function ContractsList() {
       if (draft.signRecordId) {
         url = `/api/sign/recover-${draft.signRecordId}`
       } else {
-        const contractNum = draft.contractNum || `EOL${String(70000 + p.id).padStart(6, '0')}`
+        const contractNum = draft.contractNum || contractNumberFor(p.id)
         url = `/api/sign/lookup-${encodeURIComponent(contractNum)}`
       }
       const res  = await fetch(url)
@@ -256,7 +256,7 @@ export default function ContractsList() {
     ;(async () => {
       for (const p of pending) {
         const draft = p.contractDraft || {}
-        const contractNum = draft.contractNum || `EOL${String(70000 + p.id).padStart(6, '0')}`
+        const contractNum = draft.contractNum || contractNumberFor(p.id)
         // Self-healing: don't trust a single stored id. Probe every path that can
         // reach the record and take whichever actually holds the client's
         // signature — so a stale/missing id or contract-number can't hide it.
@@ -353,7 +353,7 @@ export default function ContractsList() {
 
   const openContract = (p) => {
     const contractNumber = p.contractDraft?.contractNum
-      || `EOL${String(70000 + p.id).padStart(6, '0')}`
+      || contractNumberFor(p.id)
     sessionStorage.setItem('contract', JSON.stringify({
       proposalId:     p.id,
       client:         p.client,
@@ -488,7 +488,7 @@ export default function ContractsList() {
           {filtered.map(p => {
             const status      = getContractStatus(p)
             const draft       = p.contractDraft || {}
-            const contractNum = draft.contractNum || `EOL${String(70000 + p.id).padStart(6, '0')}`
+            const contractNum = draft.contractNum || contractNumberFor(p.id)
             const signedAt    = draft.signedAt
             const primaryLabel = status === 'not-started' ? 'Start' : status === 'signed' ? 'View' : 'Open'
 

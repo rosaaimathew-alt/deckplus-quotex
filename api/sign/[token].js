@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { uploadToDrive } from '../_google-drive.js'
 import { verifyToken } from '../_auth.js'
+import { getKV } from '../_kv.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { kv } = await import('@vercel/kv')
+    const kv = await getKV()
 
     // ── CREATE new signing request with 3 role-specific links ────────
     if (token === 'create') {

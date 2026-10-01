@@ -229,3 +229,52 @@ revoke execute on function patch_record(text, text, jsonb)  from public, anon;
 revoke execute on function delete_record(text, text)        from public, anon;
 revoke execute on function patch_settings(jsonb)            from public, anon;
 revoke execute on function reserve_ids()                    from public, anon;
+
+-- ── API key/value store (replaces Vercel KV) ────────────────────────────────
+-- Signing records and links, proposal view links and Drive tokens written by
+-- the serverless API (api/_kv.js). Direct access is closed; the API goes
+-- through the SECURITY DEFINER functions, so a caller must know the exact key
+-- (keys are random UUID tokens).
+create table if not exists public.app_kv (
+  key        text primary key,
+  value      jsonb,
+  expires_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_kv enable row level security;
+revoke all on public.app_kv from anon, authenticated;
+
+create or replace function public.kv_get(k text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v jsonb; exp timestamptz;
+begin
+  select value, expires_at into v, exp from public.app_kv where key = k;
+  if not found then return null; end if;
+  if exp is not null and exp < now() then
+    delete from public.app_kv where key = k;
+    return null;
+  end if;
+  return v;
+end $$;
+
+create or replace function public.kv_set(k text, v jsonb, ttl_seconds integer default null)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.app_kv (key, value, expires_at, updated_at)
+  values (k, v, case when ttl_seconds is null then null else now() + make_interval(secs => ttl_seconds) end, now())
+  on conflict (key) do update
+    set value = excluded.value, expires_at = excluded.expires_at, updated_at = now();
+end $$;
+
+create or replace function public.kv_del(k text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.app_kv where key = k;
+end $$;
+
+revoke all on function public.kv_get(text) from public;
+revoke all on function public.kv_set(text, jsonb, integer) from public;
+revoke all on function public.kv_del(text) from public;
+grant execute on function public.kv_get(text) to anon, authenticated, service_role;
+grant execute on function public.kv_set(text, jsonb, integer) to anon, authenticated, service_role;
+grant execute on function public.kv_del(text) to anon, authenticated, service_role;

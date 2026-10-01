@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { verifyToken } from '../_auth.js'
+import { getKV } from '../_kv.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '4mb' } } }
 
@@ -18,7 +19,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { kv } = await import('@vercel/kv')
+    const kv = await getKV()
     const TTL = 60 * 60 * 24 * 90 // 90 days
 
     // ── CREATE ────────────────────────────────────────────────────────────

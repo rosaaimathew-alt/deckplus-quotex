@@ -12,7 +12,8 @@ typo fixes, no additions, no omissions.
 | `scripts/verify-contract-text.mjs` | Proves the module matches the source PDF word for word. Run after any change to the module. |
 | `src/contract/contractFields.js` | What goes in the blanks: auto-fill from the proposal, payment-line mapping, which spec sheets a job gets, which signature fields each party owes. |
 | `src/contract/DeckPlusContract.jsx` | Renders the packet. Layout only; contains no contract wording. Used by the office editor, the signing page and the signed copy. |
-| `public/contract/` | Every image from the source: the Deck Plus logo, the Electrical Specifications header artwork, the Processing Form title and the house sketch. |
+| `public/contract/` | Every image from the sources: the Deck Plus logo, the Electrical Specifications header artwork, the Processing Form title, the house sketch, and the NC E-589CI and York County permit pages rendered from their PDFs. |
+| `api/_kv.js` | Storage for signing records and links. Supabase-backed (`app_kv` table + `kv_get`/`kv_set`/`kv_del` functions); uses Vercel KV instead only if one is attached. |
 | `src/pages/ContractView.jsx` | Office/sales page: fills blanks, picks spec sheets, drafts the Scope of Work, sends for signature. |
 | `src/pages/SignPage.jsx` | Client / Deck Plus signing page (`/sign/<token>`). |
 | `src/pages/ContractViewFull.jsx` | Signed copy with signatures placed (`/view/<recordId>`). |
@@ -20,8 +21,11 @@ typo fixes, no additions, no omissions.
 ## Verifying the wording
 
 ```
-node scripts/verify-contract-text.mjs path/to/2026_CONTRACTOR_AGREEMENT_7.4.26.docx.pdf
+node scripts/verify-contract-text.mjs path/to/2026_CONTRACTOR_AGREEMENT_7.4.26.docx.pdf path/to/GENERAL_RELEASE_OF_LIABILITY.pdf
 ```
+
+The second argument (the General Release) is optional but should always be
+passed when checking a change to the release text.
 
 Pages 1–8 are compared as an ordered word sequence. Pages 9–12 are grid forms
 whose PDF text layer reads column-wise, so they are compared as per-page word
@@ -43,12 +47,17 @@ app prints from the extracted images.
 5. **Scope of Work** — ours, drafted from the proposal (see below). Clause 2 of the agreement refers to the Scope of Work "annexed hereto".
 6. Spec sheets, only when the job needs them: Electrical Specifications (source p. 8), Porch Detail Form (p. 9), Deck Detail Form (p. 10), Patio Detail Form (p. 11)
 7. Page 12 — Processing Form (every contract)
+8. **General Release of Liability** addendum (every contract). Verbatim text; "DP-" is printed and the blank takes the contract number without its prefix. The large open area ("relating to the following:") is the `releaseSubject` fill-in. NORTH / SOUTH before "CAROLINA" follows the job's state.
+9. **NC Form E-589CI, Affidavit of Capital Improvement** — every North Carolina job. Reproduced as the two rendered pages of the official PDF; the app writes the owner's name and address, Deck Plus's address, the capital improvement description, project name and address, title ("Owner") into Section I, and the client signs and dates it.
+10. **York County Residential Permit Application** — every York County, SC job. Reproduced as the rendered page of the county's PDF; the client signs, prints their name and dates the Property Owner line. The office fills in the rest afterwards, so nothing else is written on it.
 
 Spec sheets default from the job (`defaultPacket`): electrical when a scope
 line mentions electrical work; porch for porch / sunroom / 3-season / screen /
 Eze-Breeze types; deck for deck types; patio for hardscape / patio / paver /
-fire pit / kitchen / fireplace / wall types. The rep can add or remove any sheet
-per contract.
+fire pit / kitchen / fireplace / wall types; E-589CI when the job state is NC;
+York permit when the county is York. The state is read from the property
+address and the county is picked on the contract page ("Job Location"). The
+rep can add or remove any sheet per contract.
 
 ## Auto-populated blanks
 
@@ -58,7 +67,7 @@ on the document):
 
 - **Dates** — agreement effective date (today), date sold (when the proposal was won, else today)
 - **Customer** — client name, phone, email, property address
-- **Project** — contract #, job name (client name), project name (client – project types), project type, design consultant (the rep who launched it, else the signed-in user)
+- **Project** — contract # (defaults to `DP-0000`; the office enters the real number), job name (client name), project name (client – project types), project type, design consultant (the rep who launched it, else the signed-in user)
 - **Payment (clause 3)** — total, total in words, and the four payment lines from the milestone schedule:
   first milestone → *upon contract signature*, second → *the day job starts*,
   last → *after 1st punch list is completed*, anything in between → the labeled third line
@@ -82,7 +91,8 @@ come from `requiredSignFields`:
 
 - Client — agreement (p. 3), scope clarification (p. 4), initials on all 18
   items and the CLIENT(S) signature (pp. 5–6), site conditions (p. 7), each
-  included spec sheet, processing form (p. 12)
+  included spec sheet, processing form (p. 12), the General Release, and the
+  E-589CI and York permit when included
 - Deck Plus — agreement, CONTRACTOR signature (p. 6), site conditions, each
   included spec sheet
 
@@ -90,6 +100,13 @@ Initials boxes get the signer's signature shrunk to fit. Dates print as the day
 the party signed. The snapshot sent for signature carries
 `contractData.dp = { version, values, checks, packet }` so the signing page and
 the signed copy print exactly what the office saw.
+
+## Storage for signing
+
+Signing records (`sign:<id>`), role links (`link:<token>`), proposal view links
+and Google Drive tokens live in the Supabase `app_kv` table, reached only
+through `kv_get` / `kv_set` / `kv_del`. The API needs `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` (already set on Vercel). No Vercel KV store is needed.
 
 ## Changing the packet
 

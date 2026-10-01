@@ -154,7 +154,7 @@ export function buildDemoSeed() {
         ],
       },
       contractDraft: {
-        contractNum: 'EOL070005', signed: false,
+        contractNum: 'DP-0005', signed: false,
         projectTypes: ['Deck (New)'],
         scopeBullets: ['Multi-level composite deck', 'Screened porch with cathedral ceiling'],
       },
@@ -180,7 +180,7 @@ export function buildDemoSeed() {
         changeOrders: [],
       },
       contractDraft: {
-        contractNum: 'EOL070006', signed: true,
+        contractNum: 'DP-0006', signed: true,
         projectTypes: ['Deck (Resurface / Rebuild)'],
         scopeBullets: ['Composite deck resurface', 'New aluminum railings'],
       },

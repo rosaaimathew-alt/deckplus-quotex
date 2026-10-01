@@ -383,6 +383,73 @@ export const PROCESSING_FORM = {
   signatureLine: '<b>Client Signature: </b>{{sig:client-processing}} Date: {{sigdate:client-processing}}',
 }
 
+
+// ── General Release of Liability (every contract, after the Processing Form) ─
+// Source: GENERAL_RELEASE_OF_LIABILITY (1 page). Same rule: word for word.
+// "DP-" is printed text in the source; the blank after it takes the contract
+// number without its prefix ({{contractNumDigits}}). The state blank before
+// "CAROLINA" takes NORTH or SOUTH from the job's state ({{releaseState}}).
+export const RELEASE = {
+  key: 'release',
+  heading: '<b>GENERAL RELEASE OF LIABILITY</b>',
+  heading2: '<b>ADDENDUM – DP-{{contractNumDigits}}</b>',
+  paras: [
+    'I, {{clientName}}, homeowner at <b>{{propertyAddress}}</b>, (Hereinafter the “Releasor”) for and in consideration of:',
+    'Outdoor living space being developed by Deck Plus, LLC, project DP-{{contractNumDigits}}',
+    'THEREFORE under the terms of this Agreement and sufficiency of which is hereby acknowledged, do hereby release and forever discharge <b>DECK PLUS, LLC</b> of <b>2225 CORONATION BLVD,</b> City of <b>CHARLOTTE</b> State of <b>NORTH CAROLINA</b> (Hereinafter the “Releasee”) including their agents, employees, subcontractors, successors and assigns, and their respective heirs, personal representatives, affiliates, successors and assigns, and any and all persons, firms or corporations liable or who might be claimed to be liable, whether or not herein named, none of whom admit any liability to the undersigned, but all expressly denying liability, from any and all claims, demands, damages, actions, causes of action or suits of any kind or nature whatsoever, which I now have or may hereafter have, arising out of or in any way relating to any and all injuries and damages of any and every kind, to both person and property, and also any and all injuries and damages that may develop in the future, as a result of or in any way relating to the following:',
+  ],
+  // The source leaves open space here for what is being released.
+  subject: '{{releaseSubject}}',
+  paras2: [
+    'It is understood and agreed that this Agreement is made and received in full and complete settlement and satisfaction the causes of action, claims and demands mentioned herein; that this Release is in addition to the entire Agreement between the parties, referenced as <b>DP-{{contractNumDigits}}</b>; and that the terms of this Agreement are contractual and not merely a recital. Furthermore, this Release shall be binding upon the undersigned, and his respective heirs, executors, administrators, personal representatives, successors and assigns. This Release shall be subject to and governed by the laws of the State of {{releaseState}} CAROLINA, This Release has been read and fully understood by the undersigned and has been explained to me.',
+  ],
+  executed: 'EXECUTED this date: {{sigdate:client-release}}',
+  signature: 'Releasor’s Signature: {{sig:client-release}}',
+  printName: 'Print Name: {{clientName}}',
+  footer: 'Page <b>1</b> of <b>1</b>',
+}
+
+// ── Government forms carried as page images ─────────────────────────────────
+// Official forms are reproduced as rendered pages of the source PDF (nothing
+// retyped). The app writes into their fields at the positions below, given as
+// percentages of the page so they hold at any print size.
+//   NC E-589CI Affidavit of Capital Improvement — every North Carolina job.
+//   York County Residential Permit Application — every York County, SC job;
+//   the client signs it before the office fills it in.
+export const E589CI_FORM = {
+  key: 'e589',
+  pages: ['/contract/e589ci-1.png', '/contract/e589ci-2.png'],
+  fields: [   // page 1 (Section I, Single Use)
+    { name: 'clientName',        left: 8.3,  top: 27.4, width: 40 },
+    { name: 'propertyStreet',    left: 8.3,  top: 30.9, width: 40 },
+    { name: 'propertyCity',      left: 8.3,  top: 34.4, width: 23 },
+    { name: 'propertyState',     left: 32.8, top: 34.4, width: 4 },
+    { name: 'propertyZip',       left: 37.4, top: 34.4, width: 8 },
+    { name: 'companyStreet',     left: 52.1, top: 30.9, width: 40 },
+    { name: 'companyCity',       left: 52.1, top: 34.4, width: 23 },
+    { name: 'companyState',      left: 77.6, top: 34.4, width: 4 },
+    { name: 'companyZip',        left: 82.6, top: 34.4, width: 8 },
+    { name: 'capitalImprovement',left: 7.6,  top: 39.4, width: 85, height: 7.5, multiline: true },
+    { name: 'projectName',       left: 7.6,  top: 49.4, width: 40 },
+    { name: 'propertyStreet',    left: 7.6,  top: 53.0, width: 42 },
+    { name: 'propertyCity',      left: 50.6, top: 53.0, width: 24 },
+    { name: 'propertyState',     left: 76.8, top: 53.0, width: 4 },
+    { name: 'propertyZip',       left: 82.0, top: 53.0, width: 8 },
+    { sig: 'client-e589',        left: 26.5, top: 62.9, width: 25, height: 2.1 },
+    { name: 'signerTitle',       left: 57.0, top: 63.6, width: 20 },
+    { sigdate: 'client-e589',    left: 83.6, top: 63.6, width: 10 },
+  ],
+}
+export const YORK_PERMIT_FORM = {
+  key: 'york',
+  pages: ['/contract/york-permit.png'],
+  fields: [
+    { sig: 'client-york',        left: 5.9,  top: 81.7, width: 29, height: 2.1 },
+    { name: 'clientName',        left: 41.3, top: 82.3, width: 29 },
+    { sigdate: 'client-york',    left: 76.4, top: 82.3, width: 17 },
+  ],
+}
+
 // ── Packet assembly ─────────────────────────────────────────────────────────
 // Print order is the source order. `when` says which jobs a trade form belongs
 // to; the office can still add or remove any form per contract.
@@ -391,6 +458,9 @@ export const PACKET_FORMS = [
   { key: 'porch',      label: 'Porch Detail Form',         page: 9,  when: (job) => /porch|sunroom|3.?season|screen|eze/i.test(job.types) },
   { key: 'deck',       label: 'Deck Detail Form',          page: 10, when: (job) => /deck/i.test(job.types) },
   { key: 'hardscape',  label: 'Patio Detail Form',         page: 11, when: (job) => /hardscape|patio|paver|firepit|fire pit|kitchen|fireplace|wall/i.test(job.types) },
+  // Government forms, after the Processing Form and the Release
+  { key: 'e589',       label: 'NC E-589CI Affidavit',       page: 14, when: (job) => /^NC$/i.test(job.state || ''), image: true },
+  { key: 'york',       label: 'York County Permit App',     page: 15, when: (job) => /^york$/i.test(job.county || ''), image: true },
 ]
 
 // Which trade forms a job gets by default, from its project types and quote.
@@ -406,4 +476,7 @@ export const BLANK_FIELDS = [
   'clientPhone', 'clientEmail', 'jobName', 'dateSold', 'projectType', 'designConsultant',
   'notes', 'county', 'startDate', 'subdivision', 'beds', 'baths', 'waterProvider',
   'energyProvider', 'gasProvider', 'specialInstructions', 'directions', 'trashOther', 'elecOther',
+  'contractNumDigits', 'releaseState', 'releaseSubject', 'jobState',
+  'propertyStreet', 'propertyCity', 'propertyState', 'propertyZip',
+  'companyStreet', 'companyCity', 'companyState', 'companyZip', 'capitalImprovement', 'signerTitle',
 ]

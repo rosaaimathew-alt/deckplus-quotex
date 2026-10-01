@@ -1,5 +1,6 @@
 import { backupJsonToDrive, isAuthenticated } from '../_google-drive.js'
 import { requireAuth } from '../_auth.js'
+import { getKV } from '../_kv.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '25mb' } } }
 
@@ -8,7 +9,7 @@ const META_KEY = 'drive:backup:meta'
 export default async function handler(req, res) {
   if (!(await requireAuth(req, res))) return
   try {
-    const { kv } = await import('@vercel/kv')
+    const kv = await getKV()
 
     if (req.method === 'GET') {
       const [meta, authenticated] = await Promise.all([kv.get(META_KEY), isAuthenticated()])

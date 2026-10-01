@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { getKV } from './_kv.js'
 
 const __dirname    = path.dirname(fileURLToPath(import.meta.url))
 const TOKEN_FILE   = path.resolve(__dirname, '../google-tokens.json')
@@ -18,8 +19,8 @@ const SCOPES = [
 ].join(' ')
 
 async function loadTokens() {
-  if (process.env.KV_REST_API_URL) {
-    const { kv } = await import('@vercel/kv')
+  if (process.env.KV_REST_API_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) {
+    const kv = await getKV()
     return await kv.get(KV_TOKEN_KEY)
   }
   try {
@@ -29,8 +30,8 @@ async function loadTokens() {
 }
 
 async function saveTokens(tokens) {
-  if (process.env.KV_REST_API_URL) {
-    const { kv } = await import('@vercel/kv')
+  if (process.env.KV_REST_API_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) {
+    const kv = await getKV()
     await kv.set(KV_TOKEN_KEY, tokens)
   } else {
     fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2))

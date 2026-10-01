@@ -15,6 +15,7 @@ import { Fragment } from 'react'
 import {
   AGREEMENT, SCOPE_CLARIFICATION, INITIALS, UNFORESEEN, ELECTRICAL_FORM,
   PORCH_FORM, DECK_FORM, PATIO_FORM, PROCESSING_FORM, PACKET_FORMS,
+  RELEASE, E589CI_FORM, YORK_PERMIT_FORM,
 } from './deckPlusAgreement'
 import { roleOfSigId, fmtDate } from './contractFields'
 
@@ -328,6 +329,50 @@ function ProcessingPage({ ctx }) {
   )
 }
 
+// ── General Release of Liability (every contract) ───────────────────────────
+function ReleasePage({ ctx }) {
+  const R = RELEASE
+  return (
+    <section className="dp-page dp-release">
+      <div className="dp-center"><Logo /></div>
+      <h1 className="dp-release-h"><Inline text={R.heading} ctx={ctx} /><br /><Inline text={R.heading2} ctx={ctx} /></h1>
+      {R.paras.map((p, i) => <p key={i}><Inline text={p} ctx={ctx} /></p>)}
+      <div className="dp-release-subject"><Inline text={R.subject} ctx={ctx} /></div>
+      {R.paras2.map((p, i) => <p key={i}><Inline text={p} ctx={ctx} /></p>)}
+      <p className="dp-sigline dp-mt-lg"><Inline text={R.executed} ctx={ctx} /></p>
+      <p className="dp-sigline"><Inline text={R.signature} ctx={ctx} /></p>
+      <p className="dp-sigline"><Inline text={R.printName} ctx={ctx} /></p>
+      <p className="dp-release-footer"><Inline text={R.footer} ctx={ctx} /></p>
+    </section>
+  )
+}
+
+// ── Government forms: page images with fields written on top ───────────────
+function ImageFormPages({ form, ctx, values, editable, onValue }) {
+  return form.pages.map((src, pi) => (
+    <Fragment key={pi}>
+      {pi > 0 && <PageBreak />}
+      <section className="dp-page dp-imgform">
+        <div className="dp-imgform-page">
+          <img src={src} alt={`${form.key} page ${pi + 1}`} />
+          {pi === 0 && form.fields.map((f, i) => {
+            const style = { left: `${f.left}%`, top: `${f.top}%`, width: `${f.width}%`, height: f.height ? `${f.height}%` : undefined }
+            if (f.sig) return <div key={i} className="dp-imgform-sig" style={style}>{ctx.sig(f.sig)}</div>
+            if (f.sigdate) return <div key={i} className="dp-imgform-field" style={style}>{ctx.sigdate(f.sigdate)}</div>
+            const val = values?.[f.name] ?? ''
+            if (editable && onValue) {
+              return f.multiline
+                ? <textarea key={i} className="dp-imgform-input" style={style} value={val} onChange={e => onValue(f.name, e.target.value)} aria-label={f.name} />
+                : <input key={i} className="dp-imgform-input" style={style} value={val} onChange={e => onValue(f.name, e.target.value)} aria-label={f.name} />
+            }
+            return <div key={i} className={`dp-imgform-field${f.multiline ? ' multi' : ''}`} style={style}>{val}</div>
+          })}
+        </div>
+      </section>
+    </Fragment>
+  ))
+}
+
 // ── Scope of Work annex (ours, drafted from the proposal) ───────────────────
 function renderScopeLines(scopeLines = [], renderBold = (t) => t) {
   const hasBulletPrefix = scopeLines.some(l => (l.text || '').trimStart().startsWith('--'))
@@ -398,7 +443,9 @@ export default function DeckPlusContract({
   innerRef, className = '', style,
 }) {
   const ctx = makeCtx({ values, checks, editable, onValue, onCheck, renderSig, renderSigDate, renderInit })
-  const forms = PACKET_FORMS.filter(f => packet.includes(f.key))
+  const forms = PACKET_FORMS.filter(f => packet.includes(f.key) && !f.image)
+  const govForms = PACKET_FORMS.filter(f => packet.includes(f.key) && f.image)
+  const IMAGE_FORMS = { e589: E589CI_FORM, york: YORK_PERMIT_FORM }
   return (
     <div ref={innerRef} className={`dp-doc contract-doc ${className}`} style={style}>
       <AgreementPages ctx={ctx} />
@@ -422,6 +469,14 @@ export default function DeckPlusContract({
       ))}
       <PageBreak />
       <ProcessingPage ctx={ctx} />
+      <PageBreak />
+      <ReleasePage ctx={ctx} />
+      {govForms.map(f => (
+        <Fragment key={f.key}>
+          <PageBreak />
+          <ImageFormPages form={IMAGE_FORMS[f.key]} ctx={ctx} values={values} editable={editable} onValue={onValue} />
+        </Fragment>
+      ))}
     </div>
   )
 }

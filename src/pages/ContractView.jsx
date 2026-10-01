@@ -5,7 +5,7 @@ import { useStore } from '../store'
 import { DEMO } from '../demo'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import { PACKET_FORMS } from '../contract/deckPlusAgreement'
-import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket } from '../contract/contractFields'
+import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, STATES, COUNTIES } from '../contract/contractFields'
 
 // ── Contract page ────────────────────────────────────────────────────────────
 // Builds the Deck Plus contract packet for a Won proposal. The packet's wording
@@ -107,7 +107,7 @@ function getMilestoneSet(key, projectTag, total) {
 const FILLIN_GROUPS = [
   { title: 'Dates', fields: [['effectiveDate', 'Agreement date'], ['dateSold', 'Date sold'], ['startDate', 'Start date (PM)']] },
   { title: 'Customer', fields: [['clientName', 'Client name'], ['clientPhone', 'Phone'], ['clientEmail', 'Email'], ['propertyAddress', 'Property address'], ['county', 'County'], ['subdivision', 'Subdivision']] },
-  { title: 'Project', fields: [['contractNum', 'Contract #'], ['jobName', 'Job name (spec sheets)'], ['projectName', 'Project name (site conditions)'], ['projectType', 'Project type'], ['designConsultant', 'Design consultant']] },
+  { title: 'Project', fields: [['contractNum', 'Contract #'], ['jobName', 'Job name (spec sheets)'], ['projectName', 'Project name (site conditions)'], ['projectType', 'Project type'], ['designConsultant', 'Design consultant'], ['releaseSubject', 'Release of liability — relating to'], ['capitalImprovement', 'E-589CI — capital improvement']] },
   { title: 'Payment (clause 3)', fields: [['contractTotal', 'Contract total'], ['contractTotalWords', 'Total in words'], ['pay1', 'Upon contract signature'], ['pay2', 'The day job starts'], ['pay3', 'Middle payment'], ['pay3Label', 'Middle payment label'], ['pay4', 'After 1st punch list']] },
 ]
 
@@ -287,10 +287,10 @@ export default function ContractView() {
   })
   const pctSum      = payments.reduce((s, p) => s + Math.round(p.pct * 100), 0)
   const hasElectrical = (scopeLines || []).some(l => /electric|outlet|light|fan|switch|wiring/i.test(`${l.name} ${l.text}`))
-  const packetKeys  = packet ?? defaultPacket({ projectTypes, scopeLines, hasElectrical })
   const saleDate    = proposal?.closedAt || proposal?.statusChangedAt || null
-  const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate })
-  const values      = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, overrides: fieldOverrides })
+  const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary })
+  const values      = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, overrides: fieldOverrides })
+  const packetKeys  = packet ?? defaultPacket({ projectTypes, scopeLines, hasElectrical, state: values.jobState, county: values.county })
   const effectiveChecks = { ...autoChecks({ projectTypes }), ...checks }
 
   const setValue = (name, v) => {
@@ -619,15 +619,33 @@ export default function ContractView() {
             </div>
           </div>
           <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Job Location <span className="font-normal text-gray-400 normal-case">(state from the address; county picks the permit forms)</span></label>
+            <div className="flex gap-2 flex-wrap items-center mb-4">
+              {STATES.map(st => <button key={st} onClick={() => setValue('jobState', st)} className={btn(values.jobState === st, 'bg-gray-900 text-white border-gray-900')}>{st}</button>)}
+              <select className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs" value={values.county || ''}
+                onChange={e => {
+                  const c = e.target.value
+                  setValue('county', c)
+                  const st = STATES.find(st => COUNTIES[st].includes(c))   // picking a county also sets its state
+                  if (st) setValue('jobState', st)
+                }}>
+                <option value="">County…</option>
+                {STATES.map(st => <optgroup key={st} label={st}>{COUNTIES[st].map(c => <option key={c} value={c}>{c}</option>)}</optgroup>)}
+                <option value="__other">Other…</option>
+              </select>
+              {(values.county === '__other' || (values.county && !Object.values(COUNTIES).flat().includes(values.county))) && (
+                <input className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs w-36" placeholder="County name" value={values.county === '__other' ? '' : values.county} onChange={e => setValue('county', e.target.value)} />
+              )}
+            </div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">
-              Spec Sheets in this Packet
+              Spec Sheets &amp; Forms in this Packet
               {packet === null && <span className="ml-2 font-normal text-gray-400 normal-case">(auto from the job — click to change)</span>}
             </label>
             <div className="flex gap-2 flex-wrap">
               {PACKET_FORMS.map(f => <button key={f.key} onClick={() => togglePacket(f.key)} className={btn(packetKeys.includes(f.key), 'bg-amber-500 text-white border-amber-500')}><FileText size={12} className="inline mr-1 -mt-0.5" />{f.label}</button>)}
               {packet !== null && <button onClick={() => setPacket(null)} className="text-xs text-gray-400 hover:text-gray-600 underline">reset to auto</button>}
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">Pages 1–7, the Scope of Work and the Processing Form print on every contract. Spec sheets follow the Scope of Work.</p>
+            <p className="text-xs text-gray-400 mt-1.5">Pages 1–7, the Scope of Work, the Processing Form and the General Release of Liability print on every contract. Spec sheets follow the Scope of Work; the NC E-589CI affidavit (all NC jobs) and the York County permit application (York County jobs) print last.</p>
           </div>
 
           <div>
