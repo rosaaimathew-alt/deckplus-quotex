@@ -46,7 +46,7 @@ export default function CommandPalette({ onClose, destinations = [], actions = [
       if (s) out.push({ kind: 'Go to', key: `d:${d.to}`, label: d.label, hint: d.hint, icon: d.icon, to: d.to, s: s + 0.5 })
       for (const t of d.tabs || []) {
         const ts = Math.max(score(t.label, query), score(t.keywords, query) ? 1 : 0)
-        if (ts && query) out.push({ kind: 'Go to', key: `t:${d.to}:${t.key}`, label: `${d.label} › ${t.label}`, hint: t.hint, icon: t.icon || d.icon, to: `${d.to}?tab=${t.key}`, s: ts })
+        if (ts && query && t.label !== d.label) out.push({ kind: 'Go to', key: `t:${d.to}:${t.key}`, label: `${d.label} › ${t.label}`, hint: t.hint, icon: t.icon || d.icon, to: `${d.to}?tab=${t.key}`, s: ts })
       }
     }
     // Actions

@@ -1,5 +1,5 @@
 // ── Navigation map ───────────────────────────────────────────────────────────
-// The whole app in six places. Every tab still answers to the page path it came
+// The whole app in seven places. Every tab still answers to the page path it came
 // from (`access`), so plan and role permissions (src/plans.js, src/roles.js)
 // work exactly as before: a tab shows only when its old page was allowed, and
 // a destination shows only when at least one of its tabs is allowed.
@@ -29,11 +29,18 @@ export const DESTINATIONS = [
       { key: 'opens',     label: 'Opens',     icon: Eye, access: '/tracker', hint: 'When customers open proposals', keywords: 'activity views tracking opened' },
     ] },
 
+  // Contracts get their own place: sales prepares and sends them, managers and
+  // project managers track signatures — everyone finds them in one spot.
+  { key: 'contracts', to: '/contracts', label: 'Contracts', icon: FileSignature,
+    hint: 'Prepare, send and track signatures', keywords: 'sign signature agreement contract',
+    tabs: [
+      { key: 'all', label: 'Contracts', icon: FileSignature, access: '/contracts', hint: 'Every contract and its signing status', keywords: 'sign signature agreement' },
+    ] },
+
   { key: 'projects', to: '/projects', label: 'Projects', icon: HardHat,
-    hint: 'Contracts, jobs and the schedule', keywords: 'operations work won',
+    hint: 'Jobs, the schedule and crews', keywords: 'operations work won',
     tabs: [
       { key: 'jobs',       label: 'Jobs',       icon: Hammer, access: '/jobs', hint: 'Stages, change orders, logs, warranty', keywords: 'job management stages change order daily log warranty costs receipts payment close out' },
-      { key: 'contracts',  label: 'Contracts',  icon: FileSignature, access: '/contracts', hint: 'Prepare, send and track signatures', keywords: 'sign signature agreement' },
       { key: 'calendar',   label: 'Calendar',   icon: CalendarDays, access: '/scheduler', hint: 'Start dates, milestones, planned work', keywords: 'schedule scheduler dates planner milestones' },
       { key: 'crews',      label: 'Subcontractors', icon: Wrench, access: '/subs', hint: 'Subs, insurance and incidents', keywords: 'subs crews coi insurance trades' },
       { key: 'checklists', label: 'Checklists', icon: ClipboardCheck, access: '/checklists', hint: 'Shared team checklists', keywords: 'punch list todo tasks' },
@@ -66,7 +73,6 @@ export const LEGACY_REDIRECTS = {
   '/tracker':       '/sales?tab=proposals',
   '/pipeline':      '/sales?tab=pipeline',
   '/clients':       '/sales?tab=clients',
-  '/contracts':     '/projects?tab=contracts',
   '/jobs':          '/projects?tab=jobs',
   '/scheduler':     '/projects?tab=calendar',
   '/subs':          '/projects?tab=crews',

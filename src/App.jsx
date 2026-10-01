@@ -15,7 +15,7 @@ import COSignPage from './pages/COSignPage'
 import ContractViewFull from './pages/ContractViewFull'
 import PublicProposal from './pages/PublicProposal'
 import Legal from './pages/Legal'
-import { SalesHub, ProjectsHub, InsightsHub, CatalogHub } from './pages/hubs/Hubs'
+import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub } from './pages/hubs/Hubs'
 import CommandPalette from './components/CommandPalette'
 import AuthGuard, { logout } from './components/AuthGuard'
 import { useStore, bootstrapOrg } from './store'
@@ -106,9 +106,9 @@ function useBadges() {
       if (d && new Date(d + 'T00:00:00') <= today) followUps++
     }
     const won = proposals.filter(p => p.status === 'Won')
-    const projects = (can('/contracts') ? won.filter(p => contractStatusOf(p) === 'not-started').length : 0)
-      + (can('/scheduler') ? won.filter(p => !isJobClosed(p) && !p.jobData?.startDate).length : 0)
-    return { sales: followUps, projects, inbox: unread }
+    const contracts = can('/contracts') ? won.filter(p => contractStatusOf(p) === 'not-started').length : 0
+    const projects  = can('/scheduler') ? won.filter(p => !isJobClosed(p) && !p.jobData?.startDate).length : 0
+    return { sales: followUps, contracts, projects, inbox: unread }
   }, [proposals, unread, can])
 }
 
@@ -323,6 +323,7 @@ function AppShell() {
           <Routes>
             <Route path="/"          element={<Gated path="/"><RoleHome /></Gated>} />
             <Route path="/sales"     element={<GatedDestination dkey="sales"><SalesHub /></GatedDestination>} />
+            <Route path="/contracts" element={<GatedDestination dkey="contracts"><ContractsHub /></GatedDestination>} />
             <Route path="/projects"  element={<GatedDestination dkey="projects"><ProjectsHub /></GatedDestination>} />
             <Route path="/insights"  element={<GatedDestination dkey="insights"><InsightsHub /></GatedDestination>} />
             <Route path="/catalog"   element={<GatedDestination dkey="catalog"><CatalogHub /></GatedDestination>} />

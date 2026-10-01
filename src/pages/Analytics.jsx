@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
+import { MenuChip } from '../components/FilterBar'
 import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
 
 // ── Sales Heat Map ────────────────────────────────────────────────────────────
@@ -1101,14 +1102,8 @@ export default function Analytics() {
       {/* Summary cards — scoped to the selected period (defaults to this year) */}
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Performance · {periodLabel}</p>
-        <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5 flex-wrap">
-          {statsPeriods.map(p => (
-            <button key={p.id} onClick={() => setStatsPeriod(p.id)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${statsPeriod === p.id ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <MenuChip label="Period" value={statsPeriod} onChange={setStatsPeriod} align="right"
+          options={statsPeriods.map(p => ({ value: p.id, label: p.label }))} />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard icon={DollarSign} label="Total Revenue"  value={`$${fmt(stats.totalRevenue)}`} sub={`${stats.won.length} jobs won · ${periodLabel}`} color="green" />

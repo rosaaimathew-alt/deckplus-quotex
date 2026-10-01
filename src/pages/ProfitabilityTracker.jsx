@@ -8,6 +8,7 @@ import {
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
+import { MenuChip } from '../components/FilterBar'
 
 const fmt   = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtSh = (n) => {
@@ -340,18 +341,8 @@ export default function ProfitabilityTracker() {
       {/* Period selector — scopes every metric below, by sale (won) month */}
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Performance · {periodLabel}</p>
-        <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5 flex-wrap">
-          {statsYears.map(y => (
-            <button key={y} onClick={() => setStatsYear(y)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${statsYear === y ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-              {y}{y === CURRENT_YEAR ? ' (YTD)' : ''}
-            </button>
-          ))}
-          <button onClick={() => setStatsYear('all')}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${statsYear === 'all' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-            All time
-          </button>
-        </div>
+        <MenuChip label="Period" value={statsYear} onChange={setStatsYear} align="right"
+          options={[...statsYears.map(y => ({ value: y, label: y === CURRENT_YEAR ? `${y} (so far)` : String(y) })), { value: 'all', label: 'All time' }]} />
       </div>
 
       {/* KPI cards */}

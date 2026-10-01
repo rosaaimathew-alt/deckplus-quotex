@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
+import { MenuChip, QuickPicks, SwitchChip } from '../components/FilterBar'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
@@ -734,7 +735,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
   const filteredGroups = filterStatus === 'All'
     ? allGroups
     : allGroups.filter(({ root, revisions }) =>
-        [root, ...revisions].some(p => p.status === filterStatus)
+        [root, ...revisions].some(p => matchesStatus(p, filterStatus))
       )
 
   // Resolve the primary (best-status) proposal per group once, then sort by it.
@@ -1177,6 +1178,16 @@ function AnalyticsView({ proposals: allProposals }) {
   )
 }
 
+// Status filters: four everyday picks; the individual stages live under "More".
+const OPEN_STATUSES = ['Draft', 'Sent', 'Followed Up', 'Negotiating']
+const QUICK_STATUS = ['All', 'Open', 'Won', 'Lost']
+const MORE_STATUS  = ['Draft', 'Sent', 'Followed Up', 'Negotiating', 'MIA', 'Archived']
+function matchesStatus(p, f) {
+  if (!f || f === 'All') return true
+  if (f === 'Open') return OPEN_STATUSES.includes(p.status)
+  return p.status === f
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────
 // Inside the Sales destination the hub picks the view (list / pipeline /
 // activity) and this page hides its own title and tab switcher. `initialStatus`
@@ -1283,7 +1294,10 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
     navigate('/quote')
   }
 
-  const filtered = proposals.filter(p => filterStatus === 'All' || p.status === filterStatus)
+  const filtered = proposals.filter(p => matchesStatus(p, filterStatus))
+  // Counts per filter, by client (one row per client, as the list shows)
+  const statusCount = (f) => buildGroups(proposals).filter(({ root, revisions }) =>
+    [root, ...revisions].some(p => matchesStatus(p, f))).length
 
   const dueCount = proposals.reduce((count, p) => {
     const due = (p.reminders || []).filter(r => {
@@ -1327,27 +1341,46 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
-        <div className="qx-hide-embedded">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Proposal Tracker</h2>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Manage your pipeline from quote to close.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {dueCount > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg text-sm font-medium text-amber-800">
-              <Bell size={15} className="text-[var(--brand-500)]" />
-              {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
-            </div>
-          )}
-          <button onClick={toggleStats}
-            className={`${tab === 'list' ? '' : 'hidden'} flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors`}>
-            {statsHidden ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
-            {statsHidden ? 'Show stats' : 'Hide stats'}
-          </button>
-        </div>
+      {/* Header (standalone page only — inside Sales the destination names it) */}
+      <div className="qx-hide-embedded mb-4">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Proposal Tracker</h2>
+        <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Manage your pipeline from quote to close.</p>
       </div>
 
+      {/* One quiet filter row: everyday status picks, the rest in "More",
+          and the view / numbers toggles on the right. */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <div className={`${view ? 'hidden' : 'flex'} gap-1 bg-gray-100 rounded-lg p-1 mr-1`}>
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === id ? 'bg-white text-[var(--brand-700)] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
+        {tab === 'list' && (
+          <>
+            <QuickPicks value={QUICK_STATUS.includes(filterStatus) ? filterStatus : null} onChange={setFilterStatus}
+              options={QUICK_STATUS.map(s => ({ value: s, label: s, count: statusCount(s) }))} />
+            <MenuChip label={MORE_STATUS.includes(filterStatus) ? 'Status' : null} placeholder="More" value={MORE_STATUS.includes(filterStatus) ? filterStatus : null}
+              onChange={setFilterStatus} options={MORE_STATUS.map(s => ({ value: s, label: s, count: statusCount(s) }))} />
+          </>
+        )}
+        <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+          {dueCount > 0 && (
+            <span className="flex items-center gap-1.5 h-8 px-3 rounded-full bg-amber-50 border border-amber-200 text-xs font-medium text-amber-800">
+              <Bell size={13} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
+            </span>
+          )}
+          {role === 'manager' && me && (
+            <SwitchChip label="Only mine" checked={officeView === 'mine'} onChange={on => setOfficeView(on ? 'mine' : 'everyone')}
+              title="Show only the deals you own" />
+          )}
+          {tab === 'list' && (
+            <SwitchChip label="Numbers" checked={!statsHidden} onChange={toggleStats} title="Show totals for a period" />
+          )}
+        </div>
+      </div>
       {/* Stats strip */}
       {!statsHidden && tab === 'list' && (() => {
         const now = new Date()
@@ -1389,7 +1422,12 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
         ]
         return (
           <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Numbers · {periodLabel}</p>
+            <MenuChip label="Period" value={periodFilter} onChange={setPeriodFilter} align="right"
+              options={PERIODS.map(({ id, label }) => ({ value: id, label }))} />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             {/* Total Proposals — shows unique clients, total proposals as sub */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center gap-1.5 mb-1">
@@ -1409,67 +1447,9 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
               </div>
             ))}
           </div>
-          {/* Period filter buttons */}
-          <div className="flex gap-1.5 flex-wrap mb-4">
-            {PERIODS.map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => setPeriodFilter(id)}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  periodFilter === id
-                    ? 'bg-[var(--brand-600)] text-white'
-                    : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           </>
         )
       })()}
-
-      {/* Tabs + Filter */}
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <div className={`${view ? 'hidden' : 'flex'} gap-1 bg-gray-100 rounded-lg p-1`}>
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === id ? 'bg-white text-[var(--brand-700)] shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Icon size={14} /> {label}
-            </button>
-          ))}
-        </div>
-        {role === 'manager' && me && (
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium" title="Office view: everyone's deals or only the ones you own">
-            {[['everyone', 'Everyone'], ['mine', 'Mine']].map(([id, label]) => (
-              <button key={id} onClick={() => setOfficeView(id)}
-                className={`px-3 py-1.5 transition-colors ${officeView === id ? 'bg-[var(--brand-600)] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-        {tab !== 'analytics' && tab !== 'activity' && (
-          <div className="flex gap-1 flex-wrap">
-            {['All', ...PROPOSAL_STATUSES].map(s => (
-              <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  filterStatus === s ? 'bg-[var(--brand-600)] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Tab content */}
       {tab === 'list' && (

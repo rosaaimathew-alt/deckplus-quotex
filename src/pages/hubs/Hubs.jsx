@@ -3,12 +3,12 @@
 // themselves are unchanged; the destination decides which one is on screen,
 // counts what needs attention in each tab, and offers the one primary action.
 import { useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import Hub from '../../components/Hub'
 import { useNav } from '../../nav'
 import { useStore } from '../../store'
-import { nextReminderDate, contractStatusOf, isJobClosed } from '../../lib/attention'
+import { nextReminderDate, isJobClosed } from '../../lib/attention'
 
 import ProposalTracker from '../ProposalTracker'
 import ClientList from '../ClientList'
@@ -70,20 +70,34 @@ export function ProjectsHub() {
     const open = won.filter(p => !isJobClosed(p))
     return {
       jobs:      { count: open.length },
-      contracts: { count: won.filter(p => contractStatusOf(p) === 'not-started').length, countTone: 'alert' },
       calendar:  { count: open.filter(p => !p.jobData?.startDate).length, countTone: 'alert' },
     }
   }, [proposals])
 
   const tabs = withRender(tabsOf('projects'), {
     jobs:       () => <Jobs />,
-    contracts:  () => <ContractsList initialFilter={params.get('filter') || undefined} />,
     calendar:   () => <PMCalendar />,
     crews:      () => <Subcontractors />,
     checklists: () => <Checklists />,
   }, counts)
 
-  return <Hub title="Projects" subtitle="Won work: contracts, the build, and the schedule." tabs={tabs} rememberKey="projects" />
+  // Contracts used to be a tab here — send old links to their own page
+  if (params.get('tab') === 'contracts') {
+    const filter = params.get('filter')
+    return <Navigate to={`/contracts${filter ? `?filter=${encodeURIComponent(filter)}` : ''}`} replace />
+  }
+  return <Hub title="Projects" subtitle="Won work: the build, the schedule and the crews." tabs={tabs} rememberKey="projects" />
+}
+
+// ── Contracts ────────────────────────────────────────────────────────────────
+// Its own place because both sales and management live in it.
+export function ContractsHub() {
+  const { tabsOf } = useNav()
+  const [params] = useSearchParams()
+  const tabs = withRender(tabsOf('contracts'), {
+    all: () => <ContractsList initialFilter={params.get('filter') || undefined} />,
+  })
+  return <Hub title="Contracts" subtitle="Prepare, send and track signatures for every won job." tabs={tabs} />
 }
 
 // ── Insights ─────────────────────────────────────────────────────────────────
