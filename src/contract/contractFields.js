@@ -4,6 +4,7 @@
 // and is never touched here; this file only computes values, checkbox ids,
 // and which signature fields each party owes.
 import { INITIALS, PACKET_FORMS, defaultPacketForms } from './deckPlusAgreement'
+import { locateAddress } from '../lib/permitFees'
 
 export const PACKET_VERSION = 'deckplus-2026-07'
 
@@ -87,9 +88,13 @@ export function autoContractValues({ data = {}, total = 0, payments = [], projec
   const client = data.client || ''
   const types = (projectTypes || []).join(', ')
   const addr = parseAddress(data.address || '')
-  const jobState = (overrides.jobState || addr.state || '').toUpperCase()
+  // State and county also come from the ZIP / city, so the right permit forms
+  // (e.g. the York County permit application) are picked without asking.
+  const loc = locateAddress(data.address || '')
+  const jobState = (overrides.jobState || addr.state || loc.state || '').toUpperCase()
   const auto = {
     jobState,
+    county: loc.county || '',
     propertyStreet: addr.street, propertyCity: addr.city, propertyState: addr.state, propertyZip: addr.zip,
     companyStreet: '2225 Coronation Blvd', companyCity: 'Charlotte', companyState: 'NC', companyZip: '',
     contractNumDigits: contractNumDigits(contractNum || data.contractNumber || ''),

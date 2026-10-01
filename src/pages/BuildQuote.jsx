@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw } from 'lucide-react'
+import { Search, Plus, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark } from 'lucide-react'
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { parseBuildSpec } from '../buildParse'
 import PorchBuildPanel from '../components/PorchBuildPanel'
 import UnderDeckPanel from '../components/UnderDeckPanel'
 import HardscapePanel from '../components/HardscapePanel'
+import { requiredFees } from '../lib/permitFees'
 
 const MARGIN_DEFAULT = 30
 
@@ -817,6 +818,12 @@ export default function BuildQuote() {
   const [showBreakdown, setShowBreakdown] = useState(true)
   const [projectTypes, setProjectTypes] = useState([])
   const [projectSummary, setProjectSummary] = useState('')
+  // Permit & jurisdiction fees are worked out from the address (src/lib/permitFees.js).
+  // The rep can remove one (feeDismissed), change its price (feeEdits) or settle a
+  // shared ZIP like 29708 (feeOverrides.tegaCay).
+  const [feeDismissed, setFeeDismissed] = useState([])
+  const [feeEdits, setFeeEdits] = useState({})
+  const [feeOverrides, setFeeOverrides] = useState({})
 
   const PROJECT_TYPE_OPTIONS = ['Open Deck','Screen Porches','Eze-Breeze Porches','Open Porches','Porch Conversions','Sunrooms','Hardscapes']
   const toggleProjectType = (t) => setProjectTypes(prev =>
@@ -848,7 +855,10 @@ export default function BuildQuote() {
         setPhone(d.phone || '')
         setAddress(d.address || '')
         setExpiration(d.expiration || '')
-        setLines((d.lines || []).map(l => ({ ...l, id: Date.now() + Math.random() })))
+        setLines((d.lines || []).filter(l => !l.autoFee).map(l => ({ ...l, id: Date.now() + Math.random() })))
+        setFeeEdits(Object.fromEntries((d.lines || []).filter(l => l.autoFee).map(l => [l.autoFee, l.unitPrice])))
+        if (d.feeDismissed) setFeeDismissed(d.feeDismissed)
+        if (d.feeOverrides) setFeeOverrides(d.feeOverrides)
         if (d.showBreakdown !== undefined) setShowBreakdown(d.showBreakdown)
         if (d.isAlaCarte !== undefined) setIsAlaCarte(!!d.isAlaCarte)
         if (d.projectTypes) setProjectTypes(d.projectTypes)
@@ -867,7 +877,10 @@ export default function BuildQuote() {
       setAddress(d.address || '')
       setExpiration(d.expiration || '')
       setMargin(d.margin ?? MARGIN_DEFAULT)
-      setLines((d.lines || []).map(l => ({ ...l, id: Date.now() + Math.random() })))
+      setLines((d.lines || []).filter(l => !l.autoFee).map(l => ({ ...l, id: Date.now() + Math.random() })))
+      setFeeDismissed(d.feeDismissed || [])
+      setFeeEdits(d.feeEdits || {})
+      setFeeOverrides(d.feeOverrides || {})
       setIsAlaCarte(d.isAlaCarte || false)
       setShowBreakdown(d.showBreakdown ?? true)
       setProjectTypes(d.projectTypes || [])
@@ -885,6 +898,7 @@ export default function BuildQuote() {
     setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(true)
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
     setDraftProposalId(null); setRestoredFrom(null)
+    setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({})
   }
 
   // Auto-save draft to localStorage whenever form state changes
@@ -894,8 +908,22 @@ export default function BuildQuote() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
       isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId,
+      feeDismissed, feeEdits, feeOverrides,
     }))
-  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId])
+  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, feeDismissed, feeEdits, feeOverrides])
+
+  // Permit fees for this address + work, as quote lines (derived, never stored twice)
+  const feePlan = useMemo(() => requiredFees({ address, lines, projectTypes, catalog: catalogRaw, overrides: feeOverrides }),
+    [address, lines, projectTypes, catalogRaw, feeOverrides])
+  const feeLines = useMemo(() => feePlan.fees
+    .filter(f => !feeDismissed.includes(f.key))
+    .map(f => ({
+      id: `fee-${f.key}`, catalogId: f.catalogId, name: f.label, section: 'Permits & Fees', description: '',
+      unit: 'LS', qty: 1, unitPrice: feeEdits[f.key] ?? f.rate, category: 'Permits & Fees',
+      costMaterials: f.cost, costSub: 0, autoFee: f.key, why: f.why,
+    })), [feePlan, feeDismissed, feeEdits])
+  const allLines = useMemo(() => [...lines, ...feeLines], [lines, feeLines])
+  const dismissedFees = feePlan.fees.filter(f => feeDismissed.includes(f.key))
 
   const cats = ['All', ...new Set(catalog.map(c => c.category))]
   const filtered = catalog
@@ -1116,14 +1144,15 @@ export default function BuildQuote() {
     const next = [...lines]; [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]; setLines(next)
   }
 
-  const subtotal = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const subtotal = allLines.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const cost = showMargin ? subtotal / (1 + margin / 100) : null
 
   // Preview keeps this quote's draft, so "Back to quote" returns to exactly
   // this screen. The draft is cleared once the proposal is sent or printed.
   const goToProposal = () => {
     sessionStorage.setItem('proposal', JSON.stringify({
-      client, email, phone, address, expiration, lines, margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
+      client, email, phone, address, expiration, lines: allLines.map(l => { const c = { ...l }; delete c.why; return c }), margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
+      feeDismissed, feeOverrides,
       ...(revisingParentId ? { parentId: revisingParentId } : {}),
       ...(draftProposalId ? { proposalId: draftProposalId } : {}),
       fromBuilder: true,
@@ -1465,9 +1494,68 @@ export default function BuildQuote() {
                     </td>
                   </tr>
                 ))}
+                {feeLines.map((f, i) => (
+                  <tr key={f.id} className={`bg-amber-50/40 ${i === 0 ? 'border-t-2 border-amber-100' : 'border-t border-gray-50'}`}>
+                    <td className="px-4 py-2 text-xs text-amber-500" title="Added from the job address">
+                      <Landmark size={13} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <p className="text-sm font-medium text-gray-800">{f.name}</p>
+                      <p className="text-xs text-amber-700/80">Auto-added · {f.why}</p>
+                    </td>
+                    <td className="px-4 pt-3 text-sm text-center text-gray-500">1</td>
+                    <td className="px-4 pt-3 text-sm text-gray-500">LS</td>
+                    <td className="px-4 pt-3">
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-gray-400 text-sm">$</span>
+                        <input type="number" min="0" aria-label={`${f.name} price`}
+                          className="w-full border border-transparent rounded px-1 py-0.5 hover:border-gray-200 focus:border-blue-300 focus:outline-none text-sm bg-transparent"
+                          value={f.unitPrice} onChange={e => setFeeEdits(cur => ({ ...cur, [f.autoFee]: parseFloat(e.target.value) || 0 }))} />
+                      </div>
+                    </td>
+                    <td className="px-4 pt-3 text-right font-medium text-gray-800 whitespace-nowrap">
+                      ${Number(f.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-2 pt-2.5">
+                      <button onClick={() => setFeeDismissed(cur => [...cur, f.autoFee])} title="Remove this fee from the quote" aria-label={`Remove ${f.name}`}
+                        className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50">
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
+
+          {/* Where the job is, and why these fees were added */}
+          {(lines.length > 0 || address) && (
+            <div className="mx-4 my-3 rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2 text-xs text-gray-600 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="flex items-center gap-1.5 font-semibold text-amber-800"><Landmark size={13} /> Permits &amp; fees</span>
+              {!address.trim() ? (
+                <span>Enter the project address and the permit fees for that location are added automatically.</span>
+              ) : !feePlan.loc.known ? (
+                <span>Couldn’t tell the county or state from “{address}”. Add the city, state and ZIP (e.g. “Charlotte, NC 28277”).</span>
+              ) : (
+                <span>
+                  {[feePlan.loc.county && `${feePlan.loc.county} County`, feePlan.loc.state, feePlan.loc.zip].filter(Boolean).join(' · ')}
+                  {feePlan.loc.countyFrom === 'city' && ' (county from the city name)'}
+                  {!(feePlan.kinds.porch || feePlan.kinds.deck || feePlan.kinds.hardscape) && ' — add the work and its permit is added too.'}
+                </span>
+              )}
+              {(feePlan.loc.tegaCayUnsure || feeOverrides.tegaCay !== undefined) && (
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" className="accent-[var(--brand-600)]" checked={!!(feeOverrides.tegaCay ?? feePlan.loc.tegaCay)}
+                    onChange={e => setFeeOverrides(cur => ({ ...cur, tegaCay: e.target.checked }))} />
+                  Inside Tega Cay city limits? (29708 is shared with Fort Mill)
+                </label>
+              )}
+              {dismissedFees.map(f => (
+                <button key={f.key} onClick={() => setFeeDismissed(cur => cur.filter(k => k !== f.key))}
+                  className="text-[var(--brand-700)] hover:underline">+ Add back {f.label}</button>
+              ))}
+            </div>
+          )}
 
           {lines.length === 0 && (
             <div className="text-center py-12 text-gray-400">
@@ -1485,7 +1573,7 @@ export default function BuildQuote() {
               <Plus size={14} /> Add blank line
             </button>
             <div className="text-right">
-              <p className="text-xs text-gray-500 mb-0.5">{lines.length} line{lines.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-gray-500 mb-0.5">{allLines.length} line{allLines.length !== 1 ? 's' : ''}</p>
               <p className="text-lg font-bold text-gray-900">
                 ${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
