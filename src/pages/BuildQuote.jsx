@@ -5,6 +5,7 @@ import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../
 import { parseBuildSpec } from '../buildParse'
 import PorchBuildPanel from '../components/PorchBuildPanel'
 import UnderDeckPanel from '../components/UnderDeckPanel'
+import HardscapePanel from '../components/HardscapePanel'
 
 const MARGIN_DEFAULT = 30
 
@@ -790,6 +791,8 @@ export default function BuildQuote() {
       extra.push({ id: 'porch-build', name: 'Porch — Build to Spec (formula)', category: 'Screen Porches', assembly: 'porchbuild', unit: 'EA', unitPrice: 0, description: 'New open, ScreenEze or Eze-Breeze porch: size, roof connection, floor, roof style and options — price, cost and scope auto-calculate.' })
     if (!catalogRaw.some(c => c.assembly === 'underdeck'))
       extra.push({ id: 'underdeck-builder', name: 'Under Deck — Build to Spec (formula)', category: 'Under Deck Ceiling', assembly: 'underdeck', unit: 'EA', unitPrice: 0, description: 'Dry under-deck ceiling: enter the size, pick the style and count the lights, fans and heaters — priced from the catalog.' })
+    if (!catalogRaw.some(c => c.assembly === 'hardscape'))
+      extra.push({ id: 'hardscape-builder', name: 'Hardscape — Build to Spec (formula)', category: 'Hardscapes', assembly: 'hardscape', unit: 'EA', unitPrice: 0, description: 'Patio, retaining wall, fire pit, drainage and outdoor kitchen — enter sizes and counts; priced from the catalog.' })
     if (!catalogRaw.some(c => c.assembly === 'porch'))
       extra.push({ id: 'porch-builder', name: 'Porch Conversion — Build to Spec (formula)', category: 'Screen Porches', assembly: 'porch', unit: 'EA', unitPrice: 0, description: 'Eze-Breeze porch conversion: enter width, depth, wall height and doors — windows, columns, transoms, price, cost and scope auto-calculate.' })
     return extra.length ? [...extra, ...catalogRaw] : catalogRaw
@@ -905,6 +908,7 @@ export default function BuildQuote() {
     if (item.assembly === 'porch') { setActiveAssembly('porch'); return }
     if (item.assembly === 'porchbuild') { setActiveAssembly('porchbuild'); return }
     if (item.assembly === 'underdeck') { setActiveAssembly('underdeck'); return }
+    if (item.assembly === 'hardscape') { setActiveAssembly('hardscape'); return }
     setLines(prev => {
       const existing = prev.find(l => l.catalogId === item.id)
       if (existing) return prev.map(l => l.catalogId === item.id ? { ...l, qty: l.qty + 1 } : l)
@@ -1349,6 +1353,13 @@ export default function BuildQuote() {
         {activeAssembly === 'underdeck' && (
           <UnderDeckPanel
             initial={assemblyInitial?.underDeck || null}
+            onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
+            onAdd={newLines => { setLines(prev => [...prev, ...newLines]); setActiveAssembly(null); setAssemblyInitial(null) }}
+          />
+        )}
+        {activeAssembly === 'hardscape' && (
+          <HardscapePanel
+            initial={assemblyInitial?.hardscape || null}
             onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
             onAdd={newLines => { setLines(prev => [...prev, ...newLines]); setActiveAssembly(null); setAssemblyInitial(null) }}
           />
