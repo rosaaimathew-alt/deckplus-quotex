@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { X, Lock, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
+import { JicField } from './Jic'
+import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
 import {
   PORCH_BUILD_DEFAULTS, PORCH_BUILD_INPUT_DEFAULTS, PORCH_TYPES, PORCH_TIES, PORCH_FLOORS, PORCH_ROOFS,
   PORCH_BUILD_GROUPS, computePorchBuild, buildPorchScope, PORCH_WINDOW_MAX_H,
@@ -68,6 +70,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
   }, [savedRates])
 
   const [inp, setInp] = useState({ ...PORCH_BUILD_INPUT_DEFAULTS, ...(initial || {}) })
+  const [jic, setJic] = useState(JIC_DEFAULT)
   const set = (patch) => setInp(p => ({ ...p, ...patch }))
   const setSub = (k, patch) => setInp(p => ({ ...p, [k]: { ...(p[k] || {}), ...patch } }))
 
@@ -85,6 +88,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
   const stepProducts = [...new Set(keysWhere(r => r.steps).map(k => rates[k].steps))]
   const landingProducts = [...new Set(keysWhere(r => r.landing).map(k => rates[k].landing))]
   const optionKeys  = keysWhere(r => r.option)
+  const elecPkgKeys = keysWhere(r => r.elecPkg)
   const optionsByGroup = PORCH_BUILD_GROUPS.map(g => ({ ...g, keys: optionKeys.filter(k => rates[k].group === g.key) })).filter(g => g.keys.length)
 
   const addOption = (key) => {
@@ -115,7 +119,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
       costSub: 0,
       ...(g.key === 'structure' ? { porchBuild: inp } : {}),
     }))
-    onAdd(lines)
+    const jl = jicLine(jic, result.total, { section: 'Porch', category: typeMeta.category, label: 'porch' })
+    onAdd(jl ? [...lines, jl] : lines)
   }
 
   return (
@@ -281,10 +286,20 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
         )}
       </div>
 
+      {/* ── Electrical package ──────────────────────────────────────── */}
+      <div className="rounded-xl border border-gray-200 p-4">
+        <Field label="Electrical package" hint="Add extra fans, outlets, lights or heaters below under Options → Electrical.">
+          <select aria-label="Electrical package" className={selCls} value={inp.elecPackage || ''} onChange={e => set({ elecPackage: e.target.value || null })}>
+            <option value="">No electrical package</option>
+            {elecPkgKeys.map(k => <option key={k} value={k}>{rates[k].label} — {money(rates[k].rate)}</option>)}
+          </select>
+        </Field>
+      </div>
+
       {/* ── Options with a quantity ───────────────────────────────────── */}
       <div className="rounded-xl border border-gray-200 p-4 space-y-2">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Options (ceilings, roof, walls, deck upgrades)</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Options (ceilings, roof, walls, deck upgrades, electrical extras)</p>
           <select className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white" value="" onChange={e => addOption(e.target.value)}>
             <option value="">+ Add option…</option>
             {optionsByGroup.map(g => (
@@ -333,6 +348,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
         <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">{scope}</pre>
       </details>
 
+      <JicField value={jic} onChange={setJic} base={result.total} />
+
       {/* ── Footer ────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-4 pt-1">
         <div className="text-sm text-gray-500">
@@ -342,7 +359,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
         <div className="ml-auto flex gap-2">
           <button onClick={add} disabled={result.total <= 0}
             className="flex items-center gap-2 px-5 py-2.5 bg-[var(--brand-600)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-            <Plus size={15} /> Add porch to quote — {money(result.total)}
+            <Plus size={15} /> Add porch to quote — {money(result.total + jicAmount(jic, result.total))}
           </button>
           <button onClick={onClose} className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
         </div>

@@ -7,6 +7,8 @@ import PorchBuildPanel from '../components/PorchBuildPanel'
 import UnderDeckPanel from '../components/UnderDeckPanel'
 import HardscapePanel from '../components/HardscapePanel'
 import { requiredFees } from '../lib/permitFees'
+import { JicField } from '../components/Jic'
+import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
 
 const MARGIN_DEFAULT = 30
 
@@ -112,7 +114,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   // Each landing is sized by the rep on site (W × D ft)
   const [landingList, setLandingList] = useState(() =>
     Array.from({ length: Number(initial?.landings) || 0 }, (_, i) => ({ id: i + 1, width: 4, depth: 4 })))
-  const [boxSteps, setBoxSteps] = useState(initial?.boxSteps ?? 0)
+  const [stepStyle, setStepStyle] = useState(initial?.stepStyle || 'Regular steps')   // Regular steps / Box steps
+  const [jic, setJic] = useState(JIC_DEFAULT)
   const [brand, setBrand]       = useState(seeded?.brand || brandNames[0])
   const [collection, setCollection] = useState(seeded?.collection || Object.keys(brands[seeded?.brand || brandNames[0]] || {})[0])
   const [difficulty, setDifficulty] = useState('Standard')
@@ -123,7 +126,7 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const [extraSections, setExtraSections] = useState(initial?.extraSections ?? [])
 
   const n = (v) => Number(v) || 0
-  const W = n(width), D = n(depth), Hft = n(height), SW = n(stairWidth), LA = landingList.length, BX = n(boxSteps)
+  const W = n(width), D = n(depth), Hft = n(height), SW = n(stairWidth), LA = landingList.length
   const landingSF = landingList.reduce((s, l) => s + n(l.width) * n(l.depth), 0)
   const ftIn = (v) => `${n(v)}′`
   // Each attached section adds its own area (framing + decking) and its exposed
@@ -137,6 +140,7 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const heightIn  = Hft * 12
   const stepCount = heightIn > 0 ? Math.ceil(heightIn / DECK_RISER_MAX_IN) : 0
   const treadLF   = stepCount * SW
+  const BX        = stepStyle === 'Box steps' ? stepCount : 0                   // box-step upcharge, per step
   const treadDeckingLF = treadLF * DECK_TREAD_BOARDS   // decking that surfaces each stair tread
 
   // ── Decking layout (frame + spline, no butt joints) ──
@@ -286,16 +290,18 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
     lines.push(`Purchase and install ${deckingLabel} decking with Cortex hidden fasteners and color-matched plugs.`)
     if (borderCourses > 0) lines.push(`Install a ${border.toLowerCase()} mitered picture-frame border on all sides.`)
     if (fasciaOn)          lines.push('Wrap the deck rim and step risers in matching 1×12 fascia.')
-    if (stepCount > 0)     lines.push(`Build a ${stepCount}-step staircase, ${SW}′ wide, with matching fascia risers and skirt boards.`)
+    if (stepCount > 0)     lines.push(BX > 0
+      ? `Build ${stepCount} box steps, ${SW}′ wide, with matching fascia risers.`
+      : `Build a ${stepCount}-step staircase, ${SW}′ wide, with matching fascia risers and skirt boards.`)
     if (railQty > 0)       lines.push('Install hybrid composite railing system.')
     if (LA > 0)            lines.push(`Build ${LA} landing${LA > 1 ? 's' : ''} (${landingList.map(l => `${ftIn(l.width)}×${ftIn(l.depth)}`).join(', ')}).`)
-    if (BX > 0)            lines.push(`Build ${BX} box step${BX > 1 ? 's' : ''}.`)
     if (difficulty !== 'Standard') lines.push(`Work includes ${difficulty.toLowerCase()} framing conditions.`)
     return lines.join('\n')
   })()
 
   const add = () => {
-    onAdd({
+    const jl = jicLine(jic, price, { section: 'Deck', category: 'Decks', label: 'deck' })
+    onAdd([{
       id: Date.now() + Math.random(),
       catalogId: null,
       name: `${deckingLabel} Open Deck — ${W}′×${D}′ (${area} SF)`,
@@ -307,7 +313,7 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
       category: 'Decks',
       costMaterials: Math.round(cost),
       costSub: 0,
-    })
+    }, ...(jl ? [jl] : [])])
     onClose()
   }
 
@@ -346,7 +352,7 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
         {dim('Depth (ft)', depth, e => setDepth(e.target.value), { min: 0 })}
         {dim('Height (ft)', height, e => setHeight(e.target.value), { min: 0 })}
         {dim('Stair width (ft)', stairWidth, e => setStairWidth(e.target.value), { min: 3, step: 1 })}
-        {dim('Box steps (#)', boxSteps, e => setBoxSteps(e.target.value), { min: 0 })}
+        {drop('Steps', stepStyle, e => setStepStyle(e.target.value), ['Regular steps', 'Box steps'])}
       </div>
 
       {/* Landings — the rep sets each size */}
@@ -510,10 +516,12 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
         <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2">{description}</p>
       </div>
 
+      <div className="mt-4"><JicField value={jic} onChange={setJic} base={price} /></div>
+
       <div className="flex gap-2 mt-5">
         <button onClick={add} disabled={price <= 0}
           className="flex-1 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-          Add deck to quote — {money(price)}
+          Add deck to quote — {money(price + jicAmount(jic, price))}
         </button>
         <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
       </div>
@@ -578,6 +586,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
   const [depth, setDepth] = useState(initial?.depth ?? 12)   // ft — side walls
   const [wallH, setWallH] = useState(initial?.wallHeight ?? 96)   // in — wall height
   const [doors, setDoors] = useState(initial?.doors ?? 1)    // 36" exit doors (on the front wall)
+  const [jic, setJic] = useState(JIC_DEFAULT)
   const [sides, setSides] = useState('Front + 2 sides')
 
   const W  = Math.max(0, parseFloat(width) || 0)
@@ -654,7 +663,8 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
   })()
 
   const add = () => {
-    onAdd({
+    const jl = jicLine(jic, price, { section: 'Porch', category: 'Screen Porches', label: 'porch conversion' })
+    onAdd([{
       id: Date.now() + Math.random(),
       catalogId: null,
       name: `Eze-Breeze Porch Conversion — ${W}′×${D}′`,
@@ -666,7 +676,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
       category: 'Screen Porches',
       costMaterials: Math.round(cost),
       costSub: 0,
-    })
+    }, ...(jl ? [jl] : [])])
     onClose()
   }
 
@@ -769,10 +779,12 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
         <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 whitespace-pre-line">{description}</p>
       </div>
 
+      <div className="mt-4"><JicField value={jic} onChange={setJic} base={price} /></div>
+
       <div className="flex gap-2 mt-5">
         <button onClick={add} disabled={price <= 0}
           className="flex-1 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-          Add porch to quote — {money(price)}
+          Add porch to quote — {money(price + jicAmount(jic, price))}
         </button>
         <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
       </div>
@@ -967,7 +979,7 @@ export default function BuildQuote() {
 
   const [activeAssembly, setActiveAssembly] = useState(null)
   const [assemblyInitial, setAssemblyInitial] = useState(null)
-  const addAssemblyLine = (line) => setLines(prev => [...prev, line])
+  const addAssemblyLine = (line) => setLines(prev => [...prev, ...(Array.isArray(line) ? line : [line])])
 
   // ── Quick Build — type or dictate a job; AI fills the matching tool ──────────
   const collectionNames = useMemo(() => {

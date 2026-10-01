@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
+import { JicField } from './Jic'
+import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
 import { UDC_STYLES, UDC_ELECTRICAL, UDC_INPUT_DEFAULTS, computeUnderDeck, rateFor } from '../underDeck'
 
 // ── Under-deck ceiling tool ──────────────────────────────────────────────────
@@ -27,6 +29,7 @@ export default function UnderDeckPanel({ onClose, onAdd, initial }) {
   const catalogRaw = useStore(s => s.catalog)
   const catalog = useMemo(() => catalogRaw || [], [catalogRaw])
   const [inp, setInp] = useState({ ...UDC_INPUT_DEFAULTS, ...(initial || {}) })
+  const [jic, setJic] = useState(JIC_DEFAULT)
   const set = (p) => setInp(cur => ({ ...cur, ...p }))
   const setQty = (key, v) => setInp(cur => ({ ...cur, electrical: { ...cur.electrical, [key]: v } }))
   const result = useMemo(() => computeUnderDeck(inp, catalog), [inp, catalog])
@@ -61,7 +64,8 @@ export default function UnderDeckPanel({ onClose, onAdd, initial }) {
       costMaterials: Math.round(l.costTotal),
       costSub: 0,
     }))
-    onAdd([ceilingLine, ...elecLines])
+    const jl = jicLine(jic, result.total, { section: 'Under Deck', category: 'Under Deck Ceiling', label: 'under-deck' })
+    onAdd([ceilingLine, ...elecLines, ...(jl ? [jl] : [])])
   }
 
   return (
@@ -116,10 +120,12 @@ export default function UnderDeckPanel({ onClose, onAdd, initial }) {
         ))}
       </div>
 
+      <JicField value={jic} onChange={setJic} base={result.total} />
+
       <div className="flex gap-2">
         <button onClick={add} disabled={result.total <= 0}
           className="flex-1 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-          Add under-deck to quote — {money(result.total)}
+          Add under-deck to quote — {money(result.total + jicAmount(jic, result.total))}
         </button>
         <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
       </div>

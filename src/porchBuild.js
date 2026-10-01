@@ -21,6 +21,7 @@ export const PORCH_BUILD_GROUPS = [
   { key: 'finishes',    label: 'Walls & finishes' },
   { key: 'flooring',    label: 'Flooring' },
   { key: 'stepsrail',   label: 'Steps, landings & railing' },
+  { key: 'electrical',  label: 'Electrical' },
 ]
 
 // ── Rate table defaults (sell price; cost 0 until the office fills it in) ────
@@ -154,6 +155,44 @@ export const PORCH_BUILD_DEFAULTS = {
   skirt_trex:    R('Trex skirt',                                'SF', 33,   'stepsrail', { option: true }),
   border_1:      R('1-board border',                            'LF', 3,    'stepsrail', { option: true }),
   border_2:      R('2-board border',                            'LF', 6,    'stepsrail', { option: true }),
+
+  // Electrical — packages (pick one) from the Porch price list
+  elec_simple:   R('SIMPLE electric package (1 fan / 1 flood / 1 outlet)',                       'LS', 1850, 'electrical', { elecPkg: true }),
+  elec_standard: R('STANDARD electric package (1 fan / 4 lights / 1 flood / 1 outlet)',          'LS', 3150, 'electrical', { elecPkg: true }),
+  elec_3s_min:   R('3-SEASON MINIMUM electric package (1 fan / 1 flood / 5 outlets)',            'LS', 2250, 'electrical', { elecPkg: true }),
+  elec_3s_gold:  R('3-SEASON GOLD electric package (1 fan / 1 flood / 4 lights / dimmer / 5 outlets)', 'LS', 3500, 'electrical', { elecPkg: true }),
+  elec_12v:      R('Outdoor electric package 12v (1 fan / 4 lights)',                            'LS', 3900, 'electrical', { elecPkg: true }),
+  // Electrical — extras (quantity)
+  elec_trench:        R('Trench power line',                  'LF', 30,   'electrical', { option: true }),
+  elec_arc:           R('Extra ARC fault circuit',            'EA', 500,  'electrical', { option: true }),
+  elec_pavilion_panel:R('Pavilion extra panel',               'EA', 1900, 'electrical', { option: true }),
+  elec_fan:           R('Extra ceiling fan',                  'EA', 300,  'electrical', { option: true }),
+  elec_outlet:        R('Extra outlet',                       'EA', 180,  'electrical', { option: true }),
+  elec_gfi:           R('GFI outlet',                         'EA', 250,  'electrical', { option: true }),
+  elec_30amp:         R('30 AMP outlet (home run)',           'EA', 800,  'electrical', { option: true }),
+  elec_flood:         R('Extra flood light',                  'EA', 350,  'electrical', { option: true }),
+  elec_can:           R('Extra can light',                    'EA', 240,  'electrical', { option: true }),
+  elec_can_bronze:    R('Can light bronze upgrade',           'EA', 40,   'electrical', { option: true }),
+  elec_switch:        R('Extra switch',                       'EA', 125,  'electrical', { option: true }),
+  elec_dimmer:        R('Dimmer switch',                      'EA', 170,  'electrical', { option: true }),
+  elec_sconce:        R('Sconce / pendant light wiring',      'EA', 240,  'electrical', { option: true }),
+  elec_crown:         R('3 5/8″ inverted crown molding',      'LF', 17,   'electrical', { option: true }),
+  elec_rope:          R('Rope lighting',                      'LF', 12.5, 'electrical', { option: true }),
+  elec_tv:            R('TV / cable jack',                    'EA', 200,  'electrical', { option: true }),
+  elec_cat5:          R('Cat 5 internet cable',               'EA', 425,  'electrical', { option: true }),
+  elec_lv_transformer:R('Low-voltage transformer / outlet',   'EA', 750,  'electrical', { option: true }),
+  elec_riser_stair:   R('Riser stair light',                  'EA', 125,  'electrical', { option: true }),
+  elec_post_light:    R('Post light, moon-shape LED',         'EA', 200,  'electrical', { option: true }),
+  elec_cap_light:     R('Cap light for sleeved post',         'EA', 380,  'electrical', { option: true }),
+  elec_lv_dimmer:     R('Dimmer for low voltage',             'EA', 330,  'electrical', { option: true }),
+  elec_riser:         R('Riser light',                        'EA', 125,  'electrical', { option: true }),
+  elec_heater_black:  R('Infratech heater 5000W 40″ SS, black',    'EA', 2500, 'electrical', { option: true }),
+  elec_heater_recess: R('Infratech heater 5000W 40″ SS, recessed', 'EA', 5000, 'electrical', { option: true }),
+  elec_heater_color:  R('Infratech custom color add',         'EA', 1000, 'electrical', { option: true }),
+  elec_fan_ucs:       R('Fan with switch (pergola / UCS system)', 'EA', 1500, 'electrical', { option: true }),
+  elec_can_ucs:       R('Can lights for UCS system',          'EA', 310,  'electrical', { option: true }),
+  elec_coach:         R('Coach light replacement',            'EA', 75,   'electrical', { option: true }),
+  elec_fan_replace:   R('Fan replacement',                    'EA', 215,  'electrical', { option: true }),
 }
 
 // Scope-of-work starting text per porch type. Placeholders until Deck Plus
@@ -247,6 +286,7 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   railing: { product: '', lf: 0 },
   fascia:  { product: '', lf: null },   // null = auto: the deck's exposed perimeter
   extras: {},                           // { key: qty } for any option: true item
+  elecPackage: null,                    // one elecPkg key or null
 }
 
 const n = (v) => Number(v) || 0
@@ -349,7 +389,10 @@ export function computePorchBuild(input, ratesIn) {
   if (inp.floor === 'deck' && inp.fascia?.product && fasciaLF > 0 && rates[inp.fascia.product]?.fascia)
     add(inp.fascia.product, fasciaLF, inp.fascia?.lf == null || inp.fascia.lf === '' ? 'exposed perimeter' : undefined)
 
-  // Manual-qty options (ceilings, trim, walls, deck upgrades…). Hip already added the flat ceiling.
+  // Electrical package (one choice)
+  if (inp.elecPackage && rates[inp.elecPackage]?.elecPkg) add(inp.elecPackage, 1)
+
+  // Manual-qty options (ceilings, trim, walls, deck upgrades, electrical extras…). Hip already added the flat ceiling.
   for (const [k, q] of Object.entries(inp.extras || {})) {
     if (!rates[k]?.option) continue
     if (k === 'flat_ceiling' && roof === 'hip') continue

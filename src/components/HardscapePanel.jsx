@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
+import { JicField } from './Jic'
+import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
 import {
   HS_CONCRETE, HS_PAVERS, HS_WALLS, HS_ACCESSORIES, HS_KITCHEN, HS_GRANITE, HS_GRANITE_COLORS,
   HS_INPUT_DEFAULTS, HS_PUMP_TRUCK_FEE, HS_STEPPING, HS_BACKFILL, HS_GRANITE_FINISH, computeHardscape, hsRate,
@@ -47,6 +49,7 @@ export default function HardscapePanel({ onClose, onAdd, initial }) {
     wall: { ...HS_INPUT_DEFAULTS.wall, ...(initial?.wall || {}) },
     granite: { ...HS_INPUT_DEFAULTS.granite, ...(initial?.granite || {}) },
   }))
+  const [jic, setJic] = useState(JIC_DEFAULT)
   const setIn = (part, p) => setInp(cur => ({ ...cur, [part]: { ...cur[part], ...p } }))
   const setQty = (key, v) => setInp(cur => ({ ...cur, qty: { ...cur.qty, [key]: v } }))
   const result = useMemo(() => computeHardscape(inp, catalog), [inp, catalog])
@@ -90,7 +93,8 @@ export default function HardscapePanel({ onClose, onAdd, initial }) {
         ...(i === 0 ? { hardscape: inp } : {}),
       }
     })
-    onAdd(out)
+    const jl = jicLine(jic, result.total, { section: 'Hardscape', category: 'Hardscapes', label: 'hardscape' })
+    onAdd(jl ? [...out, jl] : out)
   }
 
   const g = HS_GRANITE.find(x => x.key === inp.granite.level)
@@ -195,10 +199,12 @@ export default function HardscapePanel({ onClose, onAdd, initial }) {
         </div>
       )}
 
+      <JicField value={jic} onChange={setJic} base={result.total} />
+
       <div className="flex gap-2">
         <button onClick={add} disabled={result.total <= 0}
           className="flex-1 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-          Add hardscape to quote — {money(result.total)}
+          Add hardscape to quote — {money(result.total + jicAmount(jic, result.total))}
         </button>
         <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
       </div>
