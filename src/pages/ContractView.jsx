@@ -102,13 +102,12 @@ function formulaMilestones(total, projectTag) {
     { label: 'Substantial completion payment',                pct: finalPct },
   ], { formula: true })
 }
+// Buttons the rep can pick. The older fixed splits (20/30/40/5/5, 20/30/40/10,
+// 30/50/20, 50/50) were retired as buttons; contracts saved with one still
+// open with it (getMilestoneSet below).
 const SCHEDULE_OPTIONS = [
-  { key: 'auto',         label: 'Auto' },
+  { key: 'auto',          label: 'Auto' },
   { key: 'formula_10_3k', label: '10% / ½ / ½ / $3K' },
-  { key: '20_30_40_5_5', label: '20 / 30 / 40 / 5 / 5' },
-  { key: '20_30_40_10',  label: '20 / 30 / 40 / 10' },
-  { key: '30_50_20',     label: '30 / 50 / 20' },
-  { key: '50_50',        label: '50 / 50' },
 ]
 function getMilestoneSet(key, projectTag, total) {
   if (key === 'formula_10_3k') return formulaMilestones(total, projectTag)
@@ -676,7 +675,7 @@ export default function ContractView() {
             </label>
             {(() => {
               const tagHistory = projectTag ? (paymentScheduleLearning[projectTag] || {}) : {}
-              const suggestedKey = Object.keys(tagHistory).sort((a, b) => tagHistory[b] - tagHistory[a])[0]
+              const suggestedKey = Object.keys(tagHistory).filter(k => SCHEDULE_OPTIONS.some(o => o.key === k)).sort((a, b) => tagHistory[b] - tagHistory[a])[0]
               return (
                 <>
                   {suggestedKey && paymentScheduleOverride === 'auto' && <p className="text-xs text-blue-600 mb-2">💡 Used <strong>{SCHEDULE_OPTIONS.find(o => o.key === suggestedKey)?.label ?? suggestedKey}</strong> on {tagHistory[suggestedKey]} past {projectTag} job{tagHistory[suggestedKey] !== 1 ? 's' : ''}</p>}
