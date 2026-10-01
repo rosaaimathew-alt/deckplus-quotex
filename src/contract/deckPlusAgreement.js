@@ -450,6 +450,12 @@ export const YORK_PERMIT_FORM = {
   ],
 }
 
+// ── Change order / addendum opening paragraph ───────────────────────────────
+// Printed at the top of every change order (addendum), exactly as given by
+// Deck Plus. {{contractNum}} is the contract the change order amends.
+export const CHANGE_ORDER_INTRO = 'This document is in reference to contract agreement {{contractNum}} May it be known the undersigned parties, for good consideration, do hereby agree to make the following changes/ or additions outlined below. These additions shall be made valid as if part of the original stated agreement.'
+export const changeOrderIntro = (contractNum) => CHANGE_ORDER_INTRO.replace('{{contractNum}}', contractNum || '')
+
 // ── Packet assembly ─────────────────────────────────────────────────────────
 // Print order is the source order. `when` says which jobs a trade form belongs
 // to; the office can still add or remove any form per contract.

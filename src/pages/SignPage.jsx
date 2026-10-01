@@ -5,6 +5,7 @@ import { X, CheckCircle2 } from 'lucide-react'
 import { ESIGN_DISCLOSURE, AGREEMENT_ACK } from '../legalContent'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import { requiredSignFields, ROLE_LABELS, fmtShortDate } from '../contract/contractFields'
+import { changeOrderIntro } from '../contract/deckPlusAgreement'
 
 // ── Signing page ─────────────────────────────────────────────────────────────
 // Each party opens their own link (/sign/<token>) and signs or initials only
@@ -173,6 +174,9 @@ export default function SignPage() {
                 <p className="text-gray-500">Licensed & Insured</p>
               </div>
             </div>
+
+            {/* Addendum opening paragraph */}
+            <p className="text-sm text-gray-800 text-justify">{changeOrderIntro(d.originalContractNum || contractNum)}</p>
 
             {/* Description */}
             <div>

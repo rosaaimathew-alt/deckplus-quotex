@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import SignaturePad from '../components/SignaturePad'
 import { CheckCircle2, Printer } from 'lucide-react'
+import { changeOrderIntro } from '../contract/deckPlusAgreement'
 
 const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -166,6 +167,9 @@ export default function COSignPage() {
               <div><strong>Client:</strong> {client}</div>
               <div><strong>Address:</strong> {address}</div>
             </div>
+
+            {/* Addendum opening paragraph */}
+            <p className="text-[10pt] mb-4 text-justify">{changeOrderIntro(contractNum)}</p>
 
             {/* Description */}
             {description && (
