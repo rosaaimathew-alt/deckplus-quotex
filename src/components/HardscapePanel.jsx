@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
+import { scopeFor } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
 import {
   HS_CONCRETE, HS_PAVERS, HS_WALLS, HS_ACCESSORIES, HS_KITCHEN, HS_GRANITE, HS_GRANITE_COLORS,
@@ -81,9 +82,13 @@ export default function HardscapePanel({ onClose, onAdd, initial }) {
         catalogId: null,
         name: isSurface ? `${l.label} patio — ${Number(P.width) || 0}′×${Number(P.depth) || 0}′ (${result.area} SF)` : l.label,
         section: 'Hardscape',
-        description: isSurface
-          ? `Install a ${l.label.toLowerCase()} patio, approximately ${Number(P.width) || 0}′ × ${Number(P.depth) || 0}′ (${result.area} SF).`
-          : (l.note || ''),
+        // Same wording as the catalog item, with this job's numbers filled in
+        description: scopeFor(catalog, l.catalogName, {
+          size: isSurface ? [Number(P.width) || 0, Number(P.depth) || 0] : null,
+          sqft: l.unit === 'SF' ? l.qty : null, lf: l.unit === 'LF' ? l.qty : null, count: l.qty,
+        }, isSurface
+          ? `Install a ${l.label.toLowerCase()} patio, approximately ${Number(P.width) || 0}’ × ${Number(P.depth) || 0}’ (${result.area} SF).`
+          : (l.note || '')),
         unit: l.unit,
         qty: l.qty,
         unitPrice: l.rate,

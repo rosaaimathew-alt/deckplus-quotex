@@ -77,17 +77,13 @@ export const PORCH_COMPONENT_DEFAULTS = {
 // Standard open-deck scope of work (materials & methods) — one bullet per line.
 // The builder prepends the deck size and appends option lines (decking brand,
 // railing, stairs, fascia, border…) so the customer sees the build, not our math.
-export const DECK_SCOPE_DEFAULT = [
-  'Set concrete block footers and install 6×6 support posts and beams, sized as required.',
-  'Frame with 2×10 pressure-treated floor joists at 12" on center.',
-  'Purchase and apply FastenMaster framing coating tape to all joists and beams.',
-].join('\n')
+// Extra standard lines for the Deck Builder scope (the deck wording itself comes
+// from the catalog). Empty by default; the office can add lines in Formulas.
+export const DECK_SCOPE_DEFAULT = ''
 
-export const PORCH_SCOPE_DEFAULT = [
-  'Install 6×6 pressure-treated support columns with top and bottom plates between each opening.',
-  'Install Eze-Breeze 4-track vinyl window units.',
-  'Paint, seal, and refinish the enclosed porch.',
-].join('\n')
+// Extra standard lines for the Porch Conversion scope (its wording comes from the
+// catalog's Porch Remodel items). Empty by default.
+export const PORCH_SCOPE_DEFAULT = ''
 
 // One-time cleanup: an earlier build injected "Deck Components" catalog items
 // (tagged `deckComp`). That approach was dropped in favor of the Deck Pricing

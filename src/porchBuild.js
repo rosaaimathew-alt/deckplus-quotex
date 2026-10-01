@@ -9,6 +9,8 @@
 // landings) are linear feet of board, exactly like the deck tool, because
 // per-SF pricing drifts from the boards actually bought on a deep porch.
 
+import { scopeFor, countWords } from './lib/scopeText'
+
 export const BOARD_FACE_IN  = 5.5    // 1×6 decking face width → 12/5.5 LF of board per SF
 export const RISER_MAX_IN   = 8.25   // max riser → step count from deck height
 export const LANDING_SF     = 16     // one landing = 4′×4′ of decking
@@ -194,25 +196,16 @@ export const PORCH_BUILD_DEFAULTS = {
   elec_fan_replace:   R('Fan replacement',                    'EA', 215,  'electrical', { option: true }),
 }
 
-// Scope-of-work starting text per porch type. Placeholders until Deck Plus
-// supplies the real inclusion lists; the office edits these in Formulas.
+// Extra standard lines per porch type, added after the catalog wording. The
+// structure wording itself comes from the catalog item for the base rate (see
+// PORCH_CATALOG_NAMES); Eze-Breeze porches price on the open-porch rows, so
+// their 3-season wording lives here. The office can edit these in Formulas.
 export const PORCH_BUILD_SCOPE_DEFAULTS = {
-  open: [
-    'Set concrete footings and 6×6 pressure-treated support posts.',
-    'Frame the porch roof and tie it into the house as specified.',
-    'Install roof sheathing, synthetic underlayment and shingles to match the house.',
-  ].join('\n'),
-  screen: [
-    'Set concrete footings and 6×6 pressure-treated support posts.',
-    'Frame the porch roof and tie it into the house as specified.',
-    'Install roof sheathing, synthetic underlayment and shingles to match the house.',
-    'Enclose the porch with the ScreenEze screen system.',
-  ].join('\n'),
+  open: '',
+  screen: '',
   ezebreeze: [
-    'Set concrete footings and laminated 6×6 support columns.',
-    'Frame the porch roof and tie it into the house as specified.',
-    'Install roof sheathing, synthetic underlayment and shingles to match the house.',
-    'Enclose the porch with Eze-Breeze 4-track vinyl window units.',
+    '• 4’x8’ Ply beaded sheets wood ceiling, 1”x4” trim.',
+    'Install shingles, soffit, gutters and downspouts matching as close as possible existing.',
   ].join('\n'),
 }
 
@@ -409,25 +402,104 @@ export function computePorchBuild(input, ratesIn) {
   return { lines, groups, total, cost, area, roof, layout, risers, fasciaLF: exposedPerimeterFt(inp) }
 }
 
-// Customer-facing scope: the office's template for the type, then the lines
-// this quote adds automatically (size, tie-in, floor, roof, enclosure counts).
-export function buildPorchScope(input, result, templates) {
+// ── Scope wording: catalog item per rate key ─────────────────────────────────
+// Each priced line writes the description of its catalog item (Deck Plus's own
+// scope wording), with the size / count / square feet filled in.
+export const PORCH_CATALOG_NAMES = {
+  base_screen_wall_deck: 'ScreenEze Wall Tie on PT Deck', base_screen_roof_deck: 'ScreenEze Roof Tie on PT Deck',
+  base_screen_wall_patio: 'ScreenEze Wall Tie on patio',  base_screen_roof_patio: 'ScreenEze Roof Tie on patio',
+  base_open_wall_deck: 'Open Wall Tie on PT Deck', base_open_roof_deck: 'Open Roof Tie on PT Deck',
+  base_open_wall_patio: 'Open Wall Tie on Patio',  base_open_roof_patio: 'Open Roof Tie on Patio',
+  freestanding_add: 'Freestanding Structure ADD', pt_lvl: 'PT LVL (Framing) LF', lvl_engineering: 'LVL Engineering (for all LVL projects)',
+  hot_tub_reinforce: 'Reinforce deck for hot tub/porch', bracing_letter: 'Engineered metal bracing LETTER', seed_straw: 'Seed and straw',
+  lam_column_pkg: '6x6 lam column package', eze_window: 'EzeBreeze', eze_transom: 'Transom',
+  door_tradewinds: 'Larsen Tradewinds Door', door_savannah: 'Larsen Savannah Door', door_savannah_pet: 'Larsen Savannah Pet Door',
+  glass_gable_end: 'Glass in openings',
+  metal_roof: 'Metal roof', tg_ceiling: 'T&G Ceiling 1x6', flat_ceiling: 'Flat Ceiling', gable_trim: 'Sunrise gable', skylight: "Skylight 4'x2'",
+  shiplap_wood: 'Shiplap Wood 1x6" wall SF', knee_wall: 'Knee wall Hardie/PlyBeaded SF', tv_wall: "TV Wall Shiplap/Siding/Paint 5'x9'",
+  paint_porch_patio: 'Paint/Stain PORCH on PATIO', paint_porch_composite: 'Paint/Stain PORCH on TREX DECK', paint_porch_deck: 'Paint/Stain PORCH on PT DECK',
+  paint_pt_deck: 'Paint/Stain on PT Deck (Porch)', paint_trex_hybrid_rail: 'Paint/Stain on TREX Deck HYBRID RAIL SF', paint_trex_rail: 'Paint/Stain on TREX Deck TREX RAIL SF',
+  floor_trex_enhance: 'Trex Enhance Upgrade', floor_trex_transcend: 'Trex Transcend Upgrade', lvt: 'LVT Flooring only', lvt_concrete: 'LVT on concrete',
+  concrete_4: 'Concrete 4"', concrete_small: 'Concrete slab LESS THAN 200SF', concrete_reinforced: 'Reinforced Concrete 4" (mesh/flooring underlayment)',
+  concrete_access: 'CONCRETE + HILL DRIVEWAY HOUSE',
+  steps_pt: 'PT Steps', landing_pt: 'PT Landing',
+  steps_trex_enhance: 'Trex ENHANCE Steps', landing_trex_enhance: 'Trex ENHANCE Landing', steps_trex_transcend: 'Trex TRANSCEND Steps', landing_trex_transcend: 'Trex TRANSCEND Landing',
+  steps_trex_lineage: 'Trex LINEAGE Steps', landing_trex_lineage: 'Trex LINEAGE Landing', steps_trex_signature: 'Trex SIGNATURE Steps', landing_trex_signature: 'Trex SIGNATURE Landing',
+  steps_tt_prime: 'TimberTech PRIME/+ Steps', landing_tt_prime: 'TimberTech PRIME/+ Landing', steps_tt_terrain: 'TimberTech TERRAIN/+ Steps', landing_tt_terrain: 'TimberTech TERRAIN/+ Landing',
+  steps_tt_reserve: 'TimberTech RESERVE Steps', landing_tt_reserve: 'TimberTech RESERVE Landing', steps_tt_harvest: 'TimberTech HARVEST PVC Steps', landing_tt_harvest: 'TimberTech HARVEST PVC Landing',
+  steps_tt_landmark: 'TimberTech LANDMARK PVC Steps', landing_tt_landmark: 'TimberTech LANDMARK PVC Landing',
+  steps_tt_vintage_pvc: 'TimberTech VINTAGE PVC Steps', landing_tt_vintage_pvc: 'TimberTech VINTAGE PVC Landing',
+  steps_tt_vintage_tg: 'TimberTech VINTAGE T&G Steps', landing_tt_vintage_tg: 'TimberTech VINTAGE T&G Landing',
+  rail_hybrid_wood: 'Hybrid Railing / wood cap', rail_hybrid_trex: 'Hybrid Railing / trex cap', rail_trex_transcend: 'Trex Transcend Railing',
+  rail_trex_signature: 'Trex SIGNATURE Alum. Railing',
+  fascia_pvc: 'PVC WHITE FASCIA LF', fascia_trex: 'TREX ENHANCE/TRANSCEND/LINEAGE FASCIA LF', fascia_tt_composite: 'TimberTech COMPOSITE FASCIA LF', fascia_tt_pvc: 'TimberTech PVC FASCIA LF',
+  box_step: 'Box steps PER STEP', post_8x8: '8x8 solid posts', trex_gate: 'Trex Aluminum Gate', privacy_wall: 'Privacy wall SF',
+  lattice_sheet: 'Eng. Lattice STAINED/ per 4x8 sheet', skirt_pt: 'PT vertical/horizontal skirt STAINED SF', skirt_trex: 'TREX vertical/horizontal skirt SF',
+  border_1: '1-Board border SF', border_2: '2-boards border SF',
+  elec_simple: 'SIMPLE Electric Package (1 fan/1 flood/ 1 outlet)', elec_standard: 'STANDARD Electric Package (1 fan/4 lights/1 flood/ 1 outlet)',
+  elec_3s_gold: '3SEASON GOLD Electric Package (1 fan/1 flood/ 4 lights / dimmer / 5 outlets)',
+  elec_trench: 'Trench power line LF', elec_fan: 'Extra Ceiling Fan', elec_outlet: 'Extra Outlet', elec_30amp: '30 AMP Outlet (home run)',
+  elec_flood: 'Extra Flood light', elec_can: 'Extra Can Lights', elec_can_bronze: 'Can Lights BRONZE upgrade', elec_sconce: 'Sconce/Pendant light wiring',
+  elec_riser_stair: 'Riser stair light', elec_post_light: 'Post light moon shape LED', elec_cap_light: 'Cap light for sleeved post', elec_riser: 'Riser light',
+  elec_heater_black: 'Infratech Heater 5000w 40inch SS BLACK', elec_fan_ucs: 'Fan w/ switch for pergola/UCS system', elec_can_ucs: 'Can lights for UCS system',
+}
+// Lines whose wording is already in the structure text (or are internal fees)
+const SCOPE_SKIP = new Set(['hip_roof', 'gable_over_19', 'deck_over_8'])
+const ROOF_WORDS = { shed: 'Shed roof', gable: 'A-Frame gable roof', semivault: 'Semi Vaulted roof', hip: 'Hip roof' }
+
+// One priced line → its scope wording
+export function porchLineScope(l, inp, result, catalog) {
+  const name = PORCH_CATALOG_NAMES[l.key]
+  const fallback = `${l.label}${l.unit === 'EA' && l.qty > 1 ? ` (${l.qty})` : ''}.`
+  if (!name) return fallback
+  if (l.key.startsWith('steps_')) {
+    const t = scopeFor(catalog, name, { count: result.risers, width: n(inp.steps?.stairWidthFt || 4) }, fallback)
+    return t.replace(/^__’x__’ landing and a/, 'A')
+  }
+  if (l.key.startsWith('landing_')) {
+    const cnt = n(inp.landings?.count)
+    let t = scopeFor(catalog, name, { size: [4, 4] }, fallback)
+    if (cnt > 1) t = t.replace('on one approximately 4’x4’ landing', `on ${countWords(cnt)} approximately 4’x4’ landings`)
+    return t
+  }
+  const area = ['SF'].includes(l.unit) ? l.qty : result.area
+  return scopeFor(catalog, name, { size: [n(inp.width), n(inp.depth)], count: l.qty, sqft: area, lf: l.unit === 'LF' ? l.qty : null }, fallback)
+}
+
+// Customer-facing scope, grouped like the quote lines: the catalog wording for
+// the porch itself, then each priced line's wording.
+export function buildPorchScope(input, result, templates, catalog = []) {
   const inp = { ...PORCH_BUILD_INPUT_DEFAULTS, ...(input || {}) }
-  const tpl = (templates || {})[inp.type] ?? PORCH_BUILD_SCOPE_DEFAULTS[inp.type] ?? ''
-  const typeLabel = PORCH_TYPES.find(t => t.key === inp.type)?.label || 'Porch'
-  const out = []
-  out.push(`Build a ${n(inp.width)}′ × ${n(inp.depth)}′ ${typeLabel.toLowerCase()} (${result.area} SF)${inp.floor === 'deck' ? ` on a new pressure-treated deck${n(inp.deckHeightFt) ? ` approximately ${n(inp.deckHeightFt)}′ above grade` : ''}` : ' on the existing patio'}.`)
-  out.push(inp.tie === 'free'
-    ? 'Freestanding structure with a gable roof.'
-    : `${PORCH_ROOFS.find(r => r.key === result.roof)?.label.replace(/ \(.*\)$/, '') || 'Shed'} roof, ${inp.tie === 'roof' ? 'tied into the existing house roof' : 'tied to the house wall'}.`)
-  out.push(...String(tpl).split('\n').map(s => s.trim()).filter(Boolean))
-  if (result.layout) {
-    out.push(`Enclose with ${result.layout.totalWindows} Eze-Breeze window unit${result.layout.totalWindows !== 1 ? 's' : ''} between ${result.layout.totalColumns} laminated 6×6 columns.`)
-    if (n(inp.wallHeightIn) > PORCH_WINDOW_MAX_H) out.push(`Install transom units above the windows to fill the ${n(inp.wallHeightIn)}″ wall height.`)
+  const W = n(inp.width), D = n(inp.depth)
+  const roofWord = ROOF_WORDS[result.roof] || ROOF_WORDS.gable
+  const tpl = String((templates || {})[inp.type] ?? PORCH_BUILD_SCOPE_DEFAULTS[inp.type] ?? '').split('\n').map(s => s.trim()).filter(Boolean)
+  const base = result.lines.find(l => l.key.startsWith('base_'))
+  let structure = ''
+  if (inp.type === 'ezebreeze') {
+    structure = (inp.floor === 'deck'
+      ? [`Build a pressure treated wood deck platform approximately ${W}’x${D}’ to receive ${/^[AEIOU]/i.test(roofWord) ? 'an' : 'a'} ${roofWord} 3-season porch.`,
+         '• Fiberglass charcoal screen below decking boards inside porch area.',
+         `Construct an approximately ${W}’x${D}’ ${roofWord} 3-season porch.`]
+      : [`Construct an approximately ${W}’x${D}’ ${roofWord} 3-season porch on existing patio.`]).join('\n')
+  } else if (base) {
+    structure = scopeFor(catalog, PORCH_CATALOG_NAMES[base.key], { size: [W, D] }, '')
+    if (structure && result.roof !== 'gable') {
+      const a = /^[AEIOU]/i.test(roofWord) ? 'an' : 'a'
+      structure = structure.replace(/\ban A-Frame gable roof/g, `${a} ${roofWord}`).replace(/A-Frame gable roof/g, roofWord)
+    }
+    if (!structure) structure = `Build a ${W}’x${D}’ ${(PORCH_TYPES.find(t => t.key === inp.type)?.label || 'porch').toLowerCase()} (${result.area} SF), ${roofWord.toLowerCase()}.`
   }
+  structure = [structure, ...tpl].filter(Boolean).join('\n')
+
+  const groups = {}
   for (const l of result.lines) {
-    if (l.group === 'structure' || l.key === 'eze_window' || l.key === 'eze_transom' || l.key === 'lam_column_pkg' || l.key === 'screeneze_upcharge') continue
-    out.push(`${l.label}${l.unit === 'EA' && l.qty > 1 ? ` (${l.qty})` : ''}.`)
+    if (l.key.startsWith('base_') || SCOPE_SKIP.has(l.key)) continue
+    const t = porchLineScope(l, inp, result, catalog)
+    if (!t) continue
+    ;(groups[l.group] = groups[l.group] || []).push(t)
   }
-  return out.join('\n')
+  groups.structure = [structure, ...(groups.structure || [])]
+  const byGroup = Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, [...new Set(v)].join('\n')]))
+  const order = ['structure', 'enclosure', 'roofceiling', 'finishes', 'flooring', 'stepsrail', 'electrical']
+  return { text: order.filter(k => byGroup[k]).map(k => byGroup[k]).join('\n'), byGroup }
 }

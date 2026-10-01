@@ -126,7 +126,7 @@ export function computeHardscape(input, catalog) {
     if (!(qty > 0)) return
     const r = hsRate(item, catalog)
     const q = r2(qty)
-    lines.push({ group, key: item.key, label: labelOverride || item.label, unit: r.unit, qty: q, rate: r.rate, cost: r.cost,
+    lines.push({ group, key: item.key, catalogName: item.catalogName, label: labelOverride || item.label, unit: r.unit, qty: q, rate: r.rate, cost: r.cost,
                  total: q * r.rate, costTotal: q * r.cost, note })
   }
 

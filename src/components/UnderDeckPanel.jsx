@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
+import { scopeFor } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
 import { UDC_STYLES, UDC_ELECTRICAL, UDC_INPUT_DEFAULTS, computeUnderDeck, rateFor } from '../underDeck'
 
@@ -42,7 +43,8 @@ export default function UnderDeckPanel({ onClose, onAdd, initial }) {
       catalogId: null,
       name: `Under-deck ceiling — ${result.style.label} (${W}′×${D}′, ${result.area} SF)`,
       section: 'Under Deck',
-      description: `Install a Dry under-deck ceiling system (${result.style.label.toLowerCase()} finish) under the deck, approximately ${W}′ × ${D}′ (${result.area} SF).`,
+      description: scopeFor(catalog, result.style.catalogName, { size: [W, D] },
+        `Install a Dry under-deck ceiling system (${result.style.label.toLowerCase()} finish) under the deck, approximately ${W}′ × ${D}′ (${result.area} SF).`),
       unit: 'SF',
       qty: result.area,
       unitPrice: result.ceiling.rate,
@@ -56,7 +58,7 @@ export default function UnderDeckPanel({ onClose, onAdd, initial }) {
       catalogId: null,
       name: l.label,
       section: 'Under Deck',
-      description: '',
+      description: scopeFor(catalog, UDC_ELECTRICAL.find(e => e.key === l.key)?.catalogName, { count: l.qty }, ''),
       unit: 'EA',
       qty: l.qty,
       unitPrice: l.rate,

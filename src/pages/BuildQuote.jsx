@@ -8,6 +8,7 @@ import UnderDeckPanel from '../components/UnderDeckPanel'
 import HardscapePanel from '../components/HardscapePanel'
 import { requiredFees } from '../lib/permitFees'
 import { JicField } from '../components/Jic'
+import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
 
 const MARGIN_DEFAULT = 30
@@ -55,6 +56,22 @@ function floorDeckingLF(Wft, Dft) {
   const { sections, boardFt } = deckLayout(Wft, 0)
   const fieldRows = Math.ceil((Math.max(0, Dft) * 12) / DECK_BOARD_FACE_IN)
   return fieldRows * sections * boardFt
+}
+
+// Decking collection → the catalog item family whose wording the deck tool uses
+// ("Trex ENHANCE Deck / Steps / Landing", "TimberTech RESERVE …", "PT …").
+function deckFamily(label) {
+  const l = String(label || '').toLowerCase()
+  const fams = [
+    [/transcend/, 'Trex TRANSCEND', 'trex'], [/lineage/, 'Trex LINEAGE', 'trex'], [/signature/, 'Trex SIGNATURE', 'trexsig'],
+    [/enhance/, 'Trex ENHANCE', 'trex'], [/prime/, 'TimberTech PRIME/+', 'ttc'], [/terrain/, 'TimberTech TERRAIN/+', 'ttc'],
+    [/reserve/, 'TimberTech RESERVE', 'ttc'], [/harvest/, 'TimberTech HARVEST PVC', 'ttp'], [/landmark/, 'TimberTech LANDMARK PVC', 'ttp'],
+    [/vintage.*(t&g|tongue)/, 'TimberTech VINTAGE T&G', 'ttp'], [/vintage/, 'TimberTech VINTAGE PVC', 'ttp'],
+    [/pressure|pine|\bpt\b|2x6/, 'PT', 'pt'],
+  ]
+  const hit = fams.find(([re]) => re.test(l))
+  const fascia = { trex: 'TREX ENHANCE/TRANSCEND/LINEAGE FASCIA LF', trexsig: 'TREX SIGNATURE FASCIA LF', ttc: 'TimberTech COMPOSITE FASCIA LF', ttp: 'TimberTech PVC FASCIA LF' }
+  return hit ? { fam: hit[1], fascia: fascia[hit[2]] || null } : { fam: null, fascia: null }
 }
 
 function DeckAssemblyPanel({ onClose, onAdd, initial }) {
@@ -128,7 +145,7 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const n = (v) => Number(v) || 0
   const W = n(width), D = n(depth), Hft = n(height), SW = n(stairWidth), LA = landingList.length
   const landingSF = landingList.reduce((s, l) => s + n(l.width) * n(l.depth), 0)
-  const ftIn = (v) => `${n(v)}′`
+  const ftIn = (v) => `${n(v)}’`
   // Each attached section adds its own area (framing + decking) and its exposed
   // edges (railing + fascia). Width = the side meeting the deck (not exposed);
   // the net added edge is the far end + two sides − the shared edge = 2 × depth.
@@ -280,23 +297,28 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const railQty = rows.find(r => r.key === 'railing')?.qty || 0
   // "From your catalog" is an internal grouping label — never show it to customers.
   const deckingLabel = (brand === 'From your catalog' ? collection : `${brand} ${collection}`).trim()
-  // Customer-facing scope of work: materials & methods, not our takeoff math.
-  // Starts from the manager's standard open-deck template, then appends the lines
-  // that describe this deck's specific selections.
+  // Customer-facing scope of work, in the catalog's wording (Deck Plus's own
+  // scope language): the decking item for the chosen collection, then border,
+  // fascia, steps, landings and railing — sizes and counts filled in.
   const description = (() => {
-    const base = (scopeTemplate || '').split('\n').map(s => s.trim()).filter(Boolean)
-    const lines = [...base]
-    if (splines > 0)       lines.push('Run full-length deck boards with double sister joists at all seams — no butt joints.')
-    lines.push(`Purchase and install ${deckingLabel} decking with Cortex hidden fasteners and color-matched plugs.`)
-    if (borderCourses > 0) lines.push(`Install a ${border.toLowerCase()} mitered picture-frame border on all sides.`)
-    if (fasciaOn)          lines.push('Wrap the deck rim and step risers in matching 1×12 fascia.')
-    if (stepCount > 0)     lines.push(BX > 0
-      ? `Build ${stepCount} box steps, ${SW}′ wide, with matching fascia risers.`
-      : `Build a ${stepCount}-step staircase, ${SW}′ wide, with matching fascia risers and skirt boards.`)
-    if (railQty > 0)       lines.push('Install hybrid composite railing system.')
-    if (LA > 0)            lines.push(`Build ${LA} landing${LA > 1 ? 's' : ''} (${landingList.map(l => `${ftIn(l.width)}×${ftIn(l.depth)}`).join(', ')}).`)
-    if (difficulty !== 'Standard') lines.push(`Work includes ${difficulty.toLowerCase()} framing conditions.`)
-    return lines.join('\n')
+    const { fam, fascia: fasciaName } = deckFamily(`${brand} ${collection}`)
+    const lines = (scopeTemplate || '').split('\n').map(s => s.trim()).filter(Boolean)
+    lines.push(scopeFor(catalog, fam && `${fam} Deck`, { size: [W, D] },
+      `Build a pressure treated wood deck platform approximately ${ftIn(W)}x${ftIn(D)}.\n• ${deckingLabel} decking as flooring, installed with hidden fasteners.`))
+    if (extraSections.length) lines.push('Deck layout as per drawing.')
+    if (borderCourses > 0) {
+      const b = scopeFor(catalog, '1-Board border SF', {}, '1-board border with lip, screwed down with color matched screws.')
+      lines.push(borderCourses === 2 ? b.replace(/1-board/i, '2-board') : b)
+    }
+    if (fasciaOn) lines.push(scopeFor(catalog, fasciaName, {}, `${deckingLabel} fascia around deck.`))
+    if (stepCount > 0) lines.push(BX > 0
+      ? scopeFor(catalog, 'Box steps PER STEP', { count: stepCount, width: SW }, `Approximately ${countWords(stepCount)} ${ftIn(SW)} wide BOX steps to grade.`)
+      : scopeFor(catalog, fam && `${fam} Steps`, { count: stepCount, width: SW }, `Approximately ${countWords(stepCount)} ${ftIn(SW)} wide steps to grade.`).replace(/^__’x__’ landing and a/, 'A'))
+    for (const l of landingList) {
+      lines.push(scopeFor(catalog, fam && `${fam} Landing`, { size: [l.width, l.depth] }, `${ftIn(l.width)}x${ftIn(l.depth)} landing.`))
+    }
+    if (railQty > 0) lines.push(scopeFor(catalog, 'Hybrid Railing / trex cap', {}, 'Install hybrid railing.'))
+    return lines.filter(Boolean).join('\n')
   })()
 
   const add = () => {
@@ -577,6 +599,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
   const customComponents = useStore(s => s.porchCustomComponents) || []
   const formulaLocked    = useStore(s => s.porchFormulaLocked)
   const scopeTemplate    = useStore(s => s.porchScopeTemplate)
+  const catalog          = useStore(s => s.catalog)
   const isManager        = useStore(s => (s.role || 'manager') === 'manager')
   const priceLocked      = formulaLocked && !isManager
   const r = (key) => rates?.[key] || PORCH_COMPONENT_DEFAULTS[key]
@@ -653,13 +676,17 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
   const marginPct = price > 0 ? ((price - cost) / price) * 100 : 0
   const money = (v) => '$' + Math.round(v).toLocaleString('en-US')
 
+  // Scope in the catalog's Porch Remodel wording, counts filled in
+  const ftIn = (v) => `${Math.round((Number(v) || 0) * 100) / 100}’`
   const description = (() => {
-    const base = (scopeTemplate || '').split('\n').map(s => s.trim()).filter(Boolean)
-    const lines = [...base]
-    lines.push(`Enclose the porch with ${totalWindows} Eze-Breeze window${totalWindows !== 1 ? 's' : ''} set between ${totalColumns} 6×6 column${totalColumns !== 1 ? 's' : ''}.`)
-    if (totalTransoms > 0) lines.push(`Install ${totalTransoms} transom unit${totalTransoms !== 1 ? 's' : ''} above the windows to fill the wall height over 105″.`)
-    if (Dr > 0)            lines.push(`Install ${Dr} 36″ exit door${Dr !== 1 ? 's' : ''}.`)
-    return lines.join('\n')
+    const lines = (scopeTemplate || '').split('\n').map(s => s.trim()).filter(Boolean)
+    lines.push(`Convert existing ${ftIn(W)}x${ftIn(D)} open porch into a 3-season porch:`)
+    lines.push(scopeFor(catalog, '6x6 lam column', { count: totalColumns }, '6”x6” laminated COX columns.'))
+    lines.push(scopeFor(catalog, 'EzeBreeze RETRO', { count: totalWindows }, `${countWords(totalWindows)} single unit Eze Breeze 3-season windows.`))
+    if (totalTransoms > 0) lines.push(scopeFor(catalog, 'Transom RETRO', { count: totalTransoms }, `${countWords(totalTransoms)} transoms.`))
+    if (Dr > 0) lines.push(scopeFor(catalog, 'Larsen Tradewinds Door RETRO', {}, '01 (one) 36” Tradewinds storm door.').replace(/^01 \(one\)/, countWords(Dr)))
+    lines.push(scopeFor(catalog, 'Paint/Stain PORCH on PATIO', {}, 'Prepare and apply paint/stain.'))
+    return lines.filter(Boolean).join('\n')
   })()
 
   const add = () => {

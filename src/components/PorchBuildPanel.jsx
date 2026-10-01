@@ -63,6 +63,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
   const savedRates = useStore(s => s.porchBuildRates) || {}
   const locked     = useStore(s => s.porchBuildLocked)
   const scopes     = useStore(s => s.porchBuildScopes)
+  const catalog    = useStore(s => s.catalog)
   const rates = useMemo(() => {
     const out = {}
     for (const k of Object.keys(PORCH_BUILD_DEFAULTS)) out[k] = { ...PORCH_BUILD_DEFAULTS[k], ...(savedRates[k] || {}) }
@@ -75,7 +76,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
   const setSub = (k, patch) => setInp(p => ({ ...p, [k]: { ...(p[k] || {}), ...patch } }))
 
   const result = useMemo(() => computePorchBuild(inp, rates), [inp, rates])
-  const scope  = useMemo(() => buildPorchScope(inp, result, scopes), [inp, result, scopes])
+  const scopeOut = useMemo(() => buildPorchScope(inp, result, scopes, catalog), [inp, result, scopes, catalog])
+  const scope = scopeOut.text
   const typeMeta = PORCH_TYPES.find(t => t.key === inp.type) || PORCH_TYPES[0]
   const W = Number(inp.width) || 0, D = Number(inp.depth) || 0
 
@@ -108,9 +110,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
       catalogId: null,
       name: `${typeMeta.label} — ${W}′×${D}′ (${result.area} SF) · ${g.label}`,
       section: 'Porch',
-      description: g.key === 'structure'
-        ? scope
-        : g.lines.map(l => `${l.label}${l.unit === 'LS' ? '' : ` — ${l.qty} ${l.unit}`}`).join('\n'),
+      description: scopeOut.byGroup[g.key] || '',
       unit: 'EA',
       qty: 1,
       unitPrice: Math.round(g.total),
