@@ -484,7 +484,7 @@ export default function ProposalView() {
                 : 'This proposal is valid for 30 days from the date above.'
               }
             </p>
-            <p><span className="font-semibold text-white">Payment:</span> A 20% deposit is required to schedule work. Progress payments will follow different stages of completion as labeled in a scope of work document drafted once the proposal has been accepted.</p>
+            <p><span className="font-semibold text-white">Payment:</span> A {subtotal >= 30000 && subtotal <= 100000 ? '10%' : '20%'} deposit is required to schedule work. Progress payments will follow different stages of completion as labeled in a scope of work document drafted once the proposal has been accepted.</p>
             <p><span className="font-semibold text-white">Site Conditions:</span> Pricing is based on normal site conditions. Any unforeseen conditions may result in additional costs with prior written approval.</p>
             <p><span className="font-semibold text-white">Warranty:</span> All projects include a standard 1-year warranty on materials and a 5-year structural warranty.</p>
             <p className="font-semibold text-white pt-1">Addendums</p>

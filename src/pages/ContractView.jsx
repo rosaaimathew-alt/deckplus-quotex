@@ -85,18 +85,38 @@ const PAYMENT_MILESTONES_20_30_40_10 = [
   { label: 'Roof Completion',                               pct: 0.40 },
   { label: 'Substantial completion payment',                pct: 0.10 },
 ]
+// $30k–$100k jobs: 10% deposit, $3,000 final payment, and the rest split into
+// two equal payments. Built from the contract total, so it's a formula rather
+// than fixed percentages.
+const FORMULA_MIN = 30000, FORMULA_MAX = 100000
+const FORMULA_DEPOSIT_PCT = 0.10, FORMULA_FINAL = 3000
+function formulaMilestones(total, projectTag) {
+  const t = Number(total) || 0
+  const finalPct = t > 0 ? Math.min(FORMULA_FINAL / t, 1 - FORMULA_DEPOSIT_PCT) : 0
+  const midPct = (1 - FORMULA_DEPOSIT_PCT - finalPct) / 2
+  const middle = projectTag === 'Deck' || projectTag === 'Hardscapes' ? 'Progress payment' : 'Roof Completion'
+  return Object.assign([
+    { label: 'Schedule deposit — @ sign contract',            pct: FORMULA_DEPOSIT_PCT },
+    { label: 'Start payment — Material drop / Framing Start', pct: midPct },
+    { label: middle,                                          pct: midPct },
+    { label: 'Substantial completion payment',                pct: finalPct },
+  ], { formula: true })
+}
 const SCHEDULE_OPTIONS = [
   { key: 'auto',         label: 'Auto' },
+  { key: 'formula_10_3k', label: '10% / ½ / ½ / $3K' },
   { key: '20_30_40_5_5', label: '20 / 30 / 40 / 5 / 5' },
   { key: '20_30_40_10',  label: '20 / 30 / 40 / 10' },
   { key: '30_50_20',     label: '30 / 50 / 20' },
   { key: '50_50',        label: '50 / 50' },
 ]
 function getMilestoneSet(key, projectTag, total) {
+  if (key === 'formula_10_3k') return formulaMilestones(total, projectTag)
   if (key === '20_30_40_5_5') return PAYMENT_MILESTONES
   if (key === '20_30_40_10')  return PAYMENT_MILESTONES_20_30_40_10
   if (key === '30_50_20')     return PAYMENT_MILESTONES_30_50_20
   if (key === '50_50')        return PAYMENT_MILESTONES_50_50
+  if (total >= FORMULA_MIN && total <= FORMULA_MAX) return formulaMilestones(total, projectTag)
   if (projectTag === 'Hardscapes' || projectTag === 'Porch Conversion') return PAYMENT_MILESTONES_HARDSCAPE
   if (total < 20000) return PAYMENT_MILESTONES_UNDER20K
   return PAYMENT_MILESTONES
@@ -285,7 +305,7 @@ export default function ContractView() {
     const pct = milestonePcts[i] != null ? milestonePcts[i] / 100 : m.pct
     return { ...m, pct, label: milestoneLabels[i] ?? m.label, amount: total * pct }
   })
-  const pctSum      = payments.reduce((s, p) => s + Math.round(p.pct * 100), 0)
+  const pctSum      = Math.round(payments.reduce((s, p) => s + p.pct * 100, 0) * 100) / 100
   const hasElectrical = (scopeLines || []).some(l => /electric|outlet|light|fan|switch|wiring/i.test(`${l.name} ${l.text}`))
   const saleDate    = proposal?.closedAt || proposal?.statusChangedAt || null
   const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary })
@@ -319,6 +339,7 @@ export default function ContractView() {
   const effectiveScheduleKey = (() => {
     if (paymentScheduleOverride !== 'auto') return paymentScheduleOverride
     const ms = getMilestoneSet('auto', projectTag, total)
+    if (ms.formula)                         return 'formula_10_3k'
     if (ms === PAYMENT_MILESTONES)          return '20_30_40_5_5'
     if (ms === PAYMENT_MILESTONES_UNDER20K) return 'simple'
     return 'hardscape'
@@ -676,11 +697,11 @@ export default function ContractView() {
                 <div className="mt-3 space-y-2">
                   {pctSum !== 100 && <p className="text-xs text-red-500 font-medium mb-2">⚠ Percentages total {pctSum}% — must equal 100%</p>}
                   {milestones.map((m, i) => {
-                    const currentPct = milestonePcts[i] != null ? milestonePcts[i] : Math.round(m.pct * 100)
+                    const currentPct = milestonePcts[i] != null ? milestonePcts[i] : Math.round(m.pct * 1000) / 10
                     return (
                       <div key={i} className="flex gap-2 items-center">
                         <div className="flex items-center gap-1 shrink-0">
-                          <input type="number" min={1} max={99} className="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center" value={currentPct}
+                          <input type="number" min={1} max={99} step="0.1" className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center" value={currentPct}
                             onChange={e => { const v = Number(e.target.value); setMilestonePcts(prev => { const n = [...prev]; n[i] = isNaN(v) ? Math.round(m.pct * 100) : v; return n }) }} />
                           <span className="text-xs text-gray-400">%</span>
                         </div>
