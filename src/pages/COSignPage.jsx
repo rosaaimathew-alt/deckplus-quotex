@@ -3,6 +3,9 @@ import { useParams } from 'react-router-dom'
 import SignaturePad from '../components/SignaturePad'
 import { CheckCircle2, Printer } from 'lucide-react'
 import { changeOrderIntro } from '../contract/deckPlusAgreement'
+import EsignDisclosureGate from '../components/EsignDisclosureGate'
+import EsignAdopt from '../components/EsignAdopt'
+import { logStep } from '../lib/esignConsent'
 
 const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -32,6 +35,7 @@ export default function COSignPage() {
   const [showCapture, setShowCapture] = useState(false)
   const [submitting, setSubmitting]   = useState(false)
   const [done, setDone]               = useState(false)
+  const [agreedAt, setAgreedAt]       = useState(null)   // ESIGN disclosure accepted, on open
 
   useEffect(() => {
     fetch(`/api/co/${token}`)
@@ -53,14 +57,15 @@ export default function COSignPage() {
     setShowCapture(false)
   }, [printedName])
 
-  const submit = async () => {
+  // `evidence` comes from EsignAdopt: consent, Adopt and Sign, device, doc hash.
+  const submit = async (evidence) => {
     if (!masterSig) { alert('Please sign first'); return }
     setSubmitting(true)
     try {
       const res = await fetch(`/api/co/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signatureDataUrl: masterSig, printedName }),
+        body: JSON.stringify({ ...evidence, signatureDataUrl: masterSig }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to submit')
@@ -86,7 +91,7 @@ export default function COSignPage() {
     </div>
   )
 
-  const { role, coData: d, signatures = {}, alreadySigned } = record
+  const { role, coData: d, signatures = {}, alreadySigned, esign, docHash } = record
   const logo        = d?.branding?.logo || null
   const companyName = d?.branding?.companyName || 'Your Company'
   const gcName    = d?.branding?.gcName || 'General Contractor'
@@ -119,9 +124,14 @@ export default function COSignPage() {
     )
   }
 
-  const existingSig = signatures?.[role]
   // When already signed, show the completed document (read-only) instead of the form.
   const viewOnly = !!alreadySigned
+
+  // ESIGN/UETA consumer disclosure — its own step before the change order.
+  if (!viewOnly && !agreedAt) {
+    return <EsignDisclosureGate companyName={companyName} logo={logo}
+      onAgree={(at) => { setAgreedAt(at); logStep(`/api/co/${token}`, 'disclosure_accepted') }} />
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 pb-12" style={docStyle}>
@@ -300,13 +310,14 @@ export default function COSignPage() {
                 </div>
               )}
 
-              <button
-                onClick={submit}
-                disabled={!masterSig || submitting}
-                className="w-full py-3 bg-gray-900 text-white rounded-xl font-semibold text-sm hover:bg-gray-700 disabled:opacity-40 transition-colors"
-              >
-                {submitting ? 'Submitting…' : `Sign Change Order — ${ROLE_LABEL[role]}`}
-              </button>
+              <div className="border border-gray-200 rounded-xl p-4" style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
+                <EsignAdopt
+                  api={`/api/co/${token}`} esign={esign} docHash={docHash} agreementAgreedAt={agreedAt}
+                  printedName={printedName} onNameChange={setPrintedName}
+                  ready={!!masterSig} notReadyText="Add your signature above first."
+                  submitting={submitting} onSign={submit}
+                />
+              </div>
             </div>
             )}
 

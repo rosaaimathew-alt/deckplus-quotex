@@ -24,14 +24,13 @@ const SignaturePad = forwardRef(function SignaturePad({ className, onChange }, r
   const [typedName, setTypedName] = useState('')
   const [fontIdx, setFontIdx] = useState(0)
   const [isEmpty, setIsEmpty] = useState(true)
+  // The draw listeners are bound once, so they read these refs rather than
+  // the first render's state and props.
+  const drewRef     = useRef(false)
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange })
 
   useEffect(() => { ensureFonts() }, [])
-
-  const emit = () => {
-    if (!onChange) return
-    if (isEmpty) { onChange(null); return }
-    onChange(canvasRef.current?.toDataURL('image/png'))
-  }
 
   // Re-render typed signature whenever name or font changes
   useEffect(() => {
@@ -56,6 +55,7 @@ const SignaturePad = forwardRef(function SignaturePad({ className, onChange }, r
     clear: () => {
       const canvas = canvasRef.current
       canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+      drewRef.current = false
       setTypedName('')
       setIsEmpty(true)
       onChange?.(null)
@@ -81,8 +81,12 @@ const SignaturePad = forwardRef(function SignaturePad({ className, onChange }, r
       }
     }
     const start = (e) => { e.preventDefault(); drawing.current = true; const { x, y } = pos(e); ctx.beginPath(); ctx.moveTo(x, y) }
-    const move  = (e) => { e.preventDefault(); if (!drawing.current) return; const { x, y } = pos(e); ctx.lineTo(x, y); ctx.stroke(); setIsEmpty(false) }
-    const end   = () => { drawing.current = false; emit() }
+    const move  = (e) => { e.preventDefault(); if (!drawing.current) return; const { x, y } = pos(e); ctx.lineTo(x, y); ctx.stroke(); drewRef.current = true; setIsEmpty(false) }
+    const end   = () => {
+      const was = drawing.current
+      drawing.current = false
+      if (was && drewRef.current) onChangeRef.current?.(canvas.toDataURL('image/png'))
+    }
 
     canvas.addEventListener('mousedown',  start)
     canvas.addEventListener('mousemove',  move)
@@ -105,6 +109,7 @@ const SignaturePad = forwardRef(function SignaturePad({ className, onChange }, r
   const switchMode = (m) => {
     const canvas = canvasRef.current
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+    drewRef.current = false
     setTypedName('')
     setIsEmpty(true)
     setMode(m)

@@ -2,7 +2,10 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import SignaturePad from '../components/SignaturePad'
 import { X, CheckCircle2 } from 'lucide-react'
-import { ESIGN_DISCLOSURE, AGREEMENT_ACK } from '../legalContent'
+import { AGREEMENT_ACK } from '../legalContent'
+import EsignDisclosureGate from '../components/EsignDisclosureGate'
+import EsignAdopt from '../components/EsignAdopt'
+import { logStep } from '../lib/esignConsent'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import { requiredSignFields, ROLE_LABELS, fmtShortDate } from '../contract/contractFields'
 import { changeOrderIntro } from '../contract/deckPlusAgreement'
@@ -30,8 +33,9 @@ export default function SignPage() {
   const [showCapture, setShowCapture] = useState(false)
   const [pendingField, setPendingField] = useState(null) // field waiting for first capture
   const [submitting, setSubmitting] = useState(false)
-  const [esignConsent, setEsignConsent] = useState(false)   // ESIGN/UETA consent
-  const [agreedAt, setAgreedAt]   = useState(null)          // binding-agreement acceptance, on open
+  const [agreedAt, setAgreedAt]   = useState(null)          // ESIGN disclosure accepted, on open
+  const [showFinalize, setShowFinalize] = useState(false)   // consent + email code + Adopt and Sign
+  const [coSig, setCoSig]         = useState(null)          // change-order signature (legacy CO links)
   const [done, setDone]           = useState(false)
 
   useEffect(() => {
@@ -71,9 +75,9 @@ export default function SignPage() {
     setAppliedFields(prev => new Set([...prev, fieldId]))
   }, [masterSig, openCapture])
 
-  const handleSubmit = async () => {
+  // `evidence` comes from EsignAdopt: consent, Adopt and Sign, device, doc hash.
+  const handleSubmit = async (evidence) => {
     if (!masterSig) { alert('Please create your signature first'); return }
-    if (!esignConsent) { alert('Please agree to sign electronically before submitting.'); return }
     if (requiredFields.length > 0 && !isComplete) {
       alert(`Please sign all required fields (${requiredFields.length - signedCount} remaining)`)
       return
@@ -86,16 +90,22 @@ export default function SignPage() {
       const res = await fetch(`/api/sign/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fieldSignatures, signatureDataUrl: masterSig, printedName, esignConsent: true, agreementAgreedAt: agreedAt }),
+        body: JSON.stringify({ ...evidence, fieldSignatures, signatureDataUrl: masterSig }),
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error)
+      setShowFinalize(false)
       setDone(true)
     } catch (err) {
       alert(err.message)
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const acceptDisclosure = (at) => {
+    setAgreedAt(at)
+    logStep(`/api/sign/${token}`, 'disclosure_accepted')
   }
 
   if (loading) return (
@@ -129,7 +139,13 @@ export default function SignPage() {
     </div>
   )
 
-  const { contractData: d, contractNum, role, signatures: existingSigs = {} } = record || {}
+  const { contractData: d, contractNum, role, signatures: existingSigs = {}, esign, docHash } = record || {}
+  const branding    = d?.branding || {}
+  const logo        = branding?.logo || null
+  const companyName = branding?.companyName || 'Deck Plus'
+
+  // ESIGN/UETA consumer disclosure — before any document, contract or change order.
+  if (!agreedAt) return <EsignDisclosureGate companyName={companyName} logo={logo} onAgree={acceptDisclosure} />
 
   if (d?.type === 'change-order') {
     const clientSig  = existingSigs?.client
@@ -237,26 +253,21 @@ export default function SignPage() {
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   {myRole === 'client' ? 'Client Signature' : 'Builder Signature'}
                 </p>
-                <input
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  placeholder="Print your full name"
-                  value={printedName}
-                  onChange={e => setPrintedName(e.target.value)}
-                />
                 <div className="border-2 border-dashed border-gray-300 rounded-xl overflow-hidden">
-                  <SignaturePad ref={sigRef} />
+                  <SignaturePad ref={sigRef} onChange={setCoSig} />
                 </div>
-                <button
-                  disabled={submitting || !printedName.trim()}
-                  onClick={async () => {
-                    if (!sigRef.current || sigRef.current.isEmpty()) { alert('Please draw your signature'); return }
+                <EsignAdopt
+                  api={`/api/sign/${token}`} esign={esign} docHash={docHash} agreementAgreedAt={agreedAt}
+                  printedName={printedName} onNameChange={setPrintedName}
+                  ready={!!coSig} notReadyText="Draw or type your signature above."
+                  submitting={submitting}
+                  onSign={async (evidence) => {
                     setSubmitting(true)
                     try {
-                      const dataUrl = sigRef.current.toDataURL()
                       const r = await fetch(`/api/sign/${token}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ signatureDataUrl: dataUrl, printedName }),
+                        body: JSON.stringify({ ...evidence, signatureDataUrl: coSig }),
                       })
                       const j = await r.json()
                       if (j.ok) setDone(true)
@@ -264,10 +275,7 @@ export default function SignPage() {
                     } catch (e) { alert(e.message) }
                     setSubmitting(false)
                   }}
-                  className="w-full py-3 bg-gray-900 text-white rounded-xl font-semibold text-sm hover:bg-gray-800 disabled:opacity-40 transition-colors"
-                >
-                  {submitting ? 'Saving…' : `Sign Change Order`}
-                </button>
+                />
               </div>
             )}
 
@@ -294,10 +302,6 @@ export default function SignPage() {
   const total       = Number(d?.total) || 0
   const payments    = Array.isArray(d?.payments) ? d.payments : []
   const scopeLines  = d?.scopeLines || []
-  const branding    = d?.branding || {}
-  const logo        = branding?.logo || null
-  const companyName = branding?.companyName || 'Deck Plus'
-
   const requiredFields = requiredSignFields(role, dp.packet)
   const signedCount = requiredFields.filter(f => appliedFields.has(f)).length
   const isComplete  = requiredFields.length === 0 || signedCount === requiredFields.length
@@ -326,41 +330,6 @@ export default function SignPage() {
     if (r === role) return appliedFields.has(id) ? <span>{today()}</span> : null
     const s = existingSigs?.[r]
     return s?.signedAt && otherSig(id, r) ? <span>{fmtShortDate(s.signedAt)}</span> : null
-  }
-
-  // ESIGN/UETA consumer disclosure gate — shown on open, BEFORE the document, as
-  // its own step (as the ESIGN Act requires). The signer must read this and
-  // check the consent box to continue; consent and its time are recorded.
-  if (!agreedAt) {
-    const esign = ESIGN_DISCLOSURE.build(companyName)
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-start justify-center p-4 py-8">
-        <div className="bg-white rounded-2xl shadow-lg w-full max-w-2xl p-6 sm:p-8">
-          <div className="flex items-center gap-3 mb-4">
-            {logo ? <img src={logo} alt="logo" className="h-8 object-contain" /> : <img src="/contract/deckplus-logo.png" alt="Deck Plus" className="h-8 object-contain" />}
-          </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-1">{ESIGN_DISCLOSURE.title}</h1>
-          <p className="text-sm text-gray-600 leading-relaxed mb-5">{esign.intro}</p>
-          <div className="max-h-[46vh] overflow-y-auto pr-2 border border-gray-200 rounded-xl p-4 mb-5 bg-gray-50">
-            {esign.sections.map((s, i) => (
-              <div key={i} className="mb-4 last:mb-0">
-                <h2 className="text-sm font-bold text-gray-900 mb-1">{s.h}</h2>
-                {s.p.map((para, j) => <p key={j} className="text-xs text-gray-600 leading-relaxed mb-1.5 last:mb-0">{para}</p>)}
-              </div>
-            ))}
-          </div>
-          <label className="flex items-start gap-2.5 mb-4 cursor-pointer">
-            <input type="checkbox" checked={esignConsent} onChange={e => setEsignConsent(e.target.checked)} className="mt-0.5 shrink-0 w-4 h-4" />
-            <span className="text-sm text-gray-800 leading-snug font-medium">{ESIGN_DISCLOSURE.consentLabel}</span>
-          </label>
-          <button onClick={() => { if (esignConsent) setAgreedAt(Date.now()) }} disabled={!esignConsent}
-            className="w-full bg-gray-900 text-white font-bold py-3 rounded-xl text-sm hover:bg-gray-700 disabled:opacity-40 transition-colors">
-            Agree &amp; Continue to Document
-          </button>
-          <p className="text-[11px] text-gray-400 mt-3 text-center">Your consent and the time are recorded. Prefer paper? Contact the contractor instead of signing here.</p>
-        </div>
-      </div>
-    )
   }
 
   if (!d?.dp) return (
@@ -441,15 +410,37 @@ export default function SignPage() {
                     <button onClick={() => openCapture()} className="text-xs text-blue-500 underline ml-1">change</button>
                   </div>
                 </div>
-                <button onClick={handleSubmit} disabled={!isComplete || submitting || !esignConsent}
+                <button onClick={() => setShowFinalize(true)} disabled={!isComplete || submitting}
                   className="shrink-0 bg-gray-900 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-gray-700 disabled:opacity-40 transition-colors whitespace-nowrap">
-                  {submitting ? 'Submitting…' : 'Sign & Submit'}
+                  Finish &amp; Sign
                 </button>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Final step: email code, consent, Adopt and Sign */}
+      {showFinalize && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg p-5 pb-8 shadow-xl max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-base">Adopt and Sign</h3>
+              <button onClick={() => setShowFinalize(false)} className="text-gray-400 hover:text-gray-600" aria-label="Close"><X size={20} /></button>
+            </div>
+            <div className="flex items-center gap-3 mb-4 rounded-xl bg-gray-50 border border-gray-200 px-3 py-2">
+              <img src={masterSig} alt="your signature" className="h-9 object-contain" />
+              <span className="text-xs text-gray-500">Contract #{contractNum} · {appliedFields.size} field{appliedFields.size !== 1 ? 's' : ''} signed</span>
+            </div>
+            <EsignAdopt
+              api={`/api/sign/${token}`} esign={esign} docHash={docHash} agreementAgreedAt={agreedAt}
+              printedName={printedName} onNameChange={setPrintedName}
+              ready={isComplete} notReadyText="Sign every required field first."
+              submitting={submitting} onSign={handleSubmit}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Signature capture drawer */}
       {showCapture && (

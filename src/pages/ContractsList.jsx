@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileSignature, FilePen, CheckCircle2, Clock, Search, X, FileX, ExternalLink, Eye, Loader2, Copy, MoreHorizontal } from 'lucide-react'
+import { FileSignature, FilePen, CheckCircle2, Clock, Search, X, FileX, ExternalLink, Eye, Loader2, Copy, MoreHorizontal, ShieldCheck } from 'lucide-react'
 import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf } from '../contractTotal'
 
@@ -497,6 +497,7 @@ export default function ContractsList({ initialFilter } = {}) {
             const clientSignedPending = remote[p.id]?.clientSigned && status !== 'signed'
             const menu = []
             if (recId) menu.push({ icon: <Eye size={14} className="text-gray-400" />, label: 'Signatures', onClick: () => setViewingRecordId(recId) })
+            if (recId) menu.push({ icon: <ShieldCheck size={14} className="text-gray-400" />, label: 'Audit certificate', onClick: () => navigate(`/certificate/contract/${recId}`) })
             if (draft.signLinks)    menu.push({ icon: <Copy size={14} className="text-gray-400" />, label: 'Signing links', onClick: () => setViewingLinks(draft.signLinks) })
             if (status === 'in-progress' && !draft.signLinks) menu.push({ icon: <Copy size={14} className="text-gray-400" />, label: recovering === p.id ? 'Finding…' : 'Find links', onClick: () => handleRecoverLinks(p), disabled: recovering === p.id })
             if (status === 'in-progress') menu.push({ icon: <CheckCircle2 size={14} className="text-gray-400" />, label: 'Mark signed', onClick: () => markContractSigned(p.id, true) })

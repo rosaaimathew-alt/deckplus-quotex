@@ -15,6 +15,7 @@ import COSignPage from './pages/COSignPage'
 import ContractViewFull from './pages/ContractViewFull'
 import PublicProposal from './pages/PublicProposal'
 import Legal from './pages/Legal'
+import EsignCertificate from './pages/EsignCertificate'
 import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub } from './pages/hubs/Hubs'
 import CommandPalette from './components/CommandPalette'
 import AuthGuard, { logout } from './components/AuthGuard'
@@ -332,6 +333,7 @@ function AppShell() {
             <Route path="/proposal"  element={<Gated path="/proposal"><ProposalView /></Gated>} />
             <Route path="/contract"  element={<Gated path="/contract"><ContractView /></Gated>} />
             <Route path="/settings"  element={<Gated path="/settings"><SettingsPage /></Gated>} />
+            <Route path="/certificate/:kind/:recordId" element={<EsignCertificate />} />
             {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
               <Route key={from} path={from} element={<LegacyRedirect to={to} />} />
             ))}

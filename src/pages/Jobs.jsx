@@ -7,7 +7,7 @@ import {
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
   AlertTriangle, CheckCheck, Clock, Wrench, FileText, Mail, Send,
   Search, Trash2, Link2, ExternalLink, PenLine, RefreshCw,
-  HardHat, CloudSun, MoreHorizontal, Loader, Store,
+  HardHat, CloudSun, MoreHorizontal, Loader, Store, ShieldCheck,
 } from 'lucide-react'
 
 const fmt    = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -776,6 +776,7 @@ function ChangeOrdersTab({ proposal }) {
           originalTotal: coBase,
           newTotal:      coData.newTotal != null ? Number(coData.newTotal) : coBase + Number(coData.amount),
           client:        proposal.client,
+          email:         proposal.email || '',
           address:       proposal.address,
           branding:      coData.branding || {},
         }
@@ -827,6 +828,7 @@ function ChangeOrdersTab({ proposal }) {
         originalTotal: coBase,
         newTotal:      co.newTotal != null ? Number(co.newTotal) : coBase + Number(co.amount || 0),
         client:        proposal.client,
+        email:         proposal.email || '',
         address:       proposal.address,
         branding:      { logo: branding?.logo || null, companyName: branding?.companyName || 'Your Company' },
       }
@@ -952,6 +954,12 @@ function ChangeOrdersTab({ proposal }) {
                 <p className="text-[11px] text-gray-400 mt-1">No email on file for this customer — the link will be created for you to copy and send.</p>
               )}
             </div>
+          )}
+
+          {co.signRecordId && (
+            <a href={`/certificate/co/${co.signRecordId}`} className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 font-medium">
+              <ShieldCheck size={11} /> Audit certificate
+            </a>
           )}
 
           {/* Signing actions */}

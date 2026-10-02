@@ -2,6 +2,8 @@ import crypto from 'crypto'
 import { uploadToDrive } from '../_google-drive.js'
 import { verifyToken } from '../_auth.js'
 import { getKV } from '../_kv.js'
+import { CONSENT_TEXT, docHashOf, requestContext, logEvent, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
+import { isMailerConfigured } from '../_mailer.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -14,11 +16,13 @@ export default async function handler(req, res) {
 
   // Admin actions (create links / recover links / look up by contract number)
   // require a signed-in operator. Client signing via role tokens stays public.
-  const isAdminAction = token === 'create' || token === 'pcreate' || token.startsWith('recover-') || token.startsWith('lookup-') || token.startsWith('record-') || token.startsWith('pdata-')
+  const isAdminAction = token === 'create' || token === 'pcreate' || token.startsWith('recover-') || token.startsWith('lookup-') || token.startsWith('record-') || token.startsWith('pdata-') || token.startsWith('verify-')
+  const header = req.headers.authorization || ''
+  const bearer = header.startsWith('Bearer ') ? header.slice(7) : (req.headers['x-qx-token'] || null)
+  let staff = null
   if (isAdminAction) {
-    const header = req.headers.authorization || ''
-    const bearer = header.startsWith('Bearer ') ? header.slice(7) : (req.headers['x-qx-token'] || null)
-    if (!(await verifyToken(bearer))) return res.status(401).json({ error: 'Unauthorized' })
+    staff = await verifyToken(bearer)
+    if (!staff) return res.status(401).json({ error: 'Unauthorized' })
   }
 
   // Health check
@@ -45,24 +49,34 @@ export default async function handler(req, res) {
         builder: crypto.randomUUID(),
         gc:      crypto.randomUUID(),
       }
-      const ttl = 60 * 60 * 24 * 60
-
+      // Signing records are permanent: no expiry, ever (see supabase/esign.sql).
+      const docHash = docHashOf(contractData)
+      const signerEmails = {
+        client:  contractData?.dp?.values?.clientEmail || contractData?.email || '',
+        builder: staff?.email || '',
+        gc:      '',
+      }
       await kv.set(`sign:${recordId}`, {
         contractData,
         contractNum: contractNum || '',
         status:      'pending',
         createdAt:   Date.now(),
+        createdBy:   staff?.email || null,
+        docHash,
+        signerEmails,
         signatures:  {},
         roleTokens,
-      }, { ex: ttl })
+      })
 
       await Promise.all(ROLES.map(role =>
-        kv.set(`link:${roleTokens[role]}`, { recordId, role }, { ex: ttl })
+        kv.set(`link:${roleTokens[role]}`, { recordId, role })
       ))
 
       if (contractNum) {
-        await kv.set(`sign-by-contract:${contractNum}`, recordId, { ex: ttl })
+        await kv.set(`sign-by-contract:${contractNum}`, recordId)
       }
+      await logEvent(requestContext(req), { recordType: 'contract', recordId, event: 'link_created', signerEmail: staff?.email, docHash,
+        detail: { contractNum: contractNum || '', createdBy: staff?.email || null, roles: ROLES } })
 
       const host  = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'
       const proto = host.includes('localhost') ? 'http' : 'https'
@@ -148,9 +162,10 @@ export default async function handler(req, res) {
     if (token.startsWith('record-') && req.method === 'GET') {
       const recordId = token.slice('record-'.length)
       const rec = await kv.get(`sign:${recordId}`)
-      if (!rec) return res.status(404).json({ error: 'Record not found or expired' })
+      if (!rec) return res.status(404).json({ error: 'Record not found' })
       return res.json({
         recordId,
+        docHash:      rec.docHash || docHashOf(rec.contractData),
         contractData: rec.contractData,
         contractNum:  rec.contractNum,
         status:       rec.status,
@@ -159,11 +174,21 @@ export default async function handler(req, res) {
       })
     }
 
+    // ── Verification report + audit trail: /api/sign/verify-<recordId> ──
+    if (token.startsWith('verify-') && req.method === 'GET') {
+      const recordId = token.slice('verify-'.length)
+      const rec = await kv.get(`sign:${recordId}`)
+      if (!rec) return res.status(404).json({ error: 'Record not found' })
+      const report = await verifyRecord({ recordType: 'contract', recordId, record: rec, doc: rec.contractData, emailOnFile: rec.signerEmails?.client })
+      return res.json({ ...report, contractNum: rec.contractNum, createdAt: rec.createdAt, createdBy: rec.createdBy || null, status: rec.status,
+        title: `Contract #${rec.contractNum || ''}`, client: rec.contractData?.dp?.values?.clientName || rec.contractData?.client || '' })
+    }
+
     // ── Recover signing links from a record: /api/sign/recover-<recordId> ──
     if (token.startsWith('recover-') && req.method === 'GET') {
       const recordId = token.slice('recover-'.length)
       const rec = await kv.get(`sign:${recordId}`)
-      if (!rec) return res.status(404).json({ error: 'Record not found or expired' })
+      if (!rec) return res.status(404).json({ error: 'Record not found' })
       if (!rec.roleTokens) return res.status(404).json({ error: 'No role tokens stored — this record predates link recovery support' })
 
       const host  = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'
@@ -187,7 +212,7 @@ export default async function handler(req, res) {
       if (!recordId) return res.status(404).json({ error: 'No signing record found for this contract number' })
 
       const rec = await kv.get(`sign:${recordId}`)
-      if (!rec) return res.status(404).json({ error: 'Signing record has expired' })
+      if (!rec) return res.status(404).json({ error: 'Signing record not found' })
       if (!rec.roleTokens) return res.status(404).json({ error: 'No role tokens stored in this record' })
 
       const host  = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'
@@ -207,56 +232,85 @@ export default async function handler(req, res) {
 
     // ── Existing role-specific token ──────────────────────────────────
     const link = await kv.get(`link:${token}`)
-    if (!link) return res.status(404).json({ error: 'Signing link not found or expired' })
+    if (!link) return res.status(404).json({ error: 'Signing link not found' })
 
     const record = await kv.get(`sign:${link.recordId}`)
     if (!record) return res.status(404).json({ error: 'Contract record not found' })
 
+    const recordId  = link.recordId
+    const docHash   = record.docHash || docHashOf(record.contractData)
+    const emailOnFile = record.signerEmails?.[link.role] || (link.role === 'client' ? (record.contractData?.dp?.values?.clientEmail || record.contractData?.email || '') : '')
+    const logBase   = { recordType: 'contract', recordId, role: link.role }
+    const companyName = record.contractData?.branding?.companyName || process.env.COMPANY_NAME || 'Deck Plus'
+
     if (req.method === 'GET') {
+      // Every open is logged. The office checking a link is marked as staff.
+      const viewer = bearer ? await verifyToken(bearer) : null
+      await logEventSafe(requestContext(req), { ...logBase, event: viewer ? 'staff_viewed' : 'opened', docHash, detail: viewer ? { staff: viewer.email } : null })
+      const { verified } = await otpStatus(kv, token)
       return res.json({
         role:         link.role,
-        recordId:     link.recordId,
+        recordId,
         contractData: record.contractData,
         contractNum:  record.contractNum,
         status:       record.status,
         signatures:   record.signatures || {},
         alreadySigned: !!(record.signatures && record.signatures[link.role]),
+        docHash,
+        esign: {
+          consentText:  CONSENT_TEXT,
+          otpRequired:  await otpRequired(),
+          otpAvailable: await isMailerConfigured(),
+          emailHint:    maskEmail(emailOnFile),
+          hasEmailOnFile: !!emailOnFile,
+          verified,
+        },
       })
     }
 
     if (req.method === 'POST') {
-      const { signatureDataUrl, fieldSignatures, printedName, pdfBase64, fileName, esignConsent, agreementAgreedAt } = req.body || {}
-      if (!signatureDataUrl && !fieldSignatures) return res.status(400).json({ error: 'Missing signature' })
+      const body = req.body || {}
+      const ctx = requestContext(req, body.device)
+
+      // Steps before the signature: each is logged with the server's time.
+      if (body.action === 'event') {
+        const allowed = ['disclosure_accepted', 'consent_checked', 'consent_unchecked', 'signature_adopted']
+        if (!allowed.includes(body.event)) return res.status(400).json({ error: 'Unknown event' })
+        await logEventSafe(ctx, { ...logBase, event: body.event, docHash, signerName: body.printedName || null,
+          detail: body.event.startsWith('consent') ? { text: CONSENT_TEXT } : null })
+        return res.json({ ok: true })
+      }
+      if (body.action === 'otp-send') {
+        const r = await otpSend(kv, { token, email: body.email, emailOnFile, companyName, docLabel: `Contract #${record.contractNum || ''}`, ctx, logBase })
+        return res.status(r.status).json(r.body)
+      }
+      if (body.action === 'otp-verify') {
+        const r = await otpVerify(kv, { token, code: body.code, ctx, logBase })
+        return res.status(r.status).json(r.body)
+      }
 
       const signatures = record.signatures || {}
       if (signatures[link.role]) return res.status(409).json({ error: `Already signed as ${link.role}` })
 
-      signatures[link.role] = {
-        signatureDataUrl: signatureDataUrl || null,
-        fields:           fieldSignatures  || {},
-        printedName:      printedName || '',
-        signedAt:         Date.now(),
-        ip:               req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown',
-        userAgent:        req.headers['user-agent'] || 'unknown',
-        esignConsent:     !!esignConsent,          // ESIGN/UETA consent captured at signing
-        esignConsentAt:   esignConsent ? Date.now() : null,
-        agreementAgreedAt: agreementAgreedAt || null,  // binding-agreement accepted on open
-      }
+      const built = await buildSignature(kv, req, { token, recordType: 'contract', recordId, role: link.role, doc: record.contractData, storedDocHash: record.docHash, emailOnFile })
+      if (built.error) return res.status(built.status).json({ error: built.error })
+      signatures[link.role] = built.entry
 
       const required  = ['client', 'builder']
       const allSigned = required.every(r => signatures[r])
-      const ttl       = 60 * 60 * 24 * 60
-      await kv.set(`sign:${link.recordId}`, {
+      await kv.set(`sign:${recordId}`, {
         ...record,
+        docHash: record.docHash || docHash,
         signatures,
         status: allSigned ? 'signed' : 'partial',
-      }, { ex: ttl })
+      })
+      if (allSigned) await logEventSafe(built.ctx, { recordType: 'contract', recordId, event: 'completed', docHash })
 
       let driveResult = null
-      if (pdfBase64 && fileName) {
-        try { driveResult = await uploadToDrive({ pdfBase64, fileName }) } catch {}
+      if (body.pdfBase64 && body.fileName) {
+        try { driveResult = await uploadToDrive({ pdfBase64: body.pdfBase64, fileName: body.fileName }) } catch {}
       }
-      return res.json({ ok: true, allSigned, driveResult })
+      return res.json({ ok: true, allSigned, driveResult, eventHash: built.entry.eventHash })
     }
 
     res.status(405).json({ error: 'Method not allowed' })

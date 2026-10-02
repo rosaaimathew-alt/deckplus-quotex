@@ -7,9 +7,13 @@
 // tokens — so this is as private as the Redis store it replaces. If a Vercel KV
 // / Upstash store is attached (KV_REST_API_URL set), that is used instead.
 //
+// E-sign records (sign:, link:, co:, co-link:, otp: …) are protected in the
+// database (supabase/esign.sql): they never expire, can't be deleted, and can
+// only be read or written with the ESIGN_DB_SECRET this module passes along.
+//
 //   const kv = await getKV()
-//   await kv.set('sign:abc', { ... }, { ex: 60 * 60 * 24 * 60 })
-//   const rec = await kv.get('sign:abc')
+//   await kv.set('pview:abc', { ... })
+//   const rec = await kv.get('pview:abc')
 import { createClient } from '@supabase/supabase-js'
 
 let _sb = null
@@ -22,20 +26,22 @@ function supabase() {
   return _sb
 }
 
+const secret = () => process.env.ESIGN_DB_SECRET || null
+
 const supabaseKV = {
   async get(key) {
-    const { data, error } = await supabase().rpc('kv_get', { k: key })
+    const { data, error } = await supabase().rpc('kv_get', { k: key, s: secret() })
     if (error) throw new Error(`kv_get failed: ${error.message}`)
     return data ?? null
   },
   async set(key, value, opts = {}) {
     const ttl = Number.isFinite(Number(opts?.ex)) ? Math.round(Number(opts.ex)) : null
-    const { error } = await supabase().rpc('kv_set', { k: key, v: value ?? null, ttl_seconds: ttl })
+    const { error } = await supabase().rpc('kv_set', { k: key, v: value ?? null, ttl_seconds: ttl, s: secret() })
     if (error) throw new Error(`kv_set failed: ${error.message}`)
     return 'OK'
   },
   async del(key) {
-    const { error } = await supabase().rpc('kv_del', { k: key })
+    const { error } = await supabase().rpc('kv_del', { k: key, s: secret() })
     if (error) throw new Error(`kv_del failed: ${error.message}`)
     return 1
   },
