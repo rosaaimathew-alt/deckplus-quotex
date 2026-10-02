@@ -43,12 +43,12 @@ $$;
 revoke all on function public.esign_secret_ok(text) from public, anon, authenticated;
 revoke all on function public.esign_enforced() from public, anon, authenticated;
 
--- ── KV functions (replace the schema.sql versions) ──────────────────────────
-drop function if exists public.kv_get(text);
-drop function if exists public.kv_set(text, jsonb, integer);
-drop function if exists public.kv_del(text);
+-- ── KV functions ────────────────────────────────────────────────────────────
+-- The API calls the *_s versions (they take the secret). The original kv_get /
+-- kv_set / kv_del from schema.sql are kept as wrappers with no secret, so any
+-- caller using the public key gets the same protection.
 
-create or replace function public.kv_get(k text, s text default null)
+create or replace function public.kv_get_s(k text, s text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v jsonb; exp timestamptz;
 begin
@@ -68,7 +68,7 @@ begin
   return v;
 end $$;
 
-create or replace function public.kv_set(k text, v jsonb, ttl_seconds integer default null, s text default null)
+create or replace function public.kv_set_s(k text, v jsonb, ttl_seconds integer default null, s text default null)
 returns void language plpgsql security definer set search_path = public as $$
 declare old jsonb;
 begin
@@ -83,13 +83,13 @@ begin
           raise exception 'E-sign links are permanent and cannot be changed' using errcode = '42501';
         end if;
       elsif k like 'sign:%' or k like 'co:%' then
-        if (old ? 'contractData') and (v -> 'contractData') is distinct from (old -> 'contractData') then
+        if (old -> 'contractData') is not null and (v -> 'contractData') is distinct from (old -> 'contractData') then
           raise exception 'The signed document cannot be changed' using errcode = '42501';
         end if;
-        if (old ? 'coData') and (v -> 'coData') is distinct from (old -> 'coData') then
+        if (old -> 'coData') is not null and (v -> 'coData') is distinct from (old -> 'coData') then
           raise exception 'The signed document cannot be changed' using errcode = '42501';
         end if;
-        if (old ? 'docHash') and (v -> 'docHash') is distinct from (old -> 'docHash') then
+        if (old -> 'docHash') is not null and (v -> 'docHash') is distinct from (old -> 'docHash') then
           raise exception 'The document hash cannot be changed' using errcode = '42501';
         end if;
         if coalesce(old -> 'signatures', '{}'::jsonb) <> '{}'::jsonb
@@ -104,27 +104,38 @@ begin
     on conflict (key) do update set value = excluded.value, expires_at = null, updated_at = now();
     return;
   end if;
-  insert into public.app_kv (key, value, expires_at, updated_at)
-  values (k, v, case when ttl_seconds is null then null else now() + make_interval(secs => ttl_seconds) end, now())
-  on conflict (key) do update
-    set value = excluded.value, expires_at = excluded.expires_at, updated_at = now();
+  if k is not null then
+    insert into public.app_kv (key, value, expires_at, updated_at)
+    values (k, v, case when ttl_seconds is null then null else now() + make_interval(secs => ttl_seconds) end, now())
+    on conflict (key) do update
+      set value = excluded.value, expires_at = excluded.expires_at, updated_at = now();
+  end if;
 end $$;
 
-create or replace function public.kv_del(k text, s text default null)
+create or replace function public.kv_del_s(k text, s text default null)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   if public.esign_protected_key(k) then
     raise exception 'E-sign records cannot be deleted' using errcode = '42501';
   end if;
-  delete from public.app_kv where key = k;
+  if k is not null then
+    delete from public.app_kv where key = k;
+  end if;
 end $$;
 
-revoke all on function public.kv_get(text, text) from public;
-revoke all on function public.kv_set(text, jsonb, integer, text) from public;
-revoke all on function public.kv_del(text, text) from public;
-grant execute on function public.kv_get(text, text) to anon, authenticated, service_role;
-grant execute on function public.kv_set(text, jsonb, integer, text) to anon, authenticated, service_role;
-grant execute on function public.kv_del(text, text) to anon, authenticated, service_role;
+revoke all on function public.kv_get_s(text, text) from public;
+revoke all on function public.kv_set_s(text, jsonb, integer, text) from public;
+revoke all on function public.kv_del_s(text, text) from public;
+grant execute on function public.kv_get_s(text, text) to anon, authenticated, service_role;
+grant execute on function public.kv_set_s(text, jsonb, integer, text) to anon, authenticated, service_role;
+grant execute on function public.kv_del_s(text, text) to anon, authenticated, service_role;
+
+create or replace function public.kv_get(k text)
+returns jsonb language sql security definer set search_path = public as $$ select public.kv_get_s(k, null) $$;
+create or replace function public.kv_set(k text, v jsonb, ttl_seconds integer default null)
+returns void language sql security definer set search_path = public as $$ select public.kv_set_s(k, v, ttl_seconds, null) $$;
+create or replace function public.kv_del(k text)
+returns void language sql security definer set search_path = public as $$ select public.kv_del_s(k, null) $$;
 
 -- Belt and braces at the table level: no API role can touch e-sign rows
 -- directly, and even the owner can't delete them or give them an expiry.
@@ -221,11 +232,13 @@ begin
   if not public.esign_secret_ok(s) then
     raise exception 'Not authorized to write the e-sign log' using errcode = '42501';
   end if;
-  insert into public.esign_events (seq, record_type, record_id, role, event, at_ms, ip, ip_chain, user_agent,
-                                   device, geo, signer_name, signer_email, doc_hash, detail, prev_hash, event_hash)
-  values (0, p_record_type, p_record_id, p_role, p_event, 0, p_ip, p_ip_chain, left(p_user_agent, 1000),
-          p_device, p_geo, p_signer_name, p_signer_email, p_doc_hash, p_detail, '', '')
-  returning * into r;
+  if p_event is not null then
+    insert into public.esign_events (seq, record_type, record_id, role, event, at_ms, ip, ip_chain, user_agent,
+                                     device, geo, signer_name, signer_email, doc_hash, detail, prev_hash, event_hash)
+    values (0, p_record_type, p_record_id, p_role, p_event, 0, p_ip, p_ip_chain, left(p_user_agent, 1000),
+            p_device, p_geo, p_signer_name, p_signer_email, p_doc_hash, p_detail, '', '')
+    returning * into r;
+  end if;
   return jsonb_build_object('seq', r.seq, 'at_ms', r.at_ms, 'event_hash', r.event_hash);
 end $$;
 

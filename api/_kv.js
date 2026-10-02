@@ -30,18 +30,18 @@ const secret = () => process.env.ESIGN_DB_SECRET || null
 
 const supabaseKV = {
   async get(key) {
-    const { data, error } = await supabase().rpc('kv_get', { k: key, s: secret() })
+    const { data, error } = await supabase().rpc('kv_get_s', { k: key, s: secret() })
     if (error) throw new Error(`kv_get failed: ${error.message}`)
     return data ?? null
   },
   async set(key, value, opts = {}) {
     const ttl = Number.isFinite(Number(opts?.ex)) ? Math.round(Number(opts.ex)) : null
-    const { error } = await supabase().rpc('kv_set', { k: key, v: value ?? null, ttl_seconds: ttl, s: secret() })
+    const { error } = await supabase().rpc('kv_set_s', { k: key, v: value ?? null, ttl_seconds: ttl, s: secret() })
     if (error) throw new Error(`kv_set failed: ${error.message}`)
     return 'OK'
   },
   async del(key) {
-    const { error } = await supabase().rpc('kv_del', { k: key, s: secret() })
+    const { error } = await supabase().rpc('kv_del_s', { k: key, s: secret() })
     if (error) throw new Error(`kv_del failed: ${error.message}`)
     return 1
   },
