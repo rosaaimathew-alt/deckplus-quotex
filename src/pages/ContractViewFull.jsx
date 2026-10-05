@@ -52,7 +52,7 @@ export default function ContractViewFull() {
   const renderSigDate = (id, role) => { const s = signatures?.[role]; return s?.signedAt && sigOf(id, role) ? <span>{fmtShortDate(s.signedAt)}</span> : null }
 
   return (
-    <div className="min-h-screen bg-gray-100 pb-12">
+    <div className="qx-ink min-h-screen bg-gray-100 pb-12">
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-20 shadow-sm no-print">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">

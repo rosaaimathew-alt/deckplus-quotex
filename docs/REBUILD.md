@@ -2,7 +2,7 @@
 
 This branch runs QuoteX on Supabase with **one row per record**, patched per
 field and pushed to every device by Realtime. It is the foundation for the new
-company's copy. The current QuoteX (`main`, Ebony Outdoor Living) is untouched:
+company's copy. The original QuoteX app (`main`) is untouched:
 this branch is never merged into `main`; the new company's repo is created from it.
 
 Design and rationale: the *QuoteX Rebuild Blueprint* doc.

@@ -51,6 +51,48 @@ export async function signOut() {
   _session = null
 }
 
+// ── Invites & self-service accounts ──────────────────────────────────────────
+// Sign-up is invite-only: an admin (or the office) creates an invite for an
+// email and role; that person opens /signup?code=… and sets their own name and
+// password. The database ties the new login to the team the invite is for.
+const need = () => { if (!supabase) throw new Error('Supabase is not configured.') }
+const rpc = async (fn, args) => {
+  need()
+  const { data, error } = await supabase.rpc(fn, args)
+  if (error) throw new Error(error.message)
+  return data
+}
+export const inviteInfo   = (code) => rpc('invite_info', { p_code: code })
+export const createInvite = ({ email, role, displayName }) => rpc('create_invite', { p_email: email, p_role: role, p_display_name: displayName || null })
+export const listInvites  = () => rpc('list_invites', {})
+export const revokeInvite = (code) => rpc('revoke_invite', { p_code: code })
+export const claimInvite  = (code, name) => rpc('claim_invite', { p_code: code || null, p_name: name || null })
+
+// Creates the login. Returns { session } when signed in straight away, or
+// { needsConfirm: true } when the project asks people to confirm their email.
+export async function signUp({ email, password, displayName }) {
+  need()
+  const { data, error } = await supabase.auth.signUp({
+    email, password,
+    options: { data: { display_name: displayName || '' }, emailRedirectTo: `${window.location.origin}/login` },
+  })
+  if (error) throw new Error(error.message)
+  if (data.session) { _session = data.session; return { session: data.session } }
+  return { needsConfirm: true }
+}
+
+export async function changePassword(newPassword) {
+  need()
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw new Error(error.message)
+}
+
+export async function sendPasswordReset(email) {
+  need()
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` })
+  if (error) throw new Error(error.message)
+}
+
 // ── Store ↔ table map ────────────────────────────────────────────────────────
 // Array collections in the store → one table each (row.data is the record).
 export const RECORD_TABLES = {
@@ -107,8 +149,16 @@ export async function loadOrg() {
   const { data: member, error: mErr } = await supabase
     .from('org_members').select('org_id, role, display_name, email').eq('user_id', uid).maybeSingle()
   if (mErr) throw mErr
-  if (!member) throw new Error('This login is not a member of an organization yet. Ask an admin to add you.')
-  const orgId = member.org_id
+  let me = member
+  if (!me) {
+    // First sign-in after accepting an invite (e.g. once email is confirmed):
+    // join the team the invite is for, then read the membership again.
+    try { await claimInvite() } catch { /* no invite for this email */ }
+    const again = await supabase.from('org_members').select('org_id, role, display_name, email').eq('user_id', uid).maybeSingle()
+    me = again.data
+  }
+  if (!me) throw new Error('This login is not on a team yet. Ask your admin for an invite link.')
+  const orgId = me.org_id
 
   const [{ data: members }, { data: settingsRow }] = await Promise.all([
     supabase.from('org_members').select('user_id, role, display_name, email').eq('org_id', orgId),
@@ -127,7 +177,7 @@ export async function loadOrg() {
 
   return {
     orgId,
-    me: { id: uid, role: member.role, displayName: member.display_name, email: member.email },
+    me: { id: uid, role: me.role, displayName: me.display_name, email: me.email },
     members: (members || []).map(m => ({ id: m.user_id, role: m.role, displayName: m.display_name, email: m.email })),
     settings: settingsRow?.data || {},
     collections,

@@ -137,7 +137,7 @@ function DemoContractDoc({ innerRef, companyName, client, address, contractNum, 
   const dep = Math.round(total * 0.2), prog = Math.round(total * 0.4), fin = Math.max(0, total - dep - prog)
   const lines = scopeLines.filter(Boolean)
   return (
-    <div ref={innerRef} className="bg-white shadow-lg print:shadow-none" style={{ fontFamily: 'Georgia, serif', fontSize: '10.5pt', lineHeight: 1.55, color: '#1a1a1a' }}>
+    <div ref={innerRef} className="qx-ink bg-white shadow-lg print:shadow-none" style={{ fontFamily: 'Georgia, serif', fontSize: '10.5pt', lineHeight: 1.55, color: '#000' }}>
       <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-center text-xs font-semibold py-2 px-4">
         SAMPLE CONTRACT · FOR DEMONSTRATION ONLY — fictional company &amp; terms, not a binding agreement.
       </div>
@@ -558,7 +558,7 @@ export default function ContractView() {
   const btn = (on, onCls = 'bg-blue-600 text-white border-blue-600') => `px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${on ? onCls : 'bg-white text-gray-600 border-gray-300 hover:border-blue-300'}`
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="qx-ink min-h-screen bg-gray-100">
 
       {/* ── Toolbar ─────────────────────────────────────────────────── */}
       <div className="no-print bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 sticky top-0 z-10">

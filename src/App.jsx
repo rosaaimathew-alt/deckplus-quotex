@@ -9,6 +9,8 @@ import InboxPage from './pages/Inbox'
 import SettingsPage from './pages/Settings'
 import ContractView from './pages/ContractView'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
+import ResetPassword from './pages/ResetPassword'
 import Landing from './pages/Landing'
 import SignPage from './pages/SignPage'
 import COSignPage from './pages/COSignPage'
@@ -430,6 +432,8 @@ export default function App() {
       <Routes>
         <Route path="/welcome"     element={<Landing />} />
         <Route path="/login"       element={<Login />} />
+        <Route path="/signup"      element={<Signup />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/sign/:token" element={<SignBoundary><SignPage /></SignBoundary>} />
         <Route path="/p/:token"    element={<PublicProposal />} />
         <Route path="/legal"       element={<Legal />} />

@@ -5,6 +5,7 @@ import { extractDominantColor, generatePalette, applyBrandStyles, DEFAULT_BRAND_
 import { canCustomizeBranding, PLAN_ORDER, PLAN_META } from '../plans'
 import { ROLE_ORDER, ROLE_META } from '../roles'
 import { DEMO } from '../demo'
+import { TeamCard, PasswordCard } from '../components/TeamCard'
 
 const PRESET_COLORS = [
   { label: 'Sky Blue',    hex: '#0369a1' },
@@ -712,6 +713,15 @@ export default function Settings() {
             </div>
             )}
           </div>
+
+          {/* ── Team & account ───────────────────────────────────── */}
+          {!DEMO && (
+            <>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Team &amp; Account</h3>
+              {(me?.role === 'admin' || me?.role === 'office') && <TeamCard />}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><PasswordCard /></div>
+            </>
+          )}
 
           {/* ── Connections & Data ─────────────────────────────────── */}
           <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Connections &amp; Data</h3>

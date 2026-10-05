@@ -155,7 +155,7 @@ export default function SignPage() {
     const coLines    = d.lines || []
 
     return (
-      <div className="min-h-screen bg-gray-100 py-8 px-4">
+      <div className="qx-ink min-h-screen bg-gray-100 py-8 px-4">
         <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
 
           {/* CO Header */}
@@ -342,7 +342,7 @@ export default function SignPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-100 pb-32">
+    <div className="qx-ink min-h-screen bg-gray-100 pb-32">
       {/* Sticky header with progress */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-20 shadow-sm">
         <div className="max-w-4xl mx-auto">

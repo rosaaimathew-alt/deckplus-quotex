@@ -59,12 +59,18 @@ export default function Login() {
               placeholder="••••••••" />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="text-right -mt-2">
+            <a href="/reset-password" className="text-xs text-blue-600 hover:underline">Forgot password?</a>
+          </div>
           <button type="submit" disabled={loading || !supabaseReady}
             className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
-        <p className="text-center text-xs text-gray-400 mt-4">
+        <p className="text-center text-sm text-gray-500 mt-4">
+          Got an invite? <a href="/signup" className="text-blue-600 font-medium hover:underline">Create your account</a>
+        </p>
+        <p className="text-center text-xs text-gray-400 mt-3">
           <a href="/legal/terms" className="hover:text-gray-600 underline">Terms</a>
           {' · '}
           <a href="/legal/privacy" className="hover:text-gray-600 underline">Privacy</a>

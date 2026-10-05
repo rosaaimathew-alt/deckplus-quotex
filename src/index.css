@@ -290,3 +290,20 @@
 .qx-embedded > * { margin-left: auto; margin-right: auto; max-width: 80rem; }
 .qx-scroll-x { scrollbar-width: none; }
 .qx-scroll-x::-webkit-scrollbar { display: none; }
+
+/* ── Contract pages: black text ───────────────────────────────────────────
+   On the contract editor, the full contract view and both signing pages, the
+   grey label / helper text prints black so it reads clearly on screen and on
+   paper. Light mode only — dark mode keeps light text on its dark background.
+   Placeholder text inside empty inputs stays grey so it still reads as a hint. */
+html:not(.dark) .qx-ink .text-gray-300,
+html:not(.dark) .qx-ink .text-gray-400,
+html:not(.dark) .qx-ink .text-gray-500,
+html:not(.dark) .qx-ink .text-gray-600,
+html:not(.dark) .qx-ink .text-gray-700,
+html:not(.dark) .qx-ink .text-gray-800,
+html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
+@media print {
+  .qx-ink .text-gray-300, .qx-ink .text-gray-400, .qx-ink .text-gray-500,
+  .qx-ink .text-gray-600, .qx-ink .text-gray-700 { color: #000 !important; }
+}

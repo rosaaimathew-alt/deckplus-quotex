@@ -9,7 +9,7 @@ export default function EsignDisclosureGate({ companyName, logo, onAgree }) {
   const [esignConsent, setEsignConsent] = useState(false)
   const esign = ESIGN_DISCLOSURE.build(companyName)
   return (
-    <div className="min-h-screen bg-gray-100 flex items-start justify-center p-4 py-8">
+    <div className="qx-ink min-h-screen bg-gray-100 flex items-start justify-center p-4 py-8">
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-2xl p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-4">
           {logo ? <img src={logo} alt="logo" className="h-8 object-contain" /> : <img src="/contract/deckplus-logo.png" alt="Deck Plus" className="h-8 object-contain" />}

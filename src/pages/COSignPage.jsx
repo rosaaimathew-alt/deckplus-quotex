@@ -107,7 +107,7 @@ export default function COSignPage() {
   const originalTotal = d?.originalTotal || 0
   const delta       = newTotal - originalTotal
 
-  const docStyle = { fontFamily: 'Georgia,"Times New Roman",serif', fontSize: '10.5pt', lineHeight: '1.55', color: '#1a1a1a' }
+  const docStyle = { fontFamily: 'Georgia,"Times New Roman",serif', fontSize: '10.5pt', lineHeight: '1.55', color: '#000' }
   const todayStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
   if (done) {
@@ -134,7 +134,7 @@ export default function COSignPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 pb-12" style={docStyle}>
+    <div className="qx-ink min-h-screen bg-gray-100 pb-12" style={docStyle}>
       {/* Top bar */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-20 shadow-sm no-print">
         <div className="max-w-3xl mx-auto flex justify-between items-center">
