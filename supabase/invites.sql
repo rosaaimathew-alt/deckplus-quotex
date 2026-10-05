@@ -117,3 +117,17 @@ grant execute on function public.list_invites() to authenticated;
 grant execute on function public.revoke_invite(text) to authenticated;
 grant execute on function public.claim_invite(text, text) to authenticated;
 grant execute on function public.invite_info(text) to anon, authenticated;
+
+-- ── Money stays with the office ─────────────────────────────────────────────
+-- Reps only ever see their own deals (proposals policy in schema.sql). Card
+-- spend, expenses and job costs are company numbers: office and admin only,
+-- plus project managers for job costs.
+alter policy expenses_org_all on public.expenses
+  using (org_id = auth_org() and auth_role() in ('office','admin'))
+  with check (org_id = auth_org() and auth_role() in ('office','admin'));
+alter policy finance_cards_org_all on public.finance_cards
+  using (org_id = auth_org() and auth_role() in ('office','admin'))
+  with check (org_id = auth_org() and auth_role() in ('office','admin'));
+alter policy job_costs_org_all on public.job_costs
+  using (org_id = auth_org() and auth_role() in ('office','admin','pm'))
+  with check (org_id = auth_org() and auth_role() in ('office','admin','pm'));

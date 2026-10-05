@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { verifyToken } from '../_auth.js'
+import { verifyToken, canSeeRecord } from '../_auth.js'
 import { getKV } from '../_kv.js'
 import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
 import { isMailerConfigured } from '../_mailer.js'
@@ -70,6 +70,7 @@ export default async function handler(req, res) {
       const recordId = token.slice('record-'.length)
       const rec = await kv.get(`co:${recordId}`)
       if (!rec) return res.status(404).json({ error: 'Change order record not found' })
+      if (!(await canSeeRecord(bearer, staff, { createdBy: rec.createdBy, proposalId: rec.coData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own change orders.' })
       const { tokens, ...safe } = rec
       return res.json({ recordId, ...safe, docHash: rec.docHash || docHashOf(rec.coData) })
     }
@@ -79,6 +80,7 @@ export default async function handler(req, res) {
       const recordId = token.slice('verify-'.length)
       const rec = await kv.get(`co:${recordId}`)
       if (!rec) return res.status(404).json({ error: 'Change order record not found' })
+      if (!(await canSeeRecord(bearer, staff, { createdBy: rec.createdBy, proposalId: rec.coData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own change orders.' })
       const report = await verifyRecord({ recordType: 'change_order', recordId, record: rec, doc: rec.coData, emailOnFile: rec.signerEmails?.client })
       return res.json({ ...report, contractNum: rec.coData?.contractNum || '', createdAt: rec.createdAt, createdBy: rec.createdBy || null, status: rec.status,
         title: `${rec.coData?.coNumber || 'Change Order'} — Contract #${rec.coData?.contractNum || ''}`, client: rec.coData?.client || '' })

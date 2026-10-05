@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { uploadToDrive } from '../_google-drive.js'
-import { verifyToken } from '../_auth.js'
+import { verifyToken, canSeeRecord } from '../_auth.js'
 import { getKV } from '../_kv.js'
 import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
 import { isMailerConfigured } from '../_mailer.js'
@@ -149,6 +149,7 @@ export default async function handler(req, res) {
       if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
       const viewToken = token.slice('pdata-'.length)
       const rec = await kv.get(`pview:${viewToken}`)
+      if (rec && !(await canSeeRecord(bearer, staff, { proposalId: rec.proposalId }))) return res.status(403).json({ error: 'You can only view your own contracts.' })
       const opens = rec?.opens || []
       const s = rec?.snapshot || {}
       return res.json({
@@ -163,6 +164,7 @@ export default async function handler(req, res) {
       const recordId = token.slice('record-'.length)
       const rec = await kv.get(`sign:${recordId}`)
       if (!rec) return res.status(404).json({ error: 'Record not found' })
+      if (!(await canSeeRecord(bearer, staff, { createdBy: rec.createdBy, proposalId: rec.contractData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own contracts.' })
       return res.json({
         recordId,
         docHash:      rec.docHash || docHashOf(rec.contractData),
@@ -179,6 +181,7 @@ export default async function handler(req, res) {
       const recordId = token.slice('verify-'.length)
       const rec = await kv.get(`sign:${recordId}`)
       if (!rec) return res.status(404).json({ error: 'Record not found' })
+      if (!(await canSeeRecord(bearer, staff, { createdBy: rec.createdBy, proposalId: rec.contractData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own contracts.' })
       const report = await verifyRecord({ recordType: 'contract', recordId, record: rec, doc: rec.contractData, emailOnFile: rec.signerEmails?.client })
       return res.json({ ...report, contractNum: rec.contractNum, createdAt: rec.createdAt, createdBy: rec.createdBy || null, status: rec.status,
         title: `Contract #${rec.contractNum || ''}`, client: rec.contractData?.dp?.values?.clientName || rec.contractData?.client || '' })
@@ -189,6 +192,7 @@ export default async function handler(req, res) {
       const recordId = token.slice('recover-'.length)
       const rec = await kv.get(`sign:${recordId}`)
       if (!rec) return res.status(404).json({ error: 'Record not found' })
+      if (!(await canSeeRecord(bearer, staff, { createdBy: rec.createdBy, proposalId: rec.contractData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own contracts.' })
       if (!rec.roleTokens) return res.status(404).json({ error: 'No role tokens stored — this record predates link recovery support' })
 
       const host  = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'
@@ -213,6 +217,7 @@ export default async function handler(req, res) {
 
       const rec = await kv.get(`sign:${recordId}`)
       if (!rec) return res.status(404).json({ error: 'Signing record not found' })
+      if (!(await canSeeRecord(bearer, staff, { createdBy: rec.createdBy, proposalId: rec.contractData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own contracts.' })
       if (!rec.roleTokens) return res.status(404).json({ error: 'No role tokens stored in this record' })
 
       const host  = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'

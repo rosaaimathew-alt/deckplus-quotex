@@ -769,6 +769,7 @@ function ChangeOrdersTab({ proposal }) {
         const coPayload = {
           coNumber:      coData.coNumber,
           contractNum,
+          proposalId:    proposal.id,
           description:   coData.description,
           lines:         coData.lines,
           scopeLines:    coData.scopeLines || [],
@@ -821,6 +822,7 @@ function ChangeOrdersTab({ proposal }) {
       const coPayload = {
         coNumber:      co.coNumber,
         contractNum,
+        proposalId:    proposal.id,
         description:   co.description,
         lines:         co.lines || [],
         scopeLines:    co.scopeLines || [],

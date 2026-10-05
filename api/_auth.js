@@ -67,3 +67,42 @@ export async function requireAuth(req, res) {
   }
   return payload
 }
+
+// ── Who may look at a record ─────────────────────────────────────────────────
+// Office, admin and project managers see every contract and change order. A
+// sales rep sees only their own: ones they sent, or ones on a deal the
+// database lets them read (proposal row-level security decides).
+function asUser(token) {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY
+  if (!url || !key || !token) return null
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+}
+
+const _roles = new Map()   // token → { role, until }
+export async function staffRole(token, staff) {
+  const hit = _roles.get(token)
+  if (hit && hit.until > Date.now()) return hit.role
+  const sb = asUser(token)
+  if (!sb || !staff?.sub) return null
+  const { data } = await sb.from('org_members').select('role').eq('user_id', staff.sub).maybeSingle()
+  const role = data?.role || null
+  if (_roles.size > 500) _roles.clear()
+  _roles.set(token, { role, until: Date.now() + CACHE_MS })
+  return role
+}
+
+export async function canSeeRecord(token, staff, { createdBy, proposalId } = {}) {
+  const role = await staffRole(token, staff)
+  if (role === 'office' || role === 'admin' || role === 'pm') return true
+  if (role !== 'rep') return false
+  if (createdBy && staff?.email && String(createdBy).toLowerCase() === String(staff.email).toLowerCase()) return true
+  if (proposalId == null || proposalId === '') return false
+  const sb = asUser(token)
+  if (!sb) return false
+  const { data } = await sb.from('proposals').select('id').eq('id', String(proposalId)).maybeSingle()
+  return !!data
+}
