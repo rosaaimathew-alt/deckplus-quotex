@@ -9,7 +9,7 @@ import {
 
 const SUGGEST_SYSTEM = `You are a sales analyst for a home-improvement contractor. Given a customer's email replies, rate how likely they are to hire us (close the deal), from 0 to 100, and give one short reason. Consider tone, urgency, objections, and buying signals. Respond ONLY with JSON: {"score": <number 0-100>, "reason": "<one short sentence>"}.`
 
-const POLL_INTERVAL = 30_000
+const POLL_INTERVAL = 2 * 60_000   // skipped while the tab is hidden
 
 function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -549,7 +549,7 @@ export default function Inbox() {
   // Initial load + polling
   useEffect(() => {
     fetchMessages(false)
-    const timer = setInterval(() => fetchMessages(true), POLL_INTERVAL)
+    const timer = setInterval(() => { if (!document.hidden) fetchMessages(true) }, POLL_INTERVAL)
     return () => clearInterval(timer)
   }, [fetchMessages])
 

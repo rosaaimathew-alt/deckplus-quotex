@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import { uploadToDrive } from '../_google-drive.js'
 import { verifyToken } from '../_auth.js'
 import { getKV } from '../_kv.js'
-import { CONSENT_TEXT, docHashOf, requestContext, logEvent, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
+import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
 import { isMailerConfigured } from '../_mailer.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
       if (contractNum) {
         await kv.set(`sign-by-contract:${contractNum}`, recordId)
       }
-      await logEvent(requestContext(req), { recordType: 'contract', recordId, event: 'link_created', signerEmail: staff?.email, docHash,
+      await logEventSafe(requestContext(req), { recordType: 'contract', recordId, event: 'link_created', signerEmail: staff?.email, docHash,
         detail: { contractNum: contractNum || '', createdBy: staff?.email || null, roles: ROLES } })
 
       const host  = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'

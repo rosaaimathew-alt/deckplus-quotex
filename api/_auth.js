@@ -1,3 +1,4 @@
+/* global Buffer, process */
 import { createClient } from '@supabase/supabase-js'
 
 // Verifies the Supabase session token the app sends on every /api/ request.
@@ -15,14 +16,37 @@ function admin() {
   return _admin
 }
 
+// A verified token is remembered for up to 5 minutes (never past its own
+// expiry) by this function instance, so a burst of API calls doesn't ask
+// Supabase Auth the same question every time.
+const _verified = new Map()   // token → { user, until }
+const CACHE_MS = 5 * 60_000
+
+function tokenExpiry(token) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'))
+    return Number(payload.exp) * 1000 || 0
+  } catch {
+    return 0
+  }
+}
+
 export async function verifyToken(token) {
   if (!token || typeof token !== 'string') return null
+  const hit = _verified.get(token)
+  if (hit && hit.until > Date.now()) return hit.user
   const sb = admin()
   if (!sb) return null   // fail closed: no Supabase key configured → nobody is authorized
   try {
     const { data, error } = await sb.auth.getUser(token)
     if (error || !data?.user) return null
-    return { email: data.user.email, sub: data.user.id }
+    const user = { email: data.user.email, sub: data.user.id }
+    const until = Math.min(Date.now() + CACHE_MS, tokenExpiry(token) || 0)
+    if (until > Date.now()) {
+      if (_verified.size > 500) _verified.clear()
+      _verified.set(token, { user, until })
+    }
+    return user
   } catch {
     return null
   }

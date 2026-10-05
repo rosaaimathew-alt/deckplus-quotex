@@ -30,7 +30,7 @@ import { TodoDock } from './components/TodoPanel'
 import { DEMO, DEMO_BASENAME, resetDemo } from './demo'
 
 const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
-const UNREAD_POLL = 60_000
+const UNREAD_POLL = 5 * 60_000   // unread badge refresh; skipped while the tab is hidden
 
 // Loads the signed-in user's org rows into the store (once) before the shell
 // renders, so every page starts from real data. Demo builds skip it.
@@ -177,11 +177,13 @@ function AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Unread inbox count — checked on load, then every minute
+  // Unread inbox count — checked on load, when the tab comes back into view,
+  // and every 5 minutes while it's visible. Never while the tab is hidden.
   useEffect(() => {
     if (!can('/inbox')) return
     let alive = true
     const check = async () => {
+      if (document.hidden) return
       try {
         const res = await fetch('/api/messages')
         if (!res.ok) return
@@ -192,8 +194,13 @@ function AppShell() {
     }
     check()
     const timer = setInterval(check, UNREAD_POLL)
-    return () => { alive = false; clearInterval(timer) }
-  }, [readMessageIds, can, setUnread])
+    const onVisible = () => { if (!document.hidden) check() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { alive = false; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
+    // readMessageIds is read inside check(); marking a message read updates the
+    // badge on the next check rather than re-fetching from the server.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [can, setUnread])
 
   const companyName = branding?.companyName || 'QUOTEX'
   const logo        = branding?.logo        || null

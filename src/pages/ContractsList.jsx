@@ -239,11 +239,16 @@ export default function ContractsList({ initialFilter } = {}) {
   // load, check each not-yet-signed contract's signing record and reflect it:
   // fully signed → mark signed; client-signed (awaiting your countersignature)
   // → flag it so a signed deal stops looking untouched.
+  // One request per contract, and each contract is checked at most once every
+  // 10 minutes per browser tab, so this can't eat into the API limits.
   useEffect(() => {
     const pending = proposals.filter(p => p.status === 'Won' && p.contractDraft && !p.contractDraft.signed)
     if (pending.length === 0) return
     let cancelled = false
-    // Fetch one endpoint and normalize the fields we care about.
+    const recentlyChecked = (id) => {
+      try { return Date.now() - Number(sessionStorage.getItem(`qx-sigcheck:${id}`) || 0) < 10 * 60_000 } catch { return false }
+    }
+    const markChecked = (id) => { try { sessionStorage.setItem(`qx-sigcheck:${id}`, String(Date.now())) } catch { /* private mode */ } }
     const probe = async (url) => {
       try {
         const r = await fetch(url)
@@ -255,37 +260,16 @@ export default function ContractsList({ initialFilter } = {}) {
     }
     ;(async () => {
       for (const p of pending) {
+        if (cancelled) return
+        if (recentlyChecked(p.id)) continue
+        markChecked(p.id)
         const draft = p.contractDraft || {}
         const contractNum = draft.contractNum || contractNumberFor(p.id)
-        // Self-healing: don't trust a single stored id. Probe every path that can
-        // reach the record and take whichever actually holds the client's
-        // signature — so a stale/missing id or contract-number can't hide it.
-        const candidates = []
-        // 1) The signing links the customer actually used — the SAME path a
-        //    working "already signed" link uses, so if the link sees the
-        //    signature, this does too. Read the record id straight off it.
-        const linkUrl = draft.signLinks?.client || draft.signLinks?.builder || draft.signLinks?.gc
-        if (linkUrl) {
-          const tok = String(linkUrl).split('/sign/').pop()
-          if (tok) {
-            const viaLink = await probe(`/api/sign/${tok}`)
-            if (viaLink) candidates.push(viaLink)
-          }
-        }
-        // 2) The stored record id.
-        if (draft.signRecordId) {
-          const byId = await probe(`/api/sign/record-${draft.signRecordId}`)
-          if (byId) candidates.push({ ...byId, recordId: byId.recordId || draft.signRecordId })
-        }
-        // 3) A fresh lookup by contract number.
-        const byNum = await probe(`/api/sign/lookup-${encodeURIComponent(contractNum)}`)
-        if (byNum) candidates.push(byNum)
-        if (cancelled) return
-        // Prefer a fully-signed record, then a client-signed one, then anything.
-        const best = candidates.find(c => c.status === 'signed')
-                  || candidates.find(c => c.clientSigned)
-                  || candidates[0]
-        if (!best) continue
+        // The stored record id when there is one, otherwise the contract number.
+        const best = draft.signRecordId
+          ? (await probe(`/api/sign/record-${draft.signRecordId}`)) || (await probe(`/api/sign/lookup-${encodeURIComponent(contractNum)}`))
+          : await probe(`/api/sign/lookup-${encodeURIComponent(contractNum)}`)
+        if (cancelled || !best) continue
         if (best.status === 'signed' || best.clientSigned) {
           setRemote(prev => ({ ...prev, [p.id]: best }))
           if (best.recordId && best.recordId !== draft.signRecordId) saveContractDraft(p.id, { signRecordId: best.recordId })

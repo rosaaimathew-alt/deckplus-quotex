@@ -81,11 +81,15 @@ function OpenEventRow({ e, showClient = true }) {
 // Global chronological feed of every proposal open across all customers.
 function ActivityView({ proposals }) {
   const [events, setEvents] = useState(null)
+  // Refetch only when the set of tracked links changes — not on every edit to
+  // any proposal.
+  const tokensKey = proposals.map(p => p.viewToken || '').filter(Boolean).join(',')
   useEffect(() => {
     let alive = true
     gatherOpenEvents(proposals).then(ev => { if (alive) setEvents(ev) })
     return () => { alive = false }
-  }, [proposals])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokensKey])
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 max-w-2xl">

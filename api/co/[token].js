@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { verifyToken } from '../_auth.js'
 import { getKV } from '../_kv.js'
-import { CONSENT_TEXT, docHashOf, requestContext, logEvent, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
+import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
 import { isMailerConfigured } from '../_mailer.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '4mb' } } }
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
         kv.set(`co-link:${tokens.client}`,  { recordId, role: 'client' }),
         kv.set(`co-link:${tokens.builder}`, { recordId, role: 'builder' }),
       ])
-      await logEvent(requestContext(req), { recordType: 'change_order', recordId, event: 'link_created', signerEmail: staff?.email, docHash,
+      await logEventSafe(requestContext(req), { recordType: 'change_order', recordId, event: 'link_created', signerEmail: staff?.email, docHash,
         detail: { coNumber: coData.coNumber || '', contractNum: coData.contractNum || '', createdBy: staff?.email || null, roles: ['client', 'builder'] } })
 
       const host  = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'
