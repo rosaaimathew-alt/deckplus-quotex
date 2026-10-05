@@ -28,7 +28,7 @@ export default function ProposalView() {
   const proposalIdRef = useRef(null)
   const { saveProposal, markProposalSent, setProposalViewToken } = useStore()
   const branding = useStore(s => s.branding)
-  const blue     = branding?.primaryColor || DEFAULT_BRAND_COLOR   // Deck Plus blue — the page background
+  const blue     = branding?.primaryColor || DEFAULT_BRAND_COLOR   // Deck Plus blue — PROPOSAL title and company name
   const companyName = branding?.companyName || 'QUOTEX'
 
   useEffect(() => {
@@ -368,18 +368,18 @@ export default function ProposalView() {
       )}
 
       {/* Proposal document */}
-      {/* Deck Plus look: white bar up top with the logo, then the rest of the
-          page in Deck Plus blue (the brand primary color) with white lettering. */}
-      <div ref={proposalDocRef} className="max-w-3xl mx-auto my-8 shadow-lg rounded-xl overflow-hidden print:shadow-none print:rounded-none print:my-0" style={{ backgroundColor: blue, color: '#fff' }}>
+      {/* White page, black text; the brand blue only for the PROPOSAL title and
+          the rules, so it reads the same on screen, printed and downloaded. */}
+      <div ref={proposalDocRef} className="qx-ink max-w-3xl mx-auto my-8 shadow-lg rounded-xl overflow-hidden print:shadow-none print:rounded-none print:my-0" style={{ backgroundColor: '#fff', color: '#000' }}>
 
         {/* Header — white bar */}
         <div className="bg-white px-10 py-7">
           <div className="flex justify-between items-start gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight" style={{ color: blue }}>PROPOSAL</h1>
-              <p className="text-sm mt-1 text-gray-500">{today}</p>
+              <p className="text-sm mt-1 text-black">{today}</p>
               {expirationFormatted && (
-                <p className="text-sm mt-0.5 font-medium text-gray-700">Valid Until: {expirationFormatted}</p>
+                <p className="text-sm mt-0.5 font-medium text-black">Valid Until: {expirationFormatted}</p>
               )}
             </div>
             <div className="text-right">
@@ -392,15 +392,15 @@ export default function ProposalView() {
 
         {/* Customer info */}
         {(client || email || phone || address) && (
-          <div className="px-10 py-5 border-b border-white/20">
-            <p className="text-xs font-semibold uppercase tracking-widest mb-3 text-white/70">Prepared For</p>
+          <div className="px-10 py-5 border-b border-gray-300">
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3 text-black">Prepared For</p>
             <div className="flex justify-between items-start flex-wrap gap-4">
               <div>
-                {client && <p className="font-semibold text-white text-lg">{client}</p>}
-                {address && <p className="text-white/80 text-sm mt-0.5">{address}</p>}
+                {client && <p className="font-semibold text-black text-lg">{client}</p>}
+                {address && <p className="text-black text-sm mt-0.5">{address}</p>}
               </div>
               {(email || phone) && (
-                <div className="text-right text-sm text-white/80">
+                <div className="text-right text-sm text-black">
                   {phone && <p>{phone}</p>}
                   {email && <p>{email}</p>}
                 </div>
@@ -411,14 +411,14 @@ export default function ProposalView() {
 
         {/* Scope of Work — always shown (broken down by item); the toggle only
             controls whether the PRICE table is itemized or a single lump sum. */}
-        <div className="px-10 py-7 border-b border-white/20">
-          <p className="text-xs font-semibold uppercase tracking-widest mb-5 text-white/70">Scope of Work</p>
+        <div className="px-10 py-7 border-b border-gray-300">
+          <p className="text-xs font-semibold uppercase tracking-widest mb-5 text-black">Scope of Work</p>
           <div className="space-y-2">
             {lines.map(line => (
-              <div key={line.id} className="border-l-2 border-white/40 pl-3">
-                <p className="text-sm font-semibold text-white">{line.name}</p>
+              <div key={line.id} className="border-l-2 border-gray-400 pl-3">
+                <p className="text-sm font-semibold text-black">{line.name}</p>
                 {line.description && (
-                  <p className="text-sm text-white/85 leading-relaxed mt-0.5 whitespace-pre-wrap">{line.description}</p>
+                  <p className="text-sm text-black leading-relaxed mt-0.5 whitespace-pre-wrap">{line.description}</p>
                 )}
               </div>
             ))}
@@ -428,47 +428,47 @@ export default function ProposalView() {
         {/* Pricing Table */}
         <div className="px-10 py-7">
           {isAlaCarte && (
-            <p className="text-xs text-white/80 italic mb-4">
+            <p className="text-xs text-black italic mb-4">
               The following options are priced individually — please indicate which you would like to proceed with.
             </p>
           )}
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b-2 border-white/40">
-                <th className="text-left pb-2 font-semibold text-white/80 text-xs uppercase tracking-wider">
+              <tr className="border-b-2 border-black">
+                <th className="text-left pb-2 font-semibold text-black text-xs uppercase tracking-wider">
                   {isAlaCarte ? 'Option' : 'Item'}
                 </th>
-                <th className="text-right pb-2 font-semibold text-white/80 text-xs uppercase tracking-wider w-28">Price</th>
+                <th className="text-right pb-2 font-semibold text-black text-xs uppercase tracking-wider w-28">Price</th>
                 {isAlaCarte && (
-                  <th className="text-right pb-2 font-semibold text-white/80 text-xs uppercase tracking-wider w-20">Select</th>
+                  <th className="text-right pb-2 font-semibold text-black text-xs uppercase tracking-wider w-20">Select</th>
                 )}
               </tr>
             </thead>
             <tbody>
               {(showBreakdown || isAlaCarte) ? lines.map((line, i) => (
-                <tr key={line.id} className={`border-b border-white/10 ${i % 2 === 0 ? '' : 'bg-white/10'}`}>
-                  <td className="py-2.5 px-1 text-white font-medium">{line.name || '—'}</td>
-                  <td className="py-2.5 px-1 text-right font-semibold text-white">${fmt((Number(line.qty) || 0) * (Number(line.unitPrice) || 0))}</td>
+                <tr key={line.id} className={`border-b border-gray-200 `}>
+                  <td className="py-2.5 px-1 text-black font-medium">{line.name || '—'}</td>
+                  <td className="py-2.5 px-1 text-right font-semibold text-black">${fmt((Number(line.qty) || 0) * (Number(line.unitPrice) || 0))}</td>
                   {isAlaCarte && (
                     <td className="py-2.5 px-1 text-right">
-                      <span className="inline-block w-4 h-4 border border-white/80 rounded-sm" />
+                      <span className="inline-block w-4 h-4 border border-black rounded-sm" />
                     </td>
                   )}
                 </tr>
               )) : (
                 <tr>
-                  <td className="py-2.5 text-white font-medium">Project Total</td>
-                  <td className="py-2.5 text-right font-semibold text-white">${fmt(subtotal)}</td>
+                  <td className="py-2.5 text-black font-medium">Project Total</td>
+                  <td className="py-2.5 text-right font-semibold text-black">${fmt(subtotal)}</td>
                 </tr>
               )}
             </tbody>
           </table>
           {/* Total — only shown in summed mode */}
           {!isAlaCarte && (
-            <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }} className="border-t-2 border-white/40 mt-2 pt-4 flex justify-end">
+            <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }} className="border-t-2 border-black mt-2 pt-4 flex justify-end">
               <div className="text-right">
-                <span className="text-xs font-semibold uppercase tracking-widest text-white/70 mr-4">Total</span>
-                <span className="text-xl font-bold text-white">${fmt(subtotal)}</span>
+                <span className="text-xs font-semibold uppercase tracking-widest text-black mr-4">Total</span>
+                <span className="text-xl font-bold text-black">${fmt(subtotal)}</span>
               </div>
             </div>
           )}
@@ -476,28 +476,28 @@ export default function ProposalView() {
 
         {/* Terms & Signature */}
         <div className="px-10 pb-10">
-          <div className="bg-white/10 rounded-lg p-4 text-xs text-white/85 leading-relaxed space-y-2">
-            <p className="font-semibold text-white">Terms & Conditions</p>
+          <div className="border border-gray-300 rounded-lg p-4 text-xs text-black leading-relaxed space-y-2">
+            <p className="font-semibold text-black">Terms & Conditions</p>
             <p>
               {expirationFormatted
                 ? `This proposal is valid until ${expirationFormatted}.`
                 : 'This proposal is valid for 30 days from the date above.'
               }
             </p>
-            <p><span className="font-semibold text-white">Payment:</span> A {subtotal >= 30000 && subtotal <= 100000 ? '10%' : '20%'} deposit is required to schedule work. Progress payments will follow different stages of completion as labeled in a scope of work document drafted once the proposal has been accepted.</p>
-            <p><span className="font-semibold text-white">Site Conditions:</span> Pricing is based on normal site conditions. Any unforeseen conditions may result in additional costs with prior written approval.</p>
-            <p><span className="font-semibold text-white">Warranty:</span> All projects include a standard 1-year warranty on materials and a 5-year structural warranty.</p>
-            <p className="font-semibold text-white pt-1">Addendums</p>
+            <p><span className="font-semibold text-black">Payment:</span> A {subtotal >= 30000 && subtotal <= 100000 ? '10%' : '20%'} deposit is required to schedule work. Progress payments will follow different stages of completion as labeled in a scope of work document drafted once the proposal has been accepted.</p>
+            <p><span className="font-semibold text-black">Site Conditions:</span> Pricing is based on normal site conditions. Any unforeseen conditions may result in additional costs with prior written approval.</p>
+            <p><span className="font-semibold text-black">Warranty:</span> All projects include a standard 1-year warranty on materials and a 5-year structural warranty.</p>
+            <p className="font-semibold text-black pt-1">Addendums</p>
             <p>Any changes resulting in additional charges must be paid at the time of the change. If the inspector requires engineering, it will result in an additional charge.</p>
           </div>
           <div className="mt-8 grid grid-cols-2 gap-10">
             <div>
-              <div className="border-b border-white/60 mb-1.5 pb-6" />
-              <p className="text-xs text-white/80">Client Signature & Date</p>
+              <div className="border-b border-black mb-1.5 pb-6" />
+              <p className="text-xs text-black">Client Signature & Date</p>
             </div>
             <div>
-              <div className="border-b border-white/60 mb-1.5 pb-6" />
-              <p className="text-xs text-white/80">Contractor Signature & Date</p>
+              <div className="border-b border-black mb-1.5 pb-6" />
+              <p className="text-xs text-black">Contractor Signature & Date</p>
             </div>
           </div>
         </div>
