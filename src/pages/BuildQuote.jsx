@@ -11,7 +11,7 @@ import { DECK_COLLECTIONS } from '../lib/deckPricing'
 import { requiredFees } from '../lib/permitFees'
 import { JicField } from '../components/Jic'
 import { scopeFor, countWords } from '../lib/scopeText'
-import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
+import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 
 const MARGIN_DEFAULT = 30
 
@@ -184,7 +184,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
   })()
 
   const add = () => {
-    const jl = jicLine(jic, price, { section: 'Porch', category: 'Screen Porches', label: 'porch conversion' })
+    // JIC is built into the price — never its own line on the quote.
     onAdd([{
       id: Date.now() + Math.random(),
       catalogId: null,
@@ -193,11 +193,11 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
       description,
       unit: 'EA',
       qty: 1,
-      unitPrice: Math.round(price),
+      unitPrice: Math.round(price + jicAmount(jic, price)),
       category: 'Screen Porches',
       costMaterials: Math.round(cost),
       costSub: 0,
-    }, ...(jl ? [jl] : [])])
+    }])
     onClose()
   }
 
@@ -300,7 +300,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
         <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 whitespace-pre-line">{description}</p>
       </div>
 
-      <div className="mt-4"><JicField value={jic} onChange={setJic} base={price} /></div>
+      <div className="mt-4"><JicField value={jic} onChange={setJic} base={price} note="A cushion for this build. Built into the porch price — the customer never sees it." /></div>
 
       <div className="flex gap-2 mt-5">
         <button onClick={add} disabled={price <= 0}

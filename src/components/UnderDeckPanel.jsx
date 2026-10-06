@@ -3,14 +3,14 @@ import { X } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
 import { scopeFor } from '../lib/scopeText'
-import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
+import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import { UDC_STYLES, UDC_ELECTRICAL, UDC_INPUT_DEFAULTS, computeUnderDeck, rateFor } from '../underDeck'
 
 // ── Under-deck ceiling tool ──────────────────────────────────────────────────
 // The rep enters the area under the deck, picks the ceiling style and counts the
 // electrical; prices come from the catalog (Deck price list rows 111–126).
-// "Add to quote" writes the ceiling as one line and each electrical item as its
-// own line, so the customer sees exactly what they're getting.
+// "Add to quote" writes ONE line — the ceiling and its electrical in the scope,
+// the JIC built into the price — so the customer sees a single under-deck price.
 
 const money = (v) => '$' + Math.round(v).toLocaleString('en-US')
 const money2 = (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 })
@@ -36,38 +36,33 @@ export default function UnderDeckPanel({ onClose, onAdd, initial }) {
   const result = useMemo(() => computeUnderDeck(inp, catalog), [inp, catalog])
   const W = Number(inp.width) || 0, D = Number(inp.depth) || 0
 
+  const jicAmt = jicAmount(jic, result.total)
+  const total  = result.total + jicAmt               // what the customer is quoted
+
   const add = () => {
-    const stamp = Date.now()
-    const ceilingLine = {
-      id: stamp + Math.random(),
+    const hasCeiling = result.area > 0 && result.ceiling?.total > 0
+    const description = [
+      hasCeiling ? scopeFor(catalog, result.style.catalogName, { size: [W, D] },
+        `Install a Dry under-deck ceiling system (${result.style.label.toLowerCase()} finish) under the deck, approximately ${W}′ × ${D}′ (${result.area} SF).`) : '',
+      ...result.electrical.map(l => scopeFor(catalog, UDC_ELECTRICAL.find(e => e.key === l.key)?.catalogName, { count: l.qty }, `${l.label} — ${l.qty}.`)),
+    ].filter(Boolean).join('\n')
+    const name = hasCeiling
+      ? `Under-deck ceiling — ${result.style.label} (${W}′×${D}′, ${result.area} SF)${result.electrical.length ? ' with lighting & power' : ''}`
+      : 'Under-deck lighting & power'
+    onAdd([{
+      id: Date.now() + Math.random(),
       catalogId: null,
-      name: `Under-deck ceiling — ${result.style.label} (${W}′×${D}′, ${result.area} SF)`,
+      name,
       section: 'Under Deck',
-      description: scopeFor(catalog, result.style.catalogName, { size: [W, D] },
-        `Install a Dry under-deck ceiling system (${result.style.label.toLowerCase()} finish) under the deck, approximately ${W}′ × ${D}′ (${result.area} SF).`),
-      unit: 'SF',
-      qty: result.area,
-      unitPrice: result.ceiling.rate,
-      category: 'Under Deck Ceiling',
-      costMaterials: Math.round(result.ceiling.costTotal),
+      description,
+      unit: 'EA',
+      qty: 1,
+      unitPrice: Math.round(total),
+      category: hasCeiling ? 'Under Deck Ceiling' : 'Electrical',
+      costMaterials: Math.round(result.lines.reduce((a, l) => a + (Number(l.costTotal) || 0), 0)),
       costSub: 0,
       underDeck: inp,
-    }
-    const elecLines = result.electrical.map((l, i) => ({
-      id: stamp + i + 1 + Math.random(),
-      catalogId: null,
-      name: l.label,
-      section: 'Under Deck',
-      description: scopeFor(catalog, UDC_ELECTRICAL.find(e => e.key === l.key)?.catalogName, { count: l.qty }, ''),
-      unit: 'EA',
-      qty: l.qty,
-      unitPrice: l.rate,
-      category: 'Electrical',
-      costMaterials: Math.round(l.costTotal),
-      costSub: 0,
-    }))
-    const jl = jicLine(jic, result.total, { section: 'Under Deck', category: 'Under Deck Ceiling', label: 'under-deck' })
-    onAdd([ceilingLine, ...elecLines, ...(jl ? [jl] : [])])
+    }])
   }
 
   return (
@@ -122,12 +117,13 @@ export default function UnderDeckPanel({ onClose, onAdd, initial }) {
         ))}
       </div>
 
-      <JicField value={jic} onChange={setJic} base={result.total} />
+      {jicAmt > 0 && <p className="text-xs text-gray-400 text-right px-1">Price list {money(result.total)} + JIC {money(jicAmt)} = <span className="font-semibold text-gray-800">{money(total)}</span></p>}
+      <JicField value={jic} onChange={setJic} base={result.total} note="A cushion for this build. Built into the under-deck price — the customer never sees it." />
 
       <div className="flex gap-2">
         <button onClick={add} disabled={result.total <= 0}
           className="flex-1 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-          Add under-deck to quote — {money(result.total + jicAmount(jic, result.total))}
+          Add under-deck to quote — {money(total)}
         </button>
         <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
       </div>

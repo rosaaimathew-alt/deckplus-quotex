@@ -2,7 +2,7 @@
 
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 
-export function JicField({ value, onChange, base, note = 'A cushion for this build. Added as its own line.' }) {
+export function JicField({ value, onChange, base, note = 'A cushion for this build. Built into the price — the customer never sees it.' }) {
   const v = value || JIC_DEFAULT
   const amt = jicAmount(v, base)
   return (

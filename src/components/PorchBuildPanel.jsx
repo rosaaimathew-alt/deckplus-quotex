@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { X, Lock, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
-import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
+import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import {
   PORCH_BUILD_DEFAULTS, PORCH_BUILD_INPUT_DEFAULTS, PORCH_TYPES, PORCH_TIES, PORCH_FLOORS, PORCH_ROOFS,
   PORCH_BUILD_GROUPS, computePorchBuild, buildPorchScope, PORCH_WINDOW_MAX_H,
@@ -11,8 +11,9 @@ import {
 // ── Porch Builder panel ──────────────────────────────────────────────────────
 // The rep enters what they know on site; every price comes from the org's rate
 // table (Item Catalog → Formulas → Porch Builder). Rates are never edited here.
-// "Add to quote" writes ONE quote line per non-empty group, so the customer sees
-// a short grouped list and the office keeps the itemized detail.
+// "Add to quote" writes ONE quote line for the whole porch — the full scope as its
+// description, the JIC built into its price — and the office keeps the itemized
+// breakdown here.
 
 const money = (v) => '$' + Math.round(v).toLocaleString('en-US')
 const inputCls = 'w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--brand-200)]'
@@ -101,26 +102,25 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
   }
   const removeOption = (key) => { const ex = { ...(inp.extras || {}) }; delete ex[key]; set({ extras: ex }) }
 
-  const marginPct = result.total > 0 && result.cost > 0 ? ((result.total - result.cost) / result.total) * 100 : null
+  const jicAmt = jicAmount(jic, result.total)
+  const total  = result.total + jicAmt               // what the customer is quoted
+  const marginPct = total > 0 && result.cost > 0 ? ((total - result.cost) / total) * 100 : null
 
   const add = () => {
-    const stamp = Date.now()
-    const lines = result.groups.map((g, i) => ({
-      id: stamp + i + Math.random(),
+    onAdd([{
+      id: Date.now() + Math.random(),
       catalogId: null,
-      name: `${typeMeta.label} — ${W}′×${D}′ (${result.area} SF) · ${g.label}`,
+      name: `${typeMeta.label} — ${W}′×${D}′ (${result.area} SF)`,
       section: 'Porch',
-      description: scopeOut.byGroup[g.key] || '',
+      description: scope,
       unit: 'EA',
       qty: 1,
-      unitPrice: Math.round(g.total),
+      unitPrice: Math.round(total),
       category: typeMeta.category,
-      costMaterials: Math.round(g.cost),
+      costMaterials: Math.round(result.cost),
       costSub: 0,
-      ...(g.key === 'structure' ? { porchBuild: inp } : {}),
-    }))
-    const jl = jicLine(jic, result.total, { section: 'Porch', category: typeMeta.category, label: 'porch' })
-    onAdd(jl ? [...lines, jl] : lines)
+      porchBuild: inp,
+    }])
   }
 
   return (
@@ -348,18 +348,19 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
         <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">{scope}</pre>
       </details>
 
-      <JicField value={jic} onChange={setJic} base={result.total} />
+      <JicField value={jic} onChange={setJic} base={result.total} note="A cushion for this build. Built into the porch price — the customer never sees it." />
 
       {/* ── Footer ────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-4 pt-1">
         <div className="text-sm text-gray-500">
+          {jicAmt > 0 && <>Price list {money(result.total)} + JIC {money(jicAmt)} · </>}
           Cost <span className="font-semibold text-gray-800">{result.cost > 0 ? money(result.cost) : 'not set'}</span>
           {marginPct != null && <> · Margin <span className="font-semibold text-gray-800">{marginPct.toFixed(0)}%</span></>}
         </div>
         <div className="ml-auto flex gap-2">
           <button onClick={add} disabled={result.total <= 0}
             className="flex items-center gap-2 px-5 py-2.5 bg-[var(--brand-600)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-            <Plus size={15} /> Add porch to quote — {money(result.total + jicAmount(jic, result.total))}
+            <Plus size={15} /> Add porch to quote — {money(total)}
           </button>
           <button onClick={onClose} className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
         </div>
