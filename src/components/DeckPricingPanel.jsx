@@ -46,10 +46,9 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
   const [stairs, setStairs]     = useState(() => {
     if (initial?.stairs === false || !(n(startH) > 0)) return []
     const steps = stepsForHeight(startH)
-    return [{ id: uid(), out: runOutForSteps(steps), across: 4, steps }]
+    return [{ id: uid(), out: runOutForSteps(steps), across: 4, steps, style: initial?.stepStyle === 'Box steps' ? 'Box' : 'Regular', auto: true }]
   })
   const [landings, setLandings] = useState(() => Array.from({ length: n(initial?.landings) }, () => ({ id: uid(), width: 4, depth: 4 })))
-  const [stepStyle, setStepStyle] = useState(initial?.stepStyle === 'Box steps' ? 'Box steps' : 'Regular steps')
   const [rail, setRail]         = useState(initial?.railing ? 'Hybrid Railing / trex cap' : 'None')
   const [bronze, setBronze]     = useState(false)
   const [fascia, setFascia]     = useState(initial?.fascia ? 'Matching' : 'None')
@@ -87,14 +86,16 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
     if (t.stepSF > 0) {
       const item = coll.steps ? `${coll.fam} Steps` : `${coll.fam} Deck`
       push('steps', `${coll.fam} Steps${coll.steps ? '' : ' (deck rate)'}`, item, 'SF', t.stepSF, coll.rate,
-        { calc: stairs.map(s => `${n(s.out)}×${n(s.across)}×${STEP_FACTOR}`).join(' + ') })
+        { calc: stairs.filter(s => n(s.out) * n(s.across) > 0).map(s => `${n(s.out)}′ out × ${n(s.across)}′ across × ${STEP_FACTOR}`).join(' + ') })
     }
     if (t.landingSF > 0) {
       const item = coll.landing ? `${coll.fam} Landing` : `${coll.fam} Deck`
       push('landing', `${coll.fam} Landing${coll.landing ? '' : ' (deck rate)'}`, item, 'SF', t.landingSF, coll.rate,
         { calc: landings.map(l => `${n(l.width)}×${n(l.depth)}`).join(' + ') })
     }
-    if (stepStyle === 'Box steps' && t.stepCount > 0) push('boxstep', 'Box steps (per step)', DECK_ITEMS.boxstep.item, 'EA', t.stepCount, DECK_ITEMS.boxstep.rate)
+    const boxRuns = stairs.filter(s => s.style === 'Box' && n(s.steps) > 0)
+    if (boxRuns.length) push('boxstep', 'Box steps — add per step', DECK_ITEMS.boxstep.item, 'EA', boxRuns.reduce((a, s) => a + n(s.steps), 0), DECK_ITEMS.boxstep.rate,
+      { calc: boxRuns.map(s => `stairs ${stairs.indexOf(s) + 1}: ${n(s.steps)} steps`).join(' + ') })
 
     const railOpt = DECK_RAILS.find(r => r.key === rail)
     const railLF  = t.openLF + t.stairRailLF
@@ -144,7 +145,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
       out.push({ key, label: c.label, item: null, unit: c.unit, qty, autoQty: 0, rate, cost: n(c.cost), line: n(qty) * n(rate), lineCost: n(qty) * n(c.cost), custom: true })
     }
     return out
-  }, [catalog, coll, redeck, canRedeck, t, W, D, H, stairs, landings, stepStyle, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, customComponents, qtyOv, rateOv])
+  }, [catalog, coll, redeck, canRedeck, t, W, D, H, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, customComponents, qtyOv, rateOv])
 
   const price = rows.reduce((s, r) => s + r.line, 0)
   const cost  = rows.reduce((s, r) => s + r.lineCost, 0)
@@ -165,7 +166,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
     for (const s of stairs) {
       const steps = n(s.steps)
       if (steps <= 0 && n(s.out) <= 0) continue
-      lines.push(stepStyle === 'Box steps'
+      lines.push(s.style === 'Box'
         ? scopeFor(catalog, DECK_ITEMS.boxstep.item, { count: steps, width: s.across }, `Approximately ${countWords(steps)} ${ft(s.across)} wide BOX steps to grade.`)
         : scopeFor(catalog, coll.steps ? `${coll.fam} Steps` : null, { count: steps, width: s.across }, `Approximately ${countWords(steps)} ${ft(s.across)} wide steps to grade.`).replace(/^__’x__’ landing and a/, 'A'))
     }
@@ -217,10 +218,27 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
   const clearOv = (...keys) => {
     setQtyOv(o => { const c = { ...o }; keys.forEach(k => delete c[k]); return c })
   }
-  const setStair = (id, p) => { setStairs(cur => cur.map(s => s.id === id ? { ...s, ...p } : s)); clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint') }
+  // Typing a run's out or step count takes it off "follow the deck height".
+  // A typed step count still sets the run-out (11″ treads) until the out is typed too.
+  const setStair = (id, p) => {
+    setStairs(cur => cur.map(s => {
+      if (s.id !== id) return s
+      if ('out' in p) return { ...s, ...p, auto: false, outTyped: true }
+      if ('steps' in p) return { ...s, ...p, auto: false, ...(s.outTyped ? {} : { out: runOutForSteps(n(p.steps)) }) }
+      return { ...s, ...p }
+    }))
+    clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint')
+  }
   const addStair = () => {
     const steps = stepsForHeight(height) || 3
-    setStairs(cur => [...cur, { id: uid(), out: runOutForSteps(steps), across: 4, steps }]); clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint')
+    setStairs(cur => [...cur, { id: uid(), out: runOutForSteps(steps), across: 4, steps, style: 'Regular', auto: true }]); clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint')
+  }
+  // Height drives the step count and run-out of every run the rep hasn't typed over.
+  const changeHeight = (v) => {
+    setHeight(v)
+    const steps = stepsForHeight(v)
+    setStairs(cur => cur.map(s => s.auto && steps > 0 ? { ...s, steps, out: runOutForSteps(steps) } : s))
+    clearOv('skirt', 'high', 'steps', 'rail', 'boxstep', 'cortex', 'paint')
   }
   const extra = (key, label, unit) => (
     <label className="block">
@@ -278,11 +296,10 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
       {jobType === 'New deck' && !canRedeck && <p className="text-xs text-gray-400 -mt-1 mb-3">The price list has no re-deck price for {coll.key}.</p>}
 
       {/* Deck size */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+      <div className="grid grid-cols-3 gap-3 mb-3">
         {field('Across — width (ft)', width, v => { setWidth(v); setQtyOv({}) })}
         {field('Out — depth (ft)', depth, v => { setDepth(v); setQtyOv({}) })}
-        {field('Height (ft)', height, v => { setHeight(v); clearOv('skirt', 'high') })}
-        {pick('Steps', stepStyle, setStepStyle, ['Regular steps', 'Box steps'])}
+        {field('Height (ft)', height, changeHeight, { step: 0.5 })}
       </div>
 
       {/* Bump-outs */}
@@ -303,7 +320,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
       {/* Stairs */}
       <Section title={`Stairs${t.stepSF ? ` · ${fmtQty(t.stepSF)} SF` : ''}`} onAdd={addStair} addLabel="Add stairs"
         empty="No stairs."
-        note={stairs.length ? `Out × across × ${STEP_FACTOR} = SF (price list). Steps suggested from height: ${stepsForHeight(height)} at ${7.5}″ risers.` : null}>
+        note={stairs.length ? `Price list: out × across × ${STEP_FACTOR} = SF × the ${coll.key} Steps $/SF. Steps = deck height ÷ 7.5″ risers (${H}′ → ${stepsForHeight(height)} steps); out = steps × 11″ treads. Box steps add ${money2(catalogPrice(catalog, DECK_ITEMS.boxstep.item, DECK_ITEMS.boxstep.rate).rate)} per step.` : null}>
         {stairs.map((s, i) => (
           <Row key={s.id} label={`Stairs ${i + 1}`} onRemove={() => { setStairs(cur => cur.filter(x => x.id !== s.id)); clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint') }}>
             <input type="number" min="0" step="0.5" value={s.out} aria-label={`Stairs ${i + 1} out`} className={smallCls} onChange={e => setStair(s.id, { out: e.target.value })} />
@@ -311,7 +328,14 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
             <input type="number" min="0" value={s.across} aria-label={`Stairs ${i + 1} across`} className={smallCls} onChange={e => setStair(s.id, { across: e.target.value })} />
             <span className="text-xs text-gray-400">across ft ·</span>
             <input type="number" min="0" value={s.steps} aria-label={`Stairs ${i + 1} steps`} className={smallCls} onChange={e => setStair(s.id, { steps: e.target.value })} />
-            <span className="text-xs text-gray-400">steps = {fmtQty(n(s.out) * n(s.across) * STEP_FACTOR)} SF</span>
+            <span className="text-xs text-gray-400">steps</span>
+            <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-white" role="group" aria-label={`Stairs ${i + 1} style`}>
+              {['Regular', 'Box'].map(st => (
+                <button key={st} type="button" onClick={() => setStair(s.id, { style: st })}
+                  className={`px-2.5 py-1 text-xs rounded-md ${s.style === st ? 'bg-[var(--brand-600)] text-white font-semibold' : 'text-gray-500 hover:bg-gray-50'}`}>{st} steps</button>
+              ))}
+            </div>
+            <span className="text-xs text-gray-500">= {fmtQty(n(s.out) * n(s.across) * STEP_FACTOR)} SF</span>
           </Row>
         ))}
       </Section>
