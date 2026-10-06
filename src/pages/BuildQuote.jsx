@@ -74,6 +74,27 @@ function deckFamily(label) {
   return hit ? { fam: hit[1], fascia: fascia[hit[2]] || null } : { fam: null, fascia: null }
 }
 
+// Skirting and paint/stain options — priced from the catalog items of the same
+// name (Deck Plus price list), with the list price as a fallback.
+const DECK_SKIRT_OPTIONS = {
+  'None': null,
+  'Trex skirt':         { item: 'TREX vertical/horizontal skirt SF', unit: 'SF', rate: 33 },
+  'PT skirt (stained)': { item: 'PT vertical/horizontal skirt STAINED SF', unit: 'SF', rate: 10 },
+  'Lattice (stained)':  { item: 'Eng. Lattice STAINED/ per 4x8 sheet', unit: 'EA', rate: 270, sheetSF: 32 },
+}
+// Paint/stain: a pressure-treated deck is painted whole; on a composite deck only
+// the new wood is (the catalog wording says so), at the hybrid-rail rate.
+const DECK_PAINT_PT        = { item: 'Paint/Stain on PT Deck (Deck)', rate: 10 }
+const DECK_PAINT_COMPOSITE = { item: 'Paint/Stain on TREX Deck HYBRID RAIL SF', rate: 8.12 }
+
+function catalogPrice(catalog, name, fallbackRate) {
+  const norm = (x) => String(x || '').toLowerCase().replace(/\s+/g, ' ').trim()
+  const hit = (catalog || []).find(c => norm(c.name) === norm(name))
+  const rate = Number(hit?.unitPrice) || fallbackRate
+  const cost = (Number(hit?.costMaterials) || 0) + (Number(hit?.costSub) || 0) || +(rate * 0.62).toFixed(2)
+  return { rate, cost }
+}
+
 function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const catalog = useStore(s => s.catalog)
   const rates   = useStore(s => s.deckComponentRates) || DECK_COMPONENT_DEFAULTS
@@ -139,6 +160,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const [border, setBorder]     = useState(initial?.border ?? 'None')       // None / Single / Double picture frame
   const [fieldWastePct, setFieldWastePct] = useState(8)  // extra field-decking waste when bordered
   const [fascia, setFascia]     = useState(initial?.fascia ? 'Matching' : 'None')  // None / Matching 1×12 fascia wrap
+  const [skirt, setSkirt]       = useState('None')   // None / Trex / PT stained / lattice
+  const [paint, setPaint]       = useState('None')   // None / Paint / stain
   // Odd-shaped decks: extra sections (bump-outs / walkways) attached to the deck.
   const [extraSections, setExtraSections] = useState(initial?.extraSections ?? [])
 
@@ -185,6 +208,17 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   const riserBuyLF       = stepFasciaBoards * 16
   const rimBuyLF         = rimBoards * 16
 
+  // ── Skirting (3 exposed sides × deck height) and paint/stain (deck + landings) ──
+  const skirtOpt   = DECK_SKIRT_OPTIONS[skirt] || null
+  const skirtLF    = skirtOpt ? Math.max(0, perimeter - W) : 0                    // skip the house side
+  const skirtSF    = Math.round(skirtLF * Hft)
+  const skirtSheets = skirtOpt?.sheetSF ? Math.ceil(skirtSF / skirtOpt.sheetSF) : 0
+  const skirtPrice = skirtOpt ? catalogPrice(catalog, skirtOpt.item, skirtOpt.rate) : null
+  const paintOn    = paint !== 'None'
+  const paintOpt   = deckFamily(`${brand} ${collection}`).fam === 'PT' ? DECK_PAINT_PT : DECK_PAINT_COMPOSITE
+  const paintSF    = paintOn ? area + landingSF : 0
+  const paintPrice = paintOn ? catalogPrice(catalog, paintOpt.item, paintOpt.rate) : null
+
   const sel = brands[brand]?.[collection]
   const brandRate  = sel?.rate ?? 5
   const brandCost  = sel?.cost ?? +(brandRate * 0.62).toFixed(2)
@@ -215,6 +249,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
       case 'splinejoist':return unit === 'LF' ? splineJoistLF : unit === 'EA' ? splines * 2 : 1
       case 'risers':     return unit === 'EA' ? stepFasciaBoards : unit === 'LF' ? riserBuyLF : 1  // fronts + stair sides, 16' boards
       case 'fascia':     return unit === 'EA' ? rimBoards : unit === 'LF' ? rimBuyLF : 1           // rim, 3 sides, 16' boards
+      case 'skirting':   return unit === 'EA' ? skirtSheets : unit === 'LF' ? skirtLF : unit === 'SF' ? skirtSF : 1
+      case 'painting':   return unit === 'SF' ? paintSF : 1
       case 'difficulty': return 1
       default:           return 1
     }
@@ -241,6 +277,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
     { key: 'borderlabor',label: 'Border labor / miters',  unit: r('borderlabor').unit, rate: r('borderlabor').rate, cost: r('borderlabor').cost, qty: null, borderOnly: true, fromRates: true },
     { key: 'spline',     label: 'Spline decking',         unit: 'LF', rate: brandRate, cost: brandCost, qty: null, fromBrand: true, splineOnly: true },
     { key: 'splinejoist',label: 'Spline sister joist',    unit: r('splinejoist').unit, rate: r('splinejoist').rate, cost: r('splinejoist').cost, qty: null, splineOnly: true, fromRates: true },
+    { key: 'skirting',   label: 'Skirting',               unit: 'SF', rate: null, cost: null, qty: null, skirtOnly: true },   // rate follows the skirting choice
+    { key: 'painting',   label: 'Paint / stain',          unit: 'SF', rate: null, cost: null, qty: null, paintOnly: true },   // rate follows PT vs composite
     { key: 'difficulty', label: 'Framing difficulty', unit: 'LS', rate: 0,    cost: 0,   qty: null, flat: true },
     ...customComponents.map(toCustomComp),
   ])
@@ -285,9 +323,15 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
   }, [difficulty])
 
   const rows = comps.filter(c => (!c.borderOnly || borderCourses > 0) && (!c.splineOnly || splines > 0) && (!c.stepOnly || stepCount > 0) && (!c.fasciaOnly || fasciaOn)
-    && (!c.landingOnly || LA > 0) && (!c.boxOnly || BX > 0)).map(c => {
+    && (!c.landingOnly || LA > 0) && (!c.boxOnly || BX > 0) && (!c.skirtOnly || skirtOpt) && (!c.paintOnly || paintOn)).map(c => {
     const qty  = c.qty != null ? c.qty : autoQty(c.key, c.unit)
-    return { ...c, qty, line: qty * c.rate, lineCost: qty * c.cost }
+    // Skirting / paint price follows the current choice until the rep types their own.
+    const pick = c.key === 'skirting' ? skirtPrice : c.key === 'painting' ? paintPrice : null
+    const rate = c.rate ?? pick?.rate ?? 0
+    const cst  = c.cost ?? pick?.cost ?? 0
+    const label = c.key === 'skirting' ? `Skirting — ${skirt}${skirtOpt?.sheetSF ? ' (4×8 sheets)' : ''}`
+      : c.key === 'painting' ? `Paint / stain — ${paintOpt === DECK_PAINT_PT ? 'PT deck' : 'new wood on composite deck'}` : c.label
+    return { ...c, label, rate, cost: cst, qty, line: qty * rate, lineCost: qty * cst }
   })
   const price = rows.reduce((s, r) => s + r.line, 0)
   const cost  = rows.reduce((s, r) => s + r.lineCost, 0)
@@ -318,6 +362,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
       lines.push(scopeFor(catalog, fam && `${fam} Landing`, { size: [l.width, l.depth] }, `${ftIn(l.width)}x${ftIn(l.depth)} landing.`))
     }
     if (railQty > 0) lines.push(scopeFor(catalog, 'Hybrid Railing / trex cap', {}, 'Install hybrid railing.'))
+    if (skirtOpt) lines.push(scopeFor(catalog, skirtOpt.item, { sqft: skirtSF }, `${skirt} skirting around the deck.`))
+    if (paintOn) lines.push(scopeFor(catalog, paintOpt.item, { sqft: paintSF }, 'Provide and apply paint/stain.'))
     return lines.filter(Boolean).join('\n')
   })()
 
@@ -447,14 +493,16 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
 
       {/* Materials / difficulty */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-        {drop('Decking brand', brand, e => { const b = e.target.value; setBrand(b); setCollection(Object.keys(brands[b] || {})[0]); patch('decking', { fromBrand: true }); patch('border', { fromBrand: true }); patch('spline', { fromBrand: true }) }, brandNames)}
-        {drop('Collection', collection, e => { setCollection(e.target.value); patch('decking', { fromBrand: true }); patch('border', { fromBrand: true }); patch('spline', { fromBrand: true }) }, collections)}
+        {drop('Decking brand', brand, e => { const b = e.target.value; setBrand(b); setCollection(Object.keys(brands[b] || {})[0]); patch('decking', { fromBrand: true }); patch('border', { fromBrand: true }); patch('spline', { fromBrand: true }); patch('painting', { rate: null, cost: null }) }, brandNames)}
+        {drop('Collection', collection, e => { setCollection(e.target.value); patch('decking', { fromBrand: true }); patch('border', { fromBrand: true }); patch('spline', { fromBrand: true }); patch('painting', { rate: null, cost: null }) }, collections)}
         {drop('Framing difficulty (flat)', difficulty, e => setDifficulty(e.target.value), Object.keys(DECK_DIFFICULTY_FLAT))}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
         {drop('Picture frame (border)', border, e => setBorder(e.target.value), ['None', 'Single', 'Double'])}
         {drop('Matching fascia (1×12)', fascia, e => setFascia(e.target.value), ['None', 'Matching'])}
+        {drop('Skirting', skirt, e => { const v = e.target.value; setSkirt(v); patch('skirting', { unit: DECK_SKIRT_OPTIONS[v]?.unit || 'SF', rate: null, cost: null, qty: null }) }, Object.keys(DECK_SKIRT_OPTIONS))}
+        {drop('Paint / stain', paint, e => { setPaint(e.target.value); patch('painting', { rate: null, cost: null, qty: null }) }, ['None', 'Paint / stain'])}
         {borderCourses > 0 && dim('Field waste %', fieldWastePct, e => setFieldWastePct(e.target.value), { min: 0 })}
       </div>
 
@@ -467,6 +515,8 @@ function DeckAssemblyPanel({ onClose, onAdd, initial }) {
         {stepCount > 0 && <p>Stair treads: {stepCount} steps × {SW}′ × {DECK_TREAD_BOARDS} boards = <strong>{treadDeckingLF} LF</strong> decking</p>}
         {splines > 0 && <p>Span needs <strong>{splines} spline{splines > 1 ? 's' : ''}</strong> ({sections} runs of {boardFt} ft, no butt joints) + double sister joist = {splineJoistLF} LF framing</p>}
         {borderCourses > 0 && <p>Border: {border.toLowerCase()}, mitered, all sides = <strong>{borderLF} LF</strong></p>}
+        {skirtOpt && <p>Skirting: {skirtLF} LF (3 sides, not the house side) × {Hft} ft high = <strong>{skirtSF} SF</strong>{skirtOpt.sheetSF ? <> → <strong>{skirtSheets} sheets</strong> (4×8)</> : null}</p>}
+        {paintOn && <p>Paint / stain: deck {area} SF{landingSF > 0 ? ` + landings ${landingSF} SF` : ''} = <strong>{paintSF} SF</strong></p>}
         {(fasciaOn || stepCount > 0) && (
           <p>Fascia 1×12 (16′ boards):{' '}
             {fasciaOn && <>rim {rimNeedLF} LF (3 sides) = <strong>{rimBoards}</strong></>}
