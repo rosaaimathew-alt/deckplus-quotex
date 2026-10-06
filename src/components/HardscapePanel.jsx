@@ -3,7 +3,7 @@ import { X } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
 import { scopeFor } from '../lib/scopeText'
-import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
+import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import {
   HS_CONCRETE, HS_PAVERS, HS_WALLS, HS_ACCESSORIES, HS_KITCHEN, HS_GRANITE, HS_GRANITE_COLORS,
   HS_INPUT_DEFAULTS, HS_PUMP_TRUCK_FEE, HS_STEPPING, HS_BACKFILL, HS_GRANITE_FINISH, computeHardscape, hsRate,
@@ -11,8 +11,9 @@ import {
 
 // ── Hardscape tool ───────────────────────────────────────────────────────────
 // Patio surface, retaining wall, patio accessories and outdoor kitchen, priced
-// from the catalog (Hardscape price list rows 34–89). "Add to quote" writes one
-// line per item so the customer sees exactly what they're getting.
+// from the catalog (Hardscape price list rows 34–89). "Add to quote" writes ONE
+// line — like the deck tool — whose scope lists every piece of work and whose
+// price includes the JIC, so the customer sees a single hardscape price.
 
 const money  = (v) => '$' + Math.round(v).toLocaleString('en-US')
 const money2 = (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 })
@@ -72,34 +73,42 @@ export default function HardscapePanel({ onClose, onAdd, initial }) {
     )
   }
 
+  const jicAmt = jicAmount(jic, result.total)
+  const total  = result.total + jicAmt               // what the customer is quoted
+
   const add = () => {
-    const stamp = Date.now()
     const P = inp.patio
-    const out = result.lines.map((l, i) => {
-      const isSurface = l.group === 'patio' && (HS_CONCRETE.some(c => c.key === l.key) || HS_PAVERS.some(p => p.key === l.key) || l.key === 'concreteSmall')
-      return {
-        id: stamp + i + Math.random(),
-        catalogId: null,
-        name: isSurface ? `${l.label} patio — ${Number(P.width) || 0}′×${Number(P.depth) || 0}′ (${result.area} SF)` : l.label,
-        section: 'Hardscape',
-        // Same wording as the catalog item, with this job's numbers filled in
-        description: scopeFor(catalog, l.catalogName, {
-          size: isSurface ? [Number(P.width) || 0, Number(P.depth) || 0] : null,
-          sqft: l.unit === 'SF' ? l.qty : null, lf: l.unit === 'LF' ? l.qty : null, count: l.qty,
-        }, isSurface
-          ? `Install a ${l.label.toLowerCase()} patio, approximately ${Number(P.width) || 0}’ × ${Number(P.depth) || 0}’ (${result.area} SF).`
-          : (l.note || '')),
-        unit: l.unit,
-        qty: l.qty,
-        unitPrice: l.rate,
-        category: l.group === 'kitchen' ? 'Outdoor Kitchens' : 'Hardscapes',
-        costMaterials: Math.round(l.costTotal),
-        costSub: 0,
-        ...(i === 0 ? { hardscape: inp } : {}),
-      }
-    })
-    const jl = jicLine(jic, result.total, { section: 'Hardscape', category: 'Hardscapes', label: 'hardscape' })
-    onAdd(jl ? [...out, jl] : out)
+    const W = Number(P.width) || 0, D = Number(P.depth) || 0
+    const isSurface = (l) => l.group === 'patio' && (HS_CONCRETE.some(c => c.key === l.key) || HS_PAVERS.some(p => p.key === l.key) || l.key === 'concreteSmall')
+    // Scope: each piece of work in the catalog's own wording, this job's numbers filled in.
+    const description = result.lines.map(l => scopeFor(catalog, l.catalogName, {
+      size: isSurface(l) ? [W, D] : null,
+      sqft: l.unit === 'SF' ? l.qty : null, lf: l.unit === 'LF' ? l.qty : null, count: l.qty,
+    }, isSurface(l)
+      ? `Install a ${l.label.toLowerCase()} patio, approximately ${W}’ × ${D}’ (${result.area} SF).`
+      : `${l.label}${l.unit === 'LS' || l.qty === 1 ? '' : ` — ${l.qty} ${l.unit}`}${l.note && !/÷/.test(l.note) ? ` (${l.note})` : ''}.`)).filter(Boolean).join('\n')
+    // Name: the patio, then the other kinds of work included.
+    const surface = result.lines.find(isSurface)
+    const parts = []
+    if (surface) parts.push(`${surface.label} patio ${W}′×${D}′ (${result.area} SF)`)
+    if (result.lines.some(l => l.group === 'wall')) parts.push('retaining wall')
+    if (result.lines.some(l => l.group === 'accessory' || (l.group === 'patio' && !isSurface(l)))) parts.push('patio accessories')
+    if (result.lines.some(l => l.group === 'kitchen')) parts.push('outdoor kitchen')
+    const kitchenOnly = result.lines.every(l => l.group === 'kitchen')
+    onAdd([{
+      id: Date.now() + Math.random(),
+      catalogId: null,
+      name: `Hardscape — ${parts.join(', ')}`.replace(/— (\w)/, (m, c) => `— ${c.toUpperCase()}`),
+      section: 'Hardscape',
+      description,
+      unit: 'EA',
+      qty: 1,
+      unitPrice: Math.round(total),
+      category: kitchenOnly ? 'Outdoor Kitchens' : 'Hardscapes',
+      costMaterials: Math.round(result.lines.reduce((a, l) => a + (Number(l.costTotal) || 0), 0)),
+      costSub: 0,
+      hardscape: inp,
+    }])
   }
 
   const g = HS_GRANITE.find(x => x.key === inp.granite.level)
@@ -204,12 +213,20 @@ export default function HardscapePanel({ onClose, onAdd, initial }) {
         </div>
       )}
 
-      <JicField value={jic} onChange={setJic} base={result.total} />
+      {result.lines.length > 0 && (
+        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 px-1">
+          {jicAmt > 0 && <span className="text-xs text-gray-400">Price list {money(result.total)} + JIC {money(jicAmt)}</span>}
+          <span className="text-sm text-gray-500">Hardscape price <span className="text-lg font-bold text-gray-900">{money(total)}</span></span>
+        </div>
+      )}
+      <p className="text-[11px] text-gray-400 px-1">Goes on the proposal as one hardscape item with the full scope written out.</p>
+
+      <JicField value={jic} onChange={setJic} base={result.total} note="A cushion for this build. Built into the hardscape price — the customer never sees it." />
 
       <div className="flex gap-2">
         <button onClick={add} disabled={result.total <= 0}
           className="flex-1 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-          Add hardscape to quote — {money(result.total + jicAmount(jic, result.total))}
+          Add hardscape to quote — {money(total)}
         </button>
         <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
       </div>
