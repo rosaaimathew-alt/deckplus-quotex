@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronRight, LayoutList, Rows3,
   Sparkles, Loader, MoveRight, Settings2, Pencil, Lock, Unlock,
 } from 'lucide-react'
-import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
+import { useStore, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { runOverCatalog } from '../aiCatalog'
 import PorchBuildFormulaCard from '../components/PorchBuildFormulas'
 
@@ -509,18 +509,22 @@ function AiSuggestBanner({ suggestions, catalog, onApply, onDismiss }) {
   )
 }
 
+// The Deck Builder prices from the Deck price-list items in the catalog, so it has
+// no built-in rates here — only the manager's own extra components.
+const DECK_NO_RATES = {}
+
 // ── Formulas view — manager sets & locks the pricing the builders consume ─────
 function FormulasView() {
   const isManager = useStore(s => (s.role || 'manager') === 'manager')
   // Deck slices
   const deck = {
-    title: 'Deck Builder', defaults: DECK_COMPONENT_DEFAULTS, isManager,
+    title: 'Deck Builder', defaults: DECK_NO_RATES, isManager,
     rates: useStore(s => s.deckComponentRates), setRate: useStore(s => s.setDeckComponentRate),
     customComponents: useStore(s => s.deckCustomComponents), addCustom: useStore(s => s.addDeckCustomComponent),
     updateCustom: useStore(s => s.updateDeckCustomComponent), removeCustom: useStore(s => s.removeDeckCustomComponent),
     locked: useStore(s => s.deckFormulaLocked), setLocked: useStore(s => s.setDeckFormulaLocked),
     scopeTemplate: useStore(s => s.deckScopeTemplate), setScopeTemplate: useStore(s => s.setDeckScopeTemplate),
-    footerNote: 'These rates feed the Deck Builder — decking & fascia are still priced per collection on their catalog items.',
+    footerNote: 'The Deck Builder prices from the Deck price-list items in this catalog (Deck, Steps, Landing, railing, fascia, skirting, paint and add-ons) — change a price on the item and the builder uses it. Components added here show on every deck quote with a quantity the rep fills in.',
     scopeTitle: 'Open Deck — standard scope of work',
     scopeSubtitle: 'Materials & methods on every open-deck quote. One bullet per line — the builder adds size, decking, railing, stairs & fascia automatically.',
     scopeHint: 'Put your always-included framing here (footers, posts & beams, joist size & spacing, framing tape). Per-quote selections are appended automatically.',
