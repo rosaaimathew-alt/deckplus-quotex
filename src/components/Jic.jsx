@@ -2,14 +2,14 @@
 
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 
-export function JicField({ value, onChange, base }) {
+export function JicField({ value, onChange, base, note = 'A cushion for this build. Added as its own line.' }) {
   const v = value || JIC_DEFAULT
   const amt = jicAmount(v, base)
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-gray-300 bg-gray-50/60 px-4 py-3">
       <div className="min-w-0">
         <p className="text-sm font-semibold text-gray-800">JIC — Just in case</p>
-        <p className="text-[11px] text-gray-500">A cushion for this build. Added as its own line.</p>
+        <p className="text-[11px] text-gray-500">{note}</p>
       </div>
       <div className="ml-auto flex items-center gap-2">
         <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs font-medium" role="radiogroup" aria-label="JIC as dollars or percent">

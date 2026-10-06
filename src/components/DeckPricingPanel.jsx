@@ -3,7 +3,7 @@ import { Plus, X, Lock, RotateCcw } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
 import { scopeFor, countWords } from '../lib/scopeText'
-import { JIC_DEFAULT, jicAmount, jicLine } from '../lib/jic'
+import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import {
   DECK_COLLECTIONS, DECK_RAILS, BRONZE_BALUSTERS, DECK_FASCIA, DECK_SKIRT_OPTIONS, DECK_PAINT_OPTIONS, DECK_ITEMS,
   catalogPrice, matchCollection, deckTakeoff, stepsForHeight, runOutForSteps, STEP_FACTOR,
@@ -149,7 +149,9 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
 
   const price = rows.reduce((s, r) => s + r.line, 0)
   const cost  = rows.reduce((s, r) => s + r.lineCost, 0)
-  const marginPct = price > 0 ? ((price - cost) / price) * 100 : 0
+  const jicAmt = jicAmount(jic, price)
+  const total  = price + jicAmt                     // what the customer is quoted
+  const marginPct = total > 0 ? ((total - cost) / total) * 100 : 0
   const row = (k) => rows.find(r => r.key === k)
 
   // ── Scope, in the catalog's own wording ──────────────────────────────────
@@ -181,7 +183,8 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
   })()
 
   const add = () => {
-    const jl = jicLine(jic, price, { section: 'Deck', category: 'Decks', label: 'deck' })
+    // JIC is built into the deck's price — never its own line, so the customer
+    // only ever sees one deck price.
     onAdd([{
       id: lineId(),
       catalogId: null,
@@ -190,11 +193,11 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
       description,
       unit: 'EA',
       qty: 1,
-      unitPrice: Math.round(price),
+      unitPrice: Math.round(total),
       category: 'Decks',
       costMaterials: Math.round(cost),
       costSub: 0,
-    }, ...(jl ? [jl] : [])])
+    }])
     onClose()
   }
 
@@ -440,7 +443,14 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
 
       <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 mt-3 border-t border-gray-200 pt-3">
         {isManager && <span className="text-xs text-gray-400">Est. cost <span className="text-gray-600 font-medium">{money(cost)}</span> · margin <span className={marginPct >= 30 ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>{marginPct.toFixed(0)}%</span></span>}
-        <span className="text-sm text-gray-500">Subtotal <span className="text-lg font-bold text-gray-900">{money(price)}</span></span>
+        {jicAmt > 0 ? (
+          <>
+            <span className="text-xs text-gray-400">Price list {money(price)} + JIC {money(jicAmt)}</span>
+            <span className="text-sm text-gray-500">Deck price <span className="text-lg font-bold text-gray-900">{money(total)}</span></span>
+          </>
+        ) : (
+          <span className="text-sm text-gray-500">Deck price <span className="text-lg font-bold text-gray-900">{money(price)}</span></span>
+        )}
       </div>
 
       <div className="mt-4">
@@ -448,12 +458,12 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
         <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 whitespace-pre-line">{description}</p>
       </div>
 
-      <div className="mt-4"><JicField value={jic} onChange={setJic} base={price} /></div>
+      <div className="mt-4"><JicField value={jic} onChange={setJic} base={price} note="A cushion for this build. Built into the deck price — the customer never sees it." /></div>
 
       <div className="flex gap-2 mt-5">
         <button onClick={add} disabled={price <= 0}
           className="flex-1 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-          Add deck to quote — {money(price + jicAmount(jic, price))}
+          Add deck to quote — {money(total)}
         </button>
         <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
       </div>
