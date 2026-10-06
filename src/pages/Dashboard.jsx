@@ -10,7 +10,6 @@ import NeedsAttention from '../components/NeedsAttention'
 import { MenuChip } from '../components/FilterBar'
 import { attentionItems, nextReminderDate, isJobClosed } from '../lib/attention'
 import { useNav } from '../nav'
-import { useUnread } from '../lib/unread'
 
 // ── Home ─────────────────────────────────────────────────────────────────────
 // Read top to bottom: what needs you today, how the numbers look, what's
@@ -76,8 +75,7 @@ export default function Dashboard() {
   const proposals  = useStore(s => s.proposals)
   const jobCosts   = useStore(s => s.jobCosts) || {}
   const { can, role } = useNav()
-  const unread     = useUnread(s => s.unread)
-  const attention  = attentionItems({ proposals, jobCosts, can, unread, role })
+  const attention  = attentionItems({ proposals, jobCosts, can, role })
 
   const [periodKey, setPeriodKey] = useState('year')
   const pick = PERIODS.find(x => x.value === periodKey) || PERIODS[3]

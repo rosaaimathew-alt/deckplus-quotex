@@ -8,7 +8,7 @@
 // LEGACY_REDIRECTS, so bookmarks and emailed links keep working.
 import { useMemo } from 'react'
 import {
-  House, Handshake, HardHat, Mail, ChartColumn, Package, List, Columns3, Users, Eye,
+  House, Handshake, HardHat, ChartColumn, Package, List, Columns3, Users, Eye,
   ClipboardCheck, FileSignature, CalendarDays, Wrench, TrendingUp, Wallet, Target,
   Upload, Sparkles, Calculator, Hammer,
 } from 'lucide-react'
@@ -45,9 +45,6 @@ export const DESTINATIONS = [
       { key: 'crews',      label: 'Subcontractors', icon: Wrench, access: '/subs', hint: 'Subs, insurance and incidents', keywords: 'subs crews coi insurance trades' },
       { key: 'checklists', label: 'Checklists', icon: ClipboardCheck, access: '/checklists', hint: 'Shared team checklists', keywords: 'punch list todo tasks' },
     ] },
-
-  { key: 'inbox', to: '/inbox', label: 'Inbox', icon: Mail, access: ['/inbox'],
-    hint: 'Customer email threads', keywords: 'email messages reply' },
 
   { key: 'insights', to: '/insights', label: 'Insights', icon: ChartColumn,
     hint: 'Revenue, win rate, profit and spend', keywords: 'reports analytics numbers metrics',

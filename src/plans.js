@@ -20,7 +20,7 @@ export const PLAN_META = {
 // Every routed section in the app.
 const ALL_ROUTES = [
   '/', '/analyze', '/ai', '/catalog', '/quote', '/analytics', '/proposal',
-  '/clients', '/tracker', '/inbox', '/settings', '/contracts', '/contract',
+  '/clients', '/tracker', '/settings', '/contracts', '/contract',
   '/jobs', '/subs', '/scheduler', '/profitability', '/pipeline', '/finance',
   '/checklists',
 ]

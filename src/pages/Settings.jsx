@@ -45,7 +45,7 @@ function SidebarPreview({ companyName, tagline, logo, color, sidebar }) {
       </div>
       {/* Nav items preview */}
       <div className="py-3 px-2 space-y-0.5">
-        {['Dashboard', 'Build Quote', 'Proposal Tracker', 'Inbox'].map((item, i) => (
+        {['Dashboard', 'Build Quote', 'Proposal Tracker', 'Contracts'].map((item, i) => (
           <div
             key={item}
             className="px-3 py-1.5 rounded-lg text-xs font-medium"
@@ -96,7 +96,7 @@ function EmailConnectCard() {
         <Mail size={16} className="text-gray-400" />
         <h3 className="font-semibold text-gray-800 text-sm">Email Account</h3>
       </div>
-      <p className="text-xs text-gray-400 mb-4">Connect your Google account to send proposals from your own address and receive replies in your Inbox.</p>
+      <p className="text-xs text-gray-400 mb-4">Connect your Google account to send proposals from your own address.</p>
 
       {connected ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
@@ -119,7 +119,7 @@ function EmailConnectCard() {
         </button>
       )}
       <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
-        Sending works on your own account immediately. For customer accounts, Google requires app verification before sending, and a security review before reading replies into the Inbox.
+        Sending works on your own account immediately. For customer accounts, Google requires app verification before sending.
       </p>
     </div>
   )

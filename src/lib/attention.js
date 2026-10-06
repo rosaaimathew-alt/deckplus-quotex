@@ -26,7 +26,7 @@ export const contractStatusOf = (p) => (!p.contractDraft ? 'not-started' : p.con
 export const isJobClosed = (p) => (p.jobData?.completedStages || []).includes('closed')
 
 // Each item: { key, tone, title, detail, count, people: [{ id, name, note }], to, cta }
-export function attentionItems({ proposals = [], jobCosts = {}, can = () => true, unread = 0, role = 'manager' }) {
+export function attentionItems({ proposals = [], jobCosts = {}, can = () => true, role = 'manager' }) {
   const items = []
   const live = proposals.filter(p => p.status !== 'Archived')
 
@@ -118,11 +118,6 @@ export function attentionItems({ proposals = [], jobCosts = {}, can = () => true
       to: '/insights?tab=profit', cta: 'Enter costs',
     })
   }
-
-  if (unread > 0 && can('/inbox')) items.push({
-    key: 'inbox', tone: 'info', title: `${unread} unread message${unread !== 1 ? 's' : ''}`,
-    detail: 'Customer replies in your inbox', count: unread, people: [], to: '/inbox', cta: 'Open inbox',
-  })
 
   const order = { alert: 0, warn: 1, info: 2 }
   return items.sort((a, b) => order[a.tone] - order[b.tone])

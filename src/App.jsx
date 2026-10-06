@@ -1,11 +1,10 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, Mail, ListChecks, Wallet, ClipboardList, Wrench } from 'lucide-react'
+import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, ListChecks, Wallet, ClipboardList, Wrench } from 'lucide-react'
 import { Component, useEffect, useMemo, useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import PMHome from './pages/PMHome'
 import BuildQuote from './pages/BuildQuote'
 import ProposalView from './pages/ProposalView'
-import InboxPage from './pages/Inbox'
 import SettingsPage from './pages/Settings'
 import ContractView from './pages/ContractView'
 import Login from './pages/Login'
@@ -27,12 +26,10 @@ import { canAccessRoute, landingRoute } from './plans'
 import { canRoleAccess, roleLanding } from './roles'
 import { useNav, LEGACY_REDIRECTS } from './nav'
 import { nextReminderDate, contractStatusOf, isJobClosed } from './lib/attention'
-import { useUnread } from './lib/unread'
 import { TodoDock } from './components/TodoPanel'
 import { DEMO, DEMO_BASENAME, resetDemo } from './demo'
 
 const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
-const UNREAD_POLL = 5 * 60_000   // unread badge refresh; skipped while the tab is hidden
 
 // Loads the signed-in user's org rows into the store (once) before the shell
 // renders, so every page starts from real data. Demo builds skip it.
@@ -99,7 +96,6 @@ function LegacyRedirect({ to }) {
 // Counts shown as badges in the sidebar — the same rules as Home's list.
 function useBadges() {
   const proposals = useStore(s => s.proposals)
-  const unread = useUnread(s => s.unread)
   const { can } = useNav()
   return useMemo(() => {
     const today = new Date()
@@ -111,8 +107,8 @@ function useBadges() {
     const won = proposals.filter(p => p.status === 'Won')
     const contracts = can('/contracts') ? won.filter(p => contractStatusOf(p) === 'not-started').length : 0
     const projects  = can('/scheduler') ? won.filter(p => !isJobClosed(p) && !p.jobData?.startDate).length : 0
-    return { sales: followUps, contracts, projects, inbox: unread }
-  }, [proposals, unread, can])
+    return { sales: followUps, contracts, projects }
+  }, [proposals, can])
 }
 
 function NavItem({ d, badge, onClick }) {
@@ -131,7 +127,6 @@ function NavItem({ d, badge, onClick }) {
 
 // ── App Shell ────────────────────────────────────────────────────────────────
 function AppShell() {
-  const readMessageIds = useStore(s => s.readMessageIds)
   const branding       = useStore(s => s.branding)
   const theme          = useStore(s => s.theme)
   const setTheme       = useStore(s => s.setTheme)
@@ -139,7 +134,6 @@ function AppShell() {
   const todoPin        = useStore(s => s.todoPin)
   const setTodoPin     = useStore(s => s.setTodoPin)
   const openTodos      = useStore(s => (s.todos || []).filter(t => !t.done).length)
-  const setUnread      = useUnread(s => s.setUnread)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const navigate = useNavigate()
@@ -179,30 +173,6 @@ function AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Unread inbox count — checked on load, when the tab comes back into view,
-  // and every 5 minutes while it's visible. Never while the tab is hidden.
-  useEffect(() => {
-    if (!can('/inbox')) return
-    let alive = true
-    const check = async () => {
-      if (document.hidden) return
-      try {
-        const res = await fetch('/api/messages')
-        if (!res.ok) return
-        const { messages } = await res.json()
-        const readSet = new Set(readMessageIds || [])
-        if (alive) setUnread((messages || []).filter(m => m.direction === 'inbound' && !readSet.has(m.id)).length)
-      } catch { /* offline or not configured */ }
-    }
-    check()
-    const timer = setInterval(check, UNREAD_POLL)
-    const onVisible = () => { if (!document.hidden) check() }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => { alive = false; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
-    // readMessageIds is read inside check(); marking a message read updates the
-    // badge on the next check rather than re-fetching from the server.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [can, setUnread])
 
   const companyName = branding?.companyName || 'QUOTEX'
   const logo        = branding?.logo        || null
@@ -221,8 +191,8 @@ function AppShell() {
   }, [canQuote, can, isDark, setTheme])
 
   // Phone tab bar: the first destinations, with New quote in the middle
-  const mobileTabs = destinations.filter(d => d.key !== 'inbox').slice(0, canQuote ? 2 : 3)
-  const mobileTabsRight = destinations.filter(d => d.key !== 'inbox' && !mobileTabs.includes(d)).slice(0, canQuote ? 1 : 1)
+  const mobileTabs = destinations.slice(0, canQuote ? 2 : 3)
+  const mobileTabsRight = destinations.filter(d => !mobileTabs.includes(d)).slice(0, 1)
 
   return (
     <div className="h-screen flex qx-ground overflow-hidden">
@@ -301,7 +271,7 @@ function AppShell() {
           </div>
         )}
 
-        {/* Top bar: search everything, to-do, inbox */}
+        {/* Top bar: search everything, to-do */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 no-print shrink-0">
           <button className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
             <Menu size={20} />
@@ -318,13 +288,6 @@ function AppShell() {
               <ListChecks size={19} />
               {openTodos > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[var(--brand-600)] text-white text-[10px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{openTodos}</span>}
             </button>
-            {can('/inbox') && (
-              <button onClick={() => navigate('/inbox')} title="Inbox"
-                className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
-                <Mail size={19} />
-                {badges.inbox > 0 && <span className="absolute -top-0.5 -right-0.5 bg-amber-400 text-[#1f1300] text-[10px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badges.inbox}</span>}
-              </button>
-            )}
           </div>
         </header>
 
@@ -337,7 +300,7 @@ function AppShell() {
             <Route path="/projects"  element={<GatedDestination dkey="projects"><ProjectsHub /></GatedDestination>} />
             <Route path="/insights"  element={<GatedDestination dkey="insights"><InsightsHub /></GatedDestination>} />
             <Route path="/catalog"   element={<GatedDestination dkey="catalog"><CatalogHub /></GatedDestination>} />
-            <Route path="/inbox"     element={<Gated path="/inbox"><InboxPage /></Gated>} />
+            <Route path="/inbox"     element={<Navigate to="/" replace />} />
             <Route path="/quote"     element={<Gated path="/quote"><BuildQuote /></Gated>} />
             <Route path="/proposal"  element={<Gated path="/proposal"><ProposalView /></Gated>} />
             <Route path="/contract"  element={<Gated path="/contract"><ContractView /></Gated>} />

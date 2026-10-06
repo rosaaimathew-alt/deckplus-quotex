@@ -3,21 +3,21 @@
 // role = what this person does inside the company. Effective access is the
 // intersection of the two.
 //
-//   sales   — the selling side (proposals, pipeline, contracts, inbox); no subs
+//   sales   — the selling side (proposals, pipeline, contracts); no subs
 //   pm      — project management: jobs, subcontractors, scheduling, view quotes
 //   manager — full access, plus the controls / finance side
 
 export const ROLE_ORDER = ['sales', 'pm', 'manager']
 
 export const ROLE_META = {
-  sales:   { label: 'Sales',           blurb: 'Proposals, pipeline, contracts & inbox' },
+  sales:   { label: 'Sales',           blurb: 'Proposals, pipeline & contracts' },
   pm:      { label: 'Project Manager', blurb: 'Jobs, subcontractors & scheduling' },
   manager: { label: 'Manager / Owner', blurb: 'Everything, plus controls & finance' },
 }
 
 const ALL = [
   '/', '/clients', '/analyze', '/ai', '/catalog', '/quote', '/analytics',
-  '/proposal', '/tracker', '/inbox', '/settings', '/contracts', '/contract',
+  '/proposal', '/tracker', '/settings', '/contracts', '/contract',
   '/jobs', '/subs', '/scheduler', '/profitability', '/pipeline', '/finance',
   '/checklists',
 ]

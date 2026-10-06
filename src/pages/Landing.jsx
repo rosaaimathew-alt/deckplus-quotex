@@ -48,7 +48,7 @@ const TIERS = [
   {
     name: 'Professional', price: '$99', cadence: '/mo',
     blurb: 'The full sales engine — everything but the field ops.',
-    features: ['Everything in Starter', 'Analytics, clients & inbox', 'AI catalog assistant', 'Custom colors & full branding'],
+    features: ['Everything in Starter', 'Analytics & clients', 'AI catalog assistant', 'Custom colors & full branding'],
     cta: 'Go Professional', highlight: true,
   },
   {
