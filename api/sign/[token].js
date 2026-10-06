@@ -102,7 +102,12 @@ export default async function handler(req, res) {
       let viewToken = proposalId != null ? await kv.get(`pview-by-proposal:${proposalId}`) : null
       if (viewToken) {
         const existing = await kv.get(`pview:${viewToken}`)
-        if (existing) await kv.set(`pview:${viewToken}`, { ...existing, snapshot, updatedAt: Date.now() })
+        // A link belongs to one customer. If this proposal now carries a
+        // different client, mint a new link instead of re-pointing the old one
+        // (the old customer's link must never show someone else's proposal).
+        const who = (s) => String(s?.client || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        if (existing && who(existing.snapshot) && who(existing.snapshot) !== who(snapshot)) viewToken = null
+        else if (existing) await kv.set(`pview:${viewToken}`, { ...existing, snapshot, updatedAt: Date.now() })
         else viewToken = null
       }
       if (!viewToken) {

@@ -39,7 +39,15 @@ export default function ProposalView() {
       // Auto-save as Draft to the proposals log (idempotent — uses existing id if set).
       // Coming back from Build Quote with the same draft updates it in place
       // (as long as it is still a Draft) instead of saving a duplicate.
-      const existing = parsed.proposalId ? useStore.getState().proposals.find(p => p.id === parsed.proposalId) : null
+      const sameClient = (a, b) => String(a || '').toLowerCase().replace(/[^a-z0-9]/g, '') === String(b || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+      const found = parsed.proposalId ? useStore.getState().proposals.find(p => p.id === parsed.proposalId) : null
+      // Only ever update a proposal for the SAME customer — a different client
+      // name means a new estimate, never an overwrite of someone else's.
+      const existing = found && (!parsed.fromBuilder || sameClient(found.client, parsed.client)) ? found : null
+      if (found && !existing) parsed.proposalId = null
+      // A revision belongs under its parent only if it's the same customer.
+      const parent = parsed.parentId ? useStore.getState().proposals.find(p => p.id === parsed.parentId) : null
+      if (parsed.fromBuilder && parent && !sameClient(parent.client, parsed.client)) parsed.parentId = null
       if (parsed.fromBuilder && existing && (existing.status || 'Draft') === 'Draft') {
         saveProposal({
           id: existing.id,
@@ -74,7 +82,7 @@ export default function ProposalView() {
         if (parsed.fromBuilder) {
           try {
             const draft = JSON.parse(localStorage.getItem('quotex:draft-proposal') || 'null')
-            if (draft) localStorage.setItem('quotex:draft-proposal', JSON.stringify({ ...draft, draftProposalId: id }))
+            if (draft) localStorage.setItem('quotex:draft-proposal', JSON.stringify({ ...draft, draftProposalId: id, draftClient: parsed.client || '', ...(parsed.parentId ? {} : { revisingParentId: null }) }))
           } catch { /* ignore */ }
         }
       } else {
@@ -243,6 +251,10 @@ export default function ProposalView() {
       const d = await r.json().catch(() => ({}))
       if (!r.ok || !d.url) throw new Error(d.error || 'Could not create link')
       if (pid != null && d.token) setProposalViewToken(pid, d.token)
+      // Getting the link is sending it: mark it sent and close the Build Quote
+      // draft, so the next quote starts as a NEW estimate instead of editing this one.
+      if (proposalIdRef.current) markProposalSent(proposalIdRef.current)
+      if (data?.fromBuilder) localStorage.removeItem('quotex:draft-proposal')
       try { await navigator.clipboard.writeText(d.url); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000) }
       catch { window.prompt('Copy your proposal link:', d.url) }
     } catch { /* no-op — user can retry */ }

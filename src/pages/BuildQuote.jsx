@@ -372,6 +372,10 @@ export default function BuildQuote() {
   // The Draft proposal this quote already saved when previewed, so previewing
   // again updates it instead of creating a duplicate.
   const [draftProposalId, setDraftProposalId] = useState(null)
+  // Whose estimate that saved draft / revision is. Typing a different customer
+  // name makes this a NEW estimate — it never overwrites the other customer's.
+  const [draftClient, setDraftClient] = useState('')
+  const [revisingClient, setRevisingClient] = useState('')
   const [restoredFrom, setRestoredFrom] = useState(null)   // banner: "picked up where you left off"
 
   const DRAFT_KEY = 'quotex:draft-proposal'
@@ -397,6 +401,7 @@ export default function BuildQuote() {
         if (d.projectTypes) setProjectTypes(d.projectTypes)
         if (d.projectSummary) setProjectSummary(d.projectSummary)
         setRevisingParentId(d.parentId || null)
+        setRevisingClient(d.client || '')
         return
       } catch {}
     }
@@ -419,7 +424,9 @@ export default function BuildQuote() {
       setProjectTypes(d.projectTypes || [])
       setProjectSummary(d.projectSummary || '')
       setRevisingParentId(d.revisingParentId || null)
+      setRevisingClient(d.revisingClient ?? d.client ?? '')
       setDraftProposalId(d.draftProposalId || null)
+      setDraftClient(d.draftClient ?? d.client ?? '')
       if (d.client || (d.lines || []).length) setRestoredFrom(d.client || 'your last quote')
     } catch {}
   }, [])
@@ -430,7 +437,7 @@ export default function BuildQuote() {
     setClient(''); setEmail(''); setPhone(''); setAddress(''); setExpiration('')
     setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(true)
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
-    setDraftProposalId(null); setRestoredFrom(null)
+    setDraftProposalId(null); setDraftClient(''); setRevisingClient(''); setRestoredFrom(null)
     setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({})
   }
 
@@ -440,10 +447,10 @@ export default function BuildQuote() {
     if (isEmpty) return
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
-      isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId,
+      isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
       feeDismissed, feeEdits, feeOverrides,
     }))
-  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, feeDismissed, feeEdits, feeOverrides])
+  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides])
 
   // Permit fees for this address + work, as quote lines (derived, never stored twice)
   const feePlan = useMemo(() => requiredFees({ address, lines, projectTypes, catalog: catalogRaw, overrides: feeOverrides }),
@@ -680,14 +687,16 @@ export default function BuildQuote() {
   const subtotal = allLines.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const cost = showMargin ? subtotal / (1 + margin / 100) : null
 
+  const sameClient = (a, b) => String(a || '').toLowerCase().replace(/[^a-z0-9]/g, '') === String(b || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
   // Preview keeps this quote's draft, so "Back to quote" returns to exactly
   // this screen. The draft is cleared once the proposal is sent or printed.
   const goToProposal = () => {
     sessionStorage.setItem('proposal', JSON.stringify({
       client, email, phone, address, expiration, lines: allLines.map(l => { const c = { ...l }; delete c.why; return c }), margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
       feeDismissed, feeOverrides,
-      ...(revisingParentId ? { parentId: revisingParentId } : {}),
-      ...(draftProposalId ? { proposalId: draftProposalId } : {}),
+      ...(revisingParentId && sameClient(revisingClient, client) ? { parentId: revisingParentId } : {}),
+      ...(draftProposalId && sameClient(draftClient, client) ? { proposalId: draftProposalId } : {}),
       fromBuilder: true,
     }))
     navigate('/proposal')
@@ -767,7 +776,15 @@ export default function BuildQuote() {
           </div>
         )}
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="text-2xl font-bold text-gray-900">Build Quote</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-gray-900">Build Quote</h2>
+            {(client || lines.length > 0 || draftProposalId || revisingParentId) && (
+              <button onClick={() => { if (window.confirm('Start a new quote for a new customer? The quote on screen is cleared (anything already saved stays in the tracker).')) startFresh() }}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
+                <Plus size={12} /> New quote
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             {/* Item breakdown toggle */}
             <button
