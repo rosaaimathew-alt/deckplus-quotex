@@ -83,7 +83,11 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
   const W = Number(inp.width) || 0, D = Number(inp.depth) || 0
 
   const keysWhere = (pred) => Object.keys(rates).filter(k => pred(rates[k]))
-  const doorKeys    = keysWhere(r => r.door)
+  const doorKeys    = keysWhere(r => (inp.type === 'sunroom' ? r.sunDoor : r.door))
+  // A sunroom can't be quoted until its window and chosen doors have prices.
+  const sunUnpriced = inp.type === 'sunroom'
+    ? [rates.sun_window, ...doorKeys.filter(k => Number(inp.doors?.[k]) > 0).map(k => rates[k])].filter(r => r && !(Number(r.rate) > 0)).map(r => r.label)
+    : []
   const floorKeys   = keysWhere(r => r.floor)
   const concreteKeys = keysWhere(r => r.concrete && r !== rates.concrete_small)
   const railKeys    = keysWhere(r => r.rail)
@@ -208,8 +212,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
                 </p>
               )}
               {result.layout?.doorsNotPlaced > 0 && <p className="text-xs text-amber-700">The front wall has no room for {result.layout.doorsNotPlaced} of the doors.</p>}
-              {!(Number(rates.sun_window?.rate) > 0) && (
-                <p className="text-xs font-semibold text-red-600">Set the Outside Brand Standard window price in Catalog → Formulas → Porch Builder before quoting a sunroom.</p>
+              {sunUnpriced.length > 0 && (
+                <p className="text-xs font-semibold text-red-600">Set a price for {sunUnpriced.join(', ')} in Catalog → Formulas → Porch Builder before quoting this sunroom.</p>
               )}
             </div>
           )}
@@ -218,7 +222,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {doorKeys.map(k => (
                 <label key={k} className="flex items-center justify-between gap-2 text-xs text-gray-700 border border-gray-200 rounded-lg px-2 py-1.5">
-                  <span className="truncate">{rates[k].label.replace('Larsen ', '')} <span className="text-gray-400">{money(rates[k].rate)}</span></span>
+                  <span className="truncate">{rates[k].label.replace('Larsen ', '')} <span className="text-gray-400">{Number(rates[k].rate) > 0 ? money(rates[k].rate) : 'no price yet'}</span></span>
                   <input type="number" min="0" className="w-12 text-sm border border-gray-300 rounded px-1 py-0.5 text-right" value={inp.doors?.[k] ?? ''} placeholder="0"
                     onChange={e => set({ doors: { ...(inp.doors || {}), [k]: e.target.value } })} />
                 </label>
@@ -386,7 +390,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           {marginPct != null && <> · Margin <span className="font-semibold text-gray-800">{marginPct.toFixed(0)}%</span></>}
         </div>
         <div className="ml-auto flex gap-2">
-          <button onClick={add} disabled={result.total <= 0 || (inp.type === 'sunroom' && !(Number(rates.sun_window?.rate) > 0))}
+          <button onClick={add} disabled={result.total <= 0 || sunUnpriced.length > 0}
             className="flex items-center gap-2 px-5 py-2.5 bg-[var(--brand-600)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
             <Plus size={15} /> Add porch to quote — {money(total)}
           </button>

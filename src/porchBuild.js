@@ -67,6 +67,13 @@ export const PORCH_BUILD_DEFAULTS = {
   sun_window:         R('Outside Brand Standard window (36″×60″)',          'EA', 950,  'enclosure'),
   sun_wall:           R('Sunroom walls — Hardie / ply-beaded (non-glass area)', 'SF', 29, 'enclosure'),
   sun_insulation:     R('Sunroom insulation',                               'LS', 800,  'enclosure'),
+  // Sunroom doors (sunrooms use these instead of the Larsen storm doors). The
+  // width is the wall opening the door takes in the window layout.
+  sun_door_fullview36: R('36″ Fullview glass door',  'EA', 0, 'enclosure', { sunDoor: true, widthIn: 36 }),
+  sun_door_slider5:    R('5′ sliding glass door',    'EA', 0, 'enclosure', { sunDoor: true, widthIn: 60 }),
+  sun_door_slider6:    R('6′ sliding glass door',    'EA', 0, 'enclosure', { sunDoor: true, widthIn: 72 }),
+  sun_door_french5:    R('5′ French door',           'EA', 0, 'enclosure', { sunDoor: true, widthIn: 60 }),
+  sun_door_french6:    R('6′ French door',           'EA', 0, 'enclosure', { sunDoor: true, widthIn: 72 }),
 
   // Roof & ceiling options
   roof_membrane:      R('Roof membrane / flat roof',                        'SF', 10.5, 'roofceiling', { option: true }),
@@ -283,7 +290,9 @@ export const SUN_GAP       = 8.5
 export const SUN_CORNER_IN = 24
 export const SUN_DOOR_H    = 80
 
+// `doors` = the door widths (in), or a count of 36″ doors.
 export function sunroomLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides', wallHeightIn = 96 } = {}) {
+  const doorWidths = Array.isArray(doors) ? doors.map(Number).filter(w => w > 0) : Array.from({ length: Math.max(0, Number(doors) || 0) }, () => SUN_WINDOW_W)
   const C = SUN_CORNER_IN
   // [name, length ft, corner buffers in inches]
   const walls = sides === 'All 4 walls'
@@ -292,19 +301,23 @@ export function sunroomLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides', 
       ? [['Front', Wft, 2 * C]]
       : [['Front', Wft, 2 * C], ['Left side', Dft, C], ['Right side', Dft, C]]
   const H = Math.max(0, Number(wallHeightIn) || 0)
-  let doorsLeft = Math.max(0, Number(doors) || 0)
+  // Doors go on the front wall, each with the 8.5″ gap to its neighbour;
+  // the windows fill what's left.
+  const placed = []
   const out = walls.map(([name, ft, buffer], i) => {
     const usable = Math.max(0, (Number(ft) || 0) * 12 - buffer)
-    const openings = usable >= SUN_WINDOW_W ? Math.floor((usable + SUN_GAP) / (SUN_WINDOW_W + SUN_GAP)) : 0
-    const d = i === 0 ? Math.min(doorsLeft, openings) : 0
-    if (i === 0) doorsLeft -= d
-    return { name, lengthFt: Number(ft) || 0, usableIn: usable, windows: openings - d, doors: d }
+    let room = usable + SUN_GAP            // n items need n gaps less one
+    let d = 0
+    if (i === 0) for (const w of doorWidths) { if (w + SUN_GAP <= room) { room -= w + SUN_GAP; placed.push(w); d++ } }
+    const windows = room >= SUN_WINDOW_W + SUN_GAP ? Math.floor(room / (SUN_WINDOW_W + SUN_GAP)) : 0
+    return { name, lengthFt: Number(ft) || 0, usableIn: usable, windows, doors: d }
   })
+  const doorsLeft = doorWidths.length - placed.length
   const windows = out.reduce((a, w) => a + w.windows, 0)
-  const doorsPlaced = out.reduce((a, w) => a + w.doors, 0)
+  const doorsPlaced = placed.length
   const grossSF = out.reduce((a, w) => a + w.lengthFt * 12 * H, 0) / 144
   const glassSF = windows * SUN_WINDOW_W * SUN_WINDOW_H / 144
-  const doorSF  = doorsPlaced * SUN_WINDOW_W * Math.min(SUN_DOOR_H, H) / 144
+  const doorSF  = placed.reduce((a, w) => a + w * Math.min(SUN_DOOR_H, H), 0) / 144
   const wallSF  = Math.max(0, Math.round(grossSF - glassSF - doorSF))
   return { walls: out, windows, doors: doorsPlaced, doorsNotPlaced: doorsLeft, wallSF, totalWindows: windows }
 }
@@ -391,12 +404,16 @@ export function computePorchBuild(input, ratesIn) {
     if (n(inp.wallHeightIn) > PORCH_WINDOW_MAX_H) add('eze_transom', layout.totalWindows)
   }
   if (inp.type === 'sunroom') {
-    layout = sunroomLayout(W, D, { doors: doorQty, sides: inp.sides, wallHeightIn: inp.wallHeightIn })
+    const widths = Object.entries(inp.doors || {}).flatMap(([k, q]) => rates[k]?.sunDoor ? Array.from({ length: Math.max(0, Math.floor(n(q))) }, () => n(rates[k].widthIn) || SUN_WINDOW_W) : [])
+    layout = sunroomLayout(W, D, { doors: widths, sides: inp.sides, wallHeightIn: inp.wallHeightIn })
     add('sun_window', layout.windows, layout.walls.map(w => `${w.name.toLowerCase()} ${w.windows}`).join(' · '))
     add('sun_wall', layout.wallSF, `${n(inp.wallHeightIn)}″ walls, less glass and doors`)
     add('sun_insulation', 1)
   }
-  if (inp.type !== 'open') for (const [k, q] of Object.entries(inp.doors || {})) if (rates[k]?.door) add(k, n(q))
+  // Sunrooms take the sunroom doors; ScreenEze / Eze-Breeze take the Larsen doors.
+  if (inp.type !== 'open') for (const [k, q] of Object.entries(inp.doors || {})) {
+    if (inp.type === 'sunroom' ? rates[k]?.sunDoor : rates[k]?.door) add(k, n(q))
+  }
   if (roof === 'gable' && n(inp.glassEnds) > 0) add('glass_gable_end', n(inp.glassEnds))
 
   // Structural toggles
