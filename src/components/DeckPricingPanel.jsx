@@ -28,7 +28,7 @@ const NONE = []
 const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)]'
 const smallCls = 'w-16 text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white'
 
-export default function DeckPricingPanel({ onClose, onAdd, initial }) {
+export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
   const catalog          = useStore(s => s.catalog)
   const customComponents = useStore(s => s.deckCustomComponents) || NONE
   const formulaLocked    = useStore(s => s.deckFormulaLocked)
@@ -36,31 +36,34 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
   const isManager        = useStore(s => (s.role || 'manager') === 'manager')
   const priceLocked      = formulaLocked && !isManager
 
+  // `saved` = this tool's settings from a quote line being edited (Edit in builder).
+  const S = saved || null
   const startH = initial?.height ?? 3
-  const [jobType, setJobType]   = useState('New deck')
-  const [collKey, setCollKey]   = useState(matchCollection(initial?.collection) || 'Trex ENHANCE')
-  const [width, setWidth]       = useState(initial?.width ?? 20)
-  const [depth, setDepth]       = useState(initial?.depth ?? 16)
-  const [height, setHeight]     = useState(startH)
-  const [sections, setSections] = useState(() => (initial?.extraSections || []).map(s => ({ id: uid(), width: s.width, depth: s.depth })))
+  const [jobType, setJobType]   = useState(S?.jobType ?? 'New deck')
+  const [collKey, setCollKey]   = useState(S?.collKey ?? (matchCollection(initial?.collection) || 'Trex ENHANCE'))
+  const [width, setWidth]       = useState(S?.width ?? initial?.width ?? 20)
+  const [depth, setDepth]       = useState(S?.depth ?? initial?.depth ?? 16)
+  const [height, setHeight]     = useState(S?.height ?? startH)
+  const [sections, setSections] = useState(() => S?.sections ?? (initial?.extraSections || []).map(s => ({ id: uid(), width: s.width, depth: s.depth })))
   const [stairs, setStairs]     = useState(() => {
+    if (S?.stairs) return S.stairs
     if (initial?.stairs === false || !(n(startH) > 0)) return []
     const steps = stepsForHeight(startH)
     return [{ id: uid(), out: runOutForSteps(steps), across: 4, steps, style: initial?.stepStyle === 'Box steps' ? 'Box' : 'Regular', auto: true }]
   })
-  const [landings, setLandings] = useState(() => Array.from({ length: n(initial?.landings) }, () => ({ id: uid(), width: 4, depth: 4 })))
-  const [rail, setRail]         = useState(initial?.railing ? 'Hybrid Railing / trex cap' : 'None')
-  const [bronze, setBronze]     = useState(false)
-  const [fascia, setFascia]     = useState(initial?.fascia ? 'Matching' : 'None')
-  const [border, setBorder]     = useState(initial?.border === 'Double' ? '2-board' : initial?.border === 'Single' ? '1-board' : 'None')
-  const [cortex, setCortex]     = useState('None')
-  const [skirt, setSkirt]       = useState('None')
-  const [paint, setPaint]       = useState('None')
-  const [freestanding, setFreestanding] = useState(false)
-  const [extras, setExtras]     = useState({})   // add-on quantities typed by the rep
-  const [qtyOv, setQtyOv]       = useState({})   // quantity overrides, by row key
-  const [rateOv, setRateOv]     = useState({})   // rate overrides, by row key
-  const [jic, setJic]           = useState(JIC_DEFAULT)
+  const [landings, setLandings] = useState(() => S?.landings ?? Array.from({ length: n(initial?.landings) }, () => ({ id: uid(), width: 4, depth: 4 })))
+  const [rail, setRail]         = useState(S?.rail ?? (initial?.railing ? 'Hybrid Railing / trex cap' : 'None'))
+  const [bronze, setBronze]     = useState(S?.bronze ?? false)
+  const [fascia, setFascia]     = useState(S?.fascia ?? (initial?.fascia ? 'Matching' : 'None'))
+  const [border, setBorder]     = useState(S?.border ?? (initial?.border === 'Double' ? '2-board' : initial?.border === 'Single' ? '1-board' : 'None'))
+  const [cortex, setCortex]     = useState(S?.cortex ?? 'None')
+  const [skirt, setSkirt]       = useState(S?.skirt ?? 'None')
+  const [paint, setPaint]       = useState(S?.paint ?? 'None')
+  const [freestanding, setFreestanding] = useState(S?.freestanding ?? false)
+  const [extras, setExtras]     = useState(S?.extras ?? {})   // add-on quantities typed by the rep
+  const [qtyOv, setQtyOv]       = useState(S?.qtyOv ?? {})   // quantity overrides, by row key
+  const [rateOv, setRateOv]     = useState(S?.rateOv ?? {})   // rate overrides, by row key
+  const [jic, setJic]           = useState(S?.jic ?? JIC_DEFAULT)
 
   const coll   = DECK_COLLECTIONS.find(c => c.key === collKey) || DECK_COLLECTIONS[0]
   const redeck = jobType === 'Re-deck'
@@ -197,6 +200,8 @@ export default function DeckPricingPanel({ onClose, onAdd, initial }) {
       category: 'Decks',
       costMaterials: Math.round(cost),
       costSub: 0,
+      // Everything needed to reopen this deck in the builder (never shown to the customer).
+      builder: { tool: 'deck', state: { jobType, collKey, width, depth, height, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv, jic } },
     }])
     onClose()
   }

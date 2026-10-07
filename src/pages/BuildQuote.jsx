@@ -88,7 +88,7 @@ const PLAY_ELEC_SPAN_FT   = 20    // porches over this span get the larger elect
 const PLAY_OUTLET_RATE       = 220  // 6/12 compliance outlet, $/outlet
 const PLAY_OUTLET_SPACING_FT = 9    // one outlet per 9 ft of FULL (4-side) perimeter
 
-function PorchAssemblyPanel({ onClose, onAdd, initial }) {
+function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
   const rates            = useStore(s => s.porchComponentRates) || PORCH_COMPONENT_DEFAULTS
   const customComponents = useStore(s => s.porchCustomComponents) || []
   const formulaLocked    = useStore(s => s.porchFormulaLocked)
@@ -99,12 +99,13 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
   const r = (key) => rates?.[key] || PORCH_COMPONENT_DEFAULTS[key]
   const toCustomComp = (c) => ({ key: `c:${c.id}`, customId: c.id, label: c.label, unit: c.unit, rate: c.rate, cost: c.cost, qty: 0, custom: true })
 
-  const [width, setWidth] = useState(initial?.width ?? 16)   // ft — front wall
-  const [depth, setDepth] = useState(initial?.depth ?? 12)   // ft — side walls
-  const [wallH, setWallH] = useState(initial?.wallHeight ?? 96)   // in — wall height
-  const [doors, setDoors] = useState(initial?.doors ?? 1)    // 36" exit doors (on the front wall)
-  const [jic, setJic] = useState(JIC_DEFAULT)
-  const [sides, setSides] = useState('Front + 2 sides')
+  // `saved` = this tool's settings from a quote line being edited (Edit in builder).
+  const [width, setWidth] = useState(saved?.width ?? initial?.width ?? 16)   // ft — front wall
+  const [depth, setDepth] = useState(saved?.depth ?? initial?.depth ?? 12)   // ft — side walls
+  const [wallH, setWallH] = useState(saved?.wallH ?? initial?.wallHeight ?? 96)   // in — wall height
+  const [doors, setDoors] = useState(saved?.doors ?? initial?.doors ?? 1)    // 36" exit doors (on the front wall)
+  const [jic, setJic] = useState(saved?.jic ?? JIC_DEFAULT)
+  const [sides, setSides] = useState(saved?.sides ?? 'Front + 2 sides')
 
   const W  = Math.max(0, parseFloat(width) || 0)
   const D  = Math.max(0, parseFloat(depth) || 0)
@@ -134,7 +135,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
     }
   }
 
-  const [comps, setComps] = useState([
+  const [comps, setComps] = useState(saved?.comps || [
     { key: 'column',    label: r('column').label,    unit: r('column').unit,    rate: r('column').rate,    cost: r('column').cost,    qty: null, fromRates: true },
     { key: 'window',    label: r('window').label,    unit: r('window').unit,    rate: r('window').rate,    cost: r('window').cost,    qty: null, fromRates: true },
     { key: 'transom',   label: r('transom').label,   unit: r('transom').unit,   rate: r('transom').rate,   cost: r('transom').cost,   qty: null, fromRates: true, transomOnly: true },
@@ -197,6 +198,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial }) {
       category: 'Screen Porches',
       costMaterials: Math.round(cost),
       costSub: 0,
+      builder: { tool: 'porch', state: { width, depth, wallH, doors, sides, jic, comps } },
     }])
     onClose()
   }
@@ -472,15 +474,15 @@ export default function BuildQuote() {
 
   const addItem = (item) => {
     // Formula/assembly items open their inline builder instead of adding a flat line.
-    if (item.assembly === 'deck') { setActiveAssembly('deck'); return }
-    if (item.assembly === 'porch') { setActiveAssembly('porch'); return }
-    if (item.assembly === 'porchbuild') { setActiveAssembly('porchbuild'); return }
-    if (item.assembly === 'underdeck') { setActiveAssembly('underdeck'); return }
-    if (item.assembly === 'hardscape') { setActiveAssembly('hardscape'); return }
+    if (item.assembly === 'deck') { setEditingLineId(null); setActiveAssembly('deck'); return }
+    if (item.assembly === 'porch') { setEditingLineId(null); setActiveAssembly('porch'); return }
+    if (item.assembly === 'porchbuild') { setEditingLineId(null); setActiveAssembly('porchbuild'); return }
+    if (item.assembly === 'underdeck') { setEditingLineId(null); setActiveAssembly('underdeck'); return }
+    if (item.assembly === 'hardscape') { setEditingLineId(null); setActiveAssembly('hardscape'); return }
     setLines(prev => {
       const existing = prev.find(l => l.catalogId === item.id)
       if (existing) return prev.map(l => l.catalogId === item.id ? { ...l, qty: l.qty + 1 } : l)
-      return [...prev, {
+      return [{
         id: Date.now() + Math.random(),
         catalogId: item.id,
         name: item.name,
@@ -492,7 +494,7 @@ export default function BuildQuote() {
         category: item.category,
         costMaterials: item.costMaterials || 0,
         costSub: item.costSub || 0,
-      }]
+      }, ...prev]
     })
   }
 
@@ -507,7 +509,27 @@ export default function BuildQuote() {
 
   const [activeAssembly, setActiveAssembly] = useState(null)
   const [assemblyInitial, setAssemblyInitial] = useState(null)
-  const addAssemblyLine = (line) => setLines(prev => [...prev, ...(Array.isArray(line) ? line : [line])])
+  // The quote line being re-opened in its builder ("Edit in builder"), if any.
+  const [editingLineId, setEditingLineId] = useState(null)
+  const editingLine = editingLineId ? lines.find(l => l.id === editingLineId) : null
+  const editSaved = editingLine?.builder?.state || null
+  const closeAssembly = () => { setActiveAssembly(null); setAssemblyInitial(null); setEditingLineId(null) }
+  // A builder's line(s) replace the line being edited in place; new ones go on top.
+  const finishAssembly = (line) => {
+    const add = Array.isArray(line) ? line : [line]
+    setLines(prev => {
+      const at = editingLineId ? prev.findIndex(l => l.id === editingLineId) : -1
+      return at >= 0 ? [...prev.slice(0, at), ...add, ...prev.slice(at + 1)] : [...add, ...prev]
+    })
+    closeAssembly()
+  }
+  const openInBuilder = (line) => {
+    if (!line?.builder?.tool) return
+    setAssemblyInitial(null)
+    setEditingLineId(line.id)
+    setActiveAssembly(line.builder.tool)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   // ── Quick Build — type or dictate a job; AI fills the matching tool ──────────
   const collectionNames = useMemo(() => {
@@ -637,7 +659,7 @@ export default function BuildQuote() {
       }
     }
 
-    setLines(prev => [...prev, ...made])
+    setLines(prev => [...made, ...prev])
     return { count: made.length, missing }
   }
 
@@ -653,6 +675,7 @@ export default function BuildQuote() {
         else setQuickNote(`Added ${count} item${count !== 1 ? 's' : ''} to the scope.${missing.length ? ` Couldn’t match: ${missing.join('; ')}.` : ''}`)
       } else {
         setAssemblyInitial(spec)
+        setEditingLineId(null)
         setActiveAssembly(spec.tool === 'porch' ? 'porch' : 'deck')
         setQuickText('')
       }
@@ -663,7 +686,7 @@ export default function BuildQuote() {
     }
   }
 
-  const addBlankLine = () => setLines(prev => [...prev, {
+  const addBlankLine = () => setLines(prev => [{
     id: Date.now() + Math.random(),
     catalogId: null,
     name: '',
@@ -673,7 +696,7 @@ export default function BuildQuote() {
     qty: 1,
     unitPrice: 0,
     category: 'General',
-  }])
+  }, ...prev])
 
   const moveUp = (idx) => {
     if (idx === 0) return
@@ -915,39 +938,45 @@ export default function BuildQuote() {
         )}
 
         {/* Inline formula-item builder (opened from the catalog) — sits in the scope area */}
+        {activeAssembly && editingLine && (
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <Calculator size={13} className="shrink-0" />
+            <span>Editing <strong>{editingLine.name}</strong> — saving replaces that line on the quote.</span>
+          </div>
+        )}
         {activeAssembly === 'deck' && (
-          <DeckPricingPanel
-            initial={assemblyInitial}
-            onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
-            onAdd={line => { addAssemblyLine(line); setActiveAssembly(null); setAssemblyInitial(null) }}
+          <DeckPricingPanel key={editingLineId || 'new'}
+            initial={assemblyInitial} saved={editSaved}
+            onClose={closeAssembly}
+            onAdd={finishAssembly}
           />
         )}
         {activeAssembly === 'porchbuild' && (
-          <PorchBuildPanel
-            initial={assemblyInitial?.porchBuild || null}
-            onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
-            onAdd={newLines => { setLines(prev => [...prev, ...newLines]); setActiveAssembly(null); setAssemblyInitial(null) }}
+          <PorchBuildPanel key={editingLineId || 'new'}
+            initial={assemblyInitial?.porchBuild || null} saved={editSaved}
+            onClose={closeAssembly}
+            onAdd={finishAssembly}
           />
         )}
         {activeAssembly === 'underdeck' && (
-          <UnderDeckPanel
-            initial={assemblyInitial?.underDeck || null}
-            onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
-            onAdd={newLines => { setLines(prev => [...prev, ...newLines]); setActiveAssembly(null); setAssemblyInitial(null) }}
+          <UnderDeckPanel key={editingLineId || 'new'}
+            initial={assemblyInitial?.underDeck || null} saved={editSaved}
+            onClose={closeAssembly}
+            onAdd={finishAssembly}
           />
         )}
         {activeAssembly === 'hardscape' && (
-          <HardscapePanel
-            initial={assemblyInitial?.hardscape || null}
-            onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
-            onAdd={newLines => { setLines(prev => [...prev, ...newLines]); setActiveAssembly(null); setAssemblyInitial(null) }}
+          <HardscapePanel key={editingLineId || 'new'}
+            initial={assemblyInitial?.hardscape || null} saved={editSaved}
+            onClose={closeAssembly}
+            onAdd={finishAssembly}
           />
         )}
         {activeAssembly === 'porch' && (
-          <PorchAssemblyPanel
-            initial={assemblyInitial}
-            onClose={() => { setActiveAssembly(null); setAssemblyInitial(null) }}
-            onAdd={line => { addAssemblyLine(line); setActiveAssembly(null); setAssemblyInitial(null) }}
+          <PorchAssemblyPanel key={editingLineId || 'new'}
+            initial={assemblyInitial} saved={editSaved}
+            onClose={closeAssembly}
+            onAdd={finishAssembly}
           />
         )}
 
@@ -1036,6 +1065,12 @@ export default function BuildQuote() {
                         )}
                         {savedToLog.has(line.id) && (
                           <span className="p-1 text-green-500"><Check size={13} /></span>
+                        )}
+                        {line.builder?.tool && (
+                          <button title="Edit in builder" aria-label={`Edit ${line.name} in builder`} onClick={() => openInBuilder(line)}
+                            className={`p-1 rounded hover:bg-[var(--brand-50)] ${editingLineId === line.id ? 'text-[var(--brand-600)]' : 'text-gray-400 hover:text-[var(--brand-600)]'}`}>
+                            <Calculator size={13} />
+                          </button>
                         )}
                         <button onClick={() => removeLine(line.id)} className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50">
                           <Trash2 size={13} />

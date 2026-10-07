@@ -26,11 +26,11 @@ function Field({ label, children, hint }) {
   )
 }
 
-export default function UnderDeckPanel({ onClose, onAdd, initial }) {
+export default function UnderDeckPanel({ onClose, onAdd, initial, saved }) {
   const catalogRaw = useStore(s => s.catalog)
   const catalog = useMemo(() => catalogRaw || [], [catalogRaw])
-  const [inp, setInp] = useState({ ...UDC_INPUT_DEFAULTS, ...(initial || {}) })
-  const [jic, setJic] = useState(JIC_DEFAULT)
+  const [inp, setInp] = useState(saved?.inp ? { ...UDC_INPUT_DEFAULTS, ...saved.inp } : { ...UDC_INPUT_DEFAULTS, ...(initial || {}) })
+  const [jic, setJic] = useState(saved?.jic ?? JIC_DEFAULT)
   const set = (p) => setInp(cur => ({ ...cur, ...p }))
   const setQty = (key, v) => setInp(cur => ({ ...cur, electrical: { ...cur.electrical, [key]: v } }))
   const result = useMemo(() => computeUnderDeck(inp, catalog), [inp, catalog])
@@ -62,6 +62,7 @@ export default function UnderDeckPanel({ onClose, onAdd, initial }) {
       costMaterials: Math.round(result.lines.reduce((a, l) => a + (Number(l.costTotal) || 0), 0)),
       costSub: 0,
       underDeck: inp,
+      builder: { tool: 'underdeck', state: { inp, jic } },
     }])
   }
 

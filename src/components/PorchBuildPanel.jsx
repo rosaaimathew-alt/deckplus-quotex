@@ -60,7 +60,7 @@ function Check({ label, checked, onChange }) {
   )
 }
 
-export default function PorchBuildPanel({ onClose, onAdd, initial }) {
+export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
   const savedRates = useStore(s => s.porchBuildRates) || {}
   const locked     = useStore(s => s.porchBuildLocked)
   const scopes     = useStore(s => s.porchBuildScopes)
@@ -71,8 +71,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
     return out
   }, [savedRates])
 
-  const [inp, setInp] = useState({ ...PORCH_BUILD_INPUT_DEFAULTS, ...(initial || {}) })
-  const [jic, setJic] = useState(JIC_DEFAULT)
+  const [inp, setInp] = useState(saved?.inp ? { ...PORCH_BUILD_INPUT_DEFAULTS, ...saved.inp } : { ...PORCH_BUILD_INPUT_DEFAULTS, ...(initial || {}) })
+  const [jic, setJic] = useState(saved?.jic ?? JIC_DEFAULT)
   const set = (patch) => setInp(p => ({ ...p, ...patch }))
   const setSub = (k, patch) => setInp(p => ({ ...p, [k]: { ...(p[k] || {}), ...patch } }))
 
@@ -120,6 +120,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial }) {
       costMaterials: Math.round(result.cost),
       costSub: 0,
       porchBuild: inp,
+      builder: { tool: 'porchbuild', state: { inp, jic } },
     }])
   }
 

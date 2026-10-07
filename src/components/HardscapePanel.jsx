@@ -42,16 +42,16 @@ function Section({ title, total, children }) {
   )
 }
 
-export default function HardscapePanel({ onClose, onAdd, initial }) {
+export default function HardscapePanel({ onClose, onAdd, initial, saved }) {
   const catalogRaw = useStore(s => s.catalog)
   const catalog = useMemo(() => catalogRaw || [], [catalogRaw])
-  const [inp, setInp] = useState(() => ({
+  const [inp, setInp] = useState(() => saved?.inp ? saved.inp : ({
     ...HS_INPUT_DEFAULTS, ...(initial || {}),
     patio: { ...HS_INPUT_DEFAULTS.patio, ...(initial?.patio || {}) },
     wall: { ...HS_INPUT_DEFAULTS.wall, ...(initial?.wall || {}) },
     granite: { ...HS_INPUT_DEFAULTS.granite, ...(initial?.granite || {}) },
   }))
-  const [jic, setJic] = useState(JIC_DEFAULT)
+  const [jic, setJic] = useState(saved?.jic ?? JIC_DEFAULT)
   const setIn = (part, p) => setInp(cur => ({ ...cur, [part]: { ...cur[part], ...p } }))
   const setQty = (key, v) => setInp(cur => ({ ...cur, qty: { ...cur.qty, [key]: v } }))
   const result = useMemo(() => computeHardscape(inp, catalog), [inp, catalog])
@@ -108,6 +108,7 @@ export default function HardscapePanel({ onClose, onAdd, initial }) {
       costMaterials: Math.round(result.lines.reduce((a, l) => a + (Number(l.costTotal) || 0), 0)),
       costSub: 0,
       hardscape: inp,
+      builder: { tool: 'hardscape', state: { inp, jic } },
     }])
   }
 
