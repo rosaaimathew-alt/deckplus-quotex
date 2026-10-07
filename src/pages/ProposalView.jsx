@@ -6,6 +6,7 @@ import { buildProposalSnapshot } from '../proposalSnapshot'
 import { DEFAULT_BRAND_COLOR } from '../brand'
 import { toCanvas } from 'html-to-image'
 import jsPDF from 'jspdf'
+import { customerLines } from '../lib/hiddenLines'
 
 const fmt = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -102,6 +103,8 @@ export default function ProposalView() {
 
   const { client, email, phone, address, expiration, lines, isAlaCarte, showBreakdown = true } = data
   const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0)
+  // Lines hidden on a summed proposal count in the total but are never shown.
+  const shownLines = customerLines(lines, { showBreakdown, isAlaCarte })
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   const expirationFormatted = expiration
     ? new Date(expiration + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -110,7 +113,7 @@ export default function ProposalView() {
   // Group lines by section
   const sectionOrder = []
   const sections = {}
-  lines.forEach(line => {
+  shownLines.forEach(line => {
     const key = (line.section || line.category || 'General').trim()
     if (!sections[key]) { sections[key] = []; sectionOrder.push(key) }
     sections[key].push(line)
@@ -123,9 +126,10 @@ export default function ProposalView() {
       return `${key.toUpperCase()}\n${prose}`
     }).join('\n\n')
 
-    const pricingText = lines.map((l, i) =>
+    // Lump sum: the total only (no per-line prices), like the proposal itself.
+    const pricingText = (showBreakdown || isAlaCarte) ? shownLines.map((l, i) =>
       `${i + 1}. ${l.name}  |  ${l.qty} ${l.unit} × $${l.unitPrice}  =  $${fmt(l.qty * l.unitPrice)}`
-    ).join('\n')
+    ).join('\n') : ''
 
     const text = [
       'PROPOSAL',
@@ -426,7 +430,7 @@ export default function ProposalView() {
         <div className="px-10 py-7 border-b border-gray-300">
           <p className="text-xs font-semibold uppercase tracking-widest mb-5 text-black">Scope of Work</p>
           <div className="space-y-2">
-            {lines.map(line => (
+            {shownLines.map(line => (
               <div key={line.id} className="border-l-2 border-gray-400 pl-3">
                 <p className="text-sm font-semibold text-black">{line.name}</p>
                 {line.description && (

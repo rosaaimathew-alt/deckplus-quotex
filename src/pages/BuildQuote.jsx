@@ -395,7 +395,9 @@ export default function BuildQuote() {
         setAddress(d.address || '')
         setExpiration(d.expiration || '')
         setLines((d.lines || []).filter(l => !l.autoFee).map(l => ({ ...l, id: Date.now() + Math.random() })))
-        setFeeEdits(Object.fromEntries((d.lines || []).filter(l => l.autoFee).map(l => [l.autoFee, l.unitPrice])))
+        setFeeEdits(Object.fromEntries((d.lines || []).filter(l => l.autoFee).flatMap(l => l.feeParts
+          ? l.feeParts.map(p => [p.key, p.unitPrice])
+          : [[l.autoFee, l.unitPrice]])))
         if (d.feeDismissed) setFeeDismissed(d.feeDismissed)
         if (d.feeOverrides) setFeeOverrides(d.feeOverrides)
         if (d.showBreakdown !== undefined) setShowBreakdown(d.showBreakdown)
@@ -464,7 +466,20 @@ export default function BuildQuote() {
       unit: 'LS', qty: 1, unitPrice: feeEdits[f.key] ?? f.rate, category: 'Permits & Fees',
       costMaterials: f.cost, costSub: 0, autoFee: f.key, why: f.why,
     })), [feePlan, feeDismissed, feeEdits])
-  const allLines = useMemo(() => [...lines, ...feeLines], [lines, feeLines])
+  // Permits & fees go on the proposal as ONE line (the parts are listed in its
+  // scope); each part is still adjustable / removable here in the builder.
+  const feeLine = useMemo(() => {
+    if (!feeLines.length) return null
+    const price = feeLines.reduce((a, f) => a + (Number(f.unitPrice) || 0), 0)
+    return {
+      id: 'fee-all', catalogId: null, name: 'Permits & fees', section: 'Permits & Fees', category: 'Permits & Fees',
+      description: feeLines.map(f => f.name).join('\n'),
+      unit: 'LS', qty: 1, unitPrice: price,
+      costMaterials: feeLines.reduce((a, f) => a + (Number(f.costMaterials) || 0), 0), costSub: 0,
+      autoFee: 'combined', feeParts: feeLines.map(f => ({ key: f.autoFee, name: f.name, unitPrice: f.unitPrice })),
+    }
+  }, [feeLines])
+  const allLines = useMemo(() => [...lines, ...(feeLine ? [feeLine] : [])], [lines, feeLine])
   const dismissedFees = feePlan.fees.filter(f => feeDismissed.includes(f.key))
 
   const cats = ['All', ...new Set(catalog.map(c => c.category))]
@@ -708,6 +723,8 @@ export default function BuildQuote() {
   }
 
   const subtotal = allLines.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  // Hiding lines from the customer only applies to lump-sum proposals.
+  const summed = !showBreakdown && !isAlaCarte
   const cost = showMargin ? subtotal / (1 + margin / 100) : null
 
   const sameClient = (a, b) => String(a || '').toLowerCase().replace(/[^a-z0-9]/g, '') === String(b || '').toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -997,7 +1014,7 @@ export default function BuildQuote() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {lines.map((line, idx) => (
-                  <tr key={line.id} className="hover:bg-gray-50 align-top">
+                  <tr key={line.id} className={`hover:bg-gray-50 align-top ${summed && line.hidden ? 'bg-gray-50 opacity-60' : ''}`}>
                     <td className="px-4 pt-3">
                       <div className="flex flex-col gap-0.5">
                         <button onClick={() => moveUp(idx)} disabled={idx === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-20"><ChevronUp size={12} /></button>
@@ -1011,6 +1028,7 @@ export default function BuildQuote() {
                         onChange={e => updateLine(line.id, 'name', e.target.value)}
                         placeholder="Item name"
                       />
+                      {summed && line.hidden && <p className="px-1 text-[11px] font-semibold text-gray-500 flex items-center gap-1"><EyeOff size={11} /> Hidden from the customer — still counted in the total</p>}
                       <textarea
                         rows={Math.min(8, Math.max(2, (line.description || '').split('\n').length))}
                         className="w-full border border-transparent rounded px-1 py-0.5 hover:border-gray-200 focus:border-blue-300 focus:outline-none text-xs text-gray-400 italic mt-0.5 resize-y"
@@ -1066,6 +1084,14 @@ export default function BuildQuote() {
                         {savedToLog.has(line.id) && (
                           <span className="p-1 text-green-500"><Check size={13} /></span>
                         )}
+                        {summed && (
+                          <button title={line.hidden ? 'Show on the proposal' : 'Hide from the customer (still in the total)'}
+                            aria-label={`${line.hidden ? 'Show' : 'Hide'} ${line.name || 'line'} on the proposal`}
+                            onClick={() => setLines(prev => prev.map(l => l.id === line.id ? { ...l, hidden: !l.hidden } : l))}
+                            className={`p-1 rounded hover:bg-gray-100 ${line.hidden ? 'text-gray-700' : 'text-gray-300 hover:text-gray-600'}`}>
+                            {line.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </button>
+                        )}
                         {line.builder?.tool && (
                           <button title="Edit in builder" aria-label={`Edit ${line.name} in builder`} onClick={() => openInBuilder(line)}
                             className={`p-1 rounded hover:bg-[var(--brand-50)] ${editingLineId === line.id ? 'text-[var(--brand-600)]' : 'text-gray-400 hover:text-[var(--brand-600)]'}`}>
@@ -1079,13 +1105,26 @@ export default function BuildQuote() {
                     </td>
                   </tr>
                 ))}
-                {feeLines.map((f, i) => (
-                  <tr key={f.id} className={`bg-amber-50/40 ${i === 0 ? 'border-t-2 border-amber-100' : 'border-t border-gray-50'}`}>
+                {feeLine && (
+                  <tr className="bg-amber-50/70 border-t-2 border-amber-100">
+                    <td className="px-4 py-2 text-xs text-amber-600"><Landmark size={13} /></td>
+                    <td className="px-4 py-2" colSpan={4}>
+                      <p className="text-sm font-semibold text-gray-800">Permits &amp; fees</p>
+                      <p className="text-xs text-amber-700/80">One line on the proposal. Adjust or remove the parts below.</p>
+                    </td>
+                    <td className="px-4 pt-3 text-right font-semibold text-gray-800 whitespace-nowrap">
+                      ${Number(feeLine.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td />
+                  </tr>
+                )}
+                {feeLines.map((f) => (
+                  <tr key={f.id} className="bg-amber-50/30 border-t border-gray-50">
                     <td className="px-4 py-2 text-xs text-amber-500" title="Added from the job address">
                       <Landmark size={13} />
                     </td>
-                    <td className="px-4 py-2">
-                      <p className="text-sm font-medium text-gray-800">{f.name}</p>
+                    <td className="px-4 py-2 pl-8">
+                      <p className="text-sm font-medium text-gray-700">{f.name}</p>
                       <p className="text-xs text-amber-700/80">Auto-added · {f.why}</p>
                     </td>
                     <td className="px-4 pt-3 text-sm text-center text-gray-500">1</td>

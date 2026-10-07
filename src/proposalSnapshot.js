@@ -1,17 +1,19 @@
+import { customerLines } from './lib/hiddenLines'
 // The single source of truth for the display-only snapshot sent to the public
 // proposal page (/p/:token). Used by every "get link" / send path so the shared
 // link always renders the proposal exactly the way the app does — including
 // descriptions and à-la-carte vs. summed pricing. No costs/margins are included.
 export function buildProposalSnapshot(data = {}, branding = {}) {
-  const lines = (data.lines || [])
-    .filter(l => (l.name || '').trim() || Number(l.unitPrice) > 0)
+  const all = (data.lines || []).filter(l => (l.name || '').trim() || Number(l.unitPrice) > 0)
+  // Hidden lines count in the total but never reach the customer's copy.
+  const subtotal = all.reduce((s, l) => s + (Number(l.qty) || 1) * (Number(l.unitPrice) || 0), 0)
+  const lines = customerLines(all, data)
     .map(l => ({
       name:        l.name || '',
       description: l.description || '',
       qty:         Number(l.qty) || 1,
       unitPrice:   Number(l.unitPrice) || 0,
     }))
-  const subtotal = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   return {
     client:         data.client || '',
     email:          data.email || '',

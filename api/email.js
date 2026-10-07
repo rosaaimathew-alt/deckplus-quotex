@@ -38,18 +38,21 @@ const viewButton = (viewUrl) => {
 }
 
 // ── Proposal email HTML ───────────────────────────────────────────────────────
-function buildProposalHtml({ client, email, address, expiration, lines, companyName, fromName, viewUrl }) {
+function buildProposalHtml({ client, email, address, expiration, lines, companyName, fromName, viewUrl, showBreakdown, isAlaCarte }) {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   const expirationFormatted = expiration
     ? new Date(expiration + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : null
   const subtotal = (lines || []).reduce((s, l) => s + (l.qty || 1) * (l.unitPrice || 0), 0)
+  // Lump sum: hidden lines are left out and no line shows its own price.
+  const summed = showBreakdown === false && !isAlaCarte
+  const shown  = summed ? (lines || []).filter(l => !l?.hidden) : (lines || [])
   const company  = esc(companyName || COMPANY)
   const sender   = esc(fromName) || company
-  const lineRows = (lines || []).map((l, i) => `
+  const lineRows = shown.map((l, i) => `
     <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
       <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500;border-bottom:1px solid #f1f5f9;">${esc(l.name) || '—'}</td>
-      <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#1e293b;text-align:right;border-bottom:1px solid #f1f5f9;">$${fmt((l.qty || 1) * (l.unitPrice || 0))}</td>
+      <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#1e293b;text-align:right;border-bottom:1px solid #f1f5f9;">${summed ? '' : `$${fmt((l.qty || 1) * (l.unitPrice || 0))}`}</td>
     </tr>`).join('')
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
