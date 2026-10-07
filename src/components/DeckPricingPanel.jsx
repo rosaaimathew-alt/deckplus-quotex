@@ -203,7 +203,6 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
       // Everything needed to reopen this deck in the builder (never shown to the customer).
       builder: { tool: 'deck', state: { jobType, collKey, width, depth, height, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv, jic } },
     }])
-    onClose()
   }
 
   // ── Small field helpers ───────────────────────────────────────────────────

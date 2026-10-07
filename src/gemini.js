@@ -2,11 +2,11 @@
 // Anthropic API key lives only on the server and is never shipped to the
 // browser. The provider (Claude) is unchanged from the client's perspective.
 
-async function callAI({ system, messages, maxTokens }) {
+async function callAI({ system, messages, maxTokens, json }) {
   const res = await fetch('/api/ai-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, messages, maxTokens }),
+    body: JSON.stringify({ system, messages, maxTokens, json }),
   })
   let data
   try {
@@ -52,7 +52,7 @@ export function getModel(systemInstruction) {
     },
     async generateContent(prompt, opts = {}) {
       const content = toContent(prompt, 'Extract all line items.')
-      const out = await callAI({ system: systemInstruction, messages: [{ role: 'user', content }], maxTokens: opts.maxTokens || 8192 })
+      const out = await callAI({ system: systemInstruction, messages: [{ role: 'user', content }], maxTokens: opts.maxTokens || 8192, json: !!opts.json })
       return { response: { text: () => out } }
     },
   }

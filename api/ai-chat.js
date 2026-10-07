@@ -19,6 +19,7 @@ export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 // Remembers a model we've confirmed works, so we don't re-discover on every call
 // (survives within a warm serverless instance).
 let _groqModelCache = null
+let _geminiModelCache = null
 
 // Convert our Anthropic-style messages into Gemini "contents".
 function toGeminiContents(messages) {
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!(await requireAuth(req, res))) return
 
-  const { system, messages, maxTokens } = req.body || {}
+  const { system, messages, maxTokens, json } = req.body || {}
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages required' })
   }
@@ -102,15 +103,31 @@ export default async function handler(req, res) {
 
     if (geminiKey) {
       const genAI = new GoogleGenerativeAI(geminiKey)
-      const model = genAI.getGenerativeModel({
-        // Overridable via env so a Google model rename never needs a code change.
-        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
-        systemInstruction: system || undefined,
-      })
-      const result = await model.generateContent({
+      const run = (name) => genAI.getGenerativeModel({ model: name, systemInstruction: system || undefined }).generateContent({
         contents: toGeminiContents(messages),
-        generationConfig: { maxOutputTokens: maxTokens || 4096 },
+        generationConfig: { maxOutputTokens: maxTokens || 4096, ...(json ? { responseMimeType: 'application/json' } : {}) },
       })
+      // Overridable via env so a Google model rename never needs a code change;
+      // if the model is gone, ask Google which Flash models this key can use.
+      const preferred = process.env.GEMINI_MODEL || _geminiModelCache || 'gemini-2.5-flash'
+      let result
+      try {
+        result = await run(preferred)
+        _geminiModelCache = preferred
+      } catch (e) {
+        if (!/not found|not supported|404|model/i.test(String(e?.message || e))) throw e
+        const lr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiKey)}`)
+        const lj = await lr.json().catch(() => ({}))
+        const names = (lj.models || [])
+          .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+          .map(m => String(m.name || '').replace(/^models\//, ''))
+          .filter(nm => /flash/i.test(nm) && !/image|tts|audio|live|thinking|exp|preview|lite/i.test(nm))
+          .sort().reverse()
+        const pick = names.find(nm => nm !== preferred)
+        if (!pick) throw e
+        result = await run(pick)
+        _geminiModelCache = pick
+      }
       return res.status(200).json({ text: result.response.text() || '' })
     }
 

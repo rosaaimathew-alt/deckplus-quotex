@@ -2,12 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Trash2, GripVertical, GitMerge, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark } from 'lucide-react'
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
-import { parseBuildSpec } from '../buildParse'
+import { parseBuildSpec, quickToolFor } from '../buildParse'
 import PorchBuildPanel from '../components/PorchBuildPanel'
 import UnderDeckPanel from '../components/UnderDeckPanel'
 import HardscapePanel from '../components/HardscapePanel'
 import DeckPricingPanel from '../components/DeckPricingPanel'
-import { DECK_COLLECTIONS } from '../lib/deckPricing'
 import { requiredFees } from '../lib/permitFees'
 import { JicField } from '../components/Jic'
 import { scopeFor, countWords } from '../lib/scopeText'
@@ -24,36 +23,6 @@ function freshIds(lines) {
     id: map.get(String(l.id)),
     ...(l.mergeInto != null ? { mergeInto: map.get(String(l.mergeInto)) ?? null } : {}),
   }))
-}
-
-// Decking layout for porch floors priced per LF of board — NO butt joints. The
-// picture frame absorbs width at the ends; once the remaining run is longer than
-// a 20' board a spline splits it into equal runs, each covered by the smallest
-// stock board (end gaps let it round up ~a foot).
-const DECK_BOARD_LENGTHS = [12, 16, 20]           // composite boards are sold in these lengths
-const DECK_BOARD_FACE_IN = 5.5                    // 1"×5.5" profile face width
-const DECK_MAX_BOARD_FT = 20                      // longest stock board
-const DECK_GAP_SLACK_FT = 0.5                     // end expansion gaps let a board round up ~a foot
-function deckLayout(Wft, frameCourses) {
-  const face = DECK_BOARD_FACE_IN / 12
-  const frameAbsorb = 2 * frameCourses * face          // both end borders
-  const fieldRun = Math.max(0, Wft - frameAbsorb)      // ft the field boards span
-  const splineW = face                                 // single spline board
-  let splines = 0
-  while (fieldRun > 0 && (fieldRun - splines * splineW) / (splines + 1) > DECK_MAX_BOARD_FT + DECK_GAP_SLACK_FT && splines < 12) splines++
-  const sections = splines + 1
-  const sectionRun = fieldRun > 0 ? (fieldRun - splines * splineW) / sections : 0
-  const boardFt = DECK_BOARD_LENGTHS.find(L => sectionRun <= L + DECK_GAP_SLACK_FT) ?? DECK_MAX_BOARD_FT
-  return { frameCourses, fieldRun, splines, sections, sectionRun, boardFt }
-}
-
-// Linear feet of decking board to floor a W×D area — the SAME takeoff the deck
-// tool uses (rows across the depth × runs of stock length), flooring only. Porch
-// floors from a composite/wood collection are priced at that collection's $/LF.
-function floorDeckingLF(Wft, Dft) {
-  const { sections, boardFt } = deckLayout(Wft, 0)
-  const fieldRows = Math.ceil((Math.max(0, Dft) * 12) / DECK_BOARD_FACE_IN)
-  return fieldRows * sections * boardFt
 }
 
 // ── Porch Conversion (Eze-Breeze) assembly ──────────────────────────────────
@@ -78,26 +47,6 @@ function porchWall(Lin, doorCount = 0) {
   const winWidth = windows > 0 ? winSpan / windows : 0                  // equal per window
   return { windows, columns, winWidth }
 }
-
-// Total Eze-Breeze window & column count for a whole porch (shared by the porch
-// tool and the proposal playground so both count units identically).
-function porchLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides' } = {}) {
-  const wallSet = sides === 'All 4 walls' ? [Wft, Dft, Wft, Dft] : sides === 'Front only' ? [Wft] : [Wft, Dft, Dft]
-  const layout = wallSet.map((ln, i) => porchWall(ln * 12, i === 0 ? doors : 0))
-  const totalWindows = layout.reduce((s, w) => s + w.windows, 0)
-  const rawColumns   = layout.reduce((s, w) => s + w.columns, 0)
-  const sharedCorners = sides === 'All 4 walls' ? 4 : Math.max(0, wallSet.length - 1)
-  return { totalWindows, totalColumns: Math.max(0, rawColumns - sharedCorners) }
-}
-
-// Proposal-playground sizing rates the contractor confirmed. (Post-demo these
-// should move into the Tools tab so a manager can edit them.)
-const PLAY_LVP_SF_RATE    = 13    // LVP porch floor, $/SF
-const PLAY_EZE_UNIT_RATE  = 850   // Eze-Breeze window, $/unit (count from geometry)
-const PLAY_RAIL_ALL_SIDES = false // cable rail on 3 open sides (W+2D), not all 4
-const PLAY_ELEC_SPAN_FT   = 20    // porches over this span get the larger electrical pkg
-const PLAY_OUTLET_RATE       = 220  // 6/12 compliance outlet, $/outlet
-const PLAY_OUTLET_SPACING_FT = 9    // one outlet per 9 ft of FULL (4-side) perimeter
 
 function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
   const rates            = useStore(s => s.porchComponentRates) || PORCH_COMPONENT_DEFAULTS
@@ -211,7 +160,6 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
       costSub: 0,
       builder: { tool: 'porch', state: { width, depth, wallH, doors, sides, jic, comps } },
     }])
-    onClose()
   }
 
   const dim = (label, value, onChange, props = {}) => (
@@ -500,11 +448,11 @@ export default function BuildQuote() {
 
   const addItem = (item) => {
     // Formula/assembly items open their inline builder instead of adding a flat line.
-    if (item.assembly === 'deck') { setEditingLineId(null); setActiveAssembly('deck'); return }
-    if (item.assembly === 'porch') { setEditingLineId(null); setActiveAssembly('porch'); return }
-    if (item.assembly === 'porchbuild') { setEditingLineId(null); setActiveAssembly('porchbuild'); return }
-    if (item.assembly === 'underdeck') { setEditingLineId(null); setActiveAssembly('underdeck'); return }
-    if (item.assembly === 'hardscape') { setEditingLineId(null); setActiveAssembly('hardscape'); return }
+    if (item.assembly === 'deck') { startTool('deck'); return }
+    if (item.assembly === 'porch') { startTool('porch'); return }
+    if (item.assembly === 'porchbuild') { startTool('porchbuild'); return }
+    if (item.assembly === 'underdeck') { startTool('underdeck'); return }
+    if (item.assembly === 'hardscape') { startTool('hardscape'); return }
     setLines(prev => {
       const existing = prev.find(l => l.catalogId === item.id)
       if (existing) return prev.map(l => l.catalogId === item.id ? { ...l, qty: l.qty + 1 } : l)
@@ -538,11 +486,37 @@ export default function BuildQuote() {
 
   const [activeAssembly, setActiveAssembly] = useState(null)
   const [assemblyInitial, setAssemblyInitial] = useState(null)
+  const [assemblySaved, setAssemblySaved] = useState(null)   // settings a tool opens with (Quick Build)
+  const [panelKey, setPanelKey] = useState(0)                // remounts the tool for each open
+  // Quick Build runs through its tools one at a time.
+  const [quickQueue, setQuickQueue] = useState([])
+  const [quickStep, setQuickStep] = useState(null)           // { index, total, labels }
   // The quote line being re-opened in its builder ("Edit in builder"), if any.
   const [editingLineId, setEditingLineId] = useState(null)
   const editingLine = editingLineId ? lines.find(l => l.id === editingLineId) : null
-  const editSaved = editingLine?.builder?.state || null
-  const closeAssembly = () => { setActiveAssembly(null); setAssemblyInitial(null); setEditingLineId(null) }
+  const editSaved = editingLine?.builder?.state || assemblySaved
+  const openTool = (t) => {
+    setEditingLineId(null)
+    setAssemblyInitial(t.initial || null)
+    setAssemblySaved(t.saved || null)
+    setActiveAssembly(t.assembly)
+    setPanelKey(k => k + 1)
+  }
+  // Open a tool by hand (catalog button) — ends any Quick Build run.
+  const startTool = (assembly) => { setQuickQueue([]); setQuickStep(null); openTool({ assembly }) }
+  // Closing a tool (added or cancelled) moves Quick Build to its next tool.
+  const closeAssembly = () => {
+    setEditingLineId(null)
+    if (quickQueue.length) {
+      const [next, ...rest] = quickQueue
+      setQuickQueue(rest)
+      setQuickStep(st => st && { ...st, index: st.index + 1 })
+      openTool(next)
+      return
+    }
+    setActiveAssembly(null); setAssemblyInitial(null); setAssemblySaved(null); setQuickStep(null)
+  }
+  const stopQuickBuild = () => { setQuickQueue([]); setQuickStep(null); setActiveAssembly(null); setAssemblyInitial(null); setAssemblySaved(null); setEditingLineId(null) }
   // A builder's line(s) replace the line being edited in place; new ones go on top.
   const finishAssembly = (line) => {
     const add = Array.isArray(line) ? line : [line]
@@ -554,6 +528,7 @@ export default function BuildQuote() {
   }
   const openInBuilder = (line) => {
     if (!line?.builder?.tool) return
+    setQuickQueue([]); setQuickStep(null); setAssemblySaved(null)
     setAssemblyInitial(null)
     setEditingLineId(line.id)
     setActiveAssembly(line.builder.tool)
@@ -561,153 +536,29 @@ export default function BuildQuote() {
   }
 
   // ── Quick Build — type or dictate a job; AI fills the matching tool ──────────
-  const collectionNames = useMemo(() => {
-    const names = new Set()
-    for (const c of catalogRaw) {
-      if (/porch\s*floor\s*upgrade/i.test(c.name || '')) {
-        const coll = (c.name || '').replace(/porch\s*floor\s*upgrade/i, '').trim()
-        if (coll) names.add(coll)
-      }
-    }
-    for (const c of DECK_COLLECTIONS) names.add(c.key)
-    return [...names]
-  }, [catalogRaw])
-
   const [quickText, setQuickText] = useState('')
   const [quickBusy, setQuickBusy] = useState(false)
   const [quickErr, setQuickErr]   = useState('')
   const [quickNote, setQuickNote] = useState('')
 
-  // Assemble a whole proposal from the catalog with EXACT, dimension-driven sizing.
-  const assembleFromCatalog = (plan, rawText = '') => {
-    const W = Number(plan.width) || 0, D = Number(plan.depth) || 0
-    const area = W * D
-    const railLF = PLAY_RAIL_ALL_SIDES ? 2 * (W + D) : (W + 2 * D)   // 3 open sides by default
-    const span = Math.max(W, D)
-    const doors = plan.doors != null ? Number(plan.doors) : 1
-    const { totalWindows } = porchLayout(W, D, { doors, sides: 'Front + 2 sides' })
-    const roof = (plan.roofType || '').toLowerCase()
-    // Substrate: is the porch built ON a deck (elevated) vs at grade?
-    const wantsDeck = /on\s+(?:a\s+|the\s+|top\s+of\s+a?\s*)?(?:pt[-\s]?wood\s+)?deck|elevated|raised\s+porch|on\s+stilts/i.test(rawText)
-
-    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-    const escapeRegExp = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const byExact = (name) => { const n = norm(name); return n ? catalogRaw.find(c => norm(c.name) === n) : null }
-    const byName = (frag) => { const f = norm(frag); return f ? catalogRaw.find(c => norm(c.name).includes(f)) : null }
-    const made = []
-    const missing = []
-    const mkLine = (item, over = {}) => ({
-      id: Date.now() + Math.random(),
-      catalogId: typeof item.id === 'number' ? item.id : null,
-      name: item.name,
-      section: item.category || 'General',
-      description: item.description || '',
-      unit: over.unit ?? item.unit ?? 'EA',
-      qty: over.qty ?? 1,
-      unitPrice: over.unitPrice ?? item.unitPrice ?? 0,
-      category: item.category || 'General',
-      costMaterials: item.costMaterials || 0, costSub: item.costSub || 0,
-    })
-
-    for (const it of (plan.items || [])) {
-      // The AI picked the exact catalog item name; that's the authority (it respects
-      // roof type, substrate like "on PT-Wood Deck", flooring product, etc.).
-      const matched = it.match ? (byExact(it.match) || byName(it.match)) : null
-      switch (it.kind) {
-        case 'structure': {
-          const cands = catalogRaw.filter(c => /porch/i.test(c.name || '') && (!roof || new RegExp(escapeRegExp(roof), 'i').test(c.name || '')))
-          const sized = cands.filter(c => { const raw = norm(c.name); return raw.includes(norm(`${W}x${D}`)) || raw.includes(norm(`${D}x${W}`)) })
-          const pool = sized.length ? sized : cands
-          const isDeck = (c) => /deck/i.test(c.name || '')
-          // Substrate is decisive: on a deck → require a deck variant; else prefer at-grade.
-          let item
-          if (wantsDeck) item = (matched && isDeck(matched) ? matched : null) || pool.find(isDeck) || matched || pool[0]
-          else           item = matched || pool.find(c => !isDeck(c)) || pool[0]
-          if (item) {
-            if (wantsDeck && !isDeck(item)) missing.push(`deck-mounted ${roof} ${W}×${D} structure (used "${item.name}" — no on-deck variant found, verify)`)
-            else if (!sized.length) missing.push(`exact ${W}×${D} ${roof} structure (used "${item.name}" — verify size/price)`)
-            made.push(mkLine(item))
-          } else missing.push(`${roof || ''} porch structure ${W}×${D}`.trim())
-          break
-        }
-        case 'lvp': {
-          const item = matched || byName('lvp') || { name: 'LVP Floor as Porch Floor', unit: 'SF', category: 'General', description: 'Provide and install 3/4" plywood subfloor and underlayment, then install LVP flooring as porch floor.' }
-          made.push(mkLine(item, { unit: 'SF', qty: area, unitPrice: PLAY_LVP_SF_RATE }))
-          break
-        }
-        case 'floor': {
-          // Composite/wood porch floor: same board takeoff as the deck, priced at
-          // the collection's own $/LF from its catalog item.
-          const item = matched || byName('porch floor')
-          if (item && Number(item.unitPrice) > 0) made.push(mkLine(item, { unit: 'LF', qty: floorDeckingLF(W, D), unitPrice: item.unitPrice }))
-          else missing.push('porch floor collection (no per-LF catalog item matched)')
-          break
-        }
-        case 'cable_rail': {
-          const item = matched || byName('cable rail') || byName('cable railing')
-          if (item) made.push(mkLine(item, { unit: 'LF', qty: railLF, unitPrice: item.unitPrice || 75 }))
-          else missing.push('cable railing')
-          break
-        }
-        case 'eze_breeze_windows': {
-          const item = matched || byName('eze breeze window') || byName('eze breeze')
-          if (item) made.push(mkLine(item, { unit: 'EA', qty: totalWindows, unitPrice: PLAY_EZE_UNIT_RATE }))
-          else missing.push('Eze-Breeze windows')
-          break
-        }
-        case 'electrical_package': {
-          // Span rule wins: >20' → the larger package, else the standard one.
-          const cands = catalogRaw.filter(c => { const nm = c.name || ''; return /electric/i.test(nm) && !/compliance|heater|6\s*\/\s*12/i.test(nm) })
-          if (cands.length) {
-            const target = span > PLAY_ELEC_SPAN_FT ? 3810 : 2900
-            const pick = cands.reduce((b, c) => Math.abs((c.unitPrice || 0) - target) < Math.abs((b.unitPrice || 0) - target) ? c : b, cands[0])
-            made.push(mkLine(pick, { qty: 1 }))
-          } else if (matched) made.push(mkLine(matched, { qty: 1 }))
-          else missing.push('electrical package')
-          break
-        }
-        default: {
-          // Any other named item → the AI's matched catalog item, sized by its unit.
-          const item = matched || byName(it.text || '')
-          if (item) {
-            const u = (item.unit || 'EA').toUpperCase()
-            made.push(mkLine(item, { qty: u === 'SF' ? area : u === 'LF' ? railLF : 1 }))
-          } else missing.push(it.text || 'item')
-        }
-      }
-    }
-
-    // Rule: new porch build + Eze-Breeze → auto-add 6/12 electrical compliance.
-    // Outlets are code-spaced: ⌈perimeter ÷ 9′⌉ outlets, each at PLAY_OUTLET_RATE.
-    const hasEze = (plan.items || []).some(i => i.kind === 'eze_breeze_windows')
-    if (plan.newBuild && hasEze) {
-      const comp = catalogRaw.find(c => /compliance/i.test(c.name || '') || /6\s*\/\s*12/.test(c.name || ''))
-      if (comp && !made.some(l => l.catalogId === comp.id)) {
-        const outlets = Math.max(1, Math.ceil((2 * (W + D)) / PLAY_OUTLET_SPACING_FT))
-        made.push(mkLine(comp, { unit: 'EA', qty: outlets, unitPrice: PLAY_OUTLET_RATE }))
-      }
-    }
-
-    setLines(prev => [...made, ...prev])
-    return { count: made.length, missing }
-  }
-
+  // Quick Build: the AI fills the builder TOOLS; each opens pre-filled in turn
+  // for the rep to check and add (no loose catalog items).
   const runQuickBuild = async () => {
     if (!quickText.trim() || quickBusy) return
     setQuickBusy(true); setQuickErr(''); setQuickNote('')
     try {
-      const spec = await parseBuildSpec(quickText, { collections: collectionNames, catalog: catalogRaw.map(c => c.name) })
-      if (spec.mode === 'catalog') {
-        const { count, missing } = assembleFromCatalog(spec, quickText)
-        setQuickText('')
-        if (!count && !missing.length) setQuickErr('Nothing matched — try naming the items, e.g. "16x16 gable Eze-Breeze porch with LVP and cable rails".')
-        else setQuickNote(`Added ${count} item${count !== 1 ? 's' : ''} to the scope.${missing.length ? ` Couldn’t match: ${missing.join('; ')}.` : ''}`)
-      } else {
-        setAssemblyInitial(spec)
-        setEditingLineId(null)
-        setActiveAssembly(spec.tool === 'porch' ? 'porch' : 'deck')
-        setQuickText('')
+      const { tools, notCovered } = await parseBuildSpec(quickText)
+      const plan = tools.map(quickToolFor).filter(Boolean)
+      if (!plan.length) {
+        setQuickErr(notCovered.length ? `No builder tool covers: ${notCovered.join('; ')}.` : 'Nothing to build — name the work, e.g. “20 by 16 Trex Enhance deck with hybrid rail”.')
+        return
       }
+      setQuickText('')
+      if (notCovered.length) setQuickNote(`Not covered by a tool (add by hand): ${notCovered.join('; ')}.`)
+      const [first, ...rest] = plan
+      setQuickQueue(rest)
+      setQuickStep({ index: 1, total: plan.length, labels: plan.map(t => t.label), notCovered })
+      openTool(first)
     } catch (e) {
       setQuickErr(e.message || 'Could not read that.')
     } finally {
@@ -965,14 +816,14 @@ export default function BuildQuote() {
             <div className="flex items-center gap-2 mb-2">
               <Sparkles size={15} className="text-[var(--brand-600)]" />
               <p className="text-sm font-semibold text-gray-800">Quick Build</p>
-              <span className="text-xs text-gray-400">— say or type a job and the tool fills itself</span>
+              <span className="text-xs text-gray-400">— say or type the job; the deck, porch, sunroom, under-deck and hardscape tools fill themselves</span>
             </div>
             <div className="flex gap-2">
               <input
                 value={quickText}
                 onChange={e => { setQuickText(e.target.value); if (quickErr) setQuickErr('') }}
                 onKeyDown={e => { if (e.key === 'Enter') runQuickBuild() }}
-                placeholder='e.g. “16 by 16 TimberTech Prime Plus open deck with railing and stairs”'
+                placeholder='e.g. “20 by 16 Trex Enhance deck, 4 feet high, hybrid rail, plus a 14 by 12 brick paver patio”'
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] bg-white"
               />
               <button onClick={runQuickBuild} disabled={quickBusy || !quickText.trim()}
@@ -987,6 +838,16 @@ export default function BuildQuote() {
         )}
 
         {/* Inline formula-item builder (opened from the catalog) — sits in the scope area */}
+        {activeAssembly && quickStep && !editingLine && (
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-[var(--brand-50)] border border-[var(--brand-200)] rounded-lg text-sm text-gray-700">
+            <Sparkles size={13} className="shrink-0 text-[var(--brand-600)]" />
+            <span>Quick Build <strong>{quickStep.index} of {quickStep.total}</strong>: {quickStep.labels[quickStep.index - 1]}
+              {quickStep.index < quickStep.total && <span className="text-gray-500"> · next: {quickStep.labels[quickStep.index]}</span>}
+              <span className="text-gray-500"> — check it, then add it (Cancel skips to the next).</span>
+              {quickStep.notCovered?.length > 0 && <span className="block text-xs text-amber-700 mt-0.5">Not covered by a tool (add by hand): {quickStep.notCovered.join('; ')}</span>}</span>
+            <button type="button" onClick={stopQuickBuild} className="ml-auto text-xs font-semibold text-[var(--brand-700)] hover:underline">Stop Quick Build</button>
+          </div>
+        )}
         {activeAssembly && editingLine && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
             <Calculator size={13} className="shrink-0" />
@@ -994,35 +855,35 @@ export default function BuildQuote() {
           </div>
         )}
         {activeAssembly === 'deck' && (
-          <DeckPricingPanel key={editingLineId || 'new'}
+          <DeckPricingPanel key={editingLineId || `p${panelKey}`}
             initial={assemblyInitial} saved={editSaved}
             onClose={closeAssembly}
             onAdd={finishAssembly}
           />
         )}
         {activeAssembly === 'porchbuild' && (
-          <PorchBuildPanel key={editingLineId || 'new'}
+          <PorchBuildPanel key={editingLineId || `p${panelKey}`}
             initial={assemblyInitial?.porchBuild || null} saved={editSaved}
             onClose={closeAssembly}
             onAdd={finishAssembly}
           />
         )}
         {activeAssembly === 'underdeck' && (
-          <UnderDeckPanel key={editingLineId || 'new'}
+          <UnderDeckPanel key={editingLineId || `p${panelKey}`}
             initial={assemblyInitial?.underDeck || null} saved={editSaved}
             onClose={closeAssembly}
             onAdd={finishAssembly}
           />
         )}
         {activeAssembly === 'hardscape' && (
-          <HardscapePanel key={editingLineId || 'new'}
+          <HardscapePanel key={editingLineId || `p${panelKey}`}
             initial={assemblyInitial?.hardscape || null} saved={editSaved}
             onClose={closeAssembly}
             onAdd={finishAssembly}
           />
         )}
         {activeAssembly === 'porch' && (
-          <PorchAssemblyPanel key={editingLineId || 'new'}
+          <PorchAssemblyPanel key={editingLineId || `p${panelKey}`}
             initial={assemblyInitial} saved={editSaved}
             onClose={closeAssembly}
             onAdd={finishAssembly}
