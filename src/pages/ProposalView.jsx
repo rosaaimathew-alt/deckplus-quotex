@@ -461,7 +461,7 @@ export default function ProposalView() {
               </tr>
             </thead>
             <tbody>
-              {(showBreakdown || isAlaCarte) ? lines.map(line => (
+              {(showBreakdown || isAlaCarte) ? shownLines.map(line => (
                 <tr key={line.id} className={`border-b border-gray-200 `}>
                   <td className="py-2.5 px-1 text-black font-medium">{line.name || '—'}</td>
                   <td className="py-2.5 px-1 text-right font-semibold text-black">${fmt((Number(line.qty) || 0) * (Number(line.unitPrice) || 0))}</td>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark } from 'lucide-react'
+import { Search, Plus, Trash2, GripVertical, GitMerge, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark } from 'lucide-react'
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { parseBuildSpec } from '../buildParse'
 import PorchBuildPanel from '../components/PorchBuildPanel'
@@ -14,6 +14,17 @@ import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 
 const MARGIN_DEFAULT = 30
+
+// New ids for lines loaded into the builder, keeping "merged into" links pointing
+// at the right line.
+function freshIds(lines) {
+  const map = new Map(lines.map(l => [String(l.id), Date.now() + Math.random()]))
+  return lines.map(l => ({
+    ...l,
+    id: map.get(String(l.id)),
+    ...(l.mergeInto != null ? { mergeInto: map.get(String(l.mergeInto)) ?? null } : {}),
+  }))
+}
 
 // Decking layout for porch floors priced per LF of board — NO butt joints. The
 // picture frame absorbs width at the ends; once the remaining run is longer than
@@ -394,7 +405,7 @@ export default function BuildQuote() {
         setPhone(d.phone || '')
         setAddress(d.address || '')
         setExpiration(d.expiration || '')
-        setLines((d.lines || []).filter(l => !l.autoFee).map(l => ({ ...l, id: Date.now() + Math.random() })))
+        setLines(freshIds((d.lines || []).filter(l => !l.autoFee)))
         setFeeEdits(Object.fromEntries((d.lines || []).filter(l => l.autoFee).flatMap(l => l.feeParts
           ? l.feeParts.map(p => [p.key, p.unitPrice])
           : [[l.autoFee, l.unitPrice]])))
@@ -419,7 +430,7 @@ export default function BuildQuote() {
       setAddress(d.address || '')
       setExpiration(d.expiration || '')
       setMargin(d.margin ?? MARGIN_DEFAULT)
-      setLines((d.lines || []).filter(l => !l.autoFee).map(l => ({ ...l, id: Date.now() + Math.random() })))
+      setLines(freshIds((d.lines || []).filter(l => !l.autoFee)))
       setFeeDismissed(d.feeDismissed || [])
       setFeeEdits(d.feeEdits || {})
       setFeeOverrides(d.feeOverrides || {})
@@ -520,7 +531,10 @@ export default function BuildQuote() {
     ))
   }
 
-  const removeLine = (id) => setLines(prev => prev.filter(l => l.id !== id))
+  // Removing a line un-merges anything that was merged into it.
+  const removeLine = (id) => setLines(prev => prev.filter(l => l.id !== id).map(l => l.mergeInto === id ? { ...l, mergeInto: null } : l))
+  const setMerge = (id, into) => setLines(prev => prev.map(l => l.id === id ? { ...l, mergeInto: into ?? null } : l))
+  const [mergePickFor, setMergePickFor] = useState(null)   // line id whose "Merge into" picker is open
 
   const [activeAssembly, setActiveAssembly] = useState(null)
   const [assemblyInitial, setAssemblyInitial] = useState(null)
@@ -713,18 +727,36 @@ export default function BuildQuote() {
     category: 'General',
   }, ...prev])
 
-  const moveUp = (idx) => {
-    if (idx === 0) return
-    const next = [...lines]; [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]; setLines(next)
+  // Drag to reorder: grab a line's handle and drop it anywhere in the list.
+  // Pointer events, so it works the same with a mouse and on a touch screen.
+  const [drag, setDrag] = useState(null)   // { from, over } while dragging
+  const moveLine = (from, to) => {
+    if (from === to || from < 0 || to < 0) return
+    setLines(prev => { const next = [...prev]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next })
   }
-  const moveDown = (idx) => {
-    if (idx === lines.length - 1) return
-    const next = [...lines]; [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]; setLines(next)
+  const dragStart = (e, idx) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    setDrag({ from: idx, over: idx })
+  }
+  const dragMove = (e) => {
+    if (!drag) return
+    const row = document.elementFromPoint(e.clientX, e.clientY)?.closest('tr[data-line-idx]')
+    if (row) { const over = Number(row.dataset.lineIdx); if (over !== drag.over) setDrag(d => d && { ...d, over }) }
+  }
+  const dragEnd = () => { if (drag) moveLine(drag.from, drag.over); setDrag(null) }
+  // Keyboard: arrow keys on a focused handle move the line one step.
+  const dragKey = (e, idx) => {
+    if (e.key === 'ArrowUp' && idx > 0) { e.preventDefault(); moveLine(idx, idx - 1) }
+    if (e.key === 'ArrowDown' && idx < lines.length - 1) { e.preventDefault(); moveLine(idx, idx + 1) }
   }
 
   const subtotal = allLines.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   // Hiding lines from the customer only applies to lump-sum proposals.
   const summed = !showBreakdown && !isAlaCarte
+  // The line a line is merged into (if it still exists).
+  const mergedTarget = (line) => line.mergeInto != null ? lines.find(l => l.id === line.mergeInto) || null : null
+  const mergedInto = (line) => lines.filter(l => l.mergeInto === line.id)
   const cost = showMargin ? subtotal / (1 + margin / 100) : null
 
   const sameClient = (a, b) => String(a || '').toLowerCase().replace(/[^a-z0-9]/g, '') === String(b || '').toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -1014,12 +1046,15 @@ export default function BuildQuote() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {lines.map((line, idx) => (
-                  <tr key={line.id} className={`hover:bg-gray-50 align-top ${summed && line.hidden ? 'bg-gray-50 opacity-60' : ''}`}>
-                    <td className="px-4 pt-3">
-                      <div className="flex flex-col gap-0.5">
-                        <button onClick={() => moveUp(idx)} disabled={idx === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-20"><ChevronUp size={12} /></button>
-                        <button onClick={() => moveDown(idx)} disabled={idx === lines.length - 1} className="text-gray-300 hover:text-gray-500 disabled:opacity-20"><ChevronDown size={12} /></button>
-                      </div>
+                  <tr key={line.id} data-line-idx={idx}
+                    className={`hover:bg-gray-50 align-top ${(summed && line.hidden) || mergedTarget(line) ? 'bg-gray-50 opacity-60' : ''} ${drag?.from === idx ? 'opacity-40' : ''} ${drag && drag.over === idx && drag.from !== idx ? (drag.over < drag.from ? 'shadow-[inset_0_3px_0_var(--brand-500)]' : 'shadow-[inset_0_-3px_0_var(--brand-500)]') : ''}`}>
+                    <td className="px-2 pt-3">
+                      <button type="button" title="Drag to reorder" aria-label={`Move ${line.name || 'line'} (drag, or use the arrow keys)`}
+                        onPointerDown={e => dragStart(e, idx)} onPointerMove={dragMove} onPointerUp={dragEnd} onPointerCancel={() => setDrag(null)}
+                        onKeyDown={e => dragKey(e, idx)}
+                        className={`p-1 rounded text-gray-300 hover:text-gray-600 hover:bg-gray-100 touch-none select-none ${drag?.from === idx ? 'cursor-grabbing' : 'cursor-grab'}`}>
+                        <GripVertical size={15} />
+                      </button>
                     </td>
                     <td className="px-4 py-2">
                       <input
@@ -1028,7 +1063,25 @@ export default function BuildQuote() {
                         onChange={e => updateLine(line.id, 'name', e.target.value)}
                         placeholder="Item name"
                       />
-                      {summed && line.hidden && <p className="px-1 text-[11px] font-semibold text-gray-500 flex items-center gap-1"><EyeOff size={11} /> Hidden from the customer — still counted in the total</p>}
+                      {summed && line.hidden && !mergedTarget(line) && <p className="px-1 text-[11px] font-semibold text-gray-500 flex items-center gap-1"><EyeOff size={11} /> Hidden from the customer — still counted in the total</p>}
+                      {mergedTarget(line) && (
+                        <p className="px-1 text-[11px] font-semibold text-gray-600 flex items-center gap-1 flex-wrap">
+                          <GitMerge size={11} /> Merged into “{mergedTarget(line).name || 'untitled line'}” — the customer sees it inside that line’s price
+                          <button type="button" onClick={() => setMerge(line.id, null)} className="ml-1 text-[var(--brand-700)] hover:underline font-semibold">Un-merge</button>
+                        </p>
+                      )}
+                      {mergePickFor === line.id && !mergedTarget(line) && (
+                        <div className="mt-1 flex items-center gap-2 px-1">
+                          <span className="text-[11px] text-gray-500">Merge into</span>
+                          <select autoFocus aria-label={`Merge ${line.name || 'line'} into`} defaultValue=""
+                            onChange={e => { if (e.target.value) { setMerge(line.id, lines.find(l => String(l.id) === e.target.value)?.id); setMergePickFor(null) } }}
+                            className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white max-w-[260px]">
+                            <option value="">Choose a line…</option>
+                            {lines.filter(l => l.id !== line.id && l.mergeInto == null).map(l => <option key={l.id} value={String(l.id)}>{l.name || 'Untitled line'}</option>)}
+                          </select>
+                          <button type="button" onClick={() => setMergePickFor(null)} className="text-[11px] text-gray-400 hover:text-gray-600">Cancel</button>
+                        </div>
+                      )}
                       <textarea
                         rows={Math.min(8, Math.max(2, (line.description || '').split('\n').length))}
                         className="w-full border border-transparent rounded px-1 py-0.5 hover:border-gray-200 focus:border-blue-300 focus:outline-none text-xs text-gray-400 italic mt-0.5 resize-y"
@@ -1059,6 +1112,11 @@ export default function BuildQuote() {
                     </td>
                     <td className="px-4 pt-3 text-right font-medium text-gray-800 whitespace-nowrap">
                       ${(line.qty * line.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {mergedInto(line).length > 0 && (
+                        <p className="text-[11px] font-normal text-gray-500" title="What the customer sees for this line">
+                          Customer sees ${(line.qty * line.unitPrice + mergedInto(line).reduce((a, l) => a + l.qty * l.unitPrice, 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      )}
                     </td>
                     <td className="px-2 pt-2.5">
                       <div className="flex flex-col gap-1">
@@ -1084,7 +1142,14 @@ export default function BuildQuote() {
                         {savedToLog.has(line.id) && (
                           <span className="p-1 text-green-500"><Check size={13} /></span>
                         )}
-                        {summed && (
+                        {lines.length > 1 && !mergedTarget(line) && !lines.some(l => l.mergeInto === line.id) && (
+                          <button title="Merge into another line (the customer sees one line, one price)" aria-label={`Merge ${line.name || 'line'} into another line`}
+                            onClick={() => setMergePickFor(cur => cur === line.id ? null : line.id)}
+                            className={`p-1 rounded hover:bg-gray-100 ${mergePickFor === line.id ? 'text-gray-700' : 'text-gray-300 hover:text-gray-600'}`}>
+                            <GitMerge size={13} />
+                          </button>
+                        )}
+                        {summed && !mergedTarget(line) && (
                           <button title={line.hidden ? 'Show on the proposal' : 'Hide from the customer (still in the total)'}
                             aria-label={`${line.hidden ? 'Show' : 'Hide'} ${line.name || 'line'} on the proposal`}
                             onClick={() => setLines(prev => prev.map(l => l.id === line.id ? { ...l, hidden: !l.hidden } : l))}

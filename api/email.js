@@ -44,9 +44,18 @@ function buildProposalHtml({ client, email, address, expiration, lines, companyN
     ? new Date(expiration + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : null
   const subtotal = (lines || []).reduce((s, l) => s + (l.qty || 1) * (l.unitPrice || 0), 0)
-  // Lump sum: hidden lines are left out and no line shows its own price.
+  // Lines merged into another are folded into it; on a lump sum, hidden lines
+  // are left out and no line shows its own price. (Same rule as
+  // src/lib/hiddenLines.js.)
   const summed = showBreakdown === false && !isAlaCarte
-  const shown  = summed ? (lines || []).filter(l => !l?.hidden) : (lines || [])
+  const all    = (lines || []).filter(Boolean)
+  const byId   = new Map(all.map(l => [String(l.id), l]))
+  const rootOf = (l) => { let cur = l; const seen = new Set(); while (cur?.mergeInto != null && byId.has(String(cur.mergeInto)) && !seen.has(String(cur.id))) { seen.add(String(cur.id)); cur = byId.get(String(cur.mergeInto)) } return cur }
+  const amt    = (l) => (l.qty || 1) * (l.unitPrice || 0)
+  const extra  = new Map()
+  for (const l of all) { const r = rootOf(l); if (r !== l) extra.set(String(r.id), (extra.get(String(r.id)) || 0) + amt(l)) }
+  const folded = all.filter(l => rootOf(l) === l).map(l => extra.has(String(l.id)) ? { ...l, qty: 1, unitPrice: amt(l) + extra.get(String(l.id)) } : l)
+  const shown  = summed ? folded.filter(l => !l.hidden) : folded
   const company  = esc(companyName || COMPANY)
   const sender   = esc(fromName) || company
   const lineRows = shown.map((l, i) => `

@@ -6,6 +6,7 @@ import { DEMO } from '../demo'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import { PACKET_FORMS } from '../contract/deckPlusAgreement'
 import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, STATES, COUNTIES } from '../contract/contractFields'
+import { mergeLines } from '../lib/hiddenLines'
 
 // ── Contract page ────────────────────────────────────────────────────────────
 // Builds the Deck Plus contract packet for a Won proposal. The packet's wording
@@ -236,7 +237,10 @@ export default function ContractView() {
   useEffect(() => {
     const raw = sessionStorage.getItem('contract')
     if (!raw) return
-    const d = JSON.parse(raw)
+    const parsed = JSON.parse(raw)
+    // Items merged into another line are folded into it here too, so the
+    // contract never lists them on their own (hidden lines stay listed).
+    const d = { ...parsed, lines: mergeLines(parsed.lines || []) }
     setData(d)
     const proposal = proposals.find(p => p.id === d.proposalId)
     const draft    = proposal?.contractDraft
