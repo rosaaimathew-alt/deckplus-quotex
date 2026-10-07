@@ -63,8 +63,8 @@ export const PORCH_BUILD_DEFAULTS = {
   door_savannah:      R('Larsen Savannah door',                             'EA', 650,  'enclosure', { door: true }),
   door_savannah_pet:  R('Larsen Savannah Pet door',                         'EA', 815,  'enclosure', { door: true }),
   glass_gable_end:    R('Glass in gable end (gable roofs only)',            'EA', 975,  'enclosure'),
-  // Sunroom — window price is set by the office in Formulas (no default)
-  sun_window:         R('Outside Brand Standard window (36″×60″)',          'EA', 0,    'enclosure'),
+  // Sunroom
+  sun_window:         R('Outside Brand Standard window (36″×60″)',          'EA', 950,  'enclosure'),
   sun_wall:           R('Sunroom walls — Hardie / ply-beaded (non-glass area)', 'SF', 29, 'enclosure'),
   sun_insulation:     R('Sunroom insulation',                               'LS', 800,  'enclosure'),
 

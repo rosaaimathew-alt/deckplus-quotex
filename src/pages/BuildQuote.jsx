@@ -361,7 +361,7 @@ export default function BuildQuote() {
   const [showMargin, setShowMargin] = useState(false)
 
   const [isAlaCarte, setIsAlaCarte] = useState(false)
-  const [showBreakdown, setShowBreakdown] = useState(true)
+  const [showBreakdown, setShowBreakdown] = useState(false)   // new quotes start as Lump Sum (one summed total)
   const [projectTypes, setProjectTypes] = useState([])
   const [projectSummary, setProjectSummary] = useState('')
   // Permit & jurisdiction fees are worked out from the address (src/lib/permitFees.js).
@@ -435,7 +435,7 @@ export default function BuildQuote() {
       setFeeEdits(d.feeEdits || {})
       setFeeOverrides(d.feeOverrides || {})
       setIsAlaCarte(d.isAlaCarte || false)
-      setShowBreakdown(d.showBreakdown ?? true)
+      setShowBreakdown(d.showBreakdown ?? false)
       setProjectTypes(d.projectTypes || [])
       setProjectSummary(d.projectSummary || '')
       setRevisingParentId(d.revisingParentId || null)
@@ -450,7 +450,7 @@ export default function BuildQuote() {
   const startFresh = () => {
     localStorage.removeItem(DRAFT_KEY)
     setClient(''); setEmail(''); setPhone(''); setAddress(''); setExpiration('')
-    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(true)
+    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false)
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
     setDraftProposalId(null); setDraftClient(''); setRevisingClient(''); setRestoredFrom(null)
     setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({})
