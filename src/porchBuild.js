@@ -69,11 +69,11 @@ export const PORCH_BUILD_DEFAULTS = {
   sun_insulation:     R('Sunroom insulation',                               'LS', 800,  'enclosure'),
   // Sunroom doors (sunrooms use these instead of the Larsen storm doors). The
   // width is the wall opening the door takes in the window layout.
-  sun_door_fullview36: R('36″ Fullview glass door',  'EA', 0, 'enclosure', { sunDoor: true, widthIn: 36 }),
-  sun_door_slider5:    R('5′ sliding glass door',    'EA', 0, 'enclosure', { sunDoor: true, widthIn: 60 }),
-  sun_door_slider6:    R('6′ sliding glass door',    'EA', 0, 'enclosure', { sunDoor: true, widthIn: 72 }),
-  sun_door_french5:    R('5′ French door',           'EA', 0, 'enclosure', { sunDoor: true, widthIn: 60 }),
-  sun_door_french6:    R('6′ French door',           'EA', 0, 'enclosure', { sunDoor: true, widthIn: 72 }),
+  sun_door_fullview36: R('36″ Fullview glass door',  'EA', 1500, 'enclosure', { sunDoor: true, widthIn: 36 }),
+  sun_door_slider5:    R('5′ sliding glass door',    'EA', 4500, 'enclosure', { sunDoor: true, widthIn: 60 }),
+  sun_door_slider6:    R('6′ sliding glass door',    'EA', 5000, 'enclosure', { sunDoor: true, widthIn: 72 }),
+  sun_door_french5:    R('5′ French door',           'EA', 5000, 'enclosure', { sunDoor: true, widthIn: 60 }),
+  sun_door_french6:    R('6′ French door',           'EA', 6000, 'enclosure', { sunDoor: true, widthIn: 72 }),
 
   // Roof & ceiling options
   roof_membrane:      R('Roof membrane / flat roof',                        'SF', 10.5, 'roofceiling', { option: true }),
