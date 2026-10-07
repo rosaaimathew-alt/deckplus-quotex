@@ -201,9 +201,15 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
                     {['Front + 2 sides', 'All 4 walls', 'Front only'].map(o => <option key={o}>{o}</option>)}
                   </select>
                 </Field>
-                <div className="text-xs text-gray-600 self-end pb-1.5">
-                  {result.layout && <><span className="font-semibold text-gray-800">{result.layout.windows}</span> windows · <span className="font-semibold text-gray-800">{result.layout.wallSF}</span> SF of wall</>}
-                </div>
+                <Field label="Doors go on">
+                  <select aria-label="Sunroom door wall" className={selCls} value={inp.doorWall || 'side'} onChange={e => set({ doorWall: e.target.value })}>
+                    <option value="side">Side walls, by the house</option>
+                    <option value="front">Front wall</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="text-xs text-gray-600">
+                {result.layout && <><span className="font-semibold text-gray-800">{result.layout.windows}</span> windows · <span className="font-semibold text-gray-800">{result.layout.wallSF}</span> SF of wall</>}
               </div>
               {result.layout?.walls && (
                 <p className="text-xs text-gray-500">
@@ -211,7 +217,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
                   {' '}— Outside Brand Standard 36″×60″, 8.5″ apart, starting 2′ from the outside corners (wind code); no buffer at the house.
                 </p>
               )}
-              {result.layout?.doorsNotPlaced > 0 && <p className="text-xs text-amber-700">The front wall has no room for {result.layout.doorsNotPlaced} of the doors.</p>}
+              {result.layout?.doorsNotPlaced > 0 && <p className="text-xs text-amber-700">No wall has room for {result.layout.doorsNotPlaced} of the doors.</p>}
               {sunUnpriced.length > 0 && (
                 <p className="text-xs font-semibold text-red-600">Set a price for {sunUnpriced.join(', ')} in Catalog → Formulas → Porch Builder before quoting this sunroom.</p>
               )}
