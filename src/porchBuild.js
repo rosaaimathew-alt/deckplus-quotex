@@ -66,6 +66,7 @@ export const PORCH_BUILD_DEFAULTS = {
   // Sunroom — window price is set by the office in Formulas (no default)
   sun_window:         R('Outside Brand Standard window (36″×60″)',          'EA', 0,    'enclosure'),
   sun_wall:           R('Sunroom walls — Hardie / ply-beaded (non-glass area)', 'SF', 29, 'enclosure'),
+  sun_insulation:     R('Sunroom insulation',                               'LS', 800,  'enclosure'),
 
   // Roof & ceiling options
   roof_membrane:      R('Roof membrane / flat roof',                        'SF', 10.5, 'roofceiling', { option: true }),
@@ -393,6 +394,7 @@ export function computePorchBuild(input, ratesIn) {
     layout = sunroomLayout(W, D, { doors: doorQty, sides: inp.sides, wallHeightIn: inp.wallHeightIn })
     add('sun_window', layout.windows, layout.walls.map(w => `${w.name.toLowerCase()} ${w.windows}`).join(' · '))
     add('sun_wall', layout.wallSF, `${n(inp.wallHeightIn)}″ walls, less glass and doors`)
+    add('sun_insulation', 1)
   }
   if (inp.type !== 'open') for (const [k, q] of Object.entries(inp.doors || {})) if (rates[k]?.door) add(k, n(q))
   if (roof === 'gable' && n(inp.glassEnds) > 0) add('glass_gable_end', n(inp.glassEnds))
@@ -515,6 +517,7 @@ export function porchLineScope(l, inp, result, catalog) {
     if (cnt > 1) t = t.replace('on one approximately 4’x4’ landing', `on ${countWords(cnt)} approximately 4’x4’ landings`)
     return t
   }
+  if (l.key === 'sun_insulation') return 'Insulate the sunroom.'
   if (l.key === 'sun_window') {
     return `Install ${countWords(l.qty)} Outside Brand Standard windows (36”x60”). Windows start 2’ in from the outside corners (solid wall per wind code).`
   }
