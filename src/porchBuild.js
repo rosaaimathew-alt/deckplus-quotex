@@ -63,6 +63,9 @@ export const PORCH_BUILD_DEFAULTS = {
   door_savannah:      R('Larsen Savannah door',                             'EA', 650,  'enclosure', { door: true }),
   door_savannah_pet:  R('Larsen Savannah Pet door',                         'EA', 815,  'enclosure', { door: true }),
   glass_gable_end:    R('Glass in gable end (gable roofs only)',            'EA', 975,  'enclosure'),
+  // Sunroom — window price is set by the office in Formulas (no default)
+  sun_window:         R('Outside Brand Standard window (36″×60″)',          'EA', 0,    'enclosure'),
+  sun_wall:           R('Sunroom walls — Hardie / ply-beaded (non-glass area)', 'SF', 29, 'enclosure'),
 
   // Roof & ceiling options
   roof_membrane:      R('Roof membrane / flat roof',                        'SF', 10.5, 'roofceiling', { option: true }),
@@ -208,12 +211,17 @@ export const PORCH_BUILD_SCOPE_DEFAULTS = {
     '• 4’x8’ Ply beaded sheets wood ceiling, 1”x4” trim.',
     'Install shingles, soffit, gutters and downspouts matching as close as possible existing.',
   ].join('\n'),
+  sunroom: [
+    '• 4’x8’ Ply beaded sheets wood ceiling, 1”x4” trim.',
+    'Install shingles, soffit, gutters and downspouts matching as close as possible existing.',
+  ].join('\n'),
 }
 
 export const PORCH_TYPES = [
   { key: 'open',      label: 'Open porch',       category: 'Open Porches' },
   { key: 'screen',    label: 'ScreenEze porch',  category: 'Screen Porches' },
   { key: 'ezebreeze', label: 'Eze-Breeze porch', category: 'Eze-Breeze Porches' },
+  { key: 'sunroom',   label: 'Sunroom',          category: 'Sunrooms' },
 ]
 export const PORCH_TIES   = [
   { key: 'wall', label: 'Wall tie' },
@@ -260,6 +268,44 @@ export function porchLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides' } =
   const rawColumns   = layout.reduce((s, w) => s + w.columns, 0)
   const sharedCorners = sides === 'All 4 walls' ? 4 : Math.max(0, wallSet.length - 1)
   return { totalWindows, totalColumns: Math.max(0, rawColumns - sharedCorners), walls: layout }
+}
+
+// ── Sunroom layout ───────────────────────────────────────────────────────────
+// Outside Brand Standard windows, 36″ wide × 60″ tall, 8.5″ of wall between
+// windows. Wind/hurricane code: the 2′ of wall next to every OUTSIDE corner is
+// solid (siding outside) — so the front wall starts its windows 2′ in from both
+// front corners, and each side wall 2′ in from its front corner. The house end
+// of a side wall needs no buffer. Doors take a 36″ opening on the front wall.
+export const SUN_WINDOW_W  = 36
+export const SUN_WINDOW_H  = 60
+export const SUN_GAP       = 8.5
+export const SUN_CORNER_IN = 24
+export const SUN_DOOR_H    = 80
+
+export function sunroomLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides', wallHeightIn = 96 } = {}) {
+  const C = SUN_CORNER_IN
+  // [name, length ft, corner buffers in inches]
+  const walls = sides === 'All 4 walls'
+    ? [['Front', Wft, 2 * C], ['Left side', Dft, 2 * C], ['Right side', Dft, 2 * C], ['Back', Wft, 2 * C]]
+    : sides === 'Front only'
+      ? [['Front', Wft, 2 * C]]
+      : [['Front', Wft, 2 * C], ['Left side', Dft, C], ['Right side', Dft, C]]
+  const H = Math.max(0, Number(wallHeightIn) || 0)
+  let doorsLeft = Math.max(0, Number(doors) || 0)
+  const out = walls.map(([name, ft, buffer], i) => {
+    const usable = Math.max(0, (Number(ft) || 0) * 12 - buffer)
+    const openings = usable >= SUN_WINDOW_W ? Math.floor((usable + SUN_GAP) / (SUN_WINDOW_W + SUN_GAP)) : 0
+    const d = i === 0 ? Math.min(doorsLeft, openings) : 0
+    if (i === 0) doorsLeft -= d
+    return { name, lengthFt: Number(ft) || 0, usableIn: usable, windows: openings - d, doors: d }
+  })
+  const windows = out.reduce((a, w) => a + w.windows, 0)
+  const doorsPlaced = out.reduce((a, w) => a + w.doors, 0)
+  const grossSF = out.reduce((a, w) => a + w.lengthFt * 12 * H, 0) / 144
+  const glassSF = windows * SUN_WINDOW_W * SUN_WINDOW_H / 144
+  const doorSF  = doorsPlaced * SUN_WINDOW_W * Math.min(SUN_DOOR_H, H) / 144
+  const wallSF  = Math.max(0, Math.round(grossSF - glassSF - doorSF))
+  return { walls: out, windows, doors: doorsPlaced, doorsNotPlaced: doorsLeft, wallSF, totalWindows: windows }
 }
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
@@ -311,7 +357,8 @@ export function computePorchBuild(input, ratesIn) {
   // Freestanding forces a gable roof (confirmed rule).
   const tie  = inp.tie
   const roof = tie === 'free' ? 'gable' : inp.roof
-  const typeForBase = inp.type === 'ezebreeze' ? 'open' : inp.type
+  // Eze-Breeze porches and sunrooms price their structure on the open-porch rows
+  const typeForBase = inp.type === 'ezebreeze' || inp.type === 'sunroom' ? 'open' : inp.type
   const tieForBase  = tie === 'free' ? 'wall' : tie
   add(`base_${typeForBase}_${tieForBase}_${inp.floor}`, area)
 
@@ -341,6 +388,11 @@ export function computePorchBuild(input, ratesIn) {
     add('lam_column_pkg', 1)
     add('eze_window', layout.totalWindows)
     if (n(inp.wallHeightIn) > PORCH_WINDOW_MAX_H) add('eze_transom', layout.totalWindows)
+  }
+  if (inp.type === 'sunroom') {
+    layout = sunroomLayout(W, D, { doors: doorQty, sides: inp.sides, wallHeightIn: inp.wallHeightIn })
+    add('sun_window', layout.windows, layout.walls.map(w => `${w.name.toLowerCase()} ${w.windows}`).join(' · '))
+    add('sun_wall', layout.wallSF, `${n(inp.wallHeightIn)}″ walls, less glass and doors`)
   }
   if (inp.type !== 'open') for (const [k, q] of Object.entries(inp.doors || {})) if (rates[k]?.door) add(k, n(q))
   if (roof === 'gable' && n(inp.glassEnds) > 0) add('glass_gable_end', n(inp.glassEnds))
@@ -415,7 +467,7 @@ export const PORCH_CATALOG_NAMES = {
   hot_tub_reinforce: 'Reinforce deck for hot tub/porch', bracing_letter: 'Engineered metal bracing LETTER', seed_straw: 'Seed and straw',
   lam_column_pkg: '6x6 lam column package', eze_window: 'EzeBreeze', eze_transom: 'Transom',
   door_tradewinds: 'Larsen Tradewinds Door', door_savannah: 'Larsen Savannah Door', door_savannah_pet: 'Larsen Savannah Pet Door',
-  glass_gable_end: 'Glass in openings',
+  glass_gable_end: 'Glass in openings', sun_wall: 'Knee wall Hardie/PlyBeaded SF',
   metal_roof: 'Metal roof', tg_ceiling: 'T&G Ceiling 1x6', flat_ceiling: 'Flat Ceiling', gable_trim: 'Sunrise gable', skylight: "Skylight 4'x2'",
   shiplap_wood: 'Shiplap Wood 1x6" wall SF', knee_wall: 'Knee wall Hardie/PlyBeaded SF', tv_wall: "TV Wall Shiplap/Siding/Paint 5'x9'",
   paint_porch_patio: 'Paint/Stain PORCH on PATIO', paint_porch_composite: 'Paint/Stain PORCH on TREX DECK', paint_porch_deck: 'Paint/Stain PORCH on PT DECK',
@@ -463,6 +515,9 @@ export function porchLineScope(l, inp, result, catalog) {
     if (cnt > 1) t = t.replace('on one approximately 4’x4’ landing', `on ${countWords(cnt)} approximately 4’x4’ landings`)
     return t
   }
+  if (l.key === 'sun_window') {
+    return `Install ${countWords(l.qty)} Outside Brand Standard windows (36”x60”). Windows start 2’ in from the outside corners (solid wall per wind code).`
+  }
   const area = ['SF'].includes(l.unit) ? l.qty : result.area
   return scopeFor(catalog, name, { size: [n(inp.width), n(inp.depth)], count: l.qty, sqft: area, lf: l.unit === 'LF' ? l.qty : null }, fallback)
 }
@@ -476,7 +531,13 @@ export function buildPorchScope(input, result, templates, catalog = []) {
   const tpl = String((templates || {})[inp.type] ?? PORCH_BUILD_SCOPE_DEFAULTS[inp.type] ?? '').split('\n').map(s => s.trim()).filter(Boolean)
   const base = result.lines.find(l => l.key.startsWith('base_'))
   let structure = ''
-  if (inp.type === 'ezebreeze') {
+  if (inp.type === 'sunroom') {
+    structure = (inp.floor === 'deck'
+      ? [`Build a pressure treated wood deck platform approximately ${W}’x${D}’ to receive ${/^[AEIOU]/i.test(roofWord) ? 'an' : 'a'} ${roofWord} sunroom.`,
+         '• Fiberglass charcoal screen below decking boards inside porch area.',
+         `Construct an approximately ${W}’x${D}’ ${roofWord} sunroom.`]
+      : [`Construct an approximately ${W}’x${D}’ ${roofWord} sunroom on existing patio.`]).join('\n')
+  } else if (inp.type === 'ezebreeze') {
     structure = (inp.floor === 'deck'
       ? [`Build a pressure treated wood deck platform approximately ${W}’x${D}’ to receive ${/^[AEIOU]/i.test(roofWord) ? 'an' : 'a'} ${roofWord} 3-season porch.`,
          '• Fiberglass charcoal screen below decking boards inside porch area.',

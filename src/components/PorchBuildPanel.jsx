@@ -186,6 +186,33 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
               </div>
             </div>
           )}
+          {inp.type === 'sunroom' && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Field label="Wall height (in)">
+                  <input type="number" min="60" aria-label="Sunroom wall height (in)" className={inputCls} value={inp.wallHeightIn} onChange={e => set({ wallHeightIn: e.target.value })} />
+                </Field>
+                <Field label="Enclosed walls">
+                  <select aria-label="Sunroom enclosed walls" className={selCls} value={inp.sides} onChange={e => set({ sides: e.target.value })}>
+                    {['Front + 2 sides', 'All 4 walls', 'Front only'].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <div className="text-xs text-gray-600 self-end pb-1.5">
+                  {result.layout && <><span className="font-semibold text-gray-800">{result.layout.windows}</span> windows · <span className="font-semibold text-gray-800">{result.layout.wallSF}</span> SF of wall</>}
+                </div>
+              </div>
+              {result.layout?.walls && (
+                <p className="text-xs text-gray-500">
+                  {result.layout.walls.map(w => `${w.name}: ${w.windows} window${w.windows === 1 ? '' : 's'}${w.doors ? ` + ${w.doors} door${w.doors > 1 ? 's' : ''}` : ''}`).join(' · ')}
+                  {' '}— Outside Brand Standard 36″×60″, 8.5″ apart, starting 2′ from the outside corners (wind code); no buffer at the house.
+                </p>
+              )}
+              {result.layout?.doorsNotPlaced > 0 && <p className="text-xs text-amber-700">The front wall has no room for {result.layout.doorsNotPlaced} of the doors.</p>}
+              {!(Number(rates.sun_window?.rate) > 0) && (
+                <p className="text-xs font-semibold text-red-600">Set the Outside Brand Standard window price in Catalog → Formulas → Porch Builder before quoting a sunroom.</p>
+              )}
+            </div>
+          )}
           <div>
             <p className="text-xs text-gray-500 mb-1.5">Doors (count per model)</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -359,7 +386,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           {marginPct != null && <> · Margin <span className="font-semibold text-gray-800">{marginPct.toFixed(0)}%</span></>}
         </div>
         <div className="ml-auto flex gap-2">
-          <button onClick={add} disabled={result.total <= 0}
+          <button onClick={add} disabled={result.total <= 0 || (inp.type === 'sunroom' && !(Number(rates.sun_window?.rate) > 0))}
             className="flex items-center gap-2 px-5 py-2.5 bg-[var(--brand-600)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
             <Plus size={15} /> Add porch to quote — {money(total)}
           </button>
