@@ -178,7 +178,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
               </Field>
               <Field label="Enclosed walls">
                 <select className={selCls} value={inp.sides} onChange={e => set({ sides: e.target.value })}>
-                  {['Front + 2 sides', 'All 4 walls', 'Front only'].map(o => <option key={o}>{o}</option>)}
+                  {['Front + 2 sides', 'Front + 1 side', 'All 4 walls', 'Front only'].map(o => <option key={o}>{o}</option>)}
                 </select>
               </Field>
               <div className="text-xs text-gray-600 self-end pb-1.5">
@@ -198,7 +198,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
                 </Field>
                 <Field label="Enclosed walls">
                   <select aria-label="Sunroom enclosed walls" className={selCls} value={inp.sides} onChange={e => set({ sides: e.target.value })}>
-                    {['Front + 2 sides', 'All 4 walls', 'Front only'].map(o => <option key={o}>{o}</option>)}
+                    {['Front + 2 sides', 'Front + 1 side', 'All 4 walls', 'Front only'].map(o => <option key={o}>{o}</option>)}
                   </select>
                 </Field>
                 <Field label="Doors go on">

@@ -56,6 +56,14 @@ function anchorOf(clause) {
   return null
 }
 
+// Which walls get windows: "front and one side" / "2 walls" / "L shaped" → front + 1 side
+function wallsOf(t) {
+  if (/all 4 (walls|sides)/.test(t)) return 'All 4 walls'
+  if (/front only|just the front|only the front/.test(t)) return 'Front only'
+  if (/front (and|\+|&) (1|one) side|(1|one) side and (the )?front|\b2 walls\b|l[ -]?shaped|corner of the house|in the corner/.test(t)) return 'Front + 1 side'
+  return undefined
+}
+
 // ── Per-tool readers ─────────────────────────────────────────────────────────
 function readDeck(t) {
   const out = { tool: 'deck' }
@@ -140,8 +148,7 @@ function readPorch(t) {
   const wallIn = t.match(new RegExp(`${NUM}\\s*in\\w*\\s*(?:tall\\s*)?walls?`)) || t.match(new RegExp(`walls?\\s*(?:are\\s*)?${NUM}\\s*in`))
   const wallFt = t.match(new RegExp(`${NUM}\\s*(?:ft|feet|foot)\\s*(?:tall\\s*)?walls?`)) || t.match(new RegExp(`walls?\\s*(?:are\\s*)?${NUM}\\s*(?:ft|feet|foot)`))
   if (wallIn) out.wallHeightIn = num(wallIn[1]); else if (wallFt) out.wallHeightIn = Math.round(num(wallFt[1]) * 12)
-  if (has(t, /all (4|four) (walls|sides)/)) out.sides = 'All 4 walls'
-  else if (has(t, /front only/)) out.sides = 'Front only'
+  out.sides = wallsOf(t)
 
   const doors = {}
   if (out.type === 'sunroom') {
@@ -188,6 +195,7 @@ function readConversion(t) {
   const wallFt = t.match(new RegExp(`${NUM}\\s*(?:ft|feet|foot)\\s*(?:tall\\s*)?walls?`))
   if (wallIn) out.wallHeight = num(wallIn[1]); else if (wallFt) out.wallHeight = Math.round(num(wallFt[1]) * 12)
   const doors = t.match(/(\d+)\s+doors?/); if (doors) out.doors = Number(doors[1]); else if (has(t, /\bno doors?\b/)) out.doors = 0
+  out.sides = wallsOf(t)
   return out
 }
 

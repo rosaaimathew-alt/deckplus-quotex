@@ -65,7 +65,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
   const [wallH, setWallH] = useState(saved?.wallH ?? initial?.wallHeight ?? 96)   // in — wall height
   const [doors, setDoors] = useState(saved?.doors ?? initial?.doors ?? 1)    // 36" exit doors (on the front wall)
   const [jic, setJic] = useState(saved?.jic ?? JIC_DEFAULT)
-  const [sides, setSides] = useState(saved?.sides ?? 'Front + 2 sides')
+  const [sides, setSides] = useState(saved?.sides ?? initial?.sides ?? 'Front + 2 sides')
 
   const W  = Math.max(0, parseFloat(width) || 0)
   const D  = Math.max(0, parseFloat(depth) || 0)
@@ -73,7 +73,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
   const Dr = Math.max(0, parseInt(doors) || 0)
 
   // Enclosed walls (ft). Door(s) ride on the front wall (index 0).
-  const wallSet = sides === 'All 4 walls' ? [W, D, W, D] : sides === 'Front only' ? [W] : [W, D, D]
+  const wallSet = sides === 'All 4 walls' ? [W, D, W, D] : sides === 'Front only' ? [W] : sides === 'Front + 1 side' ? [W, D] : [W, D, D]
   const layout = wallSet.map((ln, i) => porchWall(ln * 12, i === 0 ? Dr : 0))
   const totalWindows = layout.reduce((s, w) => s + w.windows, 0)
   const rawColumns   = layout.reduce((s, w) => s + w.columns, 0)
@@ -196,7 +196,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
         {dim('Depth (ft)', depth, e => setDepth(e.target.value), { min: 0 })}
         {dim('Wall height (in)', wallH, e => setWallH(e.target.value), { min: 0 })}
         {dim('# Doors (36″)', doors, e => setDoors(e.target.value), { min: 0, step: 1 })}
-        {drop('Enclosed walls', sides, e => setSides(e.target.value), ['Front + 2 sides', 'All 4 walls', 'Front only'])}
+        {drop('Enclosed walls', sides, e => setSides(e.target.value), ['Front + 2 sides', 'Front + 1 side', 'All 4 walls', 'Front only'])}
       </div>
 
       {/* Layout recommendation */}

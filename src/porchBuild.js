@@ -270,7 +270,8 @@ export function porchWall(Lin, doorCount = 0) {
 }
 
 export function porchLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides' } = {}) {
-  const wallSet = sides === 'All 4 walls' ? [Wft, Dft, Wft, Dft] : sides === 'Front only' ? [Wft] : [Wft, Dft, Dft]
+  // 'Front + 1 side' = an L-corner of the house: the other side is the house wall.
+  const wallSet = sides === 'All 4 walls' ? [Wft, Dft, Wft, Dft] : sides === 'Front only' ? [Wft] : sides === 'Front + 1 side' ? [Wft, Dft] : [Wft, Dft, Dft]
   const layout = wallSet.map((ln, i) => porchWall(ln * 12, i === 0 ? doors : 0))
   const totalWindows = layout.reduce((s, w) => s + w.windows, 0)
   const rawColumns   = layout.reduce((s, w) => s + w.columns, 0)
@@ -300,6 +301,9 @@ export function sunroomLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides', 
     ? [['Front', Wft, 2 * C], ['Left side', Dft, 2 * C], ['Right side', Dft, 2 * C], ['Back', Wft, 2 * C]]
     : sides === 'Front only'
       ? [['Front', Wft, 2 * C]]
+      // L-corner of the house: one outside corner, so the front's house end needs no buffer
+      : sides === 'Front + 1 side'
+        ? [['Front', Wft, C], ['Side', Dft, C]]
       : [['Front', Wft, 2 * C], ['Left side', Dft, C], ['Right side', Dft, C]]
   const H = Math.max(0, Number(wallHeightIn) || 0)
   // Doors usually go on the side walls next to the house (alternating left /
@@ -310,7 +314,7 @@ export function sunroomLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides', 
     return { name, lengthFt: Number(ft) || 0, usableIn: usable, room: usable + SUN_GAP, doors: 0 }   // n items need n gaps less one
   })
   const idx = (nm) => rows.findIndex(r => r.name === nm)
-  const sidesIdx = [idx('Left side'), idx('Right side')].filter(i => i >= 0)
+  const sidesIdx = [idx('Left side'), idx('Right side'), idx('Side')].filter(i => i >= 0)
   const frontIdx = [idx('Front')].filter(i => i >= 0)
   const backIdx  = [idx('Back')].filter(i => i >= 0)
   const placed = []

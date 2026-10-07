@@ -61,7 +61,7 @@ export function quickToolFor(spec) {
       type, width: num(s.width), depth: num(s.depth),
       tie: oneOf(s.tie, PORCH_TIES.map(t => t.key)), floor: oneOf(s.floor, PORCH_FLOORS.map(t => t.key)),
       roof: oneOf(s.roof, PORCH_ROOFS.map(t => t.key)), deckHeightFt: num(s.deckHeightFt), wallHeightIn: num(s.wallHeightIn),
-      sides: oneOf(s.sides, ['Front + 2 sides', 'All 4 walls', 'Front only']),
+      sides: oneOf(s.sides, ['Front + 2 sides', 'Front + 1 side', 'All 4 walls', 'Front only']),
       doors: pickQty(s.doors, keys(r => r.door || r.sunDoor)), doorWall: oneOf(s.doorWall, ['side', 'front']),
       flooring: oneOf(s.flooring, keys(r => r.floor)), elecPackage: oneOf(s.elecPackage, keys(r => r.elecPkg)),
       extras: pickQty(s.extras, keys(r => r.option)),
@@ -74,7 +74,7 @@ export function quickToolFor(spec) {
   if (s.tool === 'conversion') {
     return {
       assembly: 'porch', label: `Porch conversion${size(num(s.width), num(s.depth))}`,
-      initial: clean({ width: num(s.width), depth: num(s.depth), wallHeight: num(s.wallHeight), doors: Number.isFinite(Number(s.doors)) ? Number(s.doors) : undefined }),
+      initial: clean({ width: num(s.width), depth: num(s.depth), wallHeight: num(s.wallHeight), doors: Number.isFinite(Number(s.doors)) ? Number(s.doors) : undefined, sides: oneOf(s.sides, ['Front + 2 sides', 'Front + 1 side', 'All 4 walls', 'Front only']) }),
     }
   }
   if (s.tool === 'underdeck') {
