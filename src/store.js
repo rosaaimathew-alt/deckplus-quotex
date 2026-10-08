@@ -1162,6 +1162,29 @@ export const useStore = create(
       deleteFinanceCard: (id) =>
         set((s) => ({ financeCards: s.financeCards.filter((c) => c.id !== id) })),
 
+      // ── Subscriptions (recurring software / services) — org-wide setting ────
+      subscriptions: [],
+      addSubscription: (sub) =>
+        set((s) => ({ subscriptions: [...(s.subscriptions || []), { id: Date.now(), active: true, cycle: 'monthly', ...sub }] })),
+      updateSubscription: (id, changes) =>
+        set((s) => ({ subscriptions: (s.subscriptions || []).map((x) => (x.id === id ? { ...x, ...changes } : x)) })),
+      deleteSubscription: (id) =>
+        set((s) => ({ subscriptions: (s.subscriptions || []).filter((x) => x.id !== id) })),
+
+      // ── Customer payments received on a job (jobData.paymentsReceived) ──────
+      addJobPayment: (proposalId, payment) =>
+        set((s) => ({
+          proposals: s.proposals.map((p) => p.id === proposalId
+            ? { ...p, jobData: { ...(p.jobData || {}), paymentsReceived: [...(p.jobData?.paymentsReceived || []), { id: Date.now(), ...payment }] } }
+            : p),
+        })),
+      removeJobPayment: (proposalId, paymentId) =>
+        set((s) => ({
+          proposals: s.proposals.map((p) => p.id === proposalId
+            ? { ...p, jobData: { ...(p.jobData || {}), paymentsReceived: (p.jobData?.paymentsReceived || []).filter((x) => x.id !== paymentId) } }
+            : p),
+        })),
+
       expenses: [],
       addExpense: (e) =>
         set((s) => ({ expenses: [{ id: Date.now(), createdAt: new Date().toISOString(), ...e }, ...s.expenses] })),
@@ -1340,6 +1363,7 @@ const SETTINGS_DEFAULTS = () => ({
   paymentScheduleLearning: {}, scopeExamples: [], historyImported: false, calendarHiddenJobs: [],
   contractPrefix: 'DP',
   porchBuildRates: {}, porchBuildLocked: false, porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
+  subscriptions: [],
 })
 const ID_COUNTERS = ['nextProposalId', 'nextCatalogId', 'nextTemplateId', 'nextScopeTemplateId', 'nextPaymentScheduleId', 'nextSubId']
 

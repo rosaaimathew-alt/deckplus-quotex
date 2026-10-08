@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
+import JobFinancials from '../components/JobFinancials'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1611,133 +1612,8 @@ function buildCloseOutHtml({ client, contractNum, address, projectType, completi
 }
 
 // ── Receipts tab — per-job receipt files, stored in Google Drive ────────────
-// ── Costs / Job P&L tab ────────────────────────────────────────────────────────
-// Log actual out-of-pocket costs against this job — amount, what it was for, and the
-// merchant — exactly like the Finance tab. Writes to the shared `expenses` store
-// tagged with this job's id, so these same costs also feed the Finance per-job P&L.
-const COST_CATEGORIES = ['Materials', 'Labor', 'Subcontractor', 'Fuel', 'Tools', 'Equipment', 'Permits', 'Office', 'Insurance', 'Other']
+// ── Costs / Job P&L tab — see components/JobFinancials.jsx ──────────────────
 
-function CostsTab({ proposal }) {
-  const { expenses, addExpense, deleteExpense } = useStore()
-  const jobCosts = (expenses || [])
-    .filter(e => e.jobId === proposal.id)
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-
-  const revenue   = contractTotalOf(proposal) + approvedChangeOrderTotal(proposal)
-  const totalCost = jobCosts.reduce((s, e) => s + (Number(e.amount) || 0), 0)
-  const profit    = revenue - totalCost
-  const marginPct = revenue > 0 ? Math.round(profit / revenue * 100) : null
-
-  const empty = { date: new Date().toISOString().slice(0, 10), description: '', merchant: '', amount: '', category: 'Materials' }
-  const [f, setF] = useState(empty)
-  const set = (k, v) => setF(p => ({ ...p, [k]: v }))
-  const save = () => {
-    if (!Number(f.amount)) return
-    addExpense({
-      date: f.date,
-      description: f.description.trim(),
-      merchant: f.merchant.trim(),
-      amount: Number(f.amount),
-      category: f.category,
-      jobId: proposal.id,
-      cardId: null,
-    })
-    setF(empty)
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* P&L summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Revenue',      value: `$${fmtDol(revenue)}`,   color: 'text-gray-900' },
-          { label: 'Total Costs',  value: `$${fmtDol(totalCost)}`, color: 'text-red-600' },
-          { label: 'Net Profit',   value: `$${fmtDol(profit)}${marginPct !== null ? ` (${marginPct}%)` : ''}`, color: profit >= 0 ? 'text-green-700' : 'text-red-600' },
-          { label: 'Logged Costs', value: String(jobCosts.length), color: 'text-gray-900' },
-        ].map(c => (
-          <div key={c.label} className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-            <p className="text-xs text-gray-400 mb-0.5">{c.label}</p>
-            <p className={`text-base font-bold ${c.color}`}>{c.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Add a cost */}
-      <div className="border border-gray-200 rounded-xl p-4 space-y-3">
-        <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5"><DollarSign size={15} className="text-gray-400" /> Add a cost</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input value={f.description} onChange={e => set('description', e.target.value)} placeholder="What it was for (e.g. deck boards)"
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
-          <div className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5">
-            <Store size={14} className="text-gray-400 shrink-0" />
-            <input value={f.merchant} onChange={e => set('merchant', e.target.value)} placeholder="Merchant / vendor (e.g. Home Depot)"
-              className="w-full text-sm py-2 focus:outline-none" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="flex items-center gap-1 border border-gray-200 rounded-lg px-2.5">
-            <span className="text-gray-400">$</span>
-            <input type="number" value={f.amount} onChange={e => set('amount', e.target.value)} placeholder="0.00"
-              onKeyDown={e => { if (e.key === 'Enter') save() }}
-              className="w-full text-sm py-2 focus:outline-none" />
-          </div>
-          <select value={f.category} onChange={e => set('category', e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300">
-            {COST_CATEGORIES.map(c => <option key={c}>{c}</option>)}
-          </select>
-          <input type="date" value={f.date} onChange={e => set('date', e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
-        </div>
-        <div className="flex justify-end">
-          <button onClick={save} disabled={!Number(f.amount)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
-            <Plus size={14} /> Add cost
-          </button>
-        </div>
-      </div>
-
-      {/* Cost list */}
-      {jobCosts.length === 0 ? (
-        <div className="text-center py-8 text-sm text-gray-400 border border-dashed border-gray-200 rounded-xl">
-          No costs logged yet. Add materials, labor, subs, fuel and more to see this job's real profit.
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                {['Date', 'Description', 'Merchant', 'Category', 'Amount', ''].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {jobCosts.map(e => (
-                <tr key={e.id} className="hover:bg-gray-50 group">
-                  <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">{fmtDate(e.date)}</td>
-                  <td className="px-3 py-2.5 text-gray-800">{e.description || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-3 py-2.5 text-gray-600">{e.merchant || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600">{e.category || 'Other'}</span></td>
-                  <td className="px-3 py-2.5 font-semibold text-gray-900 whitespace-nowrap">${fmtDol(e.amount)}</td>
-                  <td className="px-3 py-2.5 text-right">
-                    <button onClick={() => deleteExpense(e.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-gray-50 border-t-2 border-gray-300">
-              <tr>
-                <td colSpan={4} className="px-3 py-2.5 font-bold text-gray-700 uppercase text-xs tracking-wider">Total Costs</td>
-                <td className="px-3 py-2.5 font-bold text-red-600 whitespace-nowrap">${fmtDol(totalCost)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
 
 function ReceiptsTab({ proposal }) {
   const { updateJobData } = useStore()
@@ -2057,7 +1933,7 @@ function JobCard({ proposal }) {
               </div>
             )}
             {tab === 'budget'  && <BudgetTab proposal={proposal} />}
-            {tab === 'costs'   && <CostsTab proposal={proposal} />}
+            {tab === 'costs'   && <JobFinancials proposal={proposal} />}
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}
