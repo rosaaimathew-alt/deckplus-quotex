@@ -3,11 +3,11 @@
 // price in one place); the numbers here are the price-list values, used only
 // when the catalog has no such item. Areas follow the sheet's columns:
 //   L/F Out × L/F Across = Total S/F × $ per S/F = Price
-// Steps are Out × Across × 1.5 (the sheet's step factor — risers + treads).
+// Steps are # of steps × Across × 1.5 (the sheet's step factor — risers + treads).
 
 export const STEP_FACTOR = 1.5
-export const RISER_MAX_IN = 7.5          // riser height → suggested step count
-export const TREAD_IN = 11               // tread depth → suggested run-out
+export const RISER_MAX_IN = 8.25         // riser height → suggested step count
+export const TREAD_IN = 11               // tread depth → run-out for the stair rail
 
 // Collections: catalog family + which pieces the price list sells + $/SF.
 // `redeck` is the Re-Deck item (includes demo / reset of existing joists).
@@ -130,14 +130,14 @@ export function deckFamily(label) {
 
 const num = (v) => Number(v) || 0
 
-// Suggested steps for a height in feet (7.5" max riser).
+// Suggested steps for a height in feet (deck height ÷ 8.25" risers, rounded up).
 export const stepsForHeight = (heightFt) => num(heightFt) > 0 ? Math.ceil((num(heightFt) * 12) / RISER_MAX_IN) : 0
 // Suggested run-out (ft, rounded up to the half foot) for that many steps.
 export const runOutForSteps = (steps) => steps > 0 ? Math.ceil((steps * TREAD_IN) / 6) / 2 : 0
 
 // The measurements the price is built from.
 //   deck: W × D ft, plus bump-outs [{ width, depth }] (width = side on the deck)
-//   stairs: [{ out, across, steps }]   landings: [{ width, depth }]
+//   stairs: [{ across, steps }]   landings: [{ width, depth }]
 export function deckTakeoff({ width, depth, sections = [], stairs = [], landings = [] }) {
   const W = num(width), D = num(depth)
   const sectionSF = sections.reduce((s, x) => s + num(x.width) * num(x.depth), 0)
@@ -145,8 +145,9 @@ export function deckTakeoff({ width, depth, sections = [], stairs = [], landings
   // Open sides: the two sides and the front — not the house side — plus the two
   // sides of each bump-out (its front replaces deck edge it covers).
   const openLF    = (W > 0 || D > 0 ? 2 * D + W : 0) + sections.reduce((s, x) => s + 2 * num(x.depth), 0)
-  const stepSF    = stairs.reduce((s, x) => s + num(x.out) * num(x.across) * STEP_FACTOR, 0)
-  const stairRailLF = stairs.reduce((s, x) => s + 2 * num(x.out), 0)   // rail down both sides
+  const stepSF    = stairs.reduce((s, x) => s + num(x.steps) * num(x.across) * STEP_FACTOR, 0)
+  // Rail down both sides of the run (steps × 11″ treads).
+  const stairRailLF = stairs.reduce((s, x) => s + 2 * runOutForSteps(num(x.steps)), 0)
   const stepCount = stairs.reduce((s, x) => s + num(x.steps), 0)
   const landingSF = landings.reduce((s, x) => s + num(x.width) * num(x.depth), 0)
   return { deckSF, sectionSF, openLF, stepSF, stairRailLF, stepCount, landingSF }

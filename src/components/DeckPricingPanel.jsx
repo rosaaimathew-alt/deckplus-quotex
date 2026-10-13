@@ -6,7 +6,7 @@ import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import {
   DECK_COLLECTIONS, DECK_RAILS, BRONZE_BALUSTERS, DECK_FASCIA, DECK_SKIRT_OPTIONS, DECK_PAINT_OPTIONS, DECK_ITEMS,
-  catalogPrice, matchCollection, deckTakeoff, stepsForHeight, runOutForSteps, STEP_FACTOR,
+  catalogPrice, matchCollection, deckTakeoff, stepsForHeight, RISER_MAX_IN, STEP_FACTOR,
 } from '../lib/deckPricing'
 
 // ── Deck Builder — priced like the Deck Plus price list ──────────────────────
@@ -49,7 +49,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
     if (S?.stairs) return S.stairs
     if (initial?.stairs === false || !(n(startH) > 0)) return []
     const steps = stepsForHeight(startH)
-    return [{ id: uid(), out: runOutForSteps(steps), across: 4, steps, style: initial?.stepStyle === 'Box steps' ? 'Box' : 'Regular', auto: true }]
+    return [{ id: uid(), across: 4, steps, style: initial?.stepStyle === 'Box steps' ? 'Box' : 'Regular', auto: true }]
   })
   const [landings, setLandings] = useState(() => S?.landings ?? Array.from({ length: n(initial?.landings) }, () => ({ id: uid(), width: 4, depth: 4 })))
   const [rail, setRail]         = useState(S?.rail ?? (initial?.railing ? 'Hybrid Railing / trex cap' : 'None'))
@@ -89,7 +89,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
     if (t.stepSF > 0) {
       const item = coll.steps ? `${coll.fam} Steps` : `${coll.fam} Deck`
       push('steps', `${coll.fam} Steps${coll.steps ? '' : ' (deck rate)'}`, item, 'SF', t.stepSF, coll.rate,
-        { calc: stairs.filter(s => n(s.out) * n(s.across) > 0).map(s => `${n(s.out)}′ out × ${n(s.across)}′ across × ${STEP_FACTOR}`).join(' + ') })
+        { calc: stairs.filter(s => n(s.steps) * n(s.across) > 0).map(s => `${n(s.steps)} steps × ${n(s.across)}′ across × ${STEP_FACTOR}`).join(' + ') })
     }
     if (t.landingSF > 0) {
       const item = coll.landing ? `${coll.fam} Landing` : `${coll.fam} Deck`
@@ -170,7 +170,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
     if (row('fascia')) lines.push(fb(row('fascia'), `${row('fascia').label} around the deck.`))
     for (const s of stairs) {
       const steps = n(s.steps)
-      if (steps <= 0 && n(s.out) <= 0) continue
+      if (steps <= 0) continue
       lines.push(s.style === 'Box'
         ? scopeFor(catalog, DECK_ITEMS.boxstep.item, { count: steps, width: s.across }, `Approximately ${countWords(steps)} ${ft(s.across)} wide BOX steps to grade.`)
         : scopeFor(catalog, coll.steps ? `${coll.fam} Steps` : null, { count: steps, width: s.across }, `Approximately ${countWords(steps)} ${ft(s.across)} wide steps to grade.`).replace(/^__’x__’ landing and a/, 'A'))
@@ -225,26 +225,20 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
   const clearOv = (...keys) => {
     setQtyOv(o => { const c = { ...o }; keys.forEach(k => delete c[k]); return c })
   }
-  // Typing a run's out or step count takes it off "follow the deck height".
-  // A typed step count still sets the run-out (11″ treads) until the out is typed too.
+  // Typing a run's step count takes it off "follow the deck height".
   const setStair = (id, p) => {
-    setStairs(cur => cur.map(s => {
-      if (s.id !== id) return s
-      if ('out' in p) return { ...s, ...p, auto: false, outTyped: true }
-      if ('steps' in p) return { ...s, ...p, auto: false, ...(s.outTyped ? {} : { out: runOutForSteps(n(p.steps)) }) }
-      return { ...s, ...p }
-    }))
+    setStairs(cur => cur.map(s => s.id !== id ? s : 'steps' in p ? { ...s, ...p, auto: false } : { ...s, ...p }))
     clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint')
   }
   const addStair = () => {
     const steps = stepsForHeight(height) || 3
-    setStairs(cur => [...cur, { id: uid(), out: runOutForSteps(steps), across: 4, steps, style: 'Regular', auto: true }]); clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint')
+    setStairs(cur => [...cur, { id: uid(), across: 4, steps, style: 'Regular', auto: true }]); clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint')
   }
-  // Height drives the step count and run-out of every run the rep hasn't typed over.
+  // Height drives the step count of every run the rep hasn't typed over.
   const changeHeight = (v) => {
     setHeight(v)
     const steps = stepsForHeight(v)
-    setStairs(cur => cur.map(s => s.auto && steps > 0 ? { ...s, steps, out: runOutForSteps(steps) } : s))
+    setStairs(cur => cur.map(s => s.auto && steps > 0 ? { ...s, steps } : s))
     clearOv('skirt', 'high', 'steps', 'rail', 'boxstep', 'cortex', 'paint')
   }
   const extra = (key, label, unit) => (
@@ -327,22 +321,24 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
       {/* Stairs */}
       <Section title={`Stairs${t.stepSF ? ` · ${fmtQty(t.stepSF)} SF` : ''}`} onAdd={addStair} addLabel="Add stairs"
         empty="No stairs."
-        note={stairs.length ? `Price list: out × across × ${STEP_FACTOR} = SF × the ${coll.key} Steps $/SF. Steps = deck height ÷ 7.5″ risers (${H}′ → ${stepsForHeight(height)} steps); out = steps × 11″ treads. Box steps add ${money2(catalogPrice(catalog, DECK_ITEMS.boxstep.item, DECK_ITEMS.boxstep.rate).rate)} per step.` : null}>
+        note={stairs.length ? `Price list: # of steps × across × ${STEP_FACTOR} = SF × the ${coll.key} Steps $/SF. Recommended: deck height ÷ ${RISER_MAX_IN}″ risers (${H}′ → ${stepsForHeight(height)} steps). Box steps add ${money2(catalogPrice(catalog, DECK_ITEMS.boxstep.item, DECK_ITEMS.boxstep.rate).rate)} per step.` : null}>
         {stairs.map((s, i) => (
           <Row key={s.id} label={`Stairs ${i + 1}`} onRemove={() => { setStairs(cur => cur.filter(x => x.id !== s.id)); clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint') }}>
-            <input type="number" min="0" step="0.5" value={s.out} aria-label={`Stairs ${i + 1} out`} className={smallCls} onChange={e => setStair(s.id, { out: e.target.value })} />
-            <span className="text-xs text-gray-400">out ×</span>
-            <input type="number" min="0" value={s.across} aria-label={`Stairs ${i + 1} across`} className={smallCls} onChange={e => setStair(s.id, { across: e.target.value })} />
-            <span className="text-xs text-gray-400">across ft ·</span>
             <input type="number" min="0" value={s.steps} aria-label={`Stairs ${i + 1} steps`} className={smallCls} onChange={e => setStair(s.id, { steps: e.target.value })} />
-            <span className="text-xs text-gray-400">steps</span>
+            <span className="text-xs text-gray-400">steps ×</span>
+            <input type="number" min="0" value={s.across} aria-label={`Stairs ${i + 1} across`} className={smallCls} onChange={e => setStair(s.id, { across: e.target.value })} />
+            <span className="text-xs text-gray-400">across ft</span>
             <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-white" role="group" aria-label={`Stairs ${i + 1} style`}>
               {['Regular', 'Box'].map(st => (
                 <button key={st} type="button" onClick={() => setStair(s.id, { style: st })}
                   className={`px-2.5 py-1 text-xs rounded-md ${s.style === st ? 'bg-[var(--brand-600)] text-white font-semibold' : 'text-gray-500 hover:bg-gray-50'}`}>{st} steps</button>
               ))}
             </div>
-            <span className="text-xs text-gray-500">= {fmtQty(n(s.out) * n(s.across) * STEP_FACTOR)} SF</span>
+            <span className="text-xs text-gray-500">= {fmtQty(n(s.steps) * n(s.across) * STEP_FACTOR)} SF</span>
+            {!s.auto && stepsForHeight(height) > 0 && n(s.steps) !== stepsForHeight(height) && (
+              <button type="button" onClick={() => { setStairs(cur => cur.map(x => x.id === s.id ? { ...x, steps: stepsForHeight(height), auto: true } : x)); clearOv('steps', 'rail', 'boxstep', 'cortex', 'paint') }}
+                className="text-xs text-[var(--brand-700)] hover:underline">Use recommended {stepsForHeight(height)}</button>
+            )}
           </Row>
         ))}
       </Section>

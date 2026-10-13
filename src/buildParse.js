@@ -5,7 +5,7 @@
 // never loose catalog items. Each tool then opens pre-filled for the rep to
 // check and add, so pricing always comes from the tools.
 import { readJob } from './lib/jobBrain'
-import { DECK_COLLECTIONS, DECK_RAILS, DECK_SKIRT_OPTIONS, DECK_PAINT_OPTIONS, stepsForHeight, runOutForSteps } from './lib/deckPricing'
+import { DECK_COLLECTIONS, DECK_RAILS, DECK_SKIRT_OPTIONS, DECK_PAINT_OPTIONS, stepsForHeight } from './lib/deckPricing'
 import { PORCH_BUILD_DEFAULTS, PORCH_TYPES, PORCH_TIES, PORCH_FLOORS, PORCH_ROOFS } from './porchBuild'
 import { HS_CONCRETE, HS_PAVERS, HS_WALLS, HS_ACCESSORIES, HS_KITCHEN, HS_GRANITE } from './hardscape'
 import { UDC_STYLES, UDC_ELECTRICAL } from './underDeck'
@@ -36,7 +36,7 @@ export function quickToolFor(spec) {
       ? s.stairs.map(st => {
           const given = num(st?.steps)
           const steps = given || stepsForHeight(height || 3) || 3
-          return { id: uid(), out: runOutForSteps(steps), across: num(st?.across) || 4, steps, style: st?.style === 'Box' ? 'Box' : 'Regular', auto: !given }
+          return { id: uid(), across: num(st?.across) || 4, steps, style: st?.style === 'Box' ? 'Box' : 'Regular', auto: !given }
         })
       : undefined
     const landings = Array.isArray(s.landings) && s.landings.length
