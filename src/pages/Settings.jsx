@@ -64,8 +64,13 @@ function SidebarPreview({ companyName, tagline, logo, color, sidebar }) {
 
 // ── Connect email (Google OAuth) ──────────────────────────────────────────────
 function EmailConnectCard() {
-  const [status, setStatus] = useState(null) // { authenticated, email }
+  const [status, setStatus] = useState(null) // { authenticated, email, googleReady, mailbox }
   const [busy, setBusy]     = useState(false)
+  // Back from Google with an error: say what happened instead of landing silently.
+  const [error, setError]   = useState(() => {
+    const q = new URLSearchParams(window.location.search)
+    return q.get('google') === 'error' ? `Google didn't finish connecting: ${q.get('msg') || 'unknown error'}` : ''
+  })
 
   const load = useCallback(async () => {
     try {
@@ -76,15 +81,18 @@ function EmailConnectCard() {
   useEffect(() => { load() }, [load])
 
   const connect = async () => {
-    setBusy(true)
+    setBusy(true); setError('')
     try {
       const origin   = window.location.origin
       const returnTo = '/settings'
       const r = await fetch(`/api/google-auth/start?origin=${encodeURIComponent(origin)}&returnTo=${encodeURIComponent(returnTo)}`)
-      const { url } = await r.json()
-      if (url) window.location.href = url
-      else setBusy(false)
-    } catch { setBusy(false) }
+      const body = await r.json().catch(() => ({}))
+      if (body.url) { window.location.href = body.url; return }
+      setError(/GOOGLE_CLIENT_ID/.test(body.error || '')
+        ? "Google sign-in isn't set up on the server yet (missing Google keys), so this button can't connect. Ask your admin to add them — or set up a sending mailbox instead."
+        : body.error || `Couldn't start Google sign-in (error ${r.status}).`)
+    } catch (e) { setError(e.message || 'Couldn\'t reach the server.') }
+    setBusy(false)
   }
 
   const connected = status?.authenticated
@@ -117,6 +125,13 @@ function EmailConnectCard() {
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
           <Mail size={15} /> {busy ? 'Opening Google…' : 'Connect Google account'}
         </button>
+      )}
+      {error && <p className="text-xs text-red-600 mt-3 leading-relaxed">{error}</p>}
+      {!connected && status && (status.mailbox
+        ? <p className="text-xs text-green-700 mt-3">Quotes are sending from <strong>{status.mailbox}</strong> until a Google account is connected.</p>
+        : <p className="text-xs text-amber-700 mt-3">No email is set up yet — quotes can't be emailed from the app.</p>)}
+      {status && status.googleReady === false && !error && (
+        <p className="text-xs text-amber-700 mt-2 leading-relaxed">Google sign-in isn't set up on the server yet (missing Google keys), so the Connect button won't work until they're added.</p>
       )}
       <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
         Sending works on your own account immediately. For customer accounts, Google requires app verification before sending.

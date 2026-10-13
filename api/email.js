@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
 import { saveMessage } from './_store.js'
-import { sendMail, isMailerConfigured } from './_mailer.js'
+import { sendMail, isMailerConfigured, smtpUser } from './_mailer.js'
 import { requireAuth } from './_auth.js'
 
 // Company name shown in customer emails (per-instance; set COMPANY_NAME in the env).
@@ -252,7 +252,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!(await requireAuth(req, res))) return
   if (!(await isMailerConfigured())) {
-    return res.status(500).json({ error: 'No email account connected. Connect your Google account in Settings (or set GMAIL_USER / GMAIL_APP_PASSWORD).' })
+    return res.status(500).json({ error: 'No email account connected. Connect your Google account in Settings, or set up a sending mailbox (SMTP).' })
   }
 
   const { action, ...body } = req.body || {}
@@ -395,7 +395,7 @@ export default async function handler(req, res) {
   const msgId = `out_${result.messageId || Date.now()}`
   await saveMessage({
     id: msgId, direction: 'outbound',
-    from: { name: fromName || 'You', email: process.env.GMAIL_USER || 'noreply' },
+    from: { name: fromName || 'You', email: smtpUser() || 'noreply' },
     to: [recipientEmail], subject,
     textBody: isReply ? replyText : '',
     htmlBody: html,

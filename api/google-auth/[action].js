@@ -1,5 +1,7 @@
+/* global process */
 import { getAuthUrl, handleCallback, isAuthenticated, getConnectedEmail } from '../_google-drive.js'
 import { verifyToken } from '../_auth.js'
+import { smtpUser } from '../_mailer.js'
 
 export default async function handler(req, res) {
   const action = req.query.action
@@ -49,9 +51,11 @@ export default async function handler(req, res) {
 
   if (action === 'status') {
     try {
-      return res.status(200).json({ authenticated: await isAuthenticated(), email: await getConnectedEmail() })
+      // googleReady: the Google sign-in keys are set on the server.
+      // mailbox: the shared SMTP mailbox quotes go out from when no Google account is connected.
+      return res.status(200).json({ authenticated: await isAuthenticated(), email: await getConnectedEmail(), googleReady: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET), mailbox: smtpUser() })
     } catch (err) {
-      return res.status(200).json({ authenticated: false, error: err.message })
+      return res.status(200).json({ authenticated: false, error: err.message, googleReady: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET), mailbox: smtpUser() })
     }
   }
 
