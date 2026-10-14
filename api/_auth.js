@@ -95,6 +95,14 @@ export async function staffRole(token, staff) {
   return role
 }
 
+// The signed-in person's company and role ({ org_id, role } or null).
+export async function staffMembership(token, staff) {
+  const sb = asUser(token)
+  if (!sb || !staff?.sub) return null
+  const { data } = await sb.from('org_members').select('org_id, role').eq('user_id', staff.sub).maybeSingle()
+  return data || null
+}
+
 export async function canSeeRecord(token, staff, { createdBy, proposalId } = {}) {
   const role = await staffRole(token, staff)
   if (role === 'office' || role === 'admin' || role === 'pm') return true

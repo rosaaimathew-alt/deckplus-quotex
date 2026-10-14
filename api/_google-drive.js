@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getKV } from './_kv.js'
+import { mailboxesAvailable, vaultGet, vaultSet } from './_mailboxes.js'
 
 const __dirname    = path.dirname(fileURLToPath(import.meta.url))
 const TOKEN_FILE   = path.resolve(__dirname, '../google-tokens.json')
@@ -18,7 +19,10 @@ const SCOPES = [
   'email',
 ].join(' ')
 
+// With Supabase the token lives in the server-only vault (needs the server
+// secret to read), never the general key-value table.
 async function loadTokens() {
+  if (mailboxesAvailable()) return await vaultGet(KV_TOKEN_KEY)
   if (process.env.KV_REST_API_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) {
     const kv = await getKV()
     return await kv.get(KV_TOKEN_KEY)
@@ -30,6 +34,7 @@ async function loadTokens() {
 }
 
 async function saveTokens(tokens) {
+  if (mailboxesAvailable()) return await vaultSet(KV_TOKEN_KEY, tokens)
   if (process.env.KV_REST_API_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) {
     const kv = await getKV()
     await kv.set(KV_TOKEN_KEY, tokens)

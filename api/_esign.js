@@ -168,7 +168,7 @@ export async function otpStatus(kv, token) {
   return { otp: o, verified, verifiedEmail: verified ? o.email : null }
 }
 
-export async function otpSend(kv, { token, email, emailOnFile, companyName, docLabel, ctx, logBase }) {
+export async function otpSend(kv, { token, email, emailOnFile, companyName, docLabel, ctx, logBase, senderEmail }) {
   const to = String(email || emailOnFile || '').trim().toLowerCase()
   if (!validEmail(to)) return { status: 400, body: { error: 'Enter a valid email address to receive your code.' } }
   if (!(await isMailerConfigured())) return { status: 503, body: { error: 'Email codes are not available right now. Please contact the office.' } }
@@ -183,6 +183,8 @@ export async function otpSend(kv, { token, email, emailOnFile, companyName, docL
     text: `Your verification code to sign ${docLabel} is ${code}.\n\nIt expires in 10 minutes. If you did not request this, ignore this email.`,
     html: `<p>Your verification code to sign <strong>${escapeHtml(docLabel)}</strong> is:</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p><p>It expires in 10 minutes. If you did not request this, you can ignore this email.</p>`,
     fromName: company,
+    // From the rep who sent the document when they've connected a mailbox.
+    sender: { email: senderEmail || null },
   })
   if (sent?.error) return { status: 502, body: { error: `Could not send the code: ${sent.error}` } }
   const matchesFile = !!emailOnFile && to === String(emailOnFile).trim().toLowerCase()

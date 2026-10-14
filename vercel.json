@@ -5,11 +5,11 @@
     "api/email.js":                     { "maxDuration": 15 },
     "api/messages.js":                  { "maxDuration": 10 },
     "api/ai-chat.js":                   { "maxDuration": 30 },
-    "api/google-auth/[action].js":      { "maxDuration": 10 },
+    "api/google-auth/[action].js":      { "maxDuration": 25 },
     "api/drive/upload.js":              { "maxDuration": 60 },
     "api/drive/backup.js":              { "maxDuration": 30 },
-    "api/sign/[token].js":              { "maxDuration": 10 },
-    "api/co/[token].js":                { "maxDuration": 10 }
+    "api/sign/[token].js":              { "maxDuration": 20 },
+    "api/co/[token].js":                { "maxDuration": 20 }
   },
   "headers": [
     {

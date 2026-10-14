@@ -62,41 +62,67 @@ function SidebarPreview({ companyName, tagline, logo, color, sidebar }) {
   )
 }
 
-// ── Connect email (Google OAuth) ──────────────────────────────────────────────
+// ── Connect email: each person's own sending mailbox ─────────────────────────
+// Pick a provider, enter the address + an app password; the server logs in to
+// test it before saving (password encrypted, never sent back to the browser).
+const MAIL_HELP = {
+  gmail:   { text: 'Gmail needs an App Password, not your normal password. Turn on 2-Step Verification, then create one and paste the 16 letters here.', link: 'https://myaccount.google.com/apppasswords', linkLabel: 'Create a Google App Password' },
+  outlook: { text: 'Use your Outlook password, or an app password if you have two-step sign-in. Some Microsoft 365 companies turn this off — your IT admin can enable "Authenticated SMTP" for your mailbox.', link: 'https://account.live.com/proofs/AppPassword', linkLabel: 'Create a Microsoft app password' },
+  yahoo:   { text: 'Yahoo needs an app password from Account Security.', link: 'https://login.yahoo.com/myaccount/security/app-password', linkLabel: 'Create a Yahoo app password' },
+  icloud:  { text: 'iCloud needs an app-specific password.', link: 'https://account.apple.com/account/manage', linkLabel: 'Create an Apple app-specific password' },
+  godaddy: { text: 'Use your GoDaddy (Microsoft 365 by GoDaddy uses the Outlook option) email password.' },
+  zoho:    { text: 'Use an application-specific password if you have two-factor sign-in on.' },
+  other:   { text: "Ask your email provider for its \"SMTP\" (outgoing mail) server name and port." },
+}
+
 function EmailConnectCard() {
-  const [status, setStatus] = useState(null) // { authenticated, email, googleReady, mailbox }
-  const [busy, setBusy]     = useState(false)
-  // Back from Google with an error: say what happened instead of landing silently.
-  const [error, setError]   = useState(() => {
-    const q = new URLSearchParams(window.location.search)
-    return q.get('google') === 'error' ? `Google didn't finish connecting: ${q.get('msg') || 'unknown error'}` : ''
-  })
+  const [status, setStatus]   = useState(null)   // mailbox-status response
+  const [loadErr, setLoadErr] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy]       = useState('')
+  const [error, setError]     = useState('')
+  const [note, setNote]       = useState('')
+  const [f, setF] = useState({ provider: 'gmail', email: '', password: '', host: '', port: 587, companyDefault: false })
+  const set = (p) => setF(x => ({ ...x, ...p }))
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch('/api/google-auth/status')
-      setStatus(await r.json())
-    } catch { setStatus({ authenticated: false }) }
+      const r = await fetch('/api/google-auth/mailbox-status')
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) { setLoadErr(body.error || `Couldn't load your email settings (error ${r.status}).`); return }
+      setStatus(body); setLoadErr('')
+    } catch { setLoadErr("Couldn't reach the server.") }
   }, [])
   useEffect(() => { load() }, [load])
 
-  const connect = async () => {
-    setBusy(true); setError('')
+  const post = async (action, payload, label) => {
+    setBusy(label); setError(''); setNote('')
     try {
-      const origin   = window.location.origin
-      const returnTo = '/settings'
-      const r = await fetch(`/api/google-auth/start?origin=${encodeURIComponent(origin)}&returnTo=${encodeURIComponent(returnTo)}`)
+      const r = await fetch(`/api/google-auth/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}) })
       const body = await r.json().catch(() => ({}))
-      if (body.url) { window.location.href = body.url; return }
-      setError(/GOOGLE_CLIENT_ID/.test(body.error || '')
-        ? "Google sign-in isn't set up on the server yet (missing Google keys), so this button can't connect. Ask your admin to add them — or set up a sending mailbox instead."
-        : body.error || `Couldn't start Google sign-in (error ${r.status}).`)
-    } catch (e) { setError(e.message || 'Couldn\'t reach the server.') }
-    setBusy(false)
+      if (!r.ok) { setError(body.error || `Something went wrong (error ${r.status}).`); return null }
+      return body
+    } catch { setError("Couldn't reach the server."); return null }
+    finally { setBusy('') }
+  }
+  const connect = async () => {
+    const ok = await post('mailbox-connect', f, 'connect')
+    if (ok) { setEditing(false); set({ password: '' }); setNote('Connected — the login worked. Send yourself a test to be sure.'); load() }
+  }
+  const test = async () => {
+    const ok = await post('mailbox-test', {}, 'test')
+    if (ok) setNote(`Test email sent to ${ok.sentTo}. Check your inbox (and spam folder).`)
+  }
+  const disconnect = async () => {
+    if (!window.confirm('Disconnect your mailbox? Emails you send will go out from the company mailbox instead.')) return
+    const ok = await post('mailbox-disconnect', {}, 'disconnect')
+    if (ok) { setNote('Disconnected.'); load() }
   }
 
-  const connected = status?.authenticated
-  const email     = status?.email
+  const providers = status?.providers || {}
+  const mine = status?.mine
+  const help = MAIL_HELP[f.provider] || MAIL_HELP.other
+  const showForm = !mine || editing
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -104,38 +130,82 @@ function EmailConnectCard() {
         <Mail size={16} className="text-gray-400" />
         <h3 className="font-semibold text-gray-800 text-sm">Email Account</h3>
       </div>
-      <p className="text-xs text-gray-400 mb-4">Connect your Google account to send proposals from your own address.</p>
+      <p className="text-xs text-gray-400 mb-4">Connect your own mailbox so the quotes, follow-ups and reminders you send come from your address.</p>
 
-      {connected ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+      {loadErr && <p className="text-xs text-red-600 mb-3">{loadErr}</p>}
+
+      {mine && !editing && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
           <div className="flex items-center gap-2 min-w-0">
             <CheckCircle size={16} className="text-green-600 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-medium text-green-800">Connected{email ? '' : ' to Google'}</p>
-              {email && <p className="text-xs text-green-700 truncate">{email}</p>}
+              <p className="text-sm font-medium text-green-800 truncate">Sending as {mine.email}</p>
+              <p className="text-xs text-green-700">{providers[mine.provider]?.label || mine.host}{mine.companyDefault ? ' · also used for company emails' : ''}</p>
             </div>
           </div>
-          <button onClick={connect} disabled={busy}
-            className="text-xs px-3 py-1.5 rounded-lg border border-green-300 text-green-700 hover:bg-green-100 disabled:opacity-50 shrink-0">
-            {busy ? 'Opening…' : 'Reconnect'}
-          </button>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button onClick={test} disabled={!!busy} className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-50">{busy === 'test' ? 'Sending…' : 'Send test email'}</button>
+            <button onClick={() => { setEditing(true); set({ provider: mine.provider || 'other', email: mine.email, host: mine.host, port: mine.port, companyDefault: mine.companyDefault, password: '' }) }} disabled={!!busy}
+              className="text-xs px-3 py-1.5 rounded-lg border border-green-300 text-green-800 hover:bg-green-100 disabled:opacity-50">Change</button>
+            <button onClick={disconnect} disabled={!!busy} className="text-xs px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-50">{busy === 'disconnect' ? 'Disconnecting…' : 'Disconnect'}</button>
+          </div>
         </div>
-      ) : (
-        <button onClick={connect} disabled={busy}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-          <Mail size={15} /> {busy ? 'Opening Google…' : 'Connect Google account'}
-        </button>
       )}
+
+      {status && showForm && (
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-xs font-medium text-gray-500 block mb-1">Email provider</span>
+            <select aria-label="Email provider" value={f.provider} onChange={e => set({ provider: e.target.value })} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white">
+              {Object.entries(providers).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              <option value="other">Other (enter server)</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-gray-500 block mb-1">Your email address</span>
+            <input aria-label="Your email address" type="email" value={f.email} onChange={e => set({ email: e.target.value })} placeholder="you@company.com" autoComplete="email"
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-gray-500 block mb-1">{f.provider === 'other' || f.provider === 'godaddy' ? 'Password' : 'App password'}</span>
+            <input aria-label="App password" type="password" value={f.password} onChange={e => set({ password: e.target.value })} autoComplete="new-password"
+              placeholder={f.provider === 'gmail' ? 'xxxx xxxx xxxx xxxx' : ''} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 font-mono" />
+          </label>
+          {f.provider === 'other' && (
+            <div className="grid grid-cols-[1fr_6rem] gap-2">
+              <input aria-label="Mail server" value={f.host} onChange={e => set({ host: e.target.value })} placeholder="smtp.yourprovider.com" className="text-sm border border-gray-300 rounded-lg px-3 py-2" />
+              <select aria-label="Port" value={f.port} onChange={e => set({ port: Number(e.target.value) })} className="text-sm border border-gray-300 rounded-lg px-2 py-2 bg-white">
+                {[587, 465, 2525, 25].map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          )}
+          <p className="text-xs text-gray-500 leading-relaxed">
+            {help.text}{help.link && <> <a href={help.link} target="_blank" rel="noreferrer" className="text-[var(--brand-700)] underline">{help.linkLabel} →</a></>}
+          </p>
+          {status.canSetCompany && (
+            <label className="flex items-start gap-2 text-xs text-gray-600">
+              <input type="checkbox" checked={!!f.companyDefault} onChange={e => set({ companyDefault: e.target.checked })} className="mt-0.5" />
+              <span>Also use this mailbox for company emails (signing codes and emails from people who haven't connected their own).</span>
+            </label>
+          )}
+          <div className="flex gap-2">
+            <button onClick={connect} disabled={!!busy || !f.email || !f.password}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-40">
+              <Mail size={15} /> {busy === 'connect' ? 'Testing the login…' : mine ? 'Save & test' : 'Connect & test'}
+            </button>
+            {editing && <button onClick={() => { setEditing(false); setError('') }} className="px-4 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>}
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-xs text-red-600 mt-3 leading-relaxed">{error}</p>}
-      {!connected && status && (status.mailbox
-        ? <p className="text-xs text-green-700 mt-3">Quotes are sending from <strong>{status.mailbox}</strong> until a Google account is connected.</p>
-        : <p className="text-xs text-amber-700 mt-3">No email is set up yet — quotes can't be emailed from the app.</p>)}
-      {status && status.googleReady === false && !error && (
-        <p className="text-xs text-amber-700 mt-2 leading-relaxed">Google sign-in isn't set up on the server yet (missing Google keys), so the Connect button won't work until they're added.</p>
+      {note && <p className="text-xs text-green-700 mt-3">{note}</p>}
+      {status && (
+        <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
+          {status.company ? <>Company emails go out from <strong className="text-gray-500">{status.company.email}</strong>.</> : status.serverMailbox ? <>Company emails go out from <strong className="text-gray-500">{status.serverMailbox}</strong>.</> : 'No company mailbox yet — the first mailbox connected is used for company emails.'}
+          {' '}Your password is encrypted and only used to send your emails.
+        </p>
       )}
-      <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
-        Sending works on your own account immediately. For customer accounts, Google requires app verification before sending.
-      </p>
     </div>
   )
 }

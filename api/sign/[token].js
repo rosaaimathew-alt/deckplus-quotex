@@ -291,7 +291,7 @@ export default async function handler(req, res) {
         return res.json({ ok: true })
       }
       if (body.action === 'otp-send') {
-        const r = await otpSend(kv, { token, email: body.email, emailOnFile, companyName, docLabel: `Contract #${record.contractNum || ''}`, ctx, logBase })
+        const r = await otpSend(kv, { token, email: body.email, emailOnFile, companyName, docLabel: `Contract #${record.contractNum || ''}`, ctx, logBase, senderEmail: record.createdBy })
         return res.status(r.status).json(r.body)
       }
       if (body.action === 'otp-verify') {

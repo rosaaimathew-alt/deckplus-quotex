@@ -250,9 +250,12 @@ function buildCloseoutHtml({ client, contractNum, address, projectType, completi
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  if (!(await requireAuth(req, res))) return
-  if (!(await isMailerConfigured())) {
-    return res.status(500).json({ error: 'No email account connected. Connect your Google account in Settings, or set up a sending mailbox (SMTP).' })
+  const staff = await requireAuth(req, res)
+  if (!staff) return
+  // Emails go out from the signed-in person's own connected mailbox when they have one.
+  const mailSender = { userId: staff.sub, email: staff.email }
+  if (!(await isMailerConfigured(mailSender))) {
+    return res.status(500).json({ error: 'No email account connected. Connect your mailbox in Settings › Email Account.' })
   }
 
   const { action, ...body } = req.body || {}
@@ -262,7 +265,7 @@ export default async function handler(req, res) {
     const { toEmail, client, amount, milestone, dueDate, contractNum, address, projectType } = body
     if (!toEmail) return res.status(400).json({ error: 'Recipient email is required.' })
     const subject = `Payment Reminder — ${contractNum || 'Your Project'} · ${COMPANY}`
-    const result  = await sendMail({ to: toEmail, subject, html: buildReminderHtml({ client, amount, milestone, dueDate, contractNum, address, projectType }) })
+    const result  = await sendMail({ to: toEmail, subject, html: buildReminderHtml({ client, amount, milestone, dueDate, contractNum, address, projectType }), sender: mailSender })
     if (result.error) return res.status(500).json({ error: result.error })
     return res.status(200).json({ success: true })
   }
@@ -276,6 +279,7 @@ export default async function handler(req, res) {
       to: toEmail,
       subject: `Following Up — Your ${COMPANY} Proposal`,
       html: buildFollowupHtml({ client, total, address, projectType, sentDaysAgo, expiration, contractNum }),
+      sender: mailSender,
     })
     if (result.error) return res.status(500).json({ error: result.error })
     return res.status(200).json({ success: true })
@@ -318,7 +322,7 @@ export default async function handler(req, res) {
   </td></tr>
 </table>
 </body></html>`
-    const result = await sendMail({ to, subject: `Change Order Requires Your Signature — ${coNumber}`, html })
+    const result = await sendMail({ to, subject: `Change Order Requires Your Signature — ${coNumber}`, html, sender: mailSender })
     if (result.error) return res.status(500).json({ error: result.error })
     return res.status(200).json({ success: true })
   }
@@ -331,6 +335,7 @@ export default async function handler(req, res) {
       to: toEmail,
       subject: `Your Project is Complete — Thank You! · ${contractNum || COMPANY}`,
       html: buildCloseoutHtml({ client, contractNum, address, projectType, completionDate }),
+      sender: mailSender,
     })
     if (result.error) return res.status(500).json({ error: result.error })
     return res.status(200).json({ success: true })
@@ -389,13 +394,13 @@ export default async function handler(req, res) {
     ? [{ filename: pdfFilename || 'Proposal.pdf', content: Buffer.from(pdfBase64, 'base64'), contentType: 'application/pdf' }]
     : undefined
 
-  const result = await sendMail({ to: recipientEmail, subject, html, attachments, fromName: sender })
+  const result = await sendMail({ to: recipientEmail, subject, html, attachments, fromName: sender, sender: mailSender })
   if (result.error) return res.status(500).json({ error: result.error })
 
   const msgId = `out_${result.messageId || Date.now()}`
   await saveMessage({
     id: msgId, direction: 'outbound',
-    from: { name: fromName || 'You', email: smtpUser() || 'noreply' },
+    from: { name: fromName || 'You', email: result.sentFrom || smtpUser() || 'noreply' },
     to: [recipientEmail], subject,
     textBody: isReply ? replyText : '',
     htmlBody: html,

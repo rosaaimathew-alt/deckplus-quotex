@@ -135,7 +135,7 @@ export default async function handler(req, res) {
       }
       if (body.action === 'otp-send') {
         const label = `${record.coData?.coNumber || 'your change order'}${record.coData?.contractNum ? ` (Contract #${record.coData.contractNum})` : ''}`
-        const r = await otpSend(kv, { token, email: body.email, emailOnFile, companyName, docLabel: label, ctx, logBase })
+        const r = await otpSend(kv, { token, email: body.email, emailOnFile, companyName, docLabel: label, ctx, logBase, senderEmail: record.createdBy })
         return res.status(r.status).json(r.body)
       }
       if (body.action === 'otp-verify') {
