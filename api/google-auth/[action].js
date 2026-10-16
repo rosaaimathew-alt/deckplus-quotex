@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         if (!validHost(host)) return res.status(400).json({ error: 'Enter your mail server name (for example smtp.yourprovider.com).' })
         if (!MAIL_PORTS.includes(port)) return res.status(400).json({ error: `Port must be one of ${MAIL_PORTS.join(', ')}.` })
         // Log in for real before saving anything.
-        const check = await verifyLogin({ host, port, username, password, provider })
+        const check = await verifyLogin({ host, port, username, password, provider, email })
         if (!check.ok) return res.status(400).json({ error: check.error })
         await saveMailbox({ userId: staff.sub, orgId: member?.org_id || null, email, provider, host, port, username, password, companyDefault: isOffice && !!body.companyDefault })
         return res.status(200).json({ ok: true, mine: pub(await mailboxForUser(staff.sub)) })
