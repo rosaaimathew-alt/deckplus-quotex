@@ -80,8 +80,11 @@ function EmailConnectCard() {
   const [loadErr, setLoadErr] = useState('')
   const [editing, setEditing] = useState(false)
   const [busy, setBusy]       = useState('')
-  const [error, setError]     = useState('')
-  const [note, setNote]       = useState('')
+  // Back from Google's sign-in window: show how it went.
+  const back = new URLSearchParams(window.location.search)
+  const [error, setError]     = useState(() => back.get('mailbox') === 'error' ? (back.get('msg') || 'Google sign-in didn\'t finish.') : '')
+  const [note, setNote]       = useState(() => back.get('mailbox') === 'connected' ? `Connected ${back.get('email') || 'your Google account'}. Send yourself a test to be sure.` : '')
+  const [manual, setManual]   = useState(false)   // show the app-password form instead of Sign in with Google
   const [f, setF] = useState({ provider: 'gmail', email: '', password: '', host: '', port: 587, companyDefault: false })
   const set = (p) => setF(x => ({ ...x, ...p }))
 
@@ -105,6 +108,10 @@ function EmailConnectCard() {
     } catch { setError("Couldn't reach the server."); return null }
     finally { setBusy('') }
   }
+  const signInWithGoogle = async () => {
+    const ok = await post('mailbox-google', {}, 'google')
+    if (ok?.url) window.location.href = ok.url
+  }
   const connect = async () => {
     const ok = await post('mailbox-connect', f, 'connect')
     if (ok) { setEditing(false); set({ password: '' }); setNote('Connected — the login worked. Send yourself a test to be sure.'); load() }
@@ -122,7 +129,10 @@ function EmailConnectCard() {
   const providers = status?.providers || {}
   const mine = status?.mine
   const help = MAIL_HELP[f.provider] || MAIL_HELP.other
-  const showForm = !mine || editing
+  const googleOn = !!status?.googleSignIn
+  const showChooser = (!mine || editing) && googleOn && !manual
+  const showForm = (!mine || editing) && (!googleOn || manual)
+  const providerLabel = (m) => m.provider === 'google' ? 'Google · signed in with Google' : (providers[m.provider]?.label || m.host)
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -140,20 +150,36 @@ function EmailConnectCard() {
             <CheckCircle size={16} className="text-green-600 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-medium text-green-800 truncate">Sending as {mine.email}</p>
-              <p className="text-xs text-green-700">{providers[mine.provider]?.label || mine.host}{mine.companyDefault ? ' · also used for company emails' : ''}</p>
+              <p className="text-xs text-green-700">{providerLabel(mine)}{mine.companyDefault ? ' · also used for company emails' : ''}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 mt-3">
             <button onClick={test} disabled={!!busy} className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-50">{busy === 'test' ? 'Sending…' : 'Send test email'}</button>
-            <button onClick={() => { setEditing(true); set({ provider: mine.provider || 'other', email: mine.email, host: mine.host, port: mine.port, companyDefault: mine.companyDefault, password: '' }) }} disabled={!!busy}
+            <button onClick={() => { setEditing(true); setManual(false); set({ provider: mine.provider === 'google' ? 'gmail' : (mine.provider || 'other'), email: mine.email, host: mine.host, port: mine.port, companyDefault: mine.companyDefault, password: '' }) }} disabled={!!busy}
               className="text-xs px-3 py-1.5 rounded-lg border border-green-300 text-green-800 hover:bg-green-100 disabled:opacity-50">Change</button>
             <button onClick={disconnect} disabled={!!busy} className="text-xs px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-50">{busy === 'disconnect' ? 'Disconnecting…' : 'Disconnect'}</button>
           </div>
         </div>
       )}
 
+      {status && showChooser && (
+        <div className="space-y-2">
+          <button onClick={signInWithGoogle} disabled={!!busy}
+            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50">
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+            {busy === 'google' ? 'Opening Google…' : 'Sign in with Google'}
+          </button>
+          <p className="text-[11px] text-gray-400 text-center">Pick your Google account and click Allow — that's it.</p>
+          <div className="flex justify-center gap-3 text-xs">
+            <button onClick={() => setManual(true)} className="text-gray-500 hover:text-gray-700 underline">Not on Google? Use another provider</button>
+            {editing && <button onClick={() => { setEditing(false); setError('') }} className="text-gray-500 hover:text-gray-700">Cancel</button>}
+          </div>
+        </div>
+      )}
+
       {status && showForm && (
         <div className="space-y-3">
+          {googleOn && <button onClick={() => setManual(false)} className="text-xs text-[var(--brand-700)] hover:underline">← Back to Sign in with Google</button>}
           <label className="block">
             <span className="text-xs font-medium text-gray-500 block mb-1">Email provider</span>
             <select aria-label="Email provider" value={f.provider} onChange={e => set({ provider: e.target.value })} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white">

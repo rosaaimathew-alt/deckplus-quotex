@@ -2,11 +2,13 @@
 import { getAuthUrl, handleCallback, isAuthenticated, getConnectedEmail } from '../_google-drive.js'
 import { verifyToken, staffMembership } from '../_auth.js'
 import { smtpUser, sendMail } from '../_mailer.js'
-import { MAIL_PROVIDERS, mailboxesAvailable, mailboxForUser, companyMailbox, saveMailbox, clearMailbox, verifyLogin } from '../_mailboxes.js'
+import { MAIL_PROVIDERS, mailboxesAvailable, mailboxForUser, companyMailbox, saveMailbox, clearMailbox, verifyLogin,
+  googleSignInReady, googleMailboxAuthUrl, readState, finishGoogleMailbox } from '../_mailboxes.js'
 
 // Account connections. Google sign-in (start / callback / status) plus each
-// person's own sending mailbox (mailbox-status / -connect / -test / -disconnect).
-const MAILBOX_ACTIONS = ['mailbox-status', 'mailbox-connect', 'mailbox-test', 'mailbox-disconnect']
+// person's own sending mailbox: one-click Sign in with Google (mailbox-google),
+// or an address + app password (mailbox-connect); -status / -test / -disconnect.
+const MAILBOX_ACTIONS = ['mailbox-status', 'mailbox-google', 'mailbox-connect', 'mailbox-test', 'mailbox-disconnect']
 const MAIL_PORTS = [25, 465, 587, 2525]
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || ''))
 // A public mail server name — never an IP address or an internal host.
@@ -37,7 +39,18 @@ export default async function handler(req, res) {
         return res.status(200).json({
           mine: pub(mine), company: company ? { email: company.email } : null,
           canSetCompany: isOffice, providers: MAIL_PROVIDERS, serverMailbox: smtpUser(),
+          googleSignIn: googleSignInReady(),
         })
+      }
+
+      // One click: returns Google's sign-in page for this person.
+      if (action === 'mailbox-google') {
+        if (!googleSignInReady()) return res.status(503).json({ error: 'Sign in with Google isn\'t switched on for Deck Plus yet. Ask the account owner to finish the Google setup.' })
+        // Google sends the person back to this same site.
+        const host = req.headers['x-forwarded-host'] || req.headers.host
+        const proto = req.headers['x-forwarded-proto'] || (String(host).startsWith('localhost') ? 'http' : 'https')
+        const origin = `${proto}://${host}`
+        return res.status(200).json({ url: googleMailboxAuthUrl({ origin, userId: staff.sub, orgId: member?.org_id || null, loginHint: staff.email }) })
       }
 
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -96,7 +109,19 @@ export default async function handler(req, res) {
   }
 
   if (action === 'callback') {
-    const { code, state } = req.query
+    const { code, state, error: googleError } = req.query
+    // Sign in with Google for a person's own mailbox (signed state "mb.…").
+    if (String(state || '').startsWith('mb.')) {
+      const st = (() => { try { return readState(state) } catch { return null } })()
+      if (!st) return res.redirect('/settings?mailbox=error&msg=' + encodeURIComponent('That sign-in link expired. Please click Sign in with Google again.'))
+      if (googleError || !code) return res.redirect('/settings?mailbox=error&msg=' + encodeURIComponent(googleError === 'access_denied' ? 'Google sign-in was cancelled.' : 'Google sign-in didn\'t finish.'))
+      try {
+        const email = await finishGoogleMailbox(code, st)
+        return res.redirect('/settings?mailbox=connected&email=' + encodeURIComponent(email))
+      } catch (err) {
+        return res.redirect('/settings?mailbox=error&msg=' + encodeURIComponent(err.message))
+      }
+    }
     if (!code) return res.status(400).send('Missing code')
     try {
       const redirectUrl = await handleCallback(code, state)

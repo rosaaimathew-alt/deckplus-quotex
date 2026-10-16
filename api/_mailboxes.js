@@ -63,9 +63,88 @@ export function transportFor({ host, port, username, password }) {
   })
 }
 // A saved row → a ready transport plus its From address, or null.
+// "google" rows were connected with Sign in with Google: the saved secret is
+// the account's refresh token, and Gmail is reached over OAuth2 (no password).
 export function transportForRow(row) {
   if (!row?.secret_enc) return null
+  if (row.provider === 'google') {
+    const { refresh_token } = JSON.parse(decryptSecret(row.secret_enc))
+    return { transporter: googleTransport(row.email, refresh_token), email: row.email }
+  }
   return { transporter: transportFor({ host: row.host, port: row.port, username: row.username, password: decryptSecret(row.secret_enc) }), email: row.email }
+}
+function googleTransport(email, refreshToken) {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { type: 'OAuth2', user: email, clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, refreshToken },
+    connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 12000,
+  })
+}
+
+// ── Sign in with Google (one click per person) ───────────────────────────────
+// The person picks their Google account in Google's own window and allows
+// "send email on your behalf"; Google hands back a refresh token, which is
+// encrypted and saved as their mailbox. Only the gmail.send scope is asked for.
+export const googleSignInReady = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) && mailboxesAvailable()
+const GOOGLE_MAIL_SCOPES = 'openid email https://www.googleapis.com/auth/gmail.send'
+
+// Signed, short-lived state so the callback knows whose mailbox this is and
+// nobody can forge it.
+const stateKey = () => Buffer.from(crypto.hkdfSync('sha256', secret() || '', 'deckplus-mail', 'oauth-state-v1', 32))
+export function signState(obj) {
+  const body = Buffer.from(JSON.stringify({ ...obj, exp: Date.now() + 15 * 60_000 })).toString('base64url')
+  const mac = crypto.createHmac('sha256', stateKey()).update(body).digest('base64url')
+  return `mb.${body}.${mac}`
+}
+export function readState(state) {
+  const [tag, body, mac] = String(state || '').split('.')
+  if (tag !== 'mb' || !body || !mac) return null
+  const want = crypto.createHmac('sha256', stateKey()).update(body).digest('base64url')
+  if (mac.length !== want.length || !crypto.timingSafeEqual(Buffer.from(mac), Buffer.from(want))) return null
+  const obj = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
+  return obj.exp > Date.now() ? obj : null
+}
+
+export function googleMailboxAuthUrl({ origin, userId, orgId, loginHint }) {
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    redirect_uri: `${origin}/api/google-auth/callback`,
+    response_type: 'code',
+    scope: GOOGLE_MAIL_SCOPES,
+    access_type: 'offline',
+    prompt: 'consent select_account',
+    state: signState({ userId, orgId: orgId || null, origin }),
+  })
+  if (loginHint) params.set('login_hint', loginHint)
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+}
+
+// Google sent the person back: swap the code for tokens, check Gmail accepts
+// them, and save the mailbox. Returns the connected address.
+export async function finishGoogleMailbox(code, st) {
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: `${st.origin}/api/google-auth/callback`, grant_type: 'authorization_code',
+    }),
+  })
+  const tok = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(`Google didn't finish the sign-in (${tok.error_description || tok.error || r.status}).`)
+  if (!String(tok.scope || '').includes('gmail.send')) throw new Error('Please tick "Send email on your behalf" on the Google screen — Deck Plus needs it to send your quotes.')
+  if (!tok.refresh_token) throw new Error('Google didn\'t return a long-term sign-in. Please try again.')
+  const who = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tok.access_token}` } }).then(x => x.json()).catch(() => ({}))
+  const email = who.email
+  if (!email) throw new Error('Google didn\'t share which address was picked. Please try again.')
+  try { await googleTransport(email, tok.refresh_token).verify() }
+  catch (err) { throw new Error(`Gmail didn't accept the sign-in for ${email}: ${err.message}`) }
+  const prev = await mailboxForUser(st.userId)   // reconnecting keeps "use for company emails"
+  await saveMailbox({
+    userId: st.userId, orgId: st.orgId, email, provider: 'google', host: 'smtp.gmail.com', port: 465,
+    username: email, password: JSON.stringify({ refresh_token: tok.refresh_token }), companyDefault: !!prev?.company_default,
+  })
+  return email
 }
 
 // Who really hosts an address's mail (from its MX records), so a login sent to
