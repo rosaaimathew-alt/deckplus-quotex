@@ -30,7 +30,7 @@ export const PORCH_BUILD_GROUPS = [
 const R = (label, unit, rate, group, extra = {}) => ({ label, unit, rate, cost: 0, group, ...extra })
 
 export const PORCH_BUILD_DEFAULTS = {
-  // Base matrix — $/SF of floor area. Eze-Breeze porches use the OPEN rows.
+  // Base matrix — $/SF of floor area. Eze-Breeze porches use the SCREEN rows; sunrooms the OPEN rows.
   base_screen_wall_deck:  R('ScreenEze porch · wall tie · on new PT deck',  'SF', 80, 'structure', { base: true }),
   base_screen_roof_deck:  R('ScreenEze porch · roof tie · on new PT deck',  'SF', 90, 'structure', { base: true }),
   base_screen_wall_patio: R('ScreenEze porch · wall tie · on patio',        'SF', 72, 'structure', { base: true }),
@@ -210,8 +210,8 @@ export const PORCH_BUILD_DEFAULTS = {
 
 // Extra standard lines per porch type, added after the catalog wording. The
 // structure wording itself comes from the catalog item for the base rate (see
-// PORCH_CATALOG_NAMES); Eze-Breeze porches price on the open-porch rows, so
-// their 3-season wording lives here. The office can edit these in Formulas.
+// PORCH_CATALOG_NAMES); Eze-Breeze porches and sunrooms have their own
+// 3-season / sunroom wording, which lives here. The office can edit these in Formulas.
 export const PORCH_BUILD_SCOPE_DEFAULTS = {
   open: '',
   screen: '',
@@ -386,8 +386,9 @@ export function computePorchBuild(input, ratesIn) {
   // Freestanding forces a gable roof (confirmed rule).
   const tie  = inp.tie
   const roof = tie === 'free' ? 'gable' : inp.roof
-  // Eze-Breeze porches and sunrooms price their structure on the open-porch rows
-  const typeForBase = inp.type === 'ezebreeze' || inp.type === 'sunroom' ? 'open' : inp.type
+  // Eze-Breeze porches price their structure on the screen-porch rows (windows
+  // are added on top); sunrooms on the open-porch rows.
+  const typeForBase = inp.type === 'ezebreeze' ? 'screen' : inp.type === 'sunroom' ? 'open' : inp.type
   const tieForBase  = tie === 'free' ? 'wall' : tie
   add(`base_${typeForBase}_${tieForBase}_${inp.floor}`, area)
 
