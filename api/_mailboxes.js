@@ -116,7 +116,10 @@ export async function verifyLogin(cfg) {
   catch (err) {
     // The server's own reply (never the password) for the logs.
     console.error(`Mailbox login failed for ${cfg.email || cfg.username} at ${cfg.host}:${cfg.port}: ${err?.code || ''} ${err?.responseCode || ''} ${String(err?.response || err?.message || '').slice(0, 200)}`)
-    let error = friendlyMailError(err, cfg)
+    // Append the server's short reply code (e.g. "535-5.7.8 BadCredentials") so
+    // support can tell the cause from what the user sees.
+    const code = String(err?.response || err?.message || '').match(/\b[45]\d\d[- ][45]\.\d\.\d+\b.{0,40}/)?.[0]
+    let error = friendlyMailError(err, cfg) + (code ? ` (Server reply: ${code.trim().replace(/\s+https?:\S+.*$/, '')})` : '')
     // Wrong provider picked? e.g. a company address hosted by Microsoft tried on Gmail.
     const real = await mailHostOf(cfg.email || cfg.username)
     if (real && cfg.provider && real.provider !== cfg.provider) {
