@@ -427,6 +427,8 @@ export default function ContractView() {
       const cloneTop  = clone.getBoundingClientRect().top
       const contentH  = Math.max(clone.scrollHeight, clone.getBoundingClientRect().height)
       const breakYsPx = Array.from(clone.querySelectorAll('.pdf-page-break')).map(el => el.getBoundingClientRect().top - cloneTop).filter(y => y > 1).sort((a, b) => a - b)
+      // Safe places to end a page: under a whole paragraph, list item, table row or heading.
+      const cutYsPx = Array.from(clone.querySelectorAll('p, li, tr, h1, h2, img, .dp-clause, .dp-sigcols')).map(el => el.getBoundingClientRect().bottom - cloneTop).sort((a, b) => a - b)
       const canvas  = await toCanvas(clone, { pixelRatio: 1.5, backgroundColor: '#ffffff', cacheBust: true })
       document.body.removeChild(overlay)
       const imgData = canvas.toDataURL('image/jpeg', 0.75)
@@ -435,16 +437,25 @@ export default function ContractView() {
       const imgH    = (canvas.height * pageW) / canvas.width
       const pxToPt  = imgH / contentH
       const boundaries = [0, ...breakYsPx.map(y => y * pxToPt), imgH]
+      const cuts = cutYsPx.map(y => y * pxToPt)
       let isFirst = true
       for (let i = 0; i < boundaries.length - 1; i++) {
         let y = boundaries[i]
-        while (y < boundaries[i + 1]) {
+        const end = boundaries[i + 1]
+        while (y < end - 1) {
           if (!isFirst) pdf.addPage()
           isFirst = false
+          // End this page under the last whole block that fits (never mid-line);
+          // fall back to a full page only when no block ends in its lower 40%.
+          let next = Math.min(y + pageH, end)
+          if (next < end) {
+            const fit = cuts.filter(c => c > y + pageH * 0.6 && c <= y + pageH)
+            if (fit.length) next = fit[fit.length - 1]
+          }
           pdf.addImage(imgData, 'JPEG', 0, -y, pageW, imgH)
-          const sliceBottom = y + pageH
-          if (sliceBottom > boundaries[i + 1]) { const coverTop = boundaries[i + 1] - y; pdf.setFillColor(255, 255, 255); pdf.rect(0, coverTop, pageW, pageH - coverTop + 2, 'F') }
-          y += pageH
+          const coverTop = next - y
+          if (coverTop < pageH) { pdf.setFillColor(255, 255, 255); pdf.rect(0, coverTop, pageW, pageH - coverTop + 2, 'F') }
+          y = next
         }
       }
       const pdfBase64 = pdf.output('datauristring').split(',')[1]

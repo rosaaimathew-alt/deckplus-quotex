@@ -105,22 +105,15 @@ function AgreementPages({ ctx }) {
       {c.subclauses && c.subclauses.map((p, i) => <p key={`s${i}`}><Inline text={p} ctx={ctx} /></p>)}
     </div>
   )
-  const page = (from, to) => AGREEMENT.clauses.filter(c => c.n >= from && c.n <= to).map(clause)
+  // Clauses 1–25 flow as one block (no forced breaks after clauses 5 and 12,
+  // which left half-empty pages); print keeps each paragraph whole.
   return (
-    <>
-      <section className="dp-page">
-        <div className="dp-center"><Logo /></div>
-        <h1 className="dp-h1"><Inline text={AGREEMENT.heading} ctx={ctx} /></h1>
-        {page(1, 5)}
-      </section>
-      <PageBreak />
-      <section className="dp-page">{page(6, 12)}</section>
-      <PageBreak />
-      <section className="dp-page">
-        {page(13, 25)}
-        <p className="dp-sigline dp-mt"><Inline text={AGREEMENT.signatureLine} ctx={ctx} /></p>
-      </section>
-    </>
+    <section className="dp-page">
+      <div className="dp-center"><Logo /></div>
+      <h1 className="dp-h1"><Inline text={AGREEMENT.heading} ctx={ctx} /></h1>
+      {AGREEMENT.clauses.map(clause)}
+      <p className="dp-sigline dp-mt"><Inline text={AGREEMENT.signatureLine} ctx={ctx} /></p>
+    </section>
   )
 }
 
