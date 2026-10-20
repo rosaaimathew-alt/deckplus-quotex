@@ -367,7 +367,8 @@ function ImageFormPages({ form, ctx, values, editable, onValue }) {
 }
 
 // ── Scope of Work annex (ours, drafted from the proposal) ───────────────────
-function renderScopeLines(scopeLines = [], renderBold = (t) => t) {
+function renderScopeLines(allLines = [], renderBold = (t) => t) {
+  const scopeLines = allLines.filter(l => !l?.isDiscount)   // the discount is a price row, not a bullet
   const hasBulletPrefix = scopeLines.some(l => (l.text || '').trimStart().startsWith('--'))
   return scopeLines.map((line, i) => {
     const txt = line.text || ''
@@ -409,7 +410,7 @@ function ScopePages({ values, scopeLines, projectSummary, total, payments, scope
         <table className="dp-grid dp-pricing dp-mt-lg">
           <thead><tr><th>ITEM</th><th className="dp-price">PRICE</th></tr></thead>
           <tbody>
-            {priced.map((l, i) => <tr key={l.id ?? i}><td>{(l.name || '').toUpperCase()}</td><td className="dp-price">${fmt(l.price)}</td></tr>)}
+            {priced.map((l, i) => <tr key={l.id ?? i}><td>{(l.name || '').toUpperCase()}</td><td className="dp-price">{Number(l.price) < 0 ? `−$${fmt(-l.price)}` : `$${fmt(l.price)}`}</td></tr>)}
             <tr className="dp-total"><td>INVESTMENT TOTAL</td><td className="dp-price">${fmt(total)}</td></tr>
           </tbody>
         </table>

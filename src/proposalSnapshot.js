@@ -1,4 +1,4 @@
-import { customerLines } from './lib/hiddenLines'
+import { customerLines, discountOf } from './lib/hiddenLines'
 // The single source of truth for the display-only snapshot sent to the public
 // proposal page (/p/:token). Used by every "get link" / send path so the shared
 // link always renders the proposal exactly the way the app does — including
@@ -28,6 +28,8 @@ export function buildProposalSnapshot(data = {}, branding = {}) {
     showBreakdown:  data.showBreakdown !== false,
     lines,
     subtotal,
+    // { label, amount } — shown under the items as Project Total → Discount → Total
+    discount:       data.isAlaCarte ? null : discountOf(all),
     total:          Number(data.total) || subtotal,
     projectSummary: data.projectSummary || data.contractDraft?.projectSummary || '',
     contractNum:    data.contractDraft?.contractNum || '',

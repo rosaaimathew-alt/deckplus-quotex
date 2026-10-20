@@ -55,14 +55,22 @@ function buildProposalHtml({ client, email, address, expiration, lines, companyN
   const extra  = new Map()
   for (const l of all) { const r = rootOf(l); if (r !== l) extra.set(String(r.id), (extra.get(String(r.id)) || 0) + amt(l)) }
   const folded = all.filter(l => rootOf(l) === l).map(l => extra.has(String(l.id)) ? { ...l, qty: 1, unitPrice: amt(l) + extra.get(String(l.id)) } : l)
-  const shown  = summed ? folded.filter(l => !l.hidden) : folded
+  // The discount shows under the items (Project Total → Discount), not as one.
+  const discLines = isAlaCarte ? [] : folded.filter(l => l.isDiscount)
+  const discAmt  = -discLines.reduce((s, l) => s + amt(l), 0)
+  const items    = folded.filter(l => !l.isDiscount)
+  const shown    = summed ? items.filter(l => !l.hidden) : items
   const company  = esc(companyName || COMPANY)
   const sender   = esc(fromName) || company
   const lineRows = shown.map((l, i) => `
     <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
       <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500;border-bottom:1px solid #f1f5f9;">${esc(l.name) || '—'}</td>
       <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#1e293b;text-align:right;border-bottom:1px solid #f1f5f9;">${summed ? '' : `$${fmt((l.qty || 1) * (l.unitPrice || 0))}`}</td>
-    </tr>`).join('')
+    </tr>`).join('') + (discLines.length ? `
+    <tr><td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500;border-bottom:1px solid #f1f5f9;">Project Total</td>
+      <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#1e293b;text-align:right;border-bottom:1px solid #f1f5f9;">$${fmt(subtotal + discAmt)}</td></tr>
+    <tr><td style="padding:10px 16px;font-size:13px;color:#15803d;font-weight:600;border-bottom:1px solid #f1f5f9;">${esc(discLines[0].name) || 'Discount'}</td>
+      <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#15803d;text-align:right;border-bottom:1px solid #f1f5f9;">−$${fmt(discAmt)}</td></tr>` : '')
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">

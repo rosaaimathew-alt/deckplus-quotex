@@ -129,7 +129,19 @@ export default function PublicProposal() {
               )) : (
                 <tr style={{ borderBottom: `1px solid ${FAINT}` }}>
                   <td style={td}>Project Total</td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>${fmt(subtotal)}</td>
+                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>${fmt(s.discount ? subtotal + s.discount.amount : subtotal)}</td>
+                </tr>
+              )}
+              {s.discount && showItemized && (
+                <tr style={{ borderBottom: `1px solid ${FAINT}` }}>
+                  <td style={td}>Project Total</td>
+                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>${fmt(subtotal + s.discount.amount)}</td>
+                </tr>
+              )}
+              {s.discount && (
+                <tr style={{ borderBottom: `1px solid ${FAINT}` }}>
+                  <td style={td}>{s.discount.label}</td>
+                  <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>−${fmt(s.discount.amount)}</td>
                 </tr>
               )}
             </tbody>

@@ -6,7 +6,7 @@ import { buildProposalSnapshot } from '../proposalSnapshot'
 import { DEFAULT_BRAND_COLOR } from '../brand'
 import { toCanvas } from 'html-to-image'
 import jsPDF from 'jspdf'
-import { customerLines } from '../lib/hiddenLines'
+import { customerLines, discountOf } from '../lib/hiddenLines'
 
 const fmt = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -105,6 +105,9 @@ export default function ProposalView() {
   const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0)
   // Lines hidden on a summed proposal count in the total but are never shown.
   const shownLines = customerLines(lines, { showBreakdown, isAlaCarte })
+  // Discount: shown under the items as Project Total → Discount → Total.
+  const disc = isAlaCarte ? null : discountOf(lines)
+  const beforeDiscount = subtotal + (disc?.amount || 0)
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   const expirationFormatted = expiration
     ? new Date(expiration + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -154,6 +157,8 @@ export default function ProposalView() {
       '',
       pricingText,
       '',
+      disc ? `PROJECT TOTAL: $${fmt(beforeDiscount)}` : '',
+      disc ? `${disc.label.toUpperCase()}: -$${fmt(disc.amount)}` : '',
       isAlaCarte ? '' : `TOTAL: $${fmt(subtotal)}`,
     ].filter(Boolean).join('\n')
 
@@ -474,7 +479,19 @@ export default function ProposalView() {
               )) : (
                 <tr>
                   <td className="py-2.5 text-black font-medium">Project Total</td>
-                  <td className="py-2.5 text-right font-semibold text-black">${fmt(subtotal)}</td>
+                  <td className="py-2.5 text-right font-semibold text-black">${fmt(disc ? beforeDiscount : subtotal)}</td>
+                </tr>
+              )}
+              {disc && (showBreakdown || isAlaCarte) && (
+                <tr className="border-b border-gray-200">
+                  <td className="py-2.5 px-1 text-black font-medium">Project Total</td>
+                  <td className="py-2.5 px-1 text-right font-semibold text-black">${fmt(beforeDiscount)}</td>
+                </tr>
+              )}
+              {disc && (
+                <tr className="border-b border-gray-200">
+                  <td className={`py-2.5 ${showBreakdown ? 'px-1' : ''} text-black font-medium`}>{disc.label}</td>
+                  <td className={`py-2.5 ${showBreakdown ? 'px-1' : ''} text-right font-semibold text-black`}>−${fmt(disc.amount)}</td>
                 </tr>
               )}
             </tbody>

@@ -46,7 +46,7 @@ const linePrice = (l) => {
   if (byUnit) return byUnit
   return Number(l.price) || Number(l.amount) || Number(l.total) || 0
 }
-const toScopeLine = (l, i) => ({ id: l.id ?? i, name: l.name, text: l.description ? `${l.name} — ${l.description}` : l.name, price: linePrice(l) })
+const toScopeLine = (l, i) => ({ id: l.id ?? i, name: l.name, text: l.description ? `${l.name} — ${l.description}` : l.name, price: linePrice(l), ...(l.isDiscount ? { isDiscount: true } : {}) })
 
 const PROJECT_TYPES = ['Open Deck', 'Screen Porches', 'Eze-Breeze Porches', 'Open Porches', 'Porch Conversions', 'Sunrooms', 'Hardscapes']
 
@@ -193,7 +193,15 @@ export default function ContractView() {
   const [contractNum, setContractNum] = useState('')
   const [projectTypes, setProjectTypes] = useState([])
   const [projectSummary, setProjectSummary] = useState('')
-  const [scopeLines, setScopeLines] = useState([])
+  const [scopeLines, setScopeLinesRaw] = useState([])
+  // The proposal's discount rides along as the last scope line (so the contract
+  // total and payments include it) but isn't a Scope of Work bullet. Edits to
+  // the scope — typing, templates, AI — never drop it.
+  const setScopeLines = (upd) => setScopeLinesRaw(prev => {
+    const keep = prev.filter(l => l.isDiscount)
+    const next = (typeof upd === 'function' ? upd(prev.filter(l => !l.isDiscount)) : upd) || []
+    return next.some(l => l.isDiscount) ? next : [...next, ...keep]
+  })
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiError, setAiError]     = useState('')
 
@@ -249,9 +257,9 @@ export default function ContractView() {
       setProjectSummary(draft.projectSummary ?? d.projectSummary ?? '')
       if (d.freshSelection && (d.lines || []).length) {
         const prevById = new Map((draft.scopeLines || []).map(l => [String(l.id), l]))
-        setScopeLines((d.lines || []).map((l, i) => { const line = toScopeLine(l, i); const prev = prevById.get(String(line.id)); return prev?.text ? { ...line, text: prev.text } : line }))
+        setScopeLinesRaw((d.lines || []).map((l, i) => { const line = toScopeLine(l, i); const prev = prevById.get(String(line.id)); return prev?.text ? { ...line, text: prev.text } : line }))
       } else {
-        setScopeLines(draft.scopeLines ?? (d.lines || []).map(toScopeLine))
+        setScopeLinesRaw(draft.scopeLines ?? (d.lines || []).map(toScopeLine))
       }
       setSavedAt(draft.savedAt ?? null)
       const tag = draft.projectTag ?? null, pso = draft.paymentScheduleOverride ?? 'auto'
@@ -272,7 +280,7 @@ export default function ContractView() {
         setPickerSelection(new Set((d.lines).map((l, i) => l.id ?? i)))
         setShowItemPicker(true)
       } else {
-        setScopeLines((d.lines || []).map(toScopeLine))
+        setScopeLinesRaw((d.lines || []).map(toScopeLine))
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on open; the draft is read from the proposal at that moment
@@ -334,7 +342,7 @@ export default function ContractView() {
   const saveDraft = (extra = {}) => {
     if (!data?.proposalId) return
     saveContractDraft(data.proposalId, { ...draftPayload(), ...extra })
-    const examples = scopeLines.filter(l => l.text?.trim()).map(l => ({ itemName: l.name || l.text.split('\n')[0].slice(0, 60), bulletText: l.text }))
+    const examples = scopeLines.filter(l => !l.isDiscount && l.text?.trim()).map(l => ({ itemName: l.name || l.text.split('\n')[0].slice(0, 60), bulletText: l.text }))
     if (examples.length > 0) saveScopeExamples(data.proposalId, examples)
     setSavedAt(new Date().toISOString())
   }
@@ -355,7 +363,7 @@ export default function ContractView() {
     if (projectTag) recordPaymentScheduleUsage(projectTag, effectiveScheduleKey)
     try {
       const fullBranding = { companyName: branding?.companyName, tagline: branding?.tagline, primaryColor: branding?.primaryColor, logo: branding?.logo || null }
-      const scopeStrings = scopeLines.map(l => (typeof l === 'string' ? l : (l?.text || l?.name || ''))).filter(Boolean)
+      const scopeStrings = scopeLines.filter(l => !l?.isDiscount).map(l => (typeof l === 'string' ? l : (l?.text || l?.name || ''))).filter(Boolean)
       const contractData = {
         ...data,
         total,
@@ -541,10 +549,11 @@ export default function ContractView() {
         className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 leading-relaxed"
         style={{ minHeight: '14rem', resize: 'vertical', fontFamily: 'system-ui, sans-serif' }}
         placeholder={'Use -- to create a bullet point:\n\n-- Build 16×16 gable-roof screen porch on new pressure-treated deck\n-- Install ScreenEze system with charcoal fiberglass screen…'}
-        value={scopeLines.map(l => l.text).join('\n')}
+        value={scopeLines.filter(l => !l.isDiscount).map(l => l.text).join('\n')}
         onChange={e => {
           const lines = e.target.value.split('\n')
-          setScopeLines(lines.map((text, i) => ({ id: scopeLines[i]?.id ?? Date.now() + i, name: scopeLines[i]?.name ?? '', price: scopeLines[i]?.price ?? 0, text })))
+          const cur = scopeLines.filter(l => !l.isDiscount)
+          setScopeLines(lines.map((text, i) => ({ id: cur[i]?.id ?? Date.now() + i, name: cur[i]?.name ?? '', price: cur[i]?.price ?? 0, text })))
         }}
       />
       <div className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontFamily: 'system-ui, sans-serif' }}>
@@ -558,7 +567,7 @@ export default function ContractView() {
           {scopeLines.filter(l => (l.name || '').trim() || Number(l.price) > 0).map(line => (
             <div key={line.id} className="flex items-center gap-2">
               <input className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs" value={line.name || ''} onChange={e => setScopeLines(prev => prev.map(l => l.id === line.id ? { ...l, name: e.target.value } : l))} />
-              <span className="w-24 text-right">${fmt(line.price)}</span>
+              <span className="w-24 text-right">{Number(line.price) < 0 ? `−$${fmt(-line.price)}` : `$${fmt(line.price)}`}</span>
             </div>
           ))}
         </div>

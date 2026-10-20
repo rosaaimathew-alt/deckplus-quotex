@@ -1,6 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Trash2, GripVertical, GitMerge, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark } from 'lucide-react'
+import { Search, Plus, Trash2, GripVertical, GitMerge, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark, Tag } from 'lucide-react'
+
+const money2 = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+// A saved discount line back into the builder's discount settings.
+const discountSpecFrom = (lines = []) => {
+  const d = (lines || []).find(l => l.isDiscount)
+  if (!d) return null
+  const pct = String(d.name || '').match(/\((\d+(?:\.\d+)?)% off\)$/)
+  return pct ? { mode: 'percent', value: pct[1], label: d.name.replace(/\s*\(\d+(?:\.\d+)?% off\)$/, '').replace(/^Discount$/, '') }
+             : { mode: 'amount', value: String(-Number(d.unitPrice) || ''), label: d.name === 'Discount' ? '' : d.name }
+}
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { parseBuildSpec, quickToolFor } from '../buildParse'
 import PorchBuildPanel from '../components/PorchBuildPanel'
@@ -318,6 +328,8 @@ export default function BuildQuote() {
   const [feeDismissed, setFeeDismissed] = useState([])
   const [feeEdits, setFeeEdits] = useState({})
   const [feeOverrides, setFeeOverrides] = useState({})
+  // Discount off the project total: { mode: 'amount' | 'percent', value, label } or null
+  const [discount, setDiscount] = useState(null)
 
   const PROJECT_TYPE_OPTIONS = ['Open Deck','Screen Porches','Eze-Breeze Porches','Open Porches','Porch Conversions','Sunrooms','Hardscapes']
   const toggleProjectType = (t) => setProjectTypes(prev =>
@@ -353,7 +365,8 @@ export default function BuildQuote() {
         setPhone(d.phone || '')
         setAddress(d.address || '')
         setExpiration(d.expiration || '')
-        setLines(freshIds((d.lines || []).filter(l => !l.autoFee)))
+        setLines(freshIds((d.lines || []).filter(l => !l.autoFee && !l.isDiscount)))
+        setDiscount(d.discount || discountSpecFrom(d.lines))
         setFeeEdits(Object.fromEntries((d.lines || []).filter(l => l.autoFee).flatMap(l => l.feeParts
           ? l.feeParts.map(p => [p.key, p.unitPrice])
           : [[l.autoFee, l.unitPrice]])))
@@ -378,7 +391,8 @@ export default function BuildQuote() {
       setAddress(d.address || '')
       setExpiration(d.expiration || '')
       setMargin(d.margin ?? MARGIN_DEFAULT)
-      setLines(freshIds((d.lines || []).filter(l => !l.autoFee)))
+      setLines(freshIds((d.lines || []).filter(l => !l.autoFee && !l.isDiscount)))
+      setDiscount(d.discount || discountSpecFrom(d.lines))
       setFeeDismissed(d.feeDismissed || [])
       setFeeEdits(d.feeEdits || {})
       setFeeOverrides(d.feeOverrides || {})
@@ -401,7 +415,7 @@ export default function BuildQuote() {
     setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false)
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
     setDraftProposalId(null); setDraftClient(''); setRevisingClient(''); setRestoredFrom(null)
-    setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({})
+    setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({}); setDiscount(null)
   }
 
   // Auto-save draft to localStorage whenever form state changes
@@ -411,9 +425,9 @@ export default function BuildQuote() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
       isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
-      feeDismissed, feeEdits, feeOverrides,
+      feeDismissed, feeEdits, feeOverrides, discount,
     }))
-  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides])
+  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount])
 
   // Permit fees for this address + work, as quote lines (derived, never stored twice)
   const feePlan = useMemo(() => requiredFees({ address, lines, projectTypes, catalog: catalogRaw, overrides: feeOverrides }),
@@ -438,7 +452,23 @@ export default function BuildQuote() {
       autoFee: 'combined', feeParts: feeLines.map(f => ({ key: f.autoFee, name: f.name, unitPrice: f.unitPrice })),
     }
   }, [feeLines])
-  const allLines = useMemo(() => [...lines, ...(feeLine ? [feeLine] : [])], [lines, feeLine])
+  // Before the discount, and the discount itself as one negative line (so every
+  // total downstream — proposal, link, email, contract, payments — includes it).
+  // À la carte has no project total, so no discount there.
+  const preDiscount = [...lines, ...(feeLine ? [feeLine] : [])].reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0)
+  const discountLine = useMemo(() => {
+    if (!discount || isAlaCarte) return null
+    const v = Math.max(0, Number(discount.value) || 0)
+    const amount = Math.min(preDiscount, discount.mode === 'percent' ? Math.round(preDiscount * Math.min(v, 100)) / 100 : v)
+    if (!(amount > 0)) return null
+    const base = (discount.label || '').trim() || 'Discount'
+    return {
+      id: 'discount', catalogId: null, isDiscount: true, section: 'Discount', category: 'Discount',
+      name: discount.mode === 'percent' ? `${base} (${v}% off)` : base, description: '',
+      unit: 'LS', qty: 1, unitPrice: -Math.round(amount * 100) / 100, costMaterials: 0, costSub: 0,
+    }
+  }, [discount, isAlaCarte, preDiscount])
+  const allLines = useMemo(() => [...lines, ...(feeLine ? [feeLine] : []), ...(discountLine ? [discountLine] : [])], [lines, feeLine, discountLine])
   const dismissedFees = feePlan.fees.filter(f => feeDismissed.includes(f.key))
 
   const cats = ['All', ...new Set(catalog.map(c => c.category))]
@@ -608,7 +638,7 @@ export default function BuildQuote() {
   // The line a line is merged into (if it still exists).
   const mergedTarget = (line) => line.mergeInto != null ? lines.find(l => l.id === line.mergeInto) || null : null
   const mergedInto = (line) => lines.filter(l => l.mergeInto === line.id)
-  const cost = showMargin ? subtotal / (1 + margin / 100) : null
+  const cost = showMargin ? preDiscount / (1 + margin / 100) : null   // the discount comes out of profit
 
   const sameClient = (a, b) => String(a || '').toLowerCase().replace(/[^a-z0-9]/g, '') === String(b || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 
@@ -617,7 +647,7 @@ export default function BuildQuote() {
   const goToProposal = () => {
     sessionStorage.setItem('proposal', JSON.stringify({
       client, email, phone, address, expiration, lines: allLines.map(l => { const c = { ...l }; delete c.why; return c }), margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
-      feeDismissed, feeOverrides,
+      feeDismissed, feeOverrides, discount: discountLine ? discount : null,
       ...(revisingParentId && sameClient(revisingClient, client) ? { parentId: revisingParentId } : {}),
       ...(draftProposalId && sameClient(draftClient, client) ? { proposalId: draftProposalId } : {}),
       fromBuilder: true,
@@ -1123,11 +1153,44 @@ export default function BuildQuote() {
               <Plus size={14} /> Add blank line
             </button>
             <div className="text-right">
-              <p className="text-xs text-gray-500 mb-0.5">{allLines.length} line{allLines.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-gray-500 mb-0.5">{lines.length + (feeLine ? 1 : 0)} line{lines.length + (feeLine ? 1 : 0) !== 1 ? 's' : ''}</p>
+              {discountLine && (
+                <>
+                  <p className="text-sm text-gray-500">Subtotal ${money2(preDiscount)}</p>
+                  <p className="text-sm font-semibold text-green-700">{discountLine.name} −${money2(-discountLine.unitPrice)}</p>
+                </>
+              )}
               <p className="text-lg font-bold text-gray-900">
                 ${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
+          </div>
+
+          {/* Discount off the project total */}
+          <div className="px-4 py-3 border-t border-gray-100">
+            {isAlaCarte ? (
+              <p className="text-xs text-gray-400 flex items-center gap-1.5"><Tag size={13} /> Discounts apply to a project total — not available on à la carte proposals.</p>
+            ) : !discount ? (
+              <button onClick={() => setDiscount({ mode: 'amount', value: '', label: '' })} className="flex items-center gap-1.5 text-sm text-green-700 hover:underline">
+                <Tag size={14} /> Add a discount
+              </button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700"><Tag size={14} className="text-green-700" /> Discount</span>
+                <div className="inline-flex rounded-lg border border-gray-200 p-0.5" role="group" aria-label="Discount type">
+                  {[['amount', '$ off'], ['percent', '% off']].map(([m, label]) => (
+                    <button key={m} type="button" onClick={() => setDiscount(d => ({ ...d, mode: m }))}
+                      className={`px-2.5 py-1 text-xs rounded-md ${discount.mode === m ? 'bg-green-700 text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>{label}</button>
+                  ))}
+                </div>
+                <input type="number" min="0" step={discount.mode === 'percent' ? '0.5' : '50'} aria-label="Discount amount" autoFocus
+                  value={discount.value} onChange={e => setDiscount(d => ({ ...d, value: e.target.value }))}
+                  placeholder={discount.mode === 'percent' ? '10' : '1000'} className="w-24 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right" />
+                <input aria-label="Discount reason" value={discount.label} onChange={e => setDiscount(d => ({ ...d, label: e.target.value }))}
+                  placeholder="Shows as (e.g. Fall promotion)" className="flex-1 min-w-[160px] border border-gray-200 rounded-lg px-2 py-1 text-sm" />
+                <button onClick={() => setDiscount(null)} title="Remove discount" className="p-1 text-gray-400 hover:text-red-500"><X size={15} /></button>
+              </div>
+            )}
           </div>
         </div>
 

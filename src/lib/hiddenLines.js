@@ -47,7 +47,21 @@ export function mergeLines(lines = []) {
   return merged
 }
 
+// The discount is shown under the items (Project Total → Discount → Total),
+// never as an item of its own.
 export function customerLines(lines = [], data = {}) {
-  const merged = mergeLines(lines)
+  const merged = mergeLines(lines).filter(l => !isDiscountLine(l))
   return isSummed(data) ? merged.filter(l => !l.hidden) : merged
+}
+
+// ── Discount ─────────────────────────────────────────────────────────────────
+// A discount is one quote line ({ isDiscount: true }) with a negative price, so
+// every total (proposal, shared link, email, contract, payments, tracker)
+// already includes it.
+export const isDiscountLine = (l) => !!l?.isDiscount
+// { label, amount } (amount positive, e.g. 1500 for $1,500 off) or null.
+export function discountOf(lines = []) {
+  const d = (lines || []).filter(isDiscountLine)
+  if (!d.length) return null
+  return { label: d[0].name || 'Discount', amount: -d.reduce((s, l) => s + lineTotal(l), 0) }
 }
