@@ -262,9 +262,12 @@ function GridForm({ form, ctx }) {
     const free = row.filter(c => !c.w).length
     return row.map(c => `${((c.w || (free ? (1 - fixed) / free : 0)) * 100).toFixed(2)}%`).join(' ')
   }
-  const Head = ({ c }) => <div className={`dp-gcell dp-ghead${c.center ? ' dp-center' : ''}`}><Inline text={c.h} ctx={ctx} /></div>
-  const Body = ({ c }) => (
-    <div className="dp-gcell">
+  // Plain render helpers, not components: a component defined in here would be
+  // a new type on every render, so React would rebuild its inputs on each
+  // keystroke and the typing box would lose focus.
+  const head = (c, key) => <div key={key} className={`dp-gcell dp-ghead${c.center ? ' dp-center' : ''}`}><Inline text={c.h} ctx={ctx} /></div>
+  const body = (c, key) => (
+    <div key={key} className="dp-gcell">
       {c.lines && c.lines.map((l, li) => <Line key={li} line={l} ctx={ctx} />)}
     </div>
   )
@@ -280,14 +283,14 @@ function GridForm({ form, ctx }) {
           const split = row.every(c => c.h && c.lines)
           if (split) return (
             <Fragment key={ri}>
-              <div className="dp-grow" style={{ gridTemplateColumns: cols }}>{row.map((c, ci) => <Head key={ci} c={c} />)}</div>
-              <div className="dp-grow" style={{ gridTemplateColumns: cols }}>{row.map((c, ci) => <Body key={ci} c={c} />)}</div>
+              <div className="dp-grow" style={{ gridTemplateColumns: cols }}>{row.map((c, ci) => head(c, ci))}</div>
+              <div className="dp-grow" style={{ gridTemplateColumns: cols }}>{row.map((c, ci) => body(c, ci))}</div>
             </Fragment>
           )
           return (
             <div key={ri} className="dp-grow" style={{ gridTemplateColumns: cols }}>
               {row.map((c, ci) => c.h && !c.lines
-                ? <Head key={ci} c={c} />
+                ? head(c, ci)
                 : <div key={ci} className="dp-gcell">
                     {c.h && <div className="dp-cellh"><Inline text={c.h} ctx={ctx} /></div>}
                     {(c.lines || []).map((l, li) => <Line key={li} line={l} ctx={ctx} />)}
