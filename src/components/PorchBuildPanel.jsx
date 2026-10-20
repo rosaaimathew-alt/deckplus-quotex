@@ -3,6 +3,7 @@ import { X, Lock, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
+import { matchCollection } from '../lib/deckPricing'
 import {
   PORCH_BUILD_DEFAULTS, PORCH_BUILD_INPUT_DEFAULTS, PORCH_TYPES, PORCH_TIES, PORCH_FLOORS, PORCH_ROOFS,
   PORCH_BUILD_GROUPS, computePorchBuild, buildPorchScope, PORCH_WINDOW_MAX_H,
@@ -264,10 +265,15 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
 
       {/* ── Flooring, steps, railing ──────────────────────────────────── */}
       <div className="rounded-xl border border-gray-200 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Field label="Flooring upgrade" hint="Trex upgrades are priced per LF of board, like the deck tool.">
-          <select className={selCls} value={inp.flooring || ''} onChange={e => set({ flooring: e.target.value || null })}>
+        <Field label="Flooring upgrade" hint="Decking upgrades are $/SF of porch floor — the deck price-list rate less PT, which the porch already includes.">
+          <select className={selCls} value={({ floor_trex_enhance: 'deckfloor_trex_enhance', floor_trex_transcend: 'deckfloor_trex_transcend' })[inp.flooring] || inp.flooring || ''} onChange={e => set({ flooring: e.target.value || null })}>
             <option value="">None (PT floor included)</option>
-            {floorKeys.map(k => <option key={k} value={k}>{rates[k].label} — {rates[k].rate}/{rates[k].unit}</option>)}
+            <optgroup label="Decking">
+              {floorKeys.filter(k => rates[k].deckColl).map(k => <option key={k} value={k}>{rates[k].deckColl} — +${rates[k].rate}/SF</option>)}
+            </optgroup>
+            <optgroup label="Other flooring">
+              {floorKeys.filter(k => !rates[k].deckColl).map(k => <option key={k} value={k}>{rates[k].label} — ${rates[k].rate}/{rates[k].unit}</option>)}
+            </optgroup>
           </select>
         </Field>
         {inp.floor === 'patio' && (
@@ -279,21 +285,21 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           </Field>
         )}
         {inp.floor === 'deck' && (
-          <Field label="Steps" hint={result.risers ? `${result.risers} risers from the deck height` : 'Set a deck height to add steps.'}>
+          <Field label="Steps" hint={result.risers ? `${result.risers} steps (deck height ÷ 8.25″) × width ft × 1.5 = SF × the collection's $/SF` : 'Set a deck height to add steps.'}>
             <div className="flex gap-2">
-              <select className={selCls} value={inp.steps?.product || ''} onChange={e => setSub('steps', { product: e.target.value })}>
+              <select className={selCls} value={matchCollection(inp.steps?.product) || ''} onChange={e => setSub('steps', { product: e.target.value })}>
                 <option value="">None</option>
-                {stepProducts.map(p => <option key={p}>{p}</option>)}
+                {stepProducts.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
               <input type="number" min="3" title="Stair width (ft)" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.steps?.stairWidthFt ?? 4} onChange={e => setSub('steps', { stairWidthFt: e.target.value })} />
             </div>
           </Field>
         )}
-        <Field label="Landings" hint="Each landing is 16 SF of board.">
+        <Field label="Landings" hint="Each landing is 4′×4′ (16 SF) × the collection's $/SF.">
           <div className="flex gap-2">
-            <select className={selCls} value={inp.landings?.product || ''} onChange={e => setSub('landings', { product: e.target.value })}>
+            <select className={selCls} value={matchCollection(inp.landings?.product) || ''} onChange={e => setSub('landings', { product: e.target.value })}>
               <option value="">None</option>
-              {landingProducts.map(p => <option key={p}>{p}</option>)}
+              {landingProducts.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
             <input type="number" min="0" title="Count" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.landings?.count ?? 0} onChange={e => setSub('landings', { count: e.target.value })} />
           </div>

@@ -5,11 +5,13 @@
 //
 //   computePorchBuild(inputs, rates) → { lines, groups, total, cost, area, layout }
 //
-// Quantities that follow decking-board logic (porch floor upgrades, steps,
-// landings) are linear feet of board, exactly like the deck tool, because
-// per-SF pricing drifts from the boards actually bought on a deep porch.
+// Decking (porch floor upgrades, steps, landings) uses the deck tool's own
+// collection list and is priced per SF, like the deck price list: steps are
+// # of steps × stair width × 1.5, landings 4′×4′ each, and a floor upgrade is
+// that collection's deck $/SF less PT (the PT floor is already in the porch).
 
 import { scopeFor, countWords } from './lib/scopeText'
+import { DECK_COLLECTIONS, STEP_FACTOR, matchCollection } from './lib/deckPricing'
 
 export const BOARD_FACE_IN  = 5.5    // 1×6 decking face width → 12/5.5 LF of board per SF
 export const RISER_MAX_IN   = 8.25   // max riser → step count from deck height
@@ -28,6 +30,22 @@ export const PORCH_BUILD_GROUPS = [
 
 // ── Rate table defaults (sell price; cost 0 until the office fills it in) ────
 const R = (label, unit, rate, group, extra = {}) => ({ label, unit, rate, cost: 0, group, ...extra })
+
+// Every deck collection → a porch floor upgrade, steps and landing row ($/SF).
+export const deckSlug = (key) => String(key).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+const PT_DECK_RATE = DECK_COLLECTIONS.find(c => c.key === 'PT')?.rate || 0
+// Porch floor upgrade prices the office has set; the rest default to the
+// collection's deck $/SF less PT until set in Item Catalog → Formulas.
+const FLOOR_UPGRADE_RATES = { 'TimberTech RESERVE': 15.4 }
+const DECK_FLOOR_ROWS = Object.fromEntries(DECK_COLLECTIONS.filter(c => c.key !== 'PT').map(c => [
+  `deckfloor_${deckSlug(c.key)}`, R(`${c.key} porch floor upgrade`, 'SF', FLOOR_UPGRADE_RATES[c.key] ?? +(c.rate - PT_DECK_RATE).toFixed(2), 'flooring', { floor: true, deckColl: c.key }),
+]))
+const DECK_STEP_ROWS = Object.fromEntries(DECK_COLLECTIONS.flatMap(c => [
+  [`decksteps_${deckSlug(c.key)}`,   R(`${c.key} steps`,   'SF', c.rate, 'stepsrail', { steps: c.key })],
+  [`decklanding_${deckSlug(c.key)}`, R(`${c.key} landing`, 'SF', c.rate, 'stepsrail', { landing: c.key })],
+]))
+// Older saved porches used these keys / names.
+const LEGACY_FLOOR = { floor_trex_enhance: 'deckfloor_trex_enhance', floor_trex_transcend: 'deckfloor_trex_transcend' }
 
 export const PORCH_BUILD_DEFAULTS = {
   // Base matrix — $/SF of floor area. Eze-Breeze porches use the SCREEN rows; sunrooms the OPEN rows.
@@ -99,9 +117,8 @@ export const PORCH_BUILD_DEFAULTS = {
   paint_trex_hybrid_rail: R('Paint/stain Trex deck, hybrid rail',           'LF', 8.12, 'finishes', { option: true }),
   paint_trex_rail:    R('Paint/stain Trex deck, Trex rail',                 'LF', 6.16, 'finishes', { option: true }),
 
-  // Flooring (Trex porch-floor upgrades are per LF of board over the PT floor)
-  floor_trex_enhance:   R('Trex Enhance porch floor upgrade',               'LF', 3.85, 'flooring', { floor: true }),
-  floor_trex_transcend: R('Trex Transcend porch floor upgrade',             'LF', 8.8,  'flooring', { floor: true }),
+  // Flooring — every deck collection as a porch floor upgrade ($/SF over the PT floor)
+  ...DECK_FLOOR_ROWS,
   pt_plywood:           R('PT plywood',                                     'SF', 4.5,  'flooring', { floor: true }),
   lvt:                  R('LVT flooring only',                              'SF', 26,   'flooring', { floor: true }),
   lvt_concrete:         R('LVT on concrete',                                'SF', 23,   'flooring', { floor: true }),
@@ -113,31 +130,8 @@ export const PORCH_BUILD_DEFAULTS = {
   concrete_reinforced:  R('Reinforced concrete 4″ (mesh / underlayment)',   'SF', 20,   'flooring', { concrete: true }),
   concrete_access:      R('Concrete + hill / driveway / house access',      'SF', 20,   'flooring', { concrete: true }),
 
-  // Steps & landings — per LF of decking board
-  steps_pt:               R('PT steps',                        'LF', 17.5,  'stepsrail', { steps: 'PT wood' }),
-  landing_pt:             R('PT landing',                      'LF', 17.5,  'stepsrail', { landing: 'PT wood' }),
-  steps_trex_enhance:     R('Trex Enhance steps',              'LF', 24.2,  'stepsrail', { steps: 'Trex Enhance' }),
-  landing_trex_enhance:   R('Trex Enhance landing',            'LF', 24.2,  'stepsrail', { landing: 'Trex Enhance' }),
-  steps_trex_transcend:   R('Trex Transcend steps',            'LF', 17.6,  'stepsrail', { steps: 'Trex Transcend' }),
-  landing_trex_transcend: R('Trex Transcend landing',          'LF', 30.8,  'stepsrail', { landing: 'Trex Transcend' }),
-  steps_trex_lineage:     R('Trex Lineage steps',              'LF', 30.8,  'stepsrail', { steps: 'Trex Lineage' }),
-  landing_trex_lineage:   R('Trex Lineage landing',            'LF', 30.8,  'stepsrail', { landing: 'Trex Lineage' }),
-  steps_trex_signature:   R('Trex Signature steps',            'LF', 30.8,  'stepsrail', { steps: 'Trex Signature' }),
-  landing_trex_signature: R('Trex Signature landing',          'LF', 36.85, 'stepsrail', { landing: 'Trex Signature' }),
-  steps_tt_prime:         R('TimberTech Prime/Prime+ steps',   'LF', 24.2,  'stepsrail', { steps: 'TimberTech Prime' }),
-  landing_tt_prime:       R('TimberTech Prime/Prime+ landing', 'LF', 24.2,  'stepsrail', { landing: 'TimberTech Prime' }),
-  steps_tt_terrain:       R('TimberTech Terrain/+ steps',      'LF', 26.4,  'stepsrail', { steps: 'TimberTech Terrain' }),
-  landing_tt_terrain:     R('TimberTech Terrain/+ landing',    'LF', 26.4,  'stepsrail', { landing: 'TimberTech Terrain' }),
-  steps_tt_reserve:       R('TimberTech Reserve steps',        'LF', 28.05, 'stepsrail', { steps: 'TimberTech Reserve' }),
-  landing_tt_reserve:     R('TimberTech Reserve landing',      'LF', 28.05, 'stepsrail', { landing: 'TimberTech Reserve' }),
-  steps_tt_harvest:       R('TimberTech Harvest PVC steps',    'LF', 29.5,  'stepsrail', { steps: 'TimberTech Harvest PVC' }),
-  landing_tt_harvest:     R('TimberTech Harvest PVC landing',  'LF', 29.5,  'stepsrail', { landing: 'TimberTech Harvest PVC' }),
-  steps_tt_landmark:      R('TimberTech Landmark PVC steps',   'LF', 31.35, 'stepsrail', { steps: 'TimberTech Landmark PVC' }),
-  landing_tt_landmark:    R('TimberTech Landmark PVC landing', 'LF', 31.35, 'stepsrail', { landing: 'TimberTech Landmark PVC' }),
-  steps_tt_vintage_pvc:   R('TimberTech Vintage PVC steps',    'LF', 33,    'stepsrail', { steps: 'TimberTech Vintage PVC' }),
-  landing_tt_vintage_pvc: R('TimberTech Vintage PVC landing',  'LF', 33,    'stepsrail', { landing: 'TimberTech Vintage PVC' }),
-  steps_tt_vintage_tg:    R('TimberTech Vintage T&G steps',    'LF', 40.15, 'stepsrail', { steps: 'TimberTech Vintage T&G' }),
-  landing_tt_vintage_tg:  R('TimberTech Vintage T&G landing',  'LF', 40.15, 'stepsrail', { landing: 'TimberTech Vintage T&G' }),
+  // Steps & landings — every deck collection, $/SF like the deck tool
+  ...DECK_STEP_ROWS,
 
   // Railing — per LF
   rail_wood_2x2:            R('2×2 pickets wood rail',                       'LF', 17,    'stepsrail', { rail: true }),
@@ -440,9 +434,9 @@ export function computePorchBuild(input, ratesIn) {
   if (inp.seedStraw) add('seed_straw', 1)
 
   // Flooring (one choice) — Trex upgrades are LF of board over the included PT floor
-  const fl = inp.flooring
+  const fl = LEGACY_FLOOR[inp.flooring] || inp.flooring
   if (fl && rates[fl]?.floor) add(fl, rates[fl].unit === 'LF' ? boardLF(area) : area)
-  const compositeFloor = fl === 'floor_trex_enhance' || fl === 'floor_trex_transcend'
+  const compositeFloor = !!rates[fl]?.deckColl
   if (inp.concrete && inp.floor === 'patio' && rates[inp.concrete]?.concrete) {
     const key = inp.concrete === 'concrete_4' && area < 200 ? 'concrete_small' : inp.concrete
     add(key, area)
@@ -453,15 +447,16 @@ export function computePorchBuild(input, ratesIn) {
     add(inp.floor === 'patio' ? 'paint_porch_patio' : compositeFloor ? 'paint_porch_composite' : 'paint_porch_deck', area)
   }
 
-  // Steps & landings — LF of decking board, deck-tool logic
+  // Steps & landings — deck-tool logic, $/SF: steps = # of steps × width × 1.5
   const risers = inp.floor === 'deck' && n(inp.deckHeightFt) > 0 ? Math.ceil(n(inp.deckHeightFt) * 12 / RISER_MAX_IN) : 0
-  if (inp.steps?.product && risers > 0) {
-    const key = Object.keys(rates).find(k => rates[k].steps === inp.steps.product)
-    if (key) add(key, risers * n(inp.steps.stairWidthFt || 4) * 2, `${risers} risers × ${n(inp.steps.stairWidthFt || 4)}′ × 2 boards`)
+  const stepColl = matchCollection(inp.steps?.product)
+  if (stepColl && risers > 0) {
+    const w = n(inp.steps.stairWidthFt || 4)
+    add(`decksteps_${deckSlug(stepColl)}`, risers * w * STEP_FACTOR, `${risers} steps × ${w}′ × ${STEP_FACTOR}`)
   }
-  if (inp.landings?.product && n(inp.landings.count) > 0) {
-    const key = Object.keys(rates).find(k => rates[k].landing === inp.landings.product)
-    if (key) add(key, boardLF(n(inp.landings.count) * LANDING_SF), `${n(inp.landings.count)} × ${LANDING_SF} SF of board`)
+  const landingColl = matchCollection(inp.landings?.product)
+  if (landingColl && n(inp.landings.count) > 0) {
+    add(`decklanding_${deckSlug(landingColl)}`, n(inp.landings.count) * LANDING_SF, `${n(inp.landings.count)} × 4′×4′`)
   }
   if (inp.railing?.product && n(inp.railing.lf) > 0 && rates[inp.railing.product]?.rail) add(inp.railing.product, n(inp.railing.lf))
   // Fascia follows the deck's exposed perimeter unless the rep overrides the LF.
@@ -494,6 +489,12 @@ export function computePorchBuild(input, ratesIn) {
 // Each priced line writes the description of its catalog item (Deck Plus's own
 // scope wording), with the size / count / square feet filled in.
 export const PORCH_CATALOG_NAMES = {
+  // Deck collections: "<family> Steps" / "<family> Landing" / "<family> Upgrade"
+  ...Object.fromEntries(DECK_COLLECTIONS.flatMap(c => [
+    [`decksteps_${deckSlug(c.key)}`, `${c.fam} Steps`],
+    [`decklanding_${deckSlug(c.key)}`, `${c.fam} Landing`],
+    ...(c.key === 'PT' ? [] : [[`deckfloor_${deckSlug(c.key)}`, c.key === 'Trex ENHANCE' ? 'Trex Enhance Upgrade' : c.key === 'Trex TRANSCEND' ? 'Trex Transcend Upgrade' : `${c.fam} Upgrade`]]),
+  ])),
   base_screen_wall_deck: 'ScreenEze Wall Tie on PT Deck', base_screen_roof_deck: 'ScreenEze Roof Tie on PT Deck',
   base_screen_wall_patio: 'ScreenEze Wall Tie on patio',  base_screen_roof_patio: 'ScreenEze Roof Tie on patio',
   base_open_wall_deck: 'Open Wall Tie on PT Deck', base_open_roof_deck: 'Open Roof Tie on PT Deck',
@@ -507,17 +508,9 @@ export const PORCH_CATALOG_NAMES = {
   shiplap_wood: 'Shiplap Wood 1x6" wall SF', knee_wall: 'Knee wall Hardie/PlyBeaded SF', tv_wall: "TV Wall Shiplap/Siding/Paint 5'x9'",
   paint_porch_patio: 'Paint/Stain PORCH on PATIO', paint_porch_composite: 'Paint/Stain PORCH on TREX DECK', paint_porch_deck: 'Paint/Stain PORCH on PT DECK',
   paint_pt_deck: 'Paint/Stain on PT Deck (Porch)', paint_trex_hybrid_rail: 'Paint/Stain on TREX Deck HYBRID RAIL SF', paint_trex_rail: 'Paint/Stain on TREX Deck TREX RAIL SF',
-  floor_trex_enhance: 'Trex Enhance Upgrade', floor_trex_transcend: 'Trex Transcend Upgrade', lvt: 'LVT Flooring only', lvt_concrete: 'LVT on concrete',
+  lvt: 'LVT Flooring only', lvt_concrete: 'LVT on concrete',
   concrete_4: 'Concrete 4"', concrete_small: 'Concrete slab LESS THAN 200SF', concrete_reinforced: 'Reinforced Concrete 4" (mesh/flooring underlayment)',
   concrete_access: 'CONCRETE + HILL DRIVEWAY HOUSE',
-  steps_pt: 'PT Steps', landing_pt: 'PT Landing',
-  steps_trex_enhance: 'Trex ENHANCE Steps', landing_trex_enhance: 'Trex ENHANCE Landing', steps_trex_transcend: 'Trex TRANSCEND Steps', landing_trex_transcend: 'Trex TRANSCEND Landing',
-  steps_trex_lineage: 'Trex LINEAGE Steps', landing_trex_lineage: 'Trex LINEAGE Landing', steps_trex_signature: 'Trex SIGNATURE Steps', landing_trex_signature: 'Trex SIGNATURE Landing',
-  steps_tt_prime: 'TimberTech PRIME/+ Steps', landing_tt_prime: 'TimberTech PRIME/+ Landing', steps_tt_terrain: 'TimberTech TERRAIN/+ Steps', landing_tt_terrain: 'TimberTech TERRAIN/+ Landing',
-  steps_tt_reserve: 'TimberTech RESERVE Steps', landing_tt_reserve: 'TimberTech RESERVE Landing', steps_tt_harvest: 'TimberTech HARVEST PVC Steps', landing_tt_harvest: 'TimberTech HARVEST PVC Landing',
-  steps_tt_landmark: 'TimberTech LANDMARK PVC Steps', landing_tt_landmark: 'TimberTech LANDMARK PVC Landing',
-  steps_tt_vintage_pvc: 'TimberTech VINTAGE PVC Steps', landing_tt_vintage_pvc: 'TimberTech VINTAGE PVC Landing',
-  steps_tt_vintage_tg: 'TimberTech VINTAGE T&G Steps', landing_tt_vintage_tg: 'TimberTech VINTAGE T&G Landing',
   rail_hybrid_wood: 'Hybrid Railing / wood cap', rail_hybrid_trex: 'Hybrid Railing / trex cap', rail_trex_transcend: 'Trex Transcend Railing',
   rail_trex_signature: 'Trex SIGNATURE Alum. Railing',
   fascia_pvc: 'PVC WHITE FASCIA LF', fascia_trex: 'TREX ENHANCE/TRANSCEND/LINEAGE FASCIA LF', fascia_tt_composite: 'TimberTech COMPOSITE FASCIA LF', fascia_tt_pvc: 'TimberTech PVC FASCIA LF',
@@ -540,15 +533,19 @@ export function porchLineScope(l, inp, result, catalog) {
   const name = PORCH_CATALOG_NAMES[l.key]
   const fallback = `${l.label}${l.unit === 'EA' && l.qty > 1 ? ` (${l.qty})` : ''}.`
   if (!name) return fallback
-  if (l.key.startsWith('steps_')) {
+  if (l.key.startsWith('decksteps_')) {
     const t = scopeFor(catalog, name, { count: result.risers, width: n(inp.steps?.stairWidthFt || 4) }, fallback)
     return t.replace(/^__’x__’ landing and a/, 'A')
   }
-  if (l.key.startsWith('landing_')) {
+  if (l.key.startsWith('decklanding_')) {
     const cnt = n(inp.landings?.count)
     let t = scopeFor(catalog, name, { size: [4, 4] }, fallback)
     if (cnt > 1) t = t.replace('on one approximately 4’x4’ landing', `on ${countWords(cnt)} approximately 4’x4’ landings`)
     return t
+  }
+  if (l.key.startsWith('deckfloor_')) {
+    const coll = PORCH_BUILD_DEFAULTS[l.key]?.deckColl || l.label
+    return scopeFor(catalog, name, { size: [n(inp.width), n(inp.depth)], sqft: l.qty }, `Upgrade the porch floor to ${coll} decking.`)
   }
   if (l.key === 'sun_insulation') return 'Insulate the sunroom.'
   if (l.key === 'sun_window') {

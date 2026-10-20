@@ -7,6 +7,9 @@
 // "sunroom", "patio"…); clauses with no key word belong to the tool before them
 // ("…deck, 4 feet high, hybrid rail").
 
+import { matchCollection } from './deckPricing'
+import { deckSlug } from '../porchBuild'
+
 const WORDS = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
   eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
@@ -174,8 +177,11 @@ function readPorch(t) {
   else if (has(t, /simple (electric|package)/)) out.elecPackage = 'elec_simple'
   else if (has(t, /\b(standard )?(electric|electrical|lights and (a )?fan|fan and lights)\b/)) out.elecPackage = 'elec_standard'
 
-  if (has(t, /trex (enhance )?(floor|decking)|enhance floor/)) out.flooring = 'floor_trex_enhance'
-  else if (has(t, /transcend (floor|decking)/)) out.flooring = 'floor_trex_transcend'
+  // "Trex Lineage floor", "TimberTech Reserve decking" → that collection's floor
+  // upgrade (only the few words right before floor / decking are read).
+  const floorWords = (t.match(/((?:[a-z0-9&+"./]+\s+){1,3})(?:floor|flooring|decking)\b/) || [])[1] || ''
+  const floorColl = matchCollection(floorWords) || (/\btrex\b/.test(floorWords) ? 'Trex ENHANCE' : /\b(timber ?tech|azek)\b/.test(floorWords) ? 'TimberTech PRIME/+' : null)
+  if (floorColl && floorColl !== 'PT') out.flooring = `deckfloor_${deckSlug(floorColl)}`
 
   const extras = {}
   const e15 = countOf(t, '(?:15 ?amp|15a) outlets?'); if (e15) extras.elec_outlet15 = e15
