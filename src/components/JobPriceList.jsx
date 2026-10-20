@@ -107,6 +107,7 @@ export default function JobPriceList({ proposal }) {
       y += 6
       if (pl.discount) row({ item: pl.discount.label, amount: money(-pl.discount.amount) }, { bold: true })
       row({ item: 'CONTRACT TOTAL', amount: money(pl.contract) }, { bold: true, fill: [226, 232, 240], color: 17, size: 10 })
+      if (pl.jicTotal > 0) row({ item: 'Total JIC built into this job (included in the contract total)', amount: money(pl.jicTotal) }, { bold: true, italic: true, fill: [255, 251, 235], color: 120 })
       for (const co of pl.changeOrders) row({ item: `Change order: ${co.label}`, amount: money(co.amount) })
       if (pl.changeOrders.length) row({ item: 'TOTAL WITH CHANGE ORDERS', amount: money(pl.grandTotal) }, { bold: true, fill: [226, 232, 240], color: 17, size: 10 })
       pdf.save(`${fileBase(pl)}.pdf`)
@@ -188,6 +189,12 @@ export default function JobPriceList({ proposal }) {
               <td className={`${td} font-bold text-gray-900`} colSpan={4}>Contract total</td>
               <td className={`${td} text-right font-bold text-gray-900`}>{money(pl.contract)}</td>
             </tr>
+            {pl.jicTotal > 0 && (
+              <tr className="bg-amber-50">
+                <td className={`${td} font-semibold italic text-amber-800`} colSpan={4}>Total JIC built into this job (included in the contract total above)</td>
+                <td className={`${td} text-right font-semibold italic text-amber-800`}>{money(pl.jicTotal)}</td>
+              </tr>
+            )}
             {pl.changeOrders.map((co, i) => (
               <tr key={`co${i}`}><td className={`${td} text-gray-700`} colSpan={4}>Change order: {co.label}</td><td className={`${td} text-right`}>{money(co.amount)}</td></tr>
             ))}

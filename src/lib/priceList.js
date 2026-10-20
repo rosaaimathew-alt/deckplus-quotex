@@ -102,6 +102,7 @@ export function priceListRows(pl) {
   }
   if (pl.discount) out.push({ Item: pl.discount.label, Qty: '', Unit: '', Rate: '', Amount: -pl.discount.amount, Note: 'Discount' })
   out.push({ Item: 'CONTRACT TOTAL', Qty: '', Unit: '', Rate: '', Amount: pl.contract, Note: '' })
+  if (pl.jicTotal > 0) out.push({ Item: 'TOTAL JIC BUILT INTO THIS JOB', Qty: '', Unit: '', Rate: '', Amount: pl.jicTotal, Note: 'Included in the contract total' })
   for (const co of pl.changeOrders) out.push({ Item: co.label, Qty: '', Unit: '', Rate: '', Amount: co.amount, Note: 'Signed change order' })
   if (pl.changeOrders.length) out.push({ Item: 'TOTAL WITH CHANGE ORDERS', Qty: '', Unit: '', Rate: '', Amount: pl.grandTotal, Note: '' })
   return out
