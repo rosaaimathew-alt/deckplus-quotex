@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, FileCheck } from 'lucide-react'
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
+import { useScopedProposals } from '../lib/proposalScope'
 import { wonRevenueOf } from '../contractTotal'
 import { TodoCard } from '../components/TodoPanel'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
 import NeedsAttention from '../components/NeedsAttention'
-import { MenuChip } from '../components/FilterBar'
+import { MenuChip, MineOrgToggle } from '../components/FilterBar'
 import { attentionItems, nextReminderDate, isJobClosed } from '../lib/attention'
 import { useNav } from '../nav'
 
@@ -72,7 +73,8 @@ const LinkBtn = ({ onClick, children }) => (
 
 export default function Dashboard() {
   const navigate   = useNavigate()
-  const proposals  = useStore(s => s.proposals)
+  // Office / admin: your own deals by default, or the whole organization's.
+  const { proposals, canChoose, mineOnly, setMineOnly } = useScopedProposals()
   const jobCosts   = useStore(s => s.jobCosts) || {}
   const { can, role } = useNav()
   const attention  = attentionItems({ proposals, jobCosts, can, role })
@@ -147,8 +149,9 @@ export default function Dashboard() {
       {/* Numbers — one quiet strip with a single period choice */}
       <section className="bg-white rounded-xl border border-gray-200 overflow-hidden" aria-label="Your numbers">
         <div className="px-5 pt-3.5 flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-gray-900">Your numbers</p>
+          <p className="text-sm font-semibold text-gray-900">{canChoose && !mineOnly ? 'Organization numbers' : 'Your numbers'}</p>
           <div className="flex items-center gap-3">
+            {canChoose && <MineOrgToggle mineOnly={mineOnly} setMineOnly={setMineOnly} />}
             {insights && <span className="hidden sm:block"><LinkBtn onClick={() => navigate('/insights')}>All insights</LinkBtn></span>}
             <MenuChip value={periodKey} onChange={setPeriodKey} align="right" options={PERIODS.map(({ value, label }) => ({ value, label }))} />
           </div>

@@ -78,3 +78,17 @@ export function SwitchChip({ label, checked, onChange, title }) {
     </button>
   )
 }
+
+// Office / admin: show just my deals ("Mine") or the whole organization's.
+export function MineOrgToggle({ mineOnly, setMineOnly }) {
+  return (
+    <div className="inline-flex rounded-full border border-gray-200 bg-white p-0.5" role="group" aria-label="Whose numbers">
+      {[[true, 'Mine'], [false, 'Organization']].map(([v, label]) => (
+        <button key={label} type="button" onClick={() => setMineOnly(v)} aria-pressed={mineOnly === v}
+          className={`h-7 px-3 rounded-full text-xs font-medium transition-colors ${mineOnly === v ? 'bg-[var(--brand-600)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}

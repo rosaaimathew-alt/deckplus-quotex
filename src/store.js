@@ -1305,9 +1305,11 @@ export const useStore = create(
       orgLoaded: false,
       me: null,                     // { id, role: 'rep'|'pm'|'office'|'admin', displayName, email }
       members: [],                  // everyone in the org, for the PM picker
-      officeView: 'everyone',       // office/admin: 'everyone' | 'mine'
+      // office/admin: whose numbers the dashboard and pipeline show — 'mine'
+      // (default) or 'everyone' (the whole organization). Remembered per browser.
+      officeView: (() => { try { return localStorage.getItem('qx_office_view') || 'mine' } catch { return 'mine' } })(),
       contractPrefix: 'DP',
-      setOfficeView: (v) => set({ officeView: v }),
+      setOfficeView: (v) => { try { localStorage.setItem('qx_office_view', v) } catch { /* private mode */ } set({ officeView: v }) },
       // A rep assigns one of the org's PMs to a deal; that PM then sees the job.
       setProposalPm: (id, pmId) =>
         set((s) => ({

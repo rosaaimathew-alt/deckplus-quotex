@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
-import { MenuChip, QuickPicks, SwitchChip } from '../components/FilterBar'
+import { MenuChip, QuickPicks, SwitchChip, MineOrgToggle } from '../components/FilterBar'
+import { useScopedProposals } from '../lib/proposalScope'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
@@ -1198,20 +1199,15 @@ function matchesStatus(p, f) {
 // pre-filters the list (e.g. links from Home's "needs attention").
 export default function ProposalTracker({ view, initialStatus } = {}) {
   const {
-    proposals: allProposals, updateProposalStatus, setWinLossReason,
+    updateProposalStatus, setWinLossReason,
     addReminder, dismissReminder,
   } = useStore()
+  const me = useStore(s => s.me)
   const navigate = useNavigate()
 
   // Who sees what is decided by the database (a rep's store only ever holds
   // their own deals). The office additionally gets a Mine / Everyone toggle.
-  const role       = useStore(s => s.role || 'manager')
-  const me         = useStore(s => s.me)
-  const officeView = useStore(s => s.officeView || 'everyone')
-  const setOfficeView = useStore(s => s.setOfficeView)
-  const proposals = (role === 'manager' && officeView === 'mine' && me)
-    ? allProposals.filter(p => p.ownerId === me.id)
-    : allProposals
+  const { proposals, canChoose, mineOnly, setMineOnly } = useScopedProposals()
 
   const [ownTab, setTab] = useState('list')
   const tab = view || ownTab
@@ -1376,10 +1372,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
               <Bell size={13} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
             </span>
           )}
-          {role === 'manager' && me && (
-            <SwitchChip label="Only mine" checked={officeView === 'mine'} onChange={on => setOfficeView(on ? 'mine' : 'everyone')}
-              title="Show only the deals you own" />
-          )}
+          {canChoose && <MineOrgToggle mineOnly={mineOnly} setMineOnly={setMineOnly} />}
           {tab === 'list' && (
             <SwitchChip label="Numbers" checked={!statsHidden} onChange={toggleStats} title="Show totals for a period" />
           )}
