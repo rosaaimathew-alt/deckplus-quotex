@@ -7,7 +7,9 @@ import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import {
   HS_CONCRETE, HS_PAVERS, HS_WALLS, HS_ACCESSORIES, HS_KITCHEN, HS_GRANITE, HS_GRANITE_COLORS,
   HS_INPUT_DEFAULTS, HS_PUMP_TRUCK_FEE, HS_STEPPING, HS_BACKFILL, HS_GRANITE_FINISH, computeHardscape, hsRate,
+  HS_GROUPS,
 } from '../hardscape'
+import { toBreakdown } from '../lib/priceList'
 
 // ── Hardscape tool ───────────────────────────────────────────────────────────
 // Patio surface, retaining wall, patio accessories and outdoor kitchen, priced
@@ -108,6 +110,7 @@ export default function HardscapePanel({ onClose, onAdd, initial, saved }) {
       costMaterials: Math.round(result.lines.reduce((a, l) => a + (Number(l.costTotal) || 0), 0)),
       costSub: 0,
       hardscape: inp,
+      breakdown: toBreakdown(result.lines, { jic, groups: HS_GROUPS }),   // the office's price list
       builder: { tool: 'hardscape', state: { inp, jic } },
     }])
   }

@@ -21,6 +21,7 @@ import { requiredFees } from '../lib/permitFees'
 import { JicField } from '../components/Jic'
 import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
+import { toBreakdown } from '../lib/priceList'
 
 const MARGIN_DEFAULT = 30
 
@@ -168,6 +169,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
       category: 'Screen Porches',
       costMaterials: Math.round(cost),
       costSub: 0,
+      breakdown: toBreakdown(rows, { jic }),   // the office's price list
       builder: { tool: 'porch', state: { width, depth, wallH, doors, sides, jic, comps } },
     }])
   }

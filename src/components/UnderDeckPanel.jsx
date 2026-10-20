@@ -5,6 +5,7 @@ import { JicField } from './Jic'
 import { scopeFor } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import { UDC_STYLES, UDC_ELECTRICAL, UDC_INPUT_DEFAULTS, computeUnderDeck, rateFor } from '../underDeck'
+import { toBreakdown } from '../lib/priceList'
 
 // ── Under-deck ceiling tool ──────────────────────────────────────────────────
 // The rep enters the area under the deck, picks the ceiling style and counts the
@@ -62,6 +63,7 @@ export default function UnderDeckPanel({ onClose, onAdd, initial, saved }) {
       costMaterials: Math.round(result.lines.reduce((a, l) => a + (Number(l.costTotal) || 0), 0)),
       costSub: 0,
       underDeck: inp,
+      breakdown: toBreakdown(result.lines, { jic }),   // the office's price list
       builder: { tool: 'underdeck', state: { inp, jic } },
     }])
   }

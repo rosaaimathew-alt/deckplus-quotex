@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
 import JobFinancials from '../components/JobFinancials'
+import JobPriceList from '../components/JobPriceList'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1735,6 +1736,7 @@ function JobCard({ proposal }) {
   const TABS = [
     { key: 'stages',  label: 'Stages' },
     { key: 'budget',  label: 'Budget' },
+    { key: 'pricelist', label: 'Price list' },
     { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
@@ -1933,6 +1935,7 @@ function JobCard({ proposal }) {
               </div>
             )}
             {tab === 'budget'  && <BudgetTab proposal={proposal} />}
+            {tab === 'pricelist' && <JobPriceList proposal={proposal} />}
             {tab === 'costs'   && <JobFinancials proposal={proposal} />}
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}

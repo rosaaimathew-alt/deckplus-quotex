@@ -8,6 +8,7 @@ import {
   PORCH_BUILD_DEFAULTS, PORCH_BUILD_INPUT_DEFAULTS, PORCH_TYPES, PORCH_TIES, PORCH_FLOORS, PORCH_ROOFS,
   PORCH_BUILD_GROUPS, computePorchBuild, buildPorchScope, PORCH_WINDOW_MAX_H,
 } from '../porchBuild'
+import { toBreakdown } from '../lib/priceList'
 
 // ── Porch Builder panel ──────────────────────────────────────────────────────
 // The rep enters what they know on site; every price comes from the org's rate
@@ -125,6 +126,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
       costMaterials: Math.round(result.cost),
       costSub: 0,
       porchBuild: inp,
+      breakdown: toBreakdown(result.lines, { jic, groups: PORCH_BUILD_GROUPS }),   // the office's price list
       builder: { tool: 'porchbuild', state: { inp, jic } },
     }])
   }
