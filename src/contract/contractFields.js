@@ -6,7 +6,13 @@
 import { INITIALS, PACKET_FORMS, defaultPacketForms } from './deckPlusAgreement'
 import { locateAddress } from '../lib/permitFees'
 
-export const PACKET_VERSION = 'deckplus-2026-07'
+// 2026-10: the Release of Liability became optional and is listed in the
+// packet when included. Contracts sent before that always carried it.
+export const PACKET_VERSION = 'deckplus-2026-10'
+export function effectivePacket(dp = {}) {
+  const packet = Array.isArray(dp.packet) ? dp.packet : []
+  return dp.version === PACKET_VERSION || packet.includes('release') ? packet : [...packet, 'release']
+}
 
 const fmtMoney = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 export const fmtDate = (d) => {
@@ -132,7 +138,8 @@ export const ROLE_LABELS = { client: 'Client', builder: 'Deck Plus' }
 export const INITIAL_ITEM_IDS = [...INITIALS.items1, ...INITIALS.items2, ...INITIALS.items3].map(it => it.id)
 
 export function requiredSignFields(role, packet = []) {
-  const forms = PACKET_FORMS.filter(f => packet.includes(f.key)).map(f => f.key)
+  const forms = PACKET_FORMS.filter(f => packet.includes(f.key) && !f.standalone).map(f => f.key)
+  const release = packet.includes('release')
   if (role === 'client') {
     return [
       'client-agreement',
@@ -142,7 +149,7 @@ export function requiredSignFields(role, packet = []) {
       'client-unforeseen',
       ...forms.filter(k => !['e589', 'york'].includes(k)).map(k => `client-${k}`),
       'client-processing',
-      'client-release',
+      ...(release ? ['client-release'] : []),
       ...forms.filter(k => ['e589', 'york'].includes(k)).map(k => `client-${k}`),
     ]
   }

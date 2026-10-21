@@ -7,7 +7,7 @@ import EsignDisclosureGate from '../components/EsignDisclosureGate'
 import EsignAdopt from '../components/EsignAdopt'
 import { logStep } from '../lib/esignConsent'
 import DeckPlusContract from '../contract/DeckPlusContract'
-import { requiredSignFields, ROLE_LABELS, fmtShortDate } from '../contract/contractFields'
+import { requiredSignFields, effectivePacket, ROLE_LABELS, fmtShortDate } from '../contract/contractFields'
 import { changeOrderIntro } from '../contract/deckPlusAgreement'
 
 // ── Signing page ─────────────────────────────────────────────────────────────
@@ -302,7 +302,8 @@ export default function SignPage() {
   const total       = Number(d?.total) || 0
   const payments    = Array.isArray(d?.payments) ? d.payments : []
   const scopeLines  = d?.scopeLines || []
-  const requiredFields = requiredSignFields(role, dp.packet)
+  const packet = effectivePacket(dp)   // contracts sent before 2026-10 always include the release
+  const requiredFields = requiredSignFields(role, packet)
   const signedCount = requiredFields.filter(f => appliedFields.has(f)).length
   const isComplete  = requiredFields.length === 0 || signedCount === requiredFields.length
   const progress    = requiredFields.length > 0 ? Math.round((signedCount / requiredFields.length) * 100) : 100
@@ -376,7 +377,7 @@ export default function SignPage() {
       <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4 dp-signing">
         <DeckPlusContract
           className="bg-white shadow-lg rounded-sm overflow-hidden"
-          values={dp.values} checks={dp.checks} packet={dp.packet}
+          values={dp.values} checks={dp.checks} packet={packet}
           scopeLines={scopeLines} projectSummary={d?.projectSummary || ''} total={total} payments={payments}
           renderSig={renderSig} renderSigDate={renderSigDate} renderInit={renderInit}
         />

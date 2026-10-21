@@ -689,7 +689,7 @@ export default function ContractView() {
               {PACKET_FORMS.map(f => <button key={f.key} onClick={() => togglePacket(f.key)} className={btn(packetKeys.includes(f.key), 'bg-amber-500 text-white border-amber-500')}><FileText size={12} className="inline mr-1 -mt-0.5" />{f.label}</button>)}
               {packet !== null && <button onClick={() => setPacket(null)} className="text-xs text-gray-400 hover:text-gray-600 underline">reset to auto</button>}
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">Pages 1–7, the Scope of Work, the Processing Form and the General Release of Liability print on every contract. Spec sheets follow the Scope of Work; the NC E-589CI affidavit (all NC jobs) and the York County permit application (York County jobs) print last.</p>
+            <p className="text-xs text-gray-400 mt-1.5">Pages 1–7, the Scope of Work and the Processing Form print on every contract. The Release of Liability is optional — click it to add it to this contract. Spec sheets follow the Scope of Work; the NC E-589CI affidavit (all NC jobs) and the York County permit application (York County jobs) print last.</p>
           </div>
 
           <div>

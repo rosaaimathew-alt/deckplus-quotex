@@ -13,7 +13,8 @@
 //   {{check:id}}  a checkbox the office ticks;  {{init:id}} client initials box
 //
 // Pages 1–7 and 12 print on every contract. Pages 8–11 are trade forms that
-// print only when the job needs them (see PACKET_FORMS.when).
+// print only when the job needs them (see PACKET_FORMS.when). The General
+// Release of Liability (page 13) is optional, added case by case.
 
 export const CONTRACT_SOURCE = {
   title: 'DECK PLUS CONTRACTOR AGREEMENT',
@@ -464,6 +465,8 @@ export const PACKET_FORMS = [
   { key: 'porch',      label: 'Porch Detail Form',         page: 9,  when: (job) => /porch|sunroom|3.?season|screen|eze/i.test(job.types) },
   { key: 'deck',       label: 'Deck Detail Form',          page: 10, when: (job) => /deck/i.test(job.types) },
   { key: 'hardscape',  label: 'Patio Detail Form',         page: 11, when: (job) => /hardscape|patio|paver|firepit|fire pit|kitchen|fireplace|wall/i.test(job.types) },
+  // Optional, case by case: off unless the office adds it. Prints after the Processing Form.
+  { key: 'release',    label: 'Release of Liability',      page: 13, when: () => false, standalone: true },
   // Government forms, after the Processing Form and the Release
   { key: 'e589',       label: 'NC E-589CI Affidavit',       page: 14, when: (job) => /^NC$/i.test(job.state || ''), image: true },
   { key: 'york',       label: 'York County Permit App',     page: 15, when: (job) => /^york$/i.test(job.county || ''), image: true },

@@ -325,7 +325,7 @@ function ProcessingPage({ ctx }) {
   )
 }
 
-// ── General Release of Liability (every contract) ───────────────────────────
+// ── General Release of Liability (optional — when the packet includes it) ───
 function ReleasePage({ ctx }) {
   const R = RELEASE
   return (
@@ -440,7 +440,7 @@ export default function DeckPlusContract({
   innerRef, className = '', style,
 }) {
   const ctx = makeCtx({ values, checks, editable, onValue, onCheck, renderSig, renderSigDate, renderInit })
-  const forms = PACKET_FORMS.filter(f => packet.includes(f.key) && !f.image)
+  const forms = PACKET_FORMS.filter(f => packet.includes(f.key) && !f.image && !f.standalone)
   const govForms = PACKET_FORMS.filter(f => packet.includes(f.key) && f.image)
   const IMAGE_FORMS = { e589: E589CI_FORM, york: YORK_PERMIT_FORM }
   return (
@@ -466,8 +466,12 @@ export default function DeckPlusContract({
       ))}
       <PageBreak />
       <ProcessingPage ctx={ctx} />
-      <PageBreak />
-      <ReleasePage ctx={ctx} />
+      {packet.includes('release') && (
+        <>
+          <PageBreak />
+          <ReleasePage ctx={ctx} />
+        </>
+      )}
       {govForms.map(f => (
         <Fragment key={f.key}>
           <PageBreak />

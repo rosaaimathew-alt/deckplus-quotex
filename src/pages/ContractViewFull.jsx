@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Printer, Loader2 } from 'lucide-react'
 import DeckPlusContract from '../contract/DeckPlusContract'
-import { fmtShortDate, ROLE_LABELS } from '../contract/contractFields'
+import { fmtShortDate, ROLE_LABELS, effectivePacket } from '../contract/contractFields'
 
 // ── Signed contract view (/view/:recordId) ───────────────────────────────────
 // Renders the packet exactly as it was sent, with every party's signatures and
@@ -70,7 +70,7 @@ export default function ContractViewFull() {
         {dp ? (
           <DeckPlusContract
             className="bg-white shadow-lg rounded-sm overflow-hidden"
-            values={dp.values} checks={dp.checks} packet={dp.packet}
+            values={dp.values} checks={dp.checks} packet={effectivePacket(dp)}
             scopeLines={d?.scopeLines || []} projectSummary={d?.projectSummary || ''} total={Number(d?.total) || 0} payments={d?.payments || []}
             renderSig={renderSig} renderSigDate={renderSigDate} renderInit={renderInit}
           />
