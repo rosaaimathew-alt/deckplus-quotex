@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { Printer, Loader2 } from 'lucide-react'
+import { Printer, Loader2, Download } from 'lucide-react'
 import SignedContractDoc from '../components/SignedContractDoc'
 import SignedAuditTrail from '../components/SignedAuditTrail'
+import { downloadContractPdf, signedContractFileName } from '../lib/contractPdf'
 
 // ── Signed contract view (/view/:recordId) ───────────────────────────────────
 // Renders the packet exactly as it was sent, with every party's signatures and
@@ -13,6 +14,8 @@ export default function ContractViewFull() {
   const [record, setRecord] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]   = useState('')
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const docRef = useRef(null)
 
   useEffect(() => {
     fetch(`/api/sign/record-${recordId}`)
@@ -42,6 +45,12 @@ export default function ContractViewFull() {
   )
 
   const { contractData: d, contractNum, signatures = {} } = record
+  const savePdf = async () => {
+    setPdfBusy(true)
+    try { await downloadContractPdf(docRef.current, signedContractFileName(record)) }
+    catch (err) { alert(`Could not make the PDF: ${err.message}`) }
+    finally { setPdfBusy(false) }
+  }
   const branding  = d?.branding || {}
   const logo      = branding?.logo || '/contract/deckplus-logo.png'
 
@@ -56,13 +65,20 @@ export default function ContractViewFull() {
               {record.status === 'signed' ? 'Fully Signed' : 'Partially Signed'}
             </span>
           </div>
-          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700"><Printer size={14} /> Print / Save PDF</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"><Printer size={14} /> Print</button>
+            <button onClick={savePdf} disabled={pdfBusy} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-60">
+              {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {pdfBusy ? 'Making PDF…' : 'Download PDF'}
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4">
-        <SignedContractDoc record={record} />
-        {Object.keys(signatures).length > 0 && <SignedAuditTrail url={`/api/sign/verify-${encodeURIComponent(recordId)}`} />}
+        <div ref={docRef}>
+          <SignedContractDoc record={record} />
+          {Object.keys(signatures).length > 0 && <SignedAuditTrail url={`/api/sign/verify-${encodeURIComponent(recordId)}`} />}
+        </div>
       </div>
     </div>
   )

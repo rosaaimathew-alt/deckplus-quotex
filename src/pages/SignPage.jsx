@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import SignaturePad from '../components/SignaturePad'
-import { X, CheckCircle2, Printer } from 'lucide-react'
+import { X, CheckCircle2, Printer, Download, Loader2 } from 'lucide-react'
 import { AGREEMENT_ACK } from '../legalContent'
 import EsignDisclosureGate from '../components/EsignDisclosureGate'
 import EsignAdopt from '../components/EsignAdopt'
@@ -9,6 +9,7 @@ import { logStep } from '../lib/esignConsent'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import SignedContractDoc from '../components/SignedContractDoc'
 import SignedAuditTrail from '../components/SignedAuditTrail'
+import { downloadContractPdf, signedContractFileName } from '../lib/contractPdf'
 import { requiredSignFields, effectivePacket, ROLE_LABELS, fmtShortDate } from '../contract/contractFields'
 import { changeOrderIntro } from '../contract/deckPlusAgreement'
 
@@ -39,6 +40,8 @@ export default function SignPage() {
   const [showFinalize, setShowFinalize] = useState(false)   // consent + email code + Adopt and Sign
   const [coSig, setCoSig]         = useState(null)          // change-order signature (legacy CO links)
   const [done, setDone]           = useState(false)
+  const [pdfBusy, setPdfBusy]     = useState(false)
+  const signedDocRef = useRef(null)
 
   useEffect(() => {
     fetch(`/api/sign/${token}`)
@@ -150,14 +153,25 @@ export default function SignPage() {
               </p>
             </div>
             {isContract && (
-              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700">
-                <Printer size={15} /> Print / Save PDF
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => window.print()} className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">
+                  <Printer size={15} /> Print
+                </button>
+                <button disabled={pdfBusy} className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-60"
+                  onClick={async () => {
+                    setPdfBusy(true)
+                    try { await downloadContractPdf(signedDocRef.current, signedContractFileName(record)) }
+                    catch (err) { alert(`Could not make the PDF: ${err.message}`) }
+                    finally { setPdfBusy(false) }
+                  }}>
+                  {pdfBusy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} {pdfBusy ? 'Making PDF…' : 'Download PDF'}
+                </button>
+              </div>
             )}
           </div>
         </div>
         {isContract && (
-          <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4">
+          <div ref={signedDocRef} className="max-w-4xl mx-auto my-4 px-2 sm:px-4">
             <SignedContractDoc record={record} />
             <SignedAuditTrail url={`/api/sign/${token}?certificate=1`} refreshKey={record?.status} />
           </div>
