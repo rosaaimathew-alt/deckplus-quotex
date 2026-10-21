@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Printer, Loader2 } from 'lucide-react'
 import SignedContractDoc from '../components/SignedContractDoc'
-import { ROLE_LABELS } from '../contract/contractFields'
+import SignedAuditTrail from '../components/SignedAuditTrail'
 
 // ── Signed contract view (/view/:recordId) ───────────────────────────────────
 // Renders the packet exactly as it was sent, with every party's signatures and
-// initials placed in their fields, plus the audit trail.
+// initials placed in their fields, then the audit trail on its own page.
 
 export default function ContractViewFull() {
   const { recordId } = useParams()
@@ -62,23 +62,7 @@ export default function ContractViewFull() {
 
       <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4">
         <SignedContractDoc record={record} />
-
-        {/* Audit trail */}
-        <div className="bg-white rounded-b-sm px-6 sm:px-12 py-6 border-t border-gray-200 no-print">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Signature Audit Trail</p>
-          <div className="space-y-2">
-            {['client', 'builder'].map(r => {
-              const sig = signatures[r]
-              if (!sig) return <div key={r} className="text-xs text-gray-400">{ROLE_LABELS[r]}: not signed</div>
-              return (
-                <div key={r} className="text-xs text-gray-600 font-mono bg-gray-50 rounded p-2 border border-gray-200">
-                  <span className="font-bold text-gray-800">{ROLE_LABELS[r]}</span> — {sig.printedName} — {new Date(sig.signedAt).toLocaleString()} — IP: {sig.ip}
-                  {sig.agreementAgreedAt && <> — ESIGN consent {new Date(sig.agreementAgreedAt).toLocaleString()}</>}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        {Object.keys(signatures).length > 0 && <SignedAuditTrail url={`/api/sign/verify-${encodeURIComponent(recordId)}`} />}
       </div>
     </div>
   )

@@ -8,6 +8,7 @@ import EsignAdopt from '../components/EsignAdopt'
 import { logStep } from '../lib/esignConsent'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import SignedContractDoc from '../components/SignedContractDoc'
+import SignedAuditTrail from '../components/SignedAuditTrail'
 import { requiredSignFields, effectivePacket, ROLE_LABELS, fmtShortDate } from '../contract/contractFields'
 import { changeOrderIntro } from '../contract/deckPlusAgreement'
 
@@ -131,7 +132,8 @@ export default function SignPage() {
   )
 
   // After signing (or on re-opening a signed link): the confirmation, then the
-  // signed contract itself with Print / Save PDF — so a printed copy is never blank.
+  // signed contract itself and its audit trail, with Print / Save PDF — so a
+  // printed copy is never blank.
   if (done || record?.alreadySigned) {
     const isContract = record?.contractData?.dp && record?.contractData?.type !== 'change-order'
     const bothSigned = record?.status === 'signed'
@@ -154,7 +156,12 @@ export default function SignPage() {
             )}
           </div>
         </div>
-        {isContract && <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4"><SignedContractDoc record={record} /></div>}
+        {isContract && (
+          <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4">
+            <SignedContractDoc record={record} />
+            <SignedAuditTrail url={`/api/sign/${token}?certificate=1`} refreshKey={record?.status} />
+          </div>
+        )}
       </div>
     )
   }

@@ -253,6 +253,14 @@ export default async function handler(req, res) {
     const logBase   = { recordType: 'contract', recordId, role: link.role }
     const companyName = record.contractData?.branding?.companyName || process.env.COMPANY_NAME || 'Deck Plus'
 
+    // Audit trail for a party who has signed, to print with their signed copy.
+    if (req.method === 'GET' && req.query.certificate) {
+      if (!record.signatures?.[link.role]) return res.status(403).json({ error: 'Sign first to see the audit trail.' })
+      const report = await verifyRecord({ recordType: 'contract', recordId, record, doc: record.contractData, emailOnFile: record.signerEmails?.client })
+      return res.json({ ...report, contractNum: record.contractNum, createdAt: record.createdAt, createdBy: record.createdBy || null, status: record.status,
+        title: `Contract #${record.contractNum || ''}`, client: record.contractData?.dp?.values?.clientName || record.contractData?.client || '' })
+    }
+
     if (req.method === 'GET') {
       // Every open is logged. The office checking a link is marked as staff.
       const viewer = bearer ? await verifyToken(bearer) : null
