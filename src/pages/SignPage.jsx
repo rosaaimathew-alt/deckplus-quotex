@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import SignaturePad from '../components/SignaturePad'
-import { X, CheckCircle2 } from 'lucide-react'
+import { X, CheckCircle2, Printer } from 'lucide-react'
 import { AGREEMENT_ACK } from '../legalContent'
 import EsignDisclosureGate from '../components/EsignDisclosureGate'
 import EsignAdopt from '../components/EsignAdopt'
 import { logStep } from '../lib/esignConsent'
 import DeckPlusContract from '../contract/DeckPlusContract'
+import SignedContractDoc from '../components/SignedContractDoc'
 import { requiredSignFields, effectivePacket, ROLE_LABELS, fmtShortDate } from '../contract/contractFields'
 import { changeOrderIntro } from '../contract/deckPlusAgreement'
 
@@ -96,6 +97,8 @@ export default function SignPage() {
       if (!res.ok) throw new Error(result.error)
       setShowFinalize(false)
       setDone(true)
+      // Reload so the signed copy below shows every signature, including this one.
+      fetch(`/api/sign/${token}`).then(r => r.ok ? r.json() : null).then(fresh => { if (fresh && !fresh.error) setRecord(fresh) }).catch(() => {})
     } catch (err) {
       alert(err.message)
     } finally {
@@ -127,17 +130,34 @@ export default function SignPage() {
     </div>
   )
 
-  if (done || record?.alreadySigned) return (
-    <div className="min-h-screen flex items-center justify-center bg-green-50">
-      <div className="text-center px-6 max-w-sm">
-        <div className="text-6xl mb-4">✓</div>
-        <h1 className="text-2xl font-bold text-green-700 mb-2">{done ? 'Signed Successfully' : 'Already Signed'}</h1>
-        <p className="text-gray-500">
-          {done ? `Thank you ${printedName}. Your signature has been recorded.` : 'This party has already signed this contract.'}
-        </p>
+  // After signing (or on re-opening a signed link): the confirmation, then the
+  // signed contract itself with Print / Save PDF — so a printed copy is never blank.
+  if (done || record?.alreadySigned) {
+    const isContract = record?.contractData?.dp && record?.contractData?.type !== 'change-order'
+    const bothSigned = record?.status === 'signed'
+    return (
+      <div className="qx-ink min-h-screen bg-gray-100 pb-12">
+        <div className="bg-green-50 border-b border-green-200 px-4 py-4 no-print">
+          <div className="max-w-4xl mx-auto flex items-center gap-4 flex-wrap">
+            <div className="text-3xl text-green-700">✓</div>
+            <div className="flex-1 min-w-[200px]">
+              <h1 className="text-lg font-bold text-green-800">{done ? 'Signed Successfully' : 'Already Signed'}</h1>
+              <p className="text-sm text-gray-600">
+                {done ? `Thank you ${printedName}. Your signature has been recorded.` : 'This party has already signed this contract.'}
+                {isContract && (bothSigned ? ' Both parties have signed — this is the final copy.' : ' Waiting on the other party to sign.')}
+              </p>
+            </div>
+            {isContract && (
+              <button onClick={() => window.print()} className="flex items-center gap-1.5 px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700">
+                <Printer size={15} /> Print / Save PDF
+              </button>
+            )}
+          </div>
+        </div>
+        {isContract && <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4"><SignedContractDoc record={record} /></div>}
       </div>
-    </div>
-  )
+    )
+  }
 
   const { contractData: d, contractNum, role, signatures: existingSigs = {}, esign, docHash } = record || {}
   const branding    = d?.branding || {}

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Printer, Loader2 } from 'lucide-react'
-import DeckPlusContract from '../contract/DeckPlusContract'
-import { fmtShortDate, ROLE_LABELS, effectivePacket } from '../contract/contractFields'
+import SignedContractDoc from '../components/SignedContractDoc'
+import { ROLE_LABELS } from '../contract/contractFields'
 
 // ── Signed contract view (/view/:recordId) ───────────────────────────────────
 // Renders the packet exactly as it was sent, with every party's signatures and
@@ -42,14 +42,8 @@ export default function ContractViewFull() {
   )
 
   const { contractData: d, contractNum, signatures = {} } = record
-  const dp        = d?.dp
   const branding  = d?.branding || {}
   const logo      = branding?.logo || '/contract/deckplus-logo.png'
-
-  const sigOf = (fieldId, role) => signatures?.[role]?.fields?.[fieldId] || signatures?.[role]?.signatureDataUrl || null
-  const renderSig     = (id, role) => { const s = sigOf(id, role); return s ? <img src={s} alt={`${ROLE_LABELS[role] || role} signature`} /> : null }
-  const renderInit    = (id) => { const s = sigOf(`init:${id}`, 'client'); return s ? <img src={s} alt="Client initials" style={{ height: 22 }} /> : null }
-  const renderSigDate = (id, role) => { const s = signatures?.[role]; return s?.signedAt && sigOf(id, role) ? <span>{fmtShortDate(s.signedAt)}</span> : null }
 
   return (
     <div className="qx-ink min-h-screen bg-gray-100 pb-12">
@@ -67,16 +61,7 @@ export default function ContractViewFull() {
       </div>
 
       <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4">
-        {dp ? (
-          <DeckPlusContract
-            className="bg-white shadow-lg rounded-sm overflow-hidden"
-            values={dp.values} checks={dp.checks} packet={effectivePacket(dp)}
-            scopeLines={d?.scopeLines || []} projectSummary={d?.projectSummary || ''} total={Number(d?.total) || 0} payments={d?.payments || []}
-            renderSig={renderSig} renderSigDate={renderSigDate} renderInit={renderInit}
-          />
-        ) : (
-          <div className="bg-white rounded-2xl border border-amber-200 p-6 text-sm text-amber-700">This record predates the Deck Plus contract packet and cannot be rendered here.</div>
-        )}
+        <SignedContractDoc record={record} />
 
         {/* Audit trail */}
         <div className="bg-white rounded-b-sm px-6 sm:px-12 py-6 border-t border-gray-200 no-print">
