@@ -1098,16 +1098,17 @@ export const useStore = create(
       // ── Scope Examples (learned from past contracts) ──────────────────────
       scopeExamples: [],
 
+      // One entry per item per contract: its final wording plus what the rep
+      // removed from / added to the starting scope (see lib/scopeLearning.js).
+      // Re-saving a contract replaces that contract's entries.
       saveScopeExamples: (contractId, examples) =>
         set((s) => {
-          const updated = [...s.scopeExamples]
-          examples.forEach(ex => {
-            if (!ex.itemName || !ex.bulletText?.trim()) return
-            const idx = updated.findIndex(e => e.itemName === ex.itemName && e.contractId === contractId)
-            if (idx >= 0) updated[idx] = { ...updated[idx], ...ex }
-            else updated.push({ id: `${contractId}-${ex.itemName}`, contractId, savedAt: new Date().toISOString(), ...ex })
-          })
-          return { scopeExamples: updated }
+          const savedAt = new Date().toISOString()
+          const fresh = examples
+            .filter(ex => ex.itemName && (ex.bulletText?.trim() || ex.removed?.length || ex.added?.length))
+            .map(ex => ({ id: `${contractId}-${ex.itemKey || ex.itemName}`, contractId, savedAt, ...ex }))
+          if (!fresh.length) return {}
+          return { scopeExamples: [...s.scopeExamples.filter(e => e.contractId !== contractId), ...fresh] }
         }),
 
       // ── Import (from backup JSON) ─────────────────────────────────────────

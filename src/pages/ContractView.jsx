@@ -6,6 +6,8 @@ import { DEMO } from '../demo'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import { PACKET_FORMS } from '../contract/deckPlusAgreement'
 import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, STATES, COUNTIES } from '../contract/contractFields'
+import { specPrefill } from '../contract/specPrefill'
+import { scopeLinesFor, normalizeScope, remapEdit, draftOf, scopeEdits, applyLearned, learnedHints, linePrice } from '../lib/scopeLearning'
 import { mergeLines } from '../lib/hiddenLines'
 
 // ── Contract page ────────────────────────────────────────────────────────────
@@ -39,14 +41,9 @@ function renderBold(text) {
 
 const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-// A line's price: qty × unitPrice, falling back to a stored price/amount/total
-// field so no item is dropped when it stores its value differently.
-const linePrice = (l) => {
-  const byUnit = (Number(l.qty) || 1) * (Number(l.unitPrice) || 0)
-  if (byUnit) return byUnit
-  return Number(l.price) || Number(l.amount) || Number(l.total) || 0
-}
-const toScopeLine = (l, i) => ({ id: l.id ?? i, name: l.name, text: l.description ? `${l.name} — ${l.description}` : l.name, price: linePrice(l), ...(l.isDiscount ? { isDiscount: true } : {}) })
+// Quote lines → scope lines: one per line of each item's description, every
+// line tagged with its item (see lib/scopeLearning.js).
+const toScopeLines = (lines = []) => lines.flatMap(scopeLinesFor)
 
 const PROJECT_TYPES = ['Open Deck', 'Screen Porches', 'Eze-Breeze Porches', 'Open Porches', 'Porch Conversions', 'Sunrooms', 'Hardscapes']
 
@@ -202,6 +199,18 @@ export default function ContractView() {
     const next = (typeof upd === 'function' ? upd(prev.filter(l => !l.isDiscount)) : upd) || []
     return next.some(l => l.isDiscount) ? next : [...next, ...keep]
   })
+  // The scope this contract started with — what the rep's edits are learned against.
+  const [scopeDraft, setScopeDraft] = useState([])
+  const [draftSource, setDraftSource] = useState('proposal')
+  // Edits learned from past contracts that were made to the starting scope (with undo).
+  const [learnedApplied, setLearnedApplied] = useState(null)
+  const startScope = (raw, source = 'proposal') => {
+    setScopeDraft(draftOf(raw)); setDraftSource(source)
+    if (source !== 'proposal') { setLearnedApplied(null); return raw }
+    const { lines, applied } = applyLearned(raw, useStore.getState().scopeExamples || [])
+    setLearnedApplied(applied.length ? { applied, raw } : null)
+    return lines
+  }
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiError, setAiError]     = useState('')
 
@@ -255,12 +264,15 @@ export default function ContractView() {
     if (draft) {
       setContractNum(draft.contractNum ?? d.contractNumber ?? '')
       setProjectSummary(draft.projectSummary ?? d.projectSummary ?? '')
+      const fresh = toScopeLines(d.lines || [])
       if (d.freshSelection && (d.lines || []).length) {
-        const prevById = new Map((draft.scopeLines || []).map(l => [String(l.id), l]))
-        setScopeLinesRaw((d.lines || []).map((l, i) => { const line = toScopeLine(l, i); const prev = prevById.get(String(line.id)); return prev?.text ? { ...line, text: prev.text } : line }))
+        const prevById = new Map(normalizeScope(draft.scopeLines || [], d.lines).map(l => [String(l.id), l]))
+        setScopeLinesRaw(fresh.map(line => { const prev = prevById.get(String(line.id)); return prev?.text ? { ...line, text: prev.text } : line }))
       } else {
-        setScopeLinesRaw(draft.scopeLines ?? (d.lines || []).map(toScopeLine))
+        setScopeLinesRaw(draft.scopeLines ? normalizeScope(draft.scopeLines, d.lines) : fresh)
       }
+      setScopeDraft(draft.scopeDraft ?? draftOf(fresh))
+      setDraftSource(draft.scopeDraftSource ?? 'proposal')
       setSavedAt(draft.savedAt ?? null)
       const tag = draft.projectTag ?? null, pso = draft.paymentScheduleOverride ?? 'auto'
       setProjectTag(tag)
@@ -280,7 +292,7 @@ export default function ContractView() {
         setPickerSelection(new Set((d.lines).map((l, i) => l.id ?? i)))
         setShowItemPicker(true)
       } else {
-        setScopeLinesRaw((d.lines || []).map(toScopeLine))
+        setScopeLinesRaw(startScope(toScopeLines(d.lines || [])))
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on open; the draft is read from the proposal at that moment
@@ -317,12 +329,16 @@ export default function ContractView() {
     return { ...m, pct, label: milestoneLabels[i] ?? m.label, amount: total * pct }
   })
   const pctSum      = Math.round(payments.reduce((s, p) => s + p.pct * 100, 0) * 100) / 100
-  const hasElectrical = (scopeLines || []).some(l => /electric|outlet|light|fan|switch|wiring/i.test(`${l.name} ${l.text}`))
+  // Spec-form answers the calculators already know, from the lines on this contract.
+  const scopeIds    = new Set((scopeLines || []).map(l => String(l.id)))
+  const spec        = specPrefill((data.lines || []).filter((l, i) => scopeIds.has(String(l.id ?? i))))
+  const specCount   = Object.keys(spec.checks).length + Object.keys(spec.values).length
+  const hasElectrical = spec.hasElectrical || (scopeLines || []).some(l => /electric|outlet|light|fan|switch|wiring/i.test(`${l.name} ${l.text}`))
   const saleDate    = proposal?.closedAt || proposal?.statusChangedAt || null
-  const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary })
-  const values      = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, overrides: fieldOverrides })
+  const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, overrides: spec.values })
+  const values      = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, overrides: { ...spec.values, ...fieldOverrides } })
   const packetKeys  = packet ?? defaultPacket({ projectTypes, scopeLines, hasElectrical, state: values.jobState, county: values.county })
-  const effectiveChecks = { ...autoChecks({ projectTypes }), ...checks }
+  const effectiveChecks = { ...autoChecks({ projectTypes }), ...spec.checks, ...checks }
 
   const setValue = (name, v) => {
     if (name === 'contractNum') { setContractNum(v); return }
@@ -338,11 +354,13 @@ export default function ContractView() {
     milestoneLabels, milestonePcts, projectTag, paymentScheduleOverride,
     packet: packetKeys, fieldOverrides, checks,
     includesElectrical: packetKeys.includes('electrical'),
+    scopeDraft, scopeDraftSource: draftSource,
   })
   const saveDraft = (extra = {}) => {
     if (!data?.proposalId) return
     saveContractDraft(data.proposalId, { ...draftPayload(), ...extra })
-    const examples = scopeLines.filter(l => !l.isDiscount && l.text?.trim()).map(l => ({ itemName: l.name || l.text.split('\n')[0].slice(0, 60), bulletText: l.text }))
+    // What the rep kept, took out and put in, per item, against the starting scope.
+    const examples = scopeEdits(scopeDraft, scopeLines, draftSource).filter(e => e.bulletText.trim() || e.removed.length || e.added.length)
     if (examples.length > 0) saveScopeExamples(data.proposalId, examples)
     setSavedAt(new Date().toISOString())
   }
@@ -478,48 +496,73 @@ export default function ContractView() {
   // ── Scope of Work drafting (from the proposal's line items) ────────────
   const addLine = () => setScopeLines(prev => [...prev, { id: Date.now(), name: '', text: '' }])
 
+  // An item's lines replaced with new text: the first line keeps the item's
+  // name and price, the rest follow it.
+  const replaceItemText = (lines, item, text) => {
+    const rows = String(text || '').split('\n')
+    const out = []
+    for (const l of lines) {
+      if (l.item !== item) { out.push(l); continue }
+      if (!l.head) continue
+      out.push({ ...l, text: rows[0], textless: false })
+      rows.slice(1).forEach((t, k) => out.push({ id: `${l.id}~${k + 1}`, name: '', price: 0, text: t, item }))
+    }
+    return out
+  }
+
   const fillFromPastContracts = () => {
-    if (!scopeExamples.length) return
+    const library = scopeExamples.filter(ex => ex.bulletText?.trim())
+    if (!library.length) return
+    const newest = (a, b) => new Date(b.savedAt) - new Date(a.savedAt)
     const score = (itemName, ex) => {
       const a = (itemName || '').toLowerCase(), b = (ex.itemName || '').toLowerCase()
       if (a === b) return 100
       const words = a.split(/\s+/).filter(w => w.length > 2)
       return words.filter(w => b.includes(w)).length / Math.max(words.length, 1)
     }
-    setScopeLines(prev => prev.map(line => {
-      const best = scopeExamples.map(ex => ({ ex, s: score(line.name || line.text, ex) })).filter(({ s }) => s > 0)
-        .sort((a, b) => (b.s !== a.s ? b.s - a.s : new Date(b.ex.savedAt) - new Date(a.ex.savedAt)))[0]
-      return best ? { ...line, text: best.ex.bulletText } : line
-    }))
+    let next = scopeLines.filter(l => !l.isDiscount)
+    for (const head of next.filter(l => l.head)) {
+      const same = library.filter(ex => ex.itemKey && ex.itemKey === head.item).sort(newest)[0]
+      const best = same || library.map(ex => ({ ex, s: score(head.name, ex) })).filter(({ s }) => s > 0)
+        .sort((a, b) => (b.s !== a.s ? b.s - a.s : newest(a.ex, b.ex)))[0]?.ex
+      if (best) next = replaceItemText(next, head.item, best.bulletText)
+    }
+    setScopeLines(startScope(next, 'past'))
   }
 
   const generateSuggestions = async () => {
-    if (!data?.lines?.length) return
+    const heads = scopeLines.filter(l => l.head && !l.isDiscount)
+    if (!heads.length) return
     setIsGenerating(true); setAiError('')
     try {
-      const itemList = (data.lines || []).map(l => `- ${l.name}${l.description ? ': ' + l.description : ''}${l.qty && l.unit ? ` (${l.qty} ${l.unit})` : ''}`).join('\n')
-      const findRelevant = (itemName) => {
-        const words = (itemName || '').toLowerCase().split(/\s+/).filter(w => w.length > 3)
-        return scopeExamples.filter(ex => words.some(w => ex.itemName?.toLowerCase().includes(w) || ex.bulletText?.toLowerCase().includes(w)))
+      const quoteById = new Map((data.lines || []).map((l, i) => [String(l.id ?? i), l]))
+      const itemList = heads.map(h => { const l = quoteById.get(String(h.id)) || h; return `- ${h.name}${l.description ? ': ' + l.description : ''}${l.qty && l.unit ? ` (${l.qty} ${l.unit})` : ''}` }).join('\n')
+      const findRelevant = (head) => {
+        const words = (head.name || '').toLowerCase().split(/\s+/).filter(w => w.length > 3)
+        return scopeExamples.filter(ex => ex.bulletText?.trim() && ((ex.itemKey && ex.itemKey === head.item) || words.some(w => ex.itemName?.toLowerCase().includes(w) || ex.bulletText?.toLowerCase().includes(w))))
           .sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt)).slice(0, 2)
       }
       const seen = new Set()
-      const relevant = (data.lines || []).flatMap(l => findRelevant(l.name)).filter(ex => { if (seen.has(ex.id)) return false; seen.add(ex.id); return true }).slice(0, 10)
+      const relevant = heads.flatMap(findRelevant).filter(ex => { if (seen.has(ex.id)) return false; seen.add(ex.id); return true }).slice(0, 10)
       const styleContext = relevant.length > 0
         ? `\n\nIMPORTANT — You have written scope bullets for this contractor before. Study these EXACT past examples and match the writing style, line breaks, indentation, and level of detail PRECISELY:\n\n${relevant.map(ex => `[${ex.itemName}]\n${ex.bulletText}`).join('\n\n')}\n\nWrite the new bullets in this SAME style.`
         : ''
+      const hints = learnedHints(scopeExamples, heads.map(h => h.item))
+      const editContext = hints.length ? `\n\nThe contractor's reps consistently edit scope wording for these items — follow these preferences:\n${hints.join('\n')}` : ''
       const res = await fetch('/api/ai-chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system: `You are a professional scope of work writer for an outdoor construction company specializing in decks, porches, pergolas, sunrooms, and outdoor structures. Write clear, professional, complete scope of work bullet points.${projectTag ? ` This is a ${projectTag} project.` : ''}${styleContext}`,
-          messages: [{ role: 'user', content: `Below are line items from an accepted proposal. For each item, write ONE professional scope of work bullet point describing the work to be performed. Use complete sentences and professional construction language. Be specific about materials and installation methods where relevant.\n\nReturn ONLY the bullet points, one per line, starting with "- ". Output exactly ${(data.lines || []).length} bullets in the same order.\n\nProposal line items:\n${itemList}` }],
+          system: `You are a professional scope of work writer for an outdoor construction company specializing in decks, porches, pergolas, sunrooms, and outdoor structures. Write clear, professional, complete scope of work bullet points.${projectTag ? ` This is a ${projectTag} project.` : ''}${styleContext}${editContext}`,
+          messages: [{ role: 'user', content: `Below are line items from an accepted proposal. For each item, write ONE professional scope of work bullet point describing the work to be performed. Use complete sentences and professional construction language. Be specific about materials and installation methods where relevant.\n\nReturn ONLY the bullet points, one per line, starting with "- ". Output exactly ${heads.length} bullets in the same order.\n\nProposal line items:\n${itemList}` }],
           maxTokens: 4096,
         }),
       })
       if (!res.ok) { const err = await res.text().catch(() => res.statusText); throw new Error(`AI error (${res.status}): ${err}`) }
       const aiData  = await res.json()
       const bullets = (aiData.text || '').split('\n').map(l => l.replace(/^[-•*\d.]+\s*/, '').trim()).filter(Boolean)
-      setScopeLines(prev => prev.map((line, i) => ({ ...line, text: bullets[i] || line.text })))
+      let next = scopeLines.filter(l => !l.isDiscount)
+      heads.forEach((h, i) => { if (bullets[i]) next = replaceItemText(next, h.item, bullets[i]) })
+      setScopeLines(startScope(next, 'ai'))
     } catch (err) { setAiError(err.message) } finally { setIsGenerating(false) }
   }
 
@@ -545,16 +588,28 @@ export default function ContractView() {
         </div>
       </div>
       {aiError && <div className="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{aiError}</div>}
+      {learnedApplied && (
+        <div className="mb-2 text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-3 py-2" style={{ fontFamily: 'system-ui, sans-serif' }}>
+          <div className="flex items-start justify-between gap-3">
+            <b>Learned from past contracts — made {learnedApplied.applied.reduce((s, a) => s + a.removed.length + a.added.length, 0)} edit(s) reps keep making:</b>
+            <button onClick={() => { setScopeLines(learnedApplied.raw); setLearnedApplied(null) }} className="shrink-0 underline hover:text-purple-950">Undo</button>
+          </div>
+          <ul className="mt-1 space-y-0.5">
+            {learnedApplied.applied.map(a => (
+              <li key={a.item}><span className="font-medium">{a.itemName || 'Item'}:</span>
+                {a.removed.map((t, i) => <span key={`r${i}`} className="ml-1 line-through text-purple-500">{t.replace(/^\s*--\s*/, '')}</span>)}
+                {a.added.map((t, i) => <span key={`a${i}`} className="ml-1">+ {t.replace(/^\s*--\s*/, '')}</span>)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <textarea
         className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 leading-relaxed"
         style={{ minHeight: '14rem', resize: 'vertical', fontFamily: 'system-ui, sans-serif' }}
         placeholder={'Use -- to create a bullet point:\n\n-- Build 16×16 gable-roof screen porch on new pressure-treated deck\n-- Install ScreenEze system with charcoal fiberglass screen…'}
-        value={scopeLines.filter(l => !l.isDiscount).map(l => l.text).join('\n')}
-        onChange={e => {
-          const lines = e.target.value.split('\n')
-          const cur = scopeLines.filter(l => !l.isDiscount)
-          setScopeLines(lines.map((text, i) => ({ id: cur[i]?.id ?? Date.now() + i, name: cur[i]?.name ?? '', price: cur[i]?.price ?? 0, text })))
-        }}
+        value={scopeLines.filter(l => !l.isDiscount && !l.textless).map(l => l.text).join('\n')}
+        onChange={e => { const texts = e.target.value.split('\n'); setScopeLines(prev => remapEdit(prev, texts)) }}
       />
       <div className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontFamily: 'system-ui, sans-serif' }}>
         <button onClick={addLine} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded px-2 py-1.5"><span className="text-base leading-none">+</span> Add bullet</button>
@@ -634,7 +689,7 @@ export default function ContractView() {
                 <button onClick={() => setPickerSelection(new Set())} className="text-xs text-gray-400 hover:underline">Clear all</button>
               </div>
               <button disabled={pickerSelection.size === 0}
-                onClick={() => { setScopeLines((data.lines || []).filter((l, i) => pickerSelection.has(l.id ?? i)).map(toScopeLine)); setShowItemPicker(false) }}
+                onClick={() => { setScopeLines(startScope(toScopeLines((data.lines || []).filter((l, i) => pickerSelection.has(l.id ?? i))))); setShowItemPicker(false) }}
                 className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-40">Confirm Selection →</button>
             </div>
           </div>
@@ -689,6 +744,11 @@ export default function ContractView() {
               {PACKET_FORMS.map(f => <button key={f.key} onClick={() => togglePacket(f.key)} className={btn(packetKeys.includes(f.key), 'bg-amber-500 text-white border-amber-500')}><FileText size={12} className="inline mr-1 -mt-0.5" />{f.label}</button>)}
               {packet !== null && <button onClick={() => setPacket(null)} className="text-xs text-gray-400 hover:text-gray-600 underline">reset to auto</button>}
             </div>
+            {specCount > 0 && (
+              <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
+                <b>{specCount} spec-form answers pre-filled from the proposal</b> (decking line, railing, skirting, steps, porch type, roof, door, screen system, electrical counts…). Review each form below and fill in what the calculators don't capture — colors, cantilever, wall type, shingles, gutters.
+              </p>
+            )}
             <p className="text-xs text-gray-400 mt-1.5">Pages 1–7, the Scope of Work and the Processing Form print on every contract. The Release of Liability is optional — click it to add it to this contract. Spec sheets follow the Scope of Work; the NC E-589CI affidavit (all NC jobs) and the York County permit application (York County jobs) print last.</p>
           </div>
 
@@ -852,7 +912,14 @@ export default function ContractView() {
                     {t.bullets.length > 6 && <li className="text-gray-400 italic">+{t.bullets.length - 6} more…</li>}
                   </ul>
                   <div className="flex gap-2 flex-wrap">
-                    <button onClick={() => { setScopeLines(prev => t.bullets.map((txt, i) => ({ id: prev[i]?.id ?? Date.now() + i, name: prev[i]?.name ?? '', price: prev[i]?.price ?? 0, text: txt }))); setShowScopeTemplates(false) }}
+                    <button onClick={() => {
+                        // Items keep their names and prices (as rows with no text); the template's bullets become the scope.
+                        setScopeLines(startScope([
+                          ...scopeLines.filter(l => !l.isDiscount && (l.head || l.textless)).map(l => ({ ...l, text: '', textless: true })),
+                          ...t.bullets.map((txt, i) => ({ id: `${Date.now()}-t${i}`, name: '', price: 0, text: txt, item: null })),
+                        ], 'template'))
+                        setShowScopeTemplates(false)
+                      }}
                       className="flex-1 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700">Replace scope</button>
                     <button onClick={() => { setScopeLines(prev => [...prev, ...t.bullets.map((txt, i) => ({ id: Date.now() + i + 1000, name: '', price: 0, text: txt }))]); setShowScopeTemplates(false) }}
                       className="flex-1 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-50">Append to scope</button>

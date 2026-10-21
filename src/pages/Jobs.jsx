@@ -205,7 +205,7 @@ export function getStages(proposal) {
   const types = proposal.contractDraft?.projectTypes || []
   const scope = [
     ...(proposal.contractDraft?.scopeBullets || []),
-    ...(proposal.contractDraft?.scopeLines   || []),
+    ...(proposal.contractDraft?.scopeLines   || []).map(l => (typeof l === 'string' ? l : `${l?.name || ''} ${l?.text || ''}`)),
   ].join(' ')
   const hasWindows = /window|glass|enclos/i.test(scope)
 

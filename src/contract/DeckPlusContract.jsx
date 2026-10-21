@@ -371,7 +371,9 @@ function ImageFormPages({ form, ctx, values, editable, onValue }) {
 
 // ── Scope of Work annex (ours, drafted from the proposal) ───────────────────
 function renderScopeLines(allLines = [], renderBold = (t) => t) {
-  const scopeLines = allLines.filter(l => !l?.isDiscount)   // the discount is a price row, not a bullet
+  // The discount is a price row, not a bullet; a "textless" line only keeps an
+  // item's name and price in the pricing table after its wording was removed.
+  const scopeLines = allLines.filter(l => !l?.isDiscount && !l?.textless)
   const hasBulletPrefix = scopeLines.some(l => (l.text || '').trimStart().startsWith('--'))
   return scopeLines.map((line, i) => {
     const txt = line.text || ''
