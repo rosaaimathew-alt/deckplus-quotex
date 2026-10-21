@@ -128,7 +128,7 @@ export const SETTINGS_KEYS = [
   'deckComponentRates', 'porchComponentRates', 'deckCustomComponents', 'porchCustomComponents',
   'deckFormulaLocked', 'porchFormulaLocked', 'deckScopeTemplate', 'porchScopeTemplate',
   'paymentScheduleLearning', 'scopeExamples', 'historyImported', 'calendarHiddenJobs',
-  'contractPrefix',
+  'contractPrefix', 'companySignature', 'welcomeEmail',
   'porchBuildRates', 'porchBuildLocked', 'porchBuildScopes',
   'subscriptions',
 ]

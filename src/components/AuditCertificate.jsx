@@ -21,6 +21,8 @@ const EVENT_LABEL = {
   signed: 'Adopted and signed',
   rejected: 'Signing attempt refused',
   completed: 'All parties signed',
+  welcome_email_sent: 'Welcome email sent to the customer',
+  welcome_email_failed: 'Welcome email could not be sent',
 }
 const ROLE = { client: 'Client', builder: 'Deck Plus', gc: 'General Contractor' }
 
@@ -103,7 +105,10 @@ export default function AuditCertificate({ rep }) {
             <Row label="Device">{deviceText(s.device)}</Row>
             <Row label="Email verified">{s.emailVerification?.method === 'email code'
               ? `${s.emailVerification.email} at ${msTime(s.emailVerification.verifiedAt)}${s.emailVerification.emailMatchesFile ? ' (matches email on file)' : ' (differs from email on file)'}`
-              : `No — ${s.emailVerification?.reason || 'not captured'}`}</Row>
+              : s.emailVerification?.method === 'staff account'
+                ? `Sent from the signed-in staff account ${s.emailVerification.email || ''}`
+                : `No — ${s.emailVerification?.reason || 'not captured'}`}</Row>
+            <Row label="Signature adopted">{s.adopt?.adoptedBy ? `By ${s.adopt.adoptedBy}${s.adopt.adoptedAtClient ? ` on ${msTime(Date.parse(s.adopt.adoptedAtClient))}` : ''}` : ''}</Row>
             <Row label="Consent">{`“${s.consent?.text}” — checked${s.consent?.checkedAtClient ? ` ${msTime(s.consent.checkedAtClient)} (device clock)` : ''}`}</Row>
             <Row label="Disclosure">{s.disclosureAcceptedAtClient ? `E-sign disclosure accepted ${msTime(s.disclosureAcceptedAtClient)} (device clock)` : ''}</Row>
             <Row label="Signing act">{s.adopt?.method}</Row>
@@ -137,7 +142,7 @@ export default function AuditCertificate({ rep }) {
               <tr key={e.seq} className="align-top">
                 <td className="px-2 py-1.5 text-gray-400 tabular-nums">{e.seq}</td>
                 <td className="px-2 py-1.5 whitespace-nowrap tabular-nums">{msTime(e.at_ms)}</td>
-                <td className="px-2 py-1.5 text-gray-800">{EVENT_LABEL[e.event] || e.event}{e.detail?.reason ? ` — ${e.detail.reason}` : ''}</td>
+                <td className="px-2 py-1.5 text-gray-800">{EVENT_LABEL[e.event] || e.event}{e.detail?.companySignature ? ' (company signature on file)' : ''}{e.detail?.reason ? ` — ${e.detail.reason}` : ''}</td>
                 <td className="px-2 py-1.5">{ROLE[e.role] || e.role || '—'}</td>
                 <td className="px-2 py-1.5"><span className="block">{e.ip || '—'}</span><span className="block text-gray-400">{geoText(e.geo)}</span></td>
                 <td className="px-2 py-1.5 break-all">{[e.signer_email, e.signer_name].filter(Boolean).join(' · ') || '—'}</td>

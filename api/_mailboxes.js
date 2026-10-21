@@ -228,6 +228,17 @@ export async function saveMailbox({ userId, orgId, email, provider, host, port, 
     p_company_default: !!companyDefault,
   })
 }
+// Turn "use for company emails" on or off for a mailbox that's already connected.
+export async function setCompanyDefault(userId, on) {
+  const row = await mailboxForUser(userId)
+  if (!row) return null
+  await rpc('mail_account_set_s', {
+    p_user: userId, p_org: row.org_id || null, p_email: row.email, p_provider: row.provider || 'other',
+    p_host: row.host, p_port: Number(row.port) || 587, p_username: row.username, p_secret_enc: row.secret_enc,
+    p_company_default: !!on,
+  })
+  return mailboxForUser(userId)
+}
 export async function clearMailbox(userId) {
   await rpc('mail_account_clear_s', { p_user: userId })
 }

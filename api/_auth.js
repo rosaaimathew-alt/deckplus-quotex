@@ -72,7 +72,7 @@ export async function requireAuth(req, res) {
 // Office, admin and project managers see every contract and change order. A
 // sales rep sees only their own: ones they sent, or ones on a deal the
 // database lets them read (proposal row-level security decides).
-function asUser(token) {
+export function asUser(token) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY
   if (!url || !key || !token) return null

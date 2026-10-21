@@ -1310,6 +1310,12 @@ export const useStore = create(
       // (default) or 'everyone' (the whole organization). Remembered per browser.
       officeView: (() => { try { return localStorage.getItem('qx_office_view') || 'mine' } catch { return 'mine' } })(),
       contractPrefix: 'DP',
+      // The company's signature on file (office/admin adopt it in Settings) and
+      // the welcome email a customer gets once the contract is fully signed.
+      companySignature: null,       // { enabled, signatureDataUrl, printedName, title, adoptedBy, adoptedAt }
+      welcomeEmail: null,           // { enabled, subject, body }
+      setCompanySignature: (v) => set({ companySignature: v }),
+      setWelcomeEmail: (v) => set({ welcomeEmail: v }),
       setOfficeView: (v) => { try { localStorage.setItem('qx_office_view', v) } catch { /* private mode */ } set({ officeView: v }) },
       // A rep assigns one of the org's PMs to a deal; that PM then sees the job.
       setProposalPm: (id, pmId) =>
@@ -1364,7 +1370,7 @@ const SETTINGS_DEFAULTS = () => ({
   deckFormulaLocked: false, porchFormulaLocked: false,
   deckScopeTemplate: DECK_SCOPE_DEFAULT, porchScopeTemplate: PORCH_SCOPE_DEFAULT,
   paymentScheduleLearning: {}, scopeExamples: [], historyImported: false, calendarHiddenJobs: [],
-  contractPrefix: 'DP',
+  contractPrefix: 'DP', companySignature: null, welcomeEmail: null,
   porchBuildRates: {}, porchBuildLocked: false, porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
   subscriptions: [],
 })

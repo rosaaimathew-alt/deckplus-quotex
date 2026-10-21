@@ -302,6 +302,44 @@ export async function buildSignature(kv, req, { token, recordType, recordId, rol
   }
 }
 
+// ── Company signature on file ────────────────────────────────────────────────
+// The company's adopted signature (Settings › Contracts) placed in every
+// company field when a signed-in staff member sends the contract. Evidence
+// records who adopted it and when, who sent the contract, from where, and the
+// document it was placed on; it is sealed and logged like any signature.
+export const COMPANY_SIGNATURE_TEXT = 'Company signature on file, adopted in advance by an authorized signer and applied automatically when the contract was sent.'
+export async function buildCompanySignature(ctx, { recordType, recordId, role = 'builder', docHash, sig, fieldIds = [], staff }) {
+  const signatureDataUrl = sig.signatureDataUrl
+  const fields = Object.fromEntries(fieldIds.map(id => [id, signatureDataUrl]))
+  const printedName = [sig.printedName, sig.title].filter(Boolean).join(', ')
+  const signedAt = Date.now()
+  const evidence = {
+    v: 1,
+    recordType, recordId, role,
+    docHash,
+    signatureHash: signatureHashOf(signatureDataUrl, fields),
+    fieldsSigned: Object.keys(fields).sort(),
+    printedName,
+    signedAt,
+    signedAtIso: new Date(signedAt).toISOString(),
+    ip: ctx.ip, ipChain: ctx.ipChain, userAgent: ctx.userAgent, device: ctx.device, geo: ctx.geo,
+    consent: { text: COMPANY_SIGNATURE_TEXT, checked: true, checkedAtClient: sig.adoptedAt || null },
+    adopt: { method: 'Company signature on file — applied when sent', adoptedAtClient: sig.adoptedAt || null, adoptedBy: sig.adoptedBy || null },
+    emailVerification: { method: 'staff account', email: staff?.email || null, verifiedAt: signedAt },
+    sentBy: staff?.email || null,
+  }
+  const sealed = seal(evidence)
+  const ev = await logEvent(ctx, { recordType, recordId, role, event: 'signed', signerName: printedName, signerEmail: staff?.email || null, docHash,
+    detail: { evidence, seal: sealed, companySignature: true } })
+  return {
+    signatureDataUrl, fields, printedName, signedAt,
+    ip: ctx.ip, userAgent: ctx.userAgent,
+    esignConsent: true, esignConsentAt: signedAt,
+    evidence, seal: sealed, eventHash: ev?.event_hash || null,
+    companySignature: true,
+  }
+}
+
 // ── Verification report ──────────────────────────────────────────────────────
 const PARTY = { client: 'Client', builder: 'Deck Plus', gc: 'General Contractor' }
 

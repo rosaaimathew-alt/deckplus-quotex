@@ -1,8 +1,9 @@
 import crypto from 'crypto'
 import { uploadToDrive } from '../_google-drive.js'
-import { verifyToken, canSeeRecord } from '../_auth.js'
+import { verifyToken, canSeeRecord, staffMembership, asUser } from '../_auth.js'
 import { getKV } from '../_kv.js'
-import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
+import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, buildCompanySignature, verifyRecord } from '../_esign.js'
+import { sendWelcomeEmail } from '../_welcome.js'
 import { isMailerConfigured } from '../_mailer.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
@@ -40,8 +41,18 @@ export default async function handler(req, res) {
     // ── CREATE new signing request with 3 role-specific links ────────
     if (token === 'create') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-      const { contractData, contractNum } = req.body || {}
+      const { contractData, contractNum, builderFields } = req.body || {}
       if (!contractData) return res.status(400).json({ error: 'Missing contractData' })
+
+      // The sender's company settings: its signature on file and welcome email.
+      const member = await staffMembership(bearer, staff).catch(() => null)
+      let orgSettings = {}
+      try {
+        const sb = asUser(bearer)
+        if (sb && member?.org_id) orgSettings = (await sb.from('org_settings').select('data').eq('org_id', member.org_id).maybeSingle()).data?.data || {}
+      } catch { /* settings unreadable: send unsigned, no welcome email */ }
+      const companySig = orgSettings.companySignature
+      const welcome = orgSettings.welcomeEmail
 
       const recordId    = crypto.randomUUID()
       const roleTokens  = {
@@ -66,6 +77,8 @@ export default async function handler(req, res) {
         signerEmails,
         signatures:  {},
         roleTokens,
+        ...(welcome?.enabled ? { welcome: { enabled: true, subject: welcome.subject, body: welcome.body, orgId: member?.org_id || null,
+          companyName: contractData?.branding?.companyName || process.env.COMPANY_NAME || 'Deck Plus' } } : {}),
       })
 
       await Promise.all(ROLES.map(role =>
@@ -78,10 +91,23 @@ export default async function handler(req, res) {
       await logEventSafe(requestContext(req), { recordType: 'contract', recordId, event: 'link_created', signerEmail: staff?.email, docHash,
         detail: { contractNum: contractNum || '', createdBy: staff?.email || null, roles: ROLES } })
 
+      // Signed for the company already, when the office has turned that on.
+      let autoSigned = false
+      const fieldIds = Array.isArray(builderFields) ? builderFields.filter(f => typeof f === 'string' && /^contractor-[a-z0-9-]+$/.test(f)).slice(0, 40) : []
+      if (companySig?.enabled && typeof companySig.signatureDataUrl === 'string' && companySig.signatureDataUrl.startsWith('data:image/') && fieldIds.length) {
+        try {
+          const entry = await buildCompanySignature(requestContext(req), { recordType: 'contract', recordId, docHash, sig: companySig, fieldIds, staff })
+          const rec = await kv.get(`sign:${recordId}`)
+          await kv.set(`sign:${recordId}`, { ...rec, signatures: { ...(rec.signatures || {}), builder: entry }, status: 'partial' })
+          autoSigned = true
+        } catch (err) { console.error('Company signature not applied:', err.message) }
+      }
+
       const host  = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'
       const proto = host.includes('localhost') ? 'http' : 'https'
       return res.json({
         recordId,
+        autoSigned,
         links: {
           client:  `${proto}://${host}/sign/${roleTokens.client}`,
           builder: `${proto}://${host}/sign/${roleTokens.builder}`,
@@ -322,7 +348,12 @@ export default async function handler(req, res) {
         signatures,
         status: allSigned ? 'signed' : 'partial',
       })
-      if (allSigned) await logEventSafe(built.ctx, { recordType: 'contract', recordId, event: 'completed', docHash })
+      if (allSigned) {
+        await logEventSafe(built.ctx, { recordType: 'contract', recordId, event: 'completed', docHash })
+        const host = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'
+        const origin = `${host.includes('localhost') ? 'http' : 'https'}://${host}`
+        try { await sendWelcomeEmail(kv, { recordId, origin, ctx: built.ctx }) } catch (err) { console.error('Welcome email:', err.message) }
+      }
 
       let driveResult = null
       if (body.pdfBase64 && body.fileName) {

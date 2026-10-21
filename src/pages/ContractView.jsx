@@ -5,7 +5,7 @@ import { useStore } from '../store'
 import { DEMO } from '../demo'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import { PACKET_FORMS } from '../contract/deckPlusAgreement'
-import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, STATES, COUNTIES } from '../contract/contractFields'
+import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, requiredSignFields, STATES, COUNTIES } from '../contract/contractFields'
 import { specPrefill } from '../contract/specPrefill'
 import { scopeLinesFor, normalizeScope, remapEdit, draftOf, scopeEdits, applyLearned, learnedHints, linePrice } from '../lib/scopeLearning'
 import { mergeLines } from '../lib/hiddenLines'
@@ -248,6 +248,8 @@ export default function ContractView() {
   const [signError, setSignError]         = useState('')
   const [signTab, setSignTab]             = useState('link')
   const [signingLinks, setSigningLinks]   = useState(null)
+  const [autoSigned, setAutoSigned]       = useState(false)
+  const companySignature = useStore(s => s.companySignature)
   const [linkLoading, setLinkLoading]     = useState(false)
   const [copiedRole, setCopiedRole]       = useState('')
 
@@ -406,13 +408,16 @@ export default function ContractView() {
         if (!result.links) throw new Error('No links in response')
         return result
       }
-      let bodyJson = JSON.stringify({ contractData, contractNum })
+      // Deck Plus's own fields — signed on send when the company signature is on.
+      const builderFields = requiredSignFields('builder', packetKeys)
+      let bodyJson = JSON.stringify({ contractData, contractNum, builderFields })
       if (bodyJson.length > 4_000_000) {
-        bodyJson = JSON.stringify({ contractData: { ...contractData, branding: { ...fullBranding, logo: null } }, contractNum })
+        bodyJson = JSON.stringify({ contractData: { ...contractData, branding: { ...fullBranding, logo: null } }, contractNum, builderFields })
         if (bodyJson.length > 4_000_000) throw new Error(`Contract data too large (${(bodyJson.length / 1024 / 1024).toFixed(2)}MB). Vercel limits requests to 4.5MB.`)
       }
       const result = await post(bodyJson)
       setSigningLinks(result.links)
+      setAutoSigned(!!result.autoSigned)
       if (data?.proposalId && result.recordId) saveDraft({ signRecordId: result.recordId, signLinks: result.links, linksSentAt: new Date().toISOString() })
     } catch (err) {
       setSignError(err.message)
@@ -1033,7 +1038,9 @@ export default function ContractView() {
                 signingLinks ? (
                   <>
                     <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-4 py-3 rounded-xl text-sm font-medium">✓ 2 unique signing links generated</div>
-                    <p className="text-sm text-gray-500">Send each link to the right party — they can only sign their own fields.</p>
+                    {autoSigned
+                      ? <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3"><b>Already signed for Deck Plus</b> with the company signature on file. Just send the <b>Client</b> link — once the customer signs, the contract is complete.</p>
+                      : <p className="text-sm text-gray-500">Send each link to the right party — they can only sign their own fields.</p>}
                     {roleRows.map(({ role, label, color }) => (
                       <div key={role} className={`border rounded-xl p-3 ${color}`}>
                         <div className="flex items-center justify-between mb-2">
@@ -1043,12 +1050,13 @@ export default function ContractView() {
                         <div className="text-[11px] text-gray-600 break-all bg-white/50 rounded px-2 py-1 select-all">{signingLinks[role]}</div>
                       </div>
                     ))}
-                    <button onClick={() => setSigningLinks(null)} className="text-xs text-gray-400 underline">Generate new set of links</button>
+                    <button onClick={() => { setSigningLinks(null); setAutoSigned(false) }} className="text-xs text-gray-400 underline">Generate new set of links</button>
                   </>
                 ) : (
                   <>
                     <p className="text-sm text-gray-600">Generate two separate signing links — one for the Client and one for Deck Plus. Each link only lets that party sign and initial their own fields.</p>
                     <p className="text-xs text-gray-400">IP address + timestamp recorded for the audit trail.</p>
+                    {companySignature?.enabled && companySignature?.signatureDataUrl && <p className="text-xs text-emerald-700">Deck Plus's part will be signed automatically with the company signature on file ({companySignature.printedName}).</p>}
                     {signError && <p className="text-sm text-red-600">{signError}</p>}
                     <button onClick={handleGetSigningLink} disabled={linkLoading} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-700 disabled:opacity-50">
                       {linkLoading ? <><Loader2 size={15} className="animate-spin" /> Creating links…</> : 'Generate Signing Links'}

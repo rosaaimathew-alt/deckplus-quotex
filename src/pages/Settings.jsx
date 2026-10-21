@@ -6,6 +6,7 @@ import { canCustomizeBranding, PLAN_ORDER, PLAN_META } from '../plans'
 import { ROLE_ORDER, ROLE_META } from '../roles'
 import { DEMO } from '../demo'
 import { TeamCard, PasswordCard } from '../components/TeamCard'
+import { CompanySignatureCard, WelcomeEmailCard } from '../components/ContractAutomationCards'
 
 const PRESET_COLORS = [
   { label: 'Sky Blue',    hex: '#0369a1' },
@@ -153,6 +154,13 @@ function EmailConnectCard() {
               <p className="text-xs text-green-700">{providerLabel(mine)}{mine.companyDefault ? ' · also used for company emails' : ''}</p>
             </div>
           </div>
+          {status?.canSetCompany && (
+            <label className="flex items-start gap-2 text-xs text-green-800 mt-3">
+              <input type="checkbox" checked={!!mine.companyDefault} disabled={!!busy} className="mt-0.5"
+                onChange={async e => { const ok = await post('mailbox-company', { on: e.target.checked }, 'company'); if (ok) load() }} />
+              <span>Use this mailbox for company emails — customer welcome emails, signing codes, and emails from people who haven't connected their own.</span>
+            </label>
+          )}
           <div className="flex flex-wrap gap-2 mt-3">
             <button onClick={test} disabled={!!busy} className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-50">{busy === 'test' ? 'Sending…' : 'Send test email'}</button>
             <button onClick={() => { setEditing(true); setManual(false); set({ provider: mine.provider === 'google' ? 'gmail' : (mine.provider || 'other'), email: mine.email, host: mine.host, port: mine.port, companyDefault: mine.companyDefault, password: '' }) }} disabled={!!busy}
@@ -831,6 +839,15 @@ export default function Settings() {
               <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Team &amp; Account</h3>
               {(me?.role === 'admin' || me?.role === 'office') && <TeamCard />}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><PasswordCard /></div>
+            </>
+          )}
+
+          {/* ── Contracts: company signature + welcome email (office / admin) ── */}
+          {!DEMO && (me?.role === 'admin' || me?.role === 'office') && (
+            <>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Contracts</h3>
+              <CompanySignatureCard />
+              <WelcomeEmailCard />
             </>
           )}
 

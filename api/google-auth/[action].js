@@ -2,13 +2,13 @@
 import { getAuthUrl, handleCallback, isAuthenticated, getConnectedEmail } from '../_google-drive.js'
 import { verifyToken, staffMembership } from '../_auth.js'
 import { smtpUser, sendMail } from '../_mailer.js'
-import { MAIL_PROVIDERS, mailboxesAvailable, mailboxForUser, companyMailbox, saveMailbox, clearMailbox, verifyLogin,
+import { MAIL_PROVIDERS, mailboxesAvailable, mailboxForUser, companyMailbox, saveMailbox, clearMailbox, setCompanyDefault, verifyLogin,
   googleSignInReady, googleMailboxAuthUrl, readState, finishGoogleMailbox } from '../_mailboxes.js'
 
 // Account connections. Google sign-in (start / callback / status) plus each
 // person's own sending mailbox: one-click Sign in with Google (mailbox-google),
 // or an address + app password (mailbox-connect); -status / -test / -disconnect.
-const MAILBOX_ACTIONS = ['mailbox-status', 'mailbox-google', 'mailbox-connect', 'mailbox-test', 'mailbox-disconnect']
+const MAILBOX_ACTIONS = ['mailbox-status', 'mailbox-google', 'mailbox-connect', 'mailbox-test', 'mailbox-disconnect', 'mailbox-company']
 const MAIL_PORTS = [25, 465, 587, 2525]
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || ''))
 // A public mail server name — never an IP address or an internal host.
@@ -87,6 +87,14 @@ export default async function handler(req, res) {
         if (sent.error) return res.status(502).json({ error: sent.error })
         if (sent.sentFrom !== mine.email) return res.status(502).json({ error: `Your mailbox ${mine.email} refused to send, so the test went out from ${sent.sentFrom} instead. Reconnect your mailbox with a fresh app password.` })
         return res.status(200).json({ ok: true, sentTo: staff.email || mine.email, sentFrom: sent.sentFrom })
+      }
+
+      // Office/admin: send company emails (welcome emails, signing codes) from this mailbox.
+      if (action === 'mailbox-company') {
+        if (!isOffice) return res.status(403).json({ error: 'Only the office or an admin can choose the company mailbox.' })
+        const row = await setCompanyDefault(staff.sub, !!body.on)
+        if (!row) return res.status(400).json({ error: 'Connect your mailbox first.' })
+        return res.status(200).json({ ok: true, mine: pub(row) })
       }
 
       if (action === 'mailbox-disconnect') {
