@@ -66,6 +66,16 @@ export const inviteInfo   = (code) => rpc('invite_info', { p_code: code })
 export const createInvite = ({ email, role, displayName }) => rpc('create_invite', { p_email: email, p_role: role, p_display_name: displayName || null })
 export const listInvites  = () => rpc('list_invites', {})
 export const revokeInvite = (code) => rpc('revoke_invite', { p_code: code })
+
+// Admins remove someone from the team (the database only lets admins do this).
+// Their proposals and jobs stay with the company; they can no longer sign in to it.
+export async function removeMember(userId, orgId = _orgId) {
+  if (!orgId) throw new Error('Not signed in to a company yet — reload and try again.')
+  const { data, error } = await supabase.from('org_members').delete()
+    .eq('user_id', userId).eq('org_id', orgId).select('user_id')
+  if (error) throw error
+  if (!data?.length) throw new Error('Could not remove them — only an admin can remove people from the team.')
+}
 export const claimInvite  = (code, name) => rpc('claim_invite', { p_code: code || null, p_name: name || null })
 
 // Creates the login. Returns { session } when signed in straight away, or

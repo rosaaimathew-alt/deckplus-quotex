@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Users, Copy, X, KeyRound, CheckCircle2 } from 'lucide-react'
+import { Users, Copy, X, KeyRound, CheckCircle2, UserMinus } from 'lucide-react'
 import { useStore } from '../store'
-import { createInvite, listInvites, revokeInvite, changePassword } from '../supabase'
+import { createInvite, listInvites, revokeInvite, changePassword, removeMember } from '../supabase'
 import { DEMO } from '../demo'
 
 // ── Settings › Team ──────────────────────────────────────────────────────────
@@ -30,6 +30,19 @@ export function TeamCard() {
   const [error, setError]     = useState('')
   const [fresh, setFresh]     = useState(null)   // the invite just created
   const [copied, setCopied]   = useState('')
+  const [removing, setRemoving] = useState('')   // user id being removed
+  const adminCount = members.filter(m => m.role === 'admin').length
+  // Admins only; never yourself, never the last admin.
+  const canRemove = (m) => isAdmin && !DEMO && m.id !== me?.id && !(m.role === 'admin' && adminCount <= 1)
+  const remove = async (m) => {
+    if (!window.confirm(`Remove ${m.displayName || m.email} from the team?\n\nThey won't be able to sign in to Deck Plus anymore. Their proposals and jobs stay with the company.`)) return
+    setRemoving(m.id); setError('')
+    try {
+      await removeMember(m.id, useStore.getState().orgId)
+      useStore.setState(s => ({ members: (s.members || []).filter(x => x.id !== m.id) }))
+    } catch (e) { setError(e.message) }
+    setRemoving('')
+  }
 
   const refresh = useCallback(async () => {
     try { setInvites(await listInvites() || []) } catch (e) { setError(e.message) }
@@ -133,6 +146,12 @@ export function TeamCard() {
             <div key={m.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <p className="flex-1 min-w-0 truncate text-gray-800">{m.displayName || m.email}<span className="text-gray-400"> · {m.email}</span></p>
               <span className="text-xs text-gray-500">{roleLabel(m.role)}{m.id === me?.id ? ' (you)' : ''}</span>
+              {canRemove(m) && (
+                <button onClick={() => remove(m)} disabled={!!removing} title={`Remove ${m.displayName || m.email} from the team`}
+                  className="flex items-center gap-1 text-xs text-red-600 hover:bg-red-50 rounded px-2 py-1 disabled:opacity-50">
+                  <UserMinus size={13} /> {removing === m.id ? 'Removing…' : 'Remove'}
+                </button>
+              )}
             </div>
           ))}
         </div>
