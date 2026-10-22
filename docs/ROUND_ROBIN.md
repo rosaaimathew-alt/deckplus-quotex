@@ -18,6 +18,14 @@ order (Rep 1 → Rep 2 → Rep 3 → Rep 1 …), no matter who is free first.
 - Cancelling a booking (`status = 'cancelled'`) frees the time slot but does
   **not** give the rep their turn back.
 
+## What the customer must enter
+
+First name, last name, street address (must start with a street number),
+city, state, 5-digit ZIP, a 10-digit phone number and email are all required;
+notes are optional. The page checks them as the visitor types, and the API
+re-checks them so a booking can't be made without them. The address and phone
+appear in the rep's email and as the Google Calendar event's location.
+
 ## Setup
 
 1. **Database** — in the Supabase SQL editor run `supabase/round_robin.sql`,
@@ -58,7 +66,8 @@ Direct link (no embed): `https://YOUR-QUOTEX-DOMAIN/book`.
 ## Seeing the queue
 
 ```sql
-select b.turn, r.name as rep, b.starts_at, b.lead_name, b.lead_email, b.status
+select b.turn, r.name as rep, b.starts_at, b.lead_name, b.lead_phone, b.lead_email,
+       b.address_street, b.address_city, b.address_state, b.address_zip, b.status
 from rr_bookings b join rr_reps r on r.id = b.rep_id order by b.turn desc;
 
 select name as next_up from rr_next_rep();

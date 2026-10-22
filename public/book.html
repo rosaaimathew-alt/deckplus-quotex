@@ -36,7 +36,14 @@
     .slot:hover, .slot:focus-visible { background: var(--accent); color: var(--accent-text); outline: none; }
     form { display: grid; gap: 12px; }
     label { display: grid; gap: 4px; font-weight: 600; font-size: .9rem; }
-    input, textarea { font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+    .grid2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+    .grid3 { display: grid; gap: 12px; grid-template-columns: 2fr 1fr 1fr; }
+    @media (max-width: 420px) { .grid3 { grid-template-columns: 1fr 1fr; } .grid3 > :first-child { grid-column: 1 / -1; } }
+    .err { color: var(--danger); font-weight: 400; font-size: .8rem; min-height: 0; }
+    .err:empty { display: none; }
+    [aria-invalid="true"] { border-color: var(--danger); }
+    .opt { font-weight: 400; }
+    input, select, textarea { font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
       background: var(--surface); color: var(--text); width: 100%; }
     textarea { min-height: 80px; resize: vertical; }
     .chosen { padding: 12px; margin-bottom: 16px; border-radius: var(--radius); background: var(--accent-soft); }
@@ -67,10 +74,19 @@
     <section id="details" hidden>
       <div class="chosen" id="chosen"></div>
       <form id="form" novalidate>
-        <label>Full name <input name="name" autocomplete="name" required maxlength="120" /></label>
-        <label>Email <input name="email" type="email" autocomplete="email" required maxlength="200" /></label>
-        <label>Phone <input name="phone" type="tel" autocomplete="tel" maxlength="40" /></label>
-        <label>Anything we should know? <textarea name="notes" maxlength="2000"></textarea></label>
+        <div class="grid2">
+          <label>First name <input name="firstName" autocomplete="given-name" required maxlength="60" /><span class="err" data-for="firstName"></span></label>
+          <label>Last name <input name="lastName" autocomplete="family-name" required maxlength="60" /><span class="err" data-for="lastName"></span></label>
+        </div>
+        <label>Street address <input name="street" autocomplete="address-line1" required maxlength="160" placeholder="123 Main St" /><span class="err" data-for="street"></span></label>
+        <div class="grid3">
+          <label>City <input name="city" autocomplete="address-level2" required maxlength="80" /><span class="err" data-for="city"></span></label>
+          <label>State <select name="state" autocomplete="address-level1" required><option value="">—</option><option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option><option>CO</option><option>CT</option><option>DE</option><option>DC</option><option>FL</option><option>GA</option><option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option><option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option><option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option><option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option><option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option><option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option><option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option><option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option><option>PR</option></select><span class="err" data-for="state"></span></label>
+          <label>ZIP <input name="zip" autocomplete="postal-code" inputmode="numeric" required maxlength="10" /><span class="err" data-for="zip"></span></label>
+        </div>
+        <label>Phone <input name="phone" type="tel" autocomplete="tel" required maxlength="20" placeholder="(555) 555-5555" /><span class="err" data-for="phone"></span></label>
+        <label>Email <input name="email" type="email" autocomplete="email" required maxlength="200" /><span class="err" data-for="email"></span></label>
+        <label><span>Anything we should know? <span class="muted opt">(optional)</span></span> <textarea name="notes" maxlength="2000"></textarea></label>
         <label class="hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off" /></label>
         <div class="row">
           <button class="btn" type="submit" id="submit">Confirm booking</button>
@@ -161,17 +177,55 @@
       $('chosen').append(Object.assign(document.createElement('strong'), { textContent: fmtFull(d) }),
         document.createTextNode(` with ${state.rep.name}`))
       show('details')
-      $('form').elements.name.focus()
+      $('form').elements.firstName.focus()
     }
+
+    // Same rules the server enforces (api/booking.js validateLead); the server has the final say.
+    const FIELDS = ['firstName', 'lastName', 'street', 'city', 'state', 'zip', 'phone', 'email']
+    function checkFields(f) {
+      const p = {}
+      const v = (n) => f[n].value.trim()
+      if (!v('firstName')) p.firstName = 'Enter your first name.'
+      if (!v('lastName')) p.lastName = 'Enter your last name.'
+      if (!/^\d+[A-Za-z]?(-\d+)?\s+\S/.test(v('street'))) p.street = 'Enter your street number and street name.'
+      if (!v('city')) p.city = 'Enter your city.'
+      if (!v('state')) p.state = 'Choose your state.'
+      if (!/^\d{5}(-\d{4})?$/.test(v('zip'))) p.zip = 'Enter a 5-digit ZIP code.'
+      if (v('phone').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '').length !== 10) p.phone = 'Enter a 10-digit phone number.'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v('email'))) p.email = 'Enter a valid email address.'
+      return p
+    }
+    function showFieldErrors(p) {
+      const f = $('form').elements
+      for (const n of FIELDS) {
+        f[n].setAttribute('aria-invalid', String(!!p[n]))
+        document.querySelector(`.err[data-for="${n}"]`).textContent = p[n] || ''
+      }
+      const first = FIELDS.find(n => p[n])
+      if (first) f[first].focus()
+      resize()
+    }
+
+    // Clear a field's message as soon as it's fixed.
+    $('form').addEventListener('input', (ev) => {
+      const n = ev.target.name
+      if (!FIELDS.includes(n) || ev.target.getAttribute('aria-invalid') !== 'true') return
+      if (!checkFields($('form').elements)[n]) {
+        ev.target.setAttribute('aria-invalid', 'false')
+        document.querySelector(`.err[data-for="${n}"]`).textContent = ''
+        if (!document.querySelector('.err:not(:empty)')) error()
+        resize()
+      }
+    })
 
     $('back').onclick = () => { error(); show('pick') }
 
     $('form').onsubmit = async (ev) => {
       ev.preventDefault()
       const f = ev.target.elements
-      if (!f.name.value.trim() || !f.email.checkValidity() || !f.email.value) {
-        return error('Please enter your name and a valid email.')
-      }
+      const problems = checkFields(f)
+      showFieldErrors(problems)
+      if (Object.keys(problems).length) return error('Please complete the highlighted fields.')
       error(); $('submit').disabled = true; $('submit').textContent = 'Booking…'
       try {
         const res = await fetch(API, {
@@ -179,11 +233,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             repId: state.rep.id, start: state.start.toISOString(), timeZone: TZ,
-            name: f.name.value, email: f.email.value, phone: f.phone.value, notes: f.notes.value, website: f.website.value,
+            ...Object.fromEntries(FIELDS.map(n => [n, f[n].value])), notes: f.notes.value, website: f.website.value,
           }),
         })
         const data = await res.json()
         if (res.status === 409) return load(data.error)
+        if (data.fields) { showFieldErrors(data.fields); throw new Error(data.error) }
         if (!res.ok) throw new Error(data.error)
         $('doneText').textContent = `${fmtFull(new Date(data.booking.start))} with ${data.booking.repName}. A confirmation is on its way to ${f.email.value}.`
         show('done')

@@ -59,6 +59,14 @@ create table if not exists rr_bookings (
 );
 create index if not exists rr_bookings_rep_time on rr_bookings (rep_id, starts_at);
 
+-- Required lead details (added after the first version; safe on existing tables).
+alter table rr_bookings add column if not exists lead_first_name text;
+alter table rr_bookings add column if not exists lead_last_name  text;
+alter table rr_bookings add column if not exists address_street  text;
+alter table rr_bookings add column if not exists address_city    text;
+alter table rr_bookings add column if not exists address_state   text;
+alter table rr_bookings add column if not exists address_zip     text;
+
 -- A rep can never hold two live bookings that overlap.
 do $$
 begin
@@ -86,14 +94,13 @@ $$;
 -- p_expected_rep is the rep whose times the visitor was shown. If someone else
 -- booked in between, the turn has moved on and we refuse with 'turn_changed'
 -- so the page reloads the new turn-holder's times. Overlaps raise 'slot_taken'.
+-- The booking API validates p_lead (all fields required except notes).
+drop function if exists rr_book(uuid, timestamptz, timestamptz, text, text, text, text);
 create or replace function rr_book(
   p_expected_rep uuid,
   p_start        timestamptz,
   p_end          timestamptz,
-  p_name         text,
-  p_email        text,
-  p_phone        text,
-  p_notes        text
+  p_lead         jsonb   -- first_name, last_name, email, phone, street, city, state, zip, notes
 ) returns rr_bookings
 language plpgsql set search_path = public as $$
 declare
@@ -112,8 +119,16 @@ begin
   end if;
 
   begin
-    insert into rr_bookings (rep_id, starts_at, ends_at, lead_name, lead_email, lead_phone, notes)
-    values (v_rep.id, p_start, p_end, p_name, p_email, p_phone, p_notes)
+    insert into rr_bookings (
+      rep_id, starts_at, ends_at,
+      lead_name, lead_first_name, lead_last_name, lead_email, lead_phone,
+      address_street, address_city, address_state, address_zip, notes
+    ) values (
+      v_rep.id, p_start, p_end,
+      concat_ws(' ', p_lead->>'first_name', p_lead->>'last_name'),
+      p_lead->>'first_name', p_lead->>'last_name', p_lead->>'email', p_lead->>'phone',
+      p_lead->>'street', p_lead->>'city', p_lead->>'state', p_lead->>'zip', nullif(p_lead->>'notes', '')
+    )
     returning * into v_booking;
   exception when exclusion_violation then
     raise exception 'slot_taken';
@@ -130,7 +145,7 @@ alter table rr_reps     enable row level security;
 alter table rr_settings enable row level security;
 alter table rr_bookings enable row level security;
 
-revoke execute on function rr_book(uuid, timestamptz, timestamptz, text, text, text, text) from public, anon, authenticated;
+revoke execute on function rr_book(uuid, timestamptz, timestamptz, jsonb) from public, anon, authenticated;
 revoke execute on function rr_next_rep() from public, anon, authenticated;
 
 drop policy if exists rr_reps_staff     on rr_reps;
