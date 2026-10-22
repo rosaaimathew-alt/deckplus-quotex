@@ -1,0 +1,178 @@
+/**
+ * Strict round-robin scheduling helpers (see supabase/round_robin.sql).
+ * - Availability = rep's weekly hours, minus their live bookings, minus their
+ *   Google Calendar busy time when a service account is configured.
+ * - Google is optional: set GOOGLE_SERVICE_ACCOUNT_JSON and have each rep share
+ *   their calendar with the service account ("Make changes to events").
+ */
+import { createClient } from '@supabase/supabase-js'
+
+let _db = null
+export function db() {
+  if (_db) return _db
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_KEY
+  if (!url || !key) throw new Error('Booking not configured: SUPABASE_URL and SUPABASE_SERVICE_KEY are required')
+  _db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  return _db
+}
+
+export async function loadTurn() {
+  const sb = db()
+  const [{ data: rep, error: repErr }, { data: settings, error: setErr }] = await Promise.all([
+    sb.rpc('rr_next_rep'),
+    sb.from('rr_settings').select('*').eq('id', true).single(),
+  ])
+  if (repErr) throw repErr
+  if (setErr) throw setErr
+  return { rep: rep?.id ? rep : null, settings }
+}
+
+// ── Timezones (no library: Intl gives us the offset for any instant) ────────
+function tzOffsetMs(ts, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(ts))
+  const p = Object.fromEntries(parts.map(x => [x.type, Number(x.value)]))
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ts / 1000) * 1000
+}
+
+// Wall-clock time in `timeZone` → UTC epoch ms (DST-safe).
+export function zonedToUtc(y, m, d, hh, mm, timeZone) {
+  const guess = Date.UTC(y, m - 1, d, hh, mm)
+  const first = guess - tzOffsetMs(guess, timeZone)
+  return guess - tzOffsetMs(first, timeZone)
+}
+
+function todayIn(timeZone, now) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(now)).map(x => [x.type, Number(x.value)]))
+  return { y: p.year, m: p.month, d: p.day }
+}
+
+const toMinutes = (hhmm) => {
+  const [h, m] = String(hhmm).split(':').map(Number)
+  return h * 60 + (m || 0)
+}
+
+/**
+ * Every bookable slot start (epoch ms) for `rep` from now through days_ahead.
+ * `busy` is a list of [startMs, endMs] the rep is unavailable.
+ */
+export function computeSlots(rep, settings, busy, now = Date.now()) {
+  const step   = settings.slot_minutes * 60_000
+  const buffer = settings.buffer_minutes * 60_000
+  const earliest = now + settings.min_notice_hours * 3_600_000
+  const { y, m, d } = todayIn(rep.timezone, now)
+  const slots = []
+
+  for (let i = 0; i <= settings.days_ahead; i++) {
+    const day = new Date(Date.UTC(y, m - 1, d + i))
+    const ranges = rep.hours?.[String(day.getUTCDay())] || []
+    for (const [from, to] of ranges) {
+      const endMin = toMinutes(to)
+      for (let min = toMinutes(from); min + settings.slot_minutes <= endMin; min += settings.slot_minutes) {
+        const start = zonedToUtc(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(),
+          Math.floor(min / 60), min % 60, rep.timezone)
+        const end = start + step
+        if (start < earliest) continue
+        if (busy.some(([bs, be]) => start < be + buffer && end + buffer > bs)) continue
+        slots.push(start)
+      }
+    }
+  }
+  return slots
+}
+
+// ── Google Calendar (optional) ──────────────────────────────────────────────
+let _calendar
+async function calendar() {
+  if (_calendar !== undefined) return _calendar
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  if (!raw) return (_calendar = null)
+  const { google } = await import('googleapis')
+  const auth = new google.auth.GoogleAuth({
+    credentials: JSON.parse(raw),
+    scopes: ['https://www.googleapis.com/auth/calendar'],
+  })
+  return (_calendar = google.calendar({ version: 'v3', auth }))
+}
+
+async function googleBusy(rep, fromMs, toMs) {
+  const cal = rep.google_calendar_id && await calendar()
+  if (!cal) return []
+  try {
+    const { data } = await cal.freebusy.query({
+      requestBody: {
+        timeMin: new Date(fromMs).toISOString(),
+        timeMax: new Date(toMs).toISOString(),
+        items: [{ id: rep.google_calendar_id }],
+      },
+    })
+    const entry = data.calendars?.[rep.google_calendar_id]
+    if (entry?.errors?.length) throw new Error(entry.errors.map(e => e.reason).join(', '))
+    return (entry?.busy || []).map(b => [Date.parse(b.start), Date.parse(b.end)])
+  } catch (err) {
+    // Keep taking leads on a Google outage; our own bookings still block overlaps.
+    console.error(`Google free/busy failed for ${rep.email}:`, err.message)
+    return []
+  }
+}
+
+export async function repBusy(rep, settings, now = Date.now()) {
+  const fromMs = now
+  const toMs = now + (settings.days_ahead + 2) * 86_400_000
+  const [{ data, error }, gBusy] = await Promise.all([
+    db().from('rr_bookings').select('starts_at, ends_at')
+      .eq('rep_id', rep.id).eq('status', 'booked')
+      .gte('ends_at', new Date(fromMs).toISOString())
+      .lte('starts_at', new Date(toMs).toISOString()),
+    googleBusy(rep, fromMs, toMs),
+  ])
+  if (error) throw error
+  return [...data.map(b => [Date.parse(b.starts_at), Date.parse(b.ends_at)]), ...gBusy]
+}
+
+// Puts the meeting on the rep's calendar. Service accounts can't send invites
+// without domain-wide delegation, so the lead gets an .ics by email instead.
+export async function createGoogleEvent(rep, booking, settings) {
+  const cal = rep.google_calendar_id && await calendar()
+  if (!cal) return null
+  const { data } = await cal.events.insert({
+    calendarId: rep.google_calendar_id,
+    requestBody: {
+      summary: `${settings.meeting_title}: ${booking.lead_name}`,
+      description: [
+        `Lead #${booking.turn} (round robin)`,
+        `Name: ${booking.lead_name}`,
+        `Email: ${booking.lead_email}`,
+        booking.lead_phone && `Phone: ${booking.lead_phone}`,
+        booking.notes && `Notes: ${booking.notes}`,
+      ].filter(Boolean).join('\n'),
+      start: { dateTime: booking.starts_at },
+      end:   { dateTime: booking.ends_at },
+    },
+  })
+  return data.id
+}
+
+const icsDate = (iso) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+const icsText = (s) => String(s || '').replace(/[\\;,]/g, m => '\\' + m).replace(/\r?\n/g, '\\n')
+
+export function buildIcs(rep, booking, settings) {
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//QuoteX//Round Robin//EN', 'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${booking.id}@quotex`,
+    `DTSTAMP:${icsDate(new Date().toISOString())}`,
+    `DTSTART:${icsDate(booking.starts_at)}`,
+    `DTEND:${icsDate(booking.ends_at)}`,
+    `SUMMARY:${icsText(`${settings.meeting_title} with ${rep.name}`)}`,
+    `ORGANIZER;CN=${icsText(rep.name)}:mailto:${rep.email}`,
+    `ATTENDEE;CN=${icsText(booking.lead_name)};RSVP=TRUE:mailto:${booking.lead_email}`,
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n')
+}

@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book a Consultation</title>
+  <style>
+    :root {
+      --bg: #ffffff; --surface: #f7f8fa; --border: #e3e6eb; --text: #14171c; --muted: #5d6573;
+      --accent: #1f6feb; --accent-text: #ffffff; --accent-soft: #e8f0fd; --danger: #c62828; --ok: #1b7f3b;
+      --radius: 10px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #111418; --surface: #1a1e24; --border: #2c323b; --text: #eef1f5; --muted: #9aa3b0;
+        --accent: #4d8dff; --accent-text: #0b0d10; --accent-soft: #1b2a44; --danger: #ff6b6b; --ok: #4cc27a;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #111418; --surface: #1a1e24; --border: #2c323b; --text: #eef1f5; --muted: #9aa3b0;
+      --accent: #4d8dff; --accent-text: #0b0d10; --accent-soft: #1b2a44; --danger: #ff6b6b; --ok: #4cc27a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 1.35rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    .days { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 16px; scrollbar-width: thin; }
+    .day { flex: 0 0 auto; min-width: 68px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); color: var(--text); text-align: center; cursor: pointer; font: inherit; }
+    .day small { display: block; color: var(--muted); font-size: .75rem; }
+    .day[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+    .slot { padding: 10px 0; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--bg);
+      color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+    .slot:hover, .slot:focus-visible { background: var(--accent); color: var(--accent-text); outline: none; }
+    form { display: grid; gap: 12px; }
+    label { display: grid; gap: 4px; font-weight: 600; font-size: .9rem; }
+    input, textarea { font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); color: var(--text); width: 100%; }
+    textarea { min-height: 80px; resize: vertical; }
+    .chosen { padding: 12px; margin-bottom: 16px; border-radius: var(--radius); background: var(--accent-soft); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { padding: 12px 18px; border-radius: var(--radius); border: 0; background: var(--accent); color: var(--accent-text);
+      font: inherit; font-weight: 700; cursor: pointer; }
+    .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+    .btn:disabled { opacity: .6; cursor: default; }
+    .msg { padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--danger); color: var(--danger); margin-bottom: 12px; }
+    .done { text-align: center; padding: 24px 0; }
+    .done .check { font-size: 2.5rem; color: var(--ok); }
+    .hp { position: absolute; left: -9999px; }
+    .muted { color: var(--muted); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1 id="title">Book a Consultation</h1>
+    <p class="sub" id="subtitle">Loading available times…</p>
+    <div id="error" class="msg" role="alert" hidden></div>
+
+    <section id="pick" hidden>
+      <div class="days" id="days" role="group" aria-label="Choose a day"></div>
+      <div class="slots" id="slots" role="group" aria-label="Choose a time"></div>
+    </section>
+
+    <section id="details" hidden>
+      <div class="chosen" id="chosen"></div>
+      <form id="form" novalidate>
+        <label>Full name <input name="name" autocomplete="name" required maxlength="120" /></label>
+        <label>Email <input name="email" type="email" autocomplete="email" required maxlength="200" /></label>
+        <label>Phone <input name="phone" type="tel" autocomplete="tel" maxlength="40" /></label>
+        <label>Anything we should know? <textarea name="notes" maxlength="2000"></textarea></label>
+        <label class="hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off" /></label>
+        <div class="row">
+          <button class="btn" type="submit" id="submit">Confirm booking</button>
+          <button class="btn ghost" type="button" id="back">Back</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="done" class="done" hidden>
+      <div class="check">✓</div>
+      <h2 id="doneTitle">You're booked!</h2>
+      <p id="doneText" class="muted"></p>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search)
+    const API = '/api/booking'
+    const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (params.get('theme')) document.documentElement.dataset.theme = params.get('theme')
+
+    const $ = (id) => document.getElementById(id)
+    const dayKey = (d) => d.toLocaleDateString('en-CA', { timeZone: TZ })
+    const fmtTime = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    const fmtFull = (d) => d.toLocaleString([], { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    let state = { rep: null, byDay: new Map(), day: null, start: null }
+
+    function show(section) {
+      for (const id of ['pick', 'details', 'done']) $(id).hidden = id !== section
+      resize()
+    }
+    function error(text) { $('error').textContent = text || ''; $('error').hidden = !text; resize() }
+
+    async function load(notice) {
+      error(notice)
+      $('subtitle').textContent = 'Loading available times…'
+      try {
+        const res = await fetch(API, { cache: 'no-store' })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        state.rep = data.rep
+        if (data.meetingTitle) { $('title').textContent = 'Book a ' + data.meetingTitle; document.title = $('title').textContent }
+        state.byDay = new Map()
+        for (const iso of data.slots) {
+          const d = new Date(iso)
+          const k = dayKey(d)
+          if (!state.byDay.has(k)) state.byDay.set(k, [])
+          state.byDay.get(k).push(d)
+        }
+        if (!data.rep || !state.byDay.size) {
+          $('subtitle').textContent = 'No times are open right now — please check back soon.'
+          $('pick').hidden = true
+          return resize()
+        }
+        $('subtitle').textContent = `${data.slotMinutes}-minute call with ${data.rep.name} · times shown in ${TZ.replace(/_/g, ' ')}`
+        if (!state.byDay.has(state.day)) state.day = state.byDay.keys().next().value
+        renderDays()
+        show('pick')
+      } catch (e) {
+        $('subtitle').textContent = ''
+        error(e.message || 'Could not load times. Please refresh.')
+      }
+    }
+
+    function renderDays() {
+      $('days').replaceChildren(...[...state.byDay.entries()].map(([k, slots]) => {
+        const b = document.createElement('button')
+        b.className = 'day'; b.type = 'button'
+        b.setAttribute('aria-pressed', String(k === state.day))
+        b.innerHTML = `<small>${slots[0].toLocaleDateString([], { weekday: 'short' })}</small>
+          <strong>${slots[0].toLocaleDateString([], { month: 'short', day: 'numeric' })}</strong>`
+        b.onclick = () => { state.day = k; renderDays() }
+        return b
+      }))
+      $('slots').replaceChildren(...state.byDay.get(state.day).map(d => {
+        const b = document.createElement('button')
+        b.className = 'slot'; b.type = 'button'; b.textContent = fmtTime(d)
+        b.onclick = () => pickSlot(d)
+        return b
+      }))
+      resize()
+    }
+
+    function pickSlot(d) {
+      state.start = d
+      error()
+      $('chosen').innerHTML = ''
+      $('chosen').append(Object.assign(document.createElement('strong'), { textContent: fmtFull(d) }),
+        document.createTextNode(` with ${state.rep.name}`))
+      show('details')
+      $('form').elements.name.focus()
+    }
+
+    $('back').onclick = () => { error(); show('pick') }
+
+    $('form').onsubmit = async (ev) => {
+      ev.preventDefault()
+      const f = ev.target.elements
+      if (!f.name.value.trim() || !f.email.checkValidity() || !f.email.value) {
+        return error('Please enter your name and a valid email.')
+      }
+      error(); $('submit').disabled = true; $('submit').textContent = 'Booking…'
+      try {
+        const res = await fetch(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            repId: state.rep.id, start: state.start.toISOString(), timeZone: TZ,
+            name: f.name.value, email: f.email.value, phone: f.phone.value, notes: f.notes.value, website: f.website.value,
+          }),
+        })
+        const data = await res.json()
+        if (res.status === 409) return load(data.error)
+        if (!res.ok) throw new Error(data.error)
+        $('doneText').textContent = `${fmtFull(new Date(data.booking.start))} with ${data.booking.repName}. A confirmation is on its way to ${f.email.value}.`
+        show('done')
+        parent.postMessage({ type: 'rr-booked', start: data.booking.start }, '*')
+      } catch (e) {
+        error(e.message || 'Booking failed — please try again.')
+      } finally {
+        $('submit').disabled = false; $('submit').textContent = 'Confirm booking'
+      }
+    }
+
+    // Tell the embedding page how tall we are (see /embed.js).
+    function resize() { parent.postMessage({ type: 'rr-height', height: document.documentElement.scrollHeight }, '*') }
+    new ResizeObserver(resize).observe(document.body)
+
+    load()
+  </script>
+</body>
+</html>
