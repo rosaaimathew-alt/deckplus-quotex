@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Book a Consultation</title>
+  <title>Schedule Your Free Estimate | Deck Plus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
   <style>
     /* ── Brand ─────────────────────────────────────────────────────────────
        Every look-and-feel choice lives here so the page can match the Deck Plus
@@ -11,40 +14,48 @@
        data-* attributes (see /embed.js). */
     :root {
       --bg: #ffffff;            /* page background (transparent when embedded) */
-      --surface: #f7f7f5;       /* inputs, day chips */
-      --border: #dcdcd7;
-      --text: #1d1d1f;
-      --muted: #6b6b70;
-      --accent: #b0894f;        /* buttons, selected states */
-      --accent-text: #ffffff;   /* text on accent */
-      --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);   /* selected day, chosen-time banner */
-      --danger: #b3261e;
-      --ok: #2e7d32;
-      --radius: 6px;            /* inputs, chips, time buttons */
-      --btn-radius: 6px;        /* main buttons */
-      --btn-transform: none;    /* e.g. uppercase */
-      --btn-tracking: normal;   /* letter-spacing on buttons */
-      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --surface: #ffffff;       /* inputs, day chips */
+      --border: #cfd4d9;
+      --text: #333a42;
+      --heading: #1f2b38;       /* deck.plus navy headings */
+      --muted: #6b7480;
+      --accent: #2a8db1;        /* deck.plus teal: form button, times, selection */
+      --accent-text: #ffffff;
+      --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
+      --cta: #f0690f;           /* deck.plus orange (eyebrow, highlights) */
+      --danger: #c62828;
+      --ok: #2a8db1;
+      --radius: 3px;            /* inputs, chips, time buttons */
+      --btn-radius: 3px;        /* main buttons */
+      --btn-transform: none;
+      --btn-tracking: normal;
+      --font: "Inter", "Helvetica Neue", Arial, sans-serif;
       --heading-font: var(--font);
       --heading-weight: 700;
-      --font-size: 15px;
+      --font-size: 16px;
     }
     html.embedded { --bg: transparent; }
     html.embedded .wrap { max-width: none; padding: 4px 3px; }   /* the host page supplies the margins */
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); font: var(--font-size)/1.5 var(--font); }
-    h1, h2 { font-family: var(--heading-font); font-weight: var(--heading-weight); }
+    h1, h2 { font-family: var(--heading-font); font-weight: var(--heading-weight); color: var(--heading); letter-spacing: -0.01em; text-wrap: balance; }
+    .eyebrow { color: var(--cta); font-weight: 600; margin: 0 0 6px; }
+    .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    ::placeholder { color: var(--muted); opacity: 1; }
     .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
-    h1 { font-size: 1.35rem; margin: 0 0 4px; }
+    h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 6px; }
     .sub { color: var(--muted); margin: 0 0 20px; }
     .days { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 16px; scrollbar-width: thin; }
     .day { flex: 0 0 auto; min-width: 68px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
       background: var(--surface); color: var(--text); text-align: center; cursor: pointer; font: inherit; }
     .day small { display: block; color: var(--muted); font-size: .75rem; }
-    .day[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    .day[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
+    .day[aria-pressed="true"] small { color: inherit; }
+    .slot:focus-visible, .day:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cta); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-    .slot { padding: 10px 0; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--bg);
-      color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+    .slot { padding: 11px 0; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--surface);
+      color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
     .slot:hover, .slot:focus-visible { background: var(--accent); color: var(--accent-text); outline: none; }
     form { display: grid; gap: 12px; }
     label { display: grid; gap: 4px; font-weight: 600; font-size: .9rem; }
@@ -55,19 +66,21 @@
     .err:empty { display: none; }
     [aria-invalid="true"] { border-color: var(--danger); }
     .opt { font-weight: 400; }
-    input, select, textarea { font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+    input, select, textarea { font: inherit; padding: 10px 20px; min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius);
       background: var(--surface); color: var(--text); width: 100%; }
-    textarea { min-height: 80px; resize: vertical; }
+    textarea { min-height: 96px; padding-top: 12px; resize: vertical; }
+    select:invalid { color: var(--muted); }
     .chosen { padding: 12px; margin-bottom: 16px; border-radius: var(--radius); background: var(--accent-soft); }
     .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn { padding: 12px 18px; border-radius: var(--btn-radius); border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text);
-      font: inherit; font-weight: 700; cursor: pointer; text-transform: var(--btn-transform); letter-spacing: var(--btn-tracking); }
+    .btn { padding: 12px 22px; border-radius: var(--btn-radius); border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text);
+      font: inherit; font-weight: 500; cursor: pointer; text-transform: var(--btn-transform); letter-spacing: var(--btn-tracking); }
     .btn.ghost { background: transparent; color: var(--accent); border-color: var(--border); }
     .demo { padding: 8px 12px; margin-bottom: 16px; border-radius: var(--radius); border: 1px dashed var(--accent); color: var(--muted); font-size: .85rem; }
     .btn:disabled { opacity: .6; cursor: default; }
     .msg { padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--danger); color: var(--danger); margin-bottom: 12px; }
     .done { text-align: center; padding: 24px 0; }
-    .done .check { font-size: 2.5rem; color: var(--ok); }
+    .done .check { width: 56px; height: 56px; margin: 0 auto 8px; border-radius: 50%; background: var(--accent); color: var(--accent-text);
+      display: grid; place-items: center; font-size: 1.75rem; }
     .hp { position: absolute; left: -9999px; }
     .muted { color: var(--muted); }
     [hidden] { display: none !important; }
@@ -76,7 +89,8 @@
 <body>
   <main class="wrap">
     <div id="demoBanner" class="demo" hidden>Preview mode — sample times and reps, nothing is actually booked.</div>
-    <h1 id="title">Book a Consultation</h1>
+    <p class="eyebrow" id="eyebrow">Transform Your Outdoor Space</p>
+    <h1 id="title">Schedule Your Free Estimate</h1>
     <p class="sub" id="subtitle">Loading available times…</p>
     <div id="error" class="msg" role="alert" hidden></div>
 
@@ -89,21 +103,21 @@
       <div class="chosen" id="chosen"></div>
       <form id="form" novalidate>
         <div class="grid2">
-          <label>First name <input name="firstName" autocomplete="given-name" required maxlength="60" /><span class="err" data-for="firstName"></span></label>
-          <label>Last name <input name="lastName" autocomplete="family-name" required maxlength="60" /><span class="err" data-for="lastName"></span></label>
+          <label><span class="sr">First name</span><input name="firstName" autocomplete="given-name" required maxlength="60" placeholder="First Name" /><span class="err" data-for="firstName"></span></label>
+          <label><span class="sr">Last name</span><input name="lastName" autocomplete="family-name" required maxlength="60" placeholder="Last Name" /><span class="err" data-for="lastName"></span></label>
         </div>
-        <label>Street address <input name="street" autocomplete="address-line1" required maxlength="160" placeholder="123 Main St" /><span class="err" data-for="street"></span></label>
+        <label><span class="sr">Street address</span><input name="street" autocomplete="address-line1" required maxlength="160" placeholder="Street Address" /><span class="err" data-for="street"></span></label>
         <div class="grid3">
-          <label>City <input name="city" autocomplete="address-level2" required maxlength="80" /><span class="err" data-for="city"></span></label>
-          <label>State <select name="state" autocomplete="address-level1" required><option value="">—</option><option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option><option>CO</option><option>CT</option><option>DE</option><option>DC</option><option>FL</option><option>GA</option><option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option><option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option><option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option><option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option><option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option><option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option><option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option><option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option><option>PR</option></select><span class="err" data-for="state"></span></label>
-          <label>ZIP <input name="zip" autocomplete="postal-code" inputmode="numeric" required maxlength="10" /><span class="err" data-for="zip"></span></label>
+          <label><span class="sr">City</span><input name="city" autocomplete="address-level2" required maxlength="80" placeholder="City" /><span class="err" data-for="city"></span></label>
+          <label><span class="sr">State</span><select name="state" autocomplete="address-level1" required><option value="">State</option><option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option><option>CO</option><option>CT</option><option>DE</option><option>DC</option><option>FL</option><option>GA</option><option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option><option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option><option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option><option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option><option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option><option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option><option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option><option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option><option>PR</option></select><span class="err" data-for="state"></span></label>
+          <label><span class="sr">ZIP code</span><input name="zip" autocomplete="postal-code" inputmode="numeric" required maxlength="10" placeholder="Zip Code" /><span class="err" data-for="zip"></span></label>
         </div>
-        <label>Phone <input name="phone" type="tel" autocomplete="tel" required maxlength="20" placeholder="(555) 555-5555" /><span class="err" data-for="phone"></span></label>
-        <label>Email <input name="email" type="email" autocomplete="email" required maxlength="200" /><span class="err" data-for="email"></span></label>
-        <label><span>Anything we should know? <span class="muted opt">(optional)</span></span> <textarea name="notes" maxlength="2000"></textarea></label>
+        <label><span class="sr">Phone number</span><input name="phone" type="tel" autocomplete="tel" required maxlength="20" placeholder="Phone Number" /><span class="err" data-for="phone"></span></label>
+        <label><span class="sr">Email address</span><input name="email" type="email" autocomplete="email" required maxlength="200" placeholder="Email Address" /><span class="err" data-for="email"></span></label>
+        <label><span class="sr">Project details (optional)</span><textarea name="notes" maxlength="2000" placeholder="Tell us about your project (optional)"></textarea></label>
         <label class="hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off" /></label>
         <div class="row">
-          <button class="btn" type="submit" id="submit">Confirm booking</button>
+          <button class="btn" type="submit" id="submit">Book My Estimate</button>
           <button class="btn ghost" type="button" id="back">Back</button>
         </div>
       </form>
@@ -111,7 +125,7 @@
 
     <section id="done" class="done" hidden>
       <div class="check">✓</div>
-      <h2 id="doneTitle">You're booked!</h2>
+      <h2 id="doneTitle">Your Free Estimate Is Booked</h2>
       <p id="doneText" class="muted"></p>
       <button class="btn ghost" type="button" id="again" hidden>Book another (preview)</button>
     </section>
@@ -153,7 +167,7 @@
       }
       document.documentElement.style.setProperty(prop, v)
     }
-    if (params.get('title') === 'none') document.getElementById('title').hidden = true
+    if (params.get('title') === 'none') { document.getElementById('title').hidden = true; document.getElementById('eyebrow').hidden = true }
 
     // ?demo — sample data so the page can be tried before the database is set up.
     const demo = (() => {
@@ -178,7 +192,7 @@
       }
       return async (method, body) => {
         await new Promise(r => setTimeout(r, 350))
-        if (method === 'GET') return [200, { rep: reps[state.turn % 3], meetingTitle: 'Consultation', slotMinutes: 30, slots: slots() }]
+        if (method === 'GET') return [200, { rep: reps[state.turn % 3], meetingTitle: 'Free Estimate', slotMinutes: 30, slots: slots() }]
         const rep = reps[state.turn % 3]
         state = { turn: state.turn + 1, taken: [...state.taken, body.start] }
         store.set(state)
@@ -217,7 +231,7 @@
         const data = res.data
         if (!res.ok) throw new Error(data.error)
         state.rep = data.rep
-        if (data.meetingTitle) { $('title').textContent = 'Book a ' + data.meetingTitle; document.title = $('title').textContent }
+        if (data.meetingTitle) $('title').textContent = 'Schedule Your ' + data.meetingTitle
         state.byDay = new Map()
         for (const iso of data.slots) {
           const d = new Date(iso)
@@ -230,7 +244,7 @@
           $('pick').hidden = true
           return resize()
         }
-        $('subtitle').textContent = `${data.slotMinutes}-minute call with ${data.rep.name} · times shown in ${TZ.replace(/_/g, ' ')}`
+        $('subtitle').textContent = `${data.slotMinutes}-minute appointment with ${data.rep.name} · times shown in ${TZ.replace(/_/g, ' ')}`
         if (!state.byDay.has(state.day)) state.day = state.byDay.keys().next().value
         renderDays()
         show('pick')
@@ -331,7 +345,7 @@
       } catch (e) {
         error(e.message || 'Booking failed — please try again.')
       } finally {
-        $('submit').disabled = false; $('submit').textContent = 'Confirm booking'
+        $('submit').disabled = false; $('submit').textContent = 'Book My Estimate'
       }
     }
 

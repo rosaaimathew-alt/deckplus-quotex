@@ -46,7 +46,7 @@ a person. Nobody logs into it and it has no inbox. Your Workspace admin gives
 it permission to read and add events on your company's calendars, and the app
 then checks each rep's calendar *as that rep*. The reps don't do anything.
 
-Once it's set up, every booking-page load and every "Confirm booking" checks
+Once it's set up, every booking-page load and every "Book My Estimate" click checks
 the rep's live Google Calendar, so any meeting, call or blocked time they add
 hides that slot. Events marked "Show as: Free" (all-day events by default)
 and declined invites don't block anything.
