@@ -200,37 +200,47 @@ export async function repBusy(rep, settings, now = Date.now()) {
   return [...data.map(b => [Date.parse(b.starts_at), Date.parse(b.ends_at), true]), ...gBusy]
 }
 
-// Puts the meeting on the rep's calendar. In workspace mode the lead is added
-// as a guest and Google emails them a real invite (returns invited: true); in
-// shared mode service accounts can't invite guests, so we email an .ics instead.
+// Puts the appointment on the rep's calendar only. The customer is not added as
+// a guest: Gmail flags Google invitations from people they haven't emailed
+// before as "unknown sender", so they get the appointment in the confirmation
+// email instead (sent from the rep's Gmail, with an .ics and an Add-to-Calendar link).
+export const leadAddress = (b) => `${b.address_street}, ${b.address_city}, ${b.address_state} ${b.address_zip}`
+
 export async function createGoogleEvent(rep, booking, settings) {
   const cal = await calendarFor(rep)
   if (!cal) return null
-  const invite = calendarMode() === 'workspace'
-  const address = `${booking.address_street}, ${booking.address_city}, ${booking.address_state} ${booking.address_zip}`
   const { data } = await cal.events.insert({
-    calendarId: invite ? 'primary' : repCalendarId(rep),
-    sendUpdates: invite ? 'all' : 'none',
+    calendarId: calendarMode() === 'workspace' ? 'primary' : repCalendarId(rep),
+    sendUpdates: 'none',
     requestBody: {
-      summary: invite ? `${settings.meeting_title}: ${booking.lead_name} & ${rep.name}` : `${settings.meeting_title}: ${booking.lead_name}`,
+      summary: `${settings.meeting_title}: ${booking.lead_name}`,
       description: [
         `Lead #${booking.turn} (round robin)`,
         `Name: ${booking.lead_name}`,
         `Email: ${booking.lead_email}`,
         `Phone: ${booking.lead_phone}`,
-        `Address: ${address}`,
+        `Address: ${leadAddress(booking)}`,
         booking.notes && `Notes: ${booking.notes}`,
-        '',
-        `Your design consultant: ${[rep.name, rep.phone, rep.email].filter(Boolean).join(' · ')}`,
-        `${rep.name.split(' ')[0]} will call within 24 hours to go over a few preliminary questions about the project.`,
-      ].filter(v => v !== false && v != null).join('\n'),
-      location: address,
+      ].filter(Boolean).join('\n'),
+      location: leadAddress(booking),
       start: { dateTime: booking.starts_at },
       end:   { dateTime: booking.ends_at },
-      attendees: invite ? [{ email: booking.lead_email, displayName: booking.lead_name }] : undefined,
     },
   })
-  return { id: data.id, invited: invite }
+  return { id: data.id }
+}
+
+// "Add to Google Calendar" link for the customer's copy of the appointment.
+export function googleCalendarLink(rep, booking, settings) {
+  const d = (iso) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+  const q = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `${settings.meeting_title} with ${rep.name}`,
+    dates: `${d(booking.starts_at)}/${d(booking.ends_at)}`,
+    location: leadAddress(booking),
+    details: `Your design consultant: ${[rep.name, rep.phone, rep.email].filter(Boolean).join(' · ')}`,
+  })
+  return `https://calendar.google.com/calendar/render?${q}`
 }
 
 const icsDate = (iso) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
@@ -245,6 +255,8 @@ export function buildIcs(rep, booking, settings) {
     `DTSTART:${icsDate(booking.starts_at)}`,
     `DTEND:${icsDate(booking.ends_at)}`,
     `SUMMARY:${icsText(`${settings.meeting_title} with ${rep.name}`)}`,
+    `LOCATION:${icsText(leadAddress(booking))}`,
+    `DESCRIPTION:${icsText(`Your design consultant: ${[rep.name, rep.phone, rep.email].filter(Boolean).join(' · ')}`)}`,
     `ORGANIZER;CN=${icsText(rep.name)}:mailto:${rep.email}`,
     `ATTENDEE;CN=${icsText(booking.lead_name)};RSVP=TRUE:mailto:${booking.lead_email}`,
     'END:VEVENT', 'END:VCALENDAR',
