@@ -228,6 +228,16 @@ export async function saveMailbox({ userId, orgId, email, provider, host, port, 
     p_company_default: !!companyDefault,
   })
 }
+// ── Invite sign-up ───────────────────────────────────────────────────────────
+// Creates the invited person's login (already confirmed — the invite link is
+// the proof, so no confirmation email) and adds them to the team, in one step.
+const INVITE_ERRORS = /^(This invite|Choose a password|You already have an account)/
+export async function inviteSignup({ code, name, password }) {
+  const { data, error } = await db().rpc('invite_signup_s', { p_code: String(code || ''), p_name: String(name || ''), p_password: String(password || ''), s: secret() })
+  if (error) throw new Error(INVITE_ERRORS.test(error.message) ? error.message : 'We could not create your account. Ask the office for a new invite link.')
+  return data
+}
+
 // Turn "use for company emails" on or off for a mailbox that's already connected.
 export async function setCompanyDefault(userId, on) {
   const row = await mailboxForUser(userId)

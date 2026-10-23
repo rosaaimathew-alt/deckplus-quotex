@@ -2,7 +2,7 @@
 import { getAuthUrl, handleCallback, isAuthenticated, getConnectedEmail } from '../_google-drive.js'
 import { verifyToken, staffMembership } from '../_auth.js'
 import { smtpUser, sendMail } from '../_mailer.js'
-import { MAIL_PROVIDERS, mailboxesAvailable, mailboxForUser, companyMailbox, saveMailbox, clearMailbox, setCompanyDefault, verifyLogin,
+import { MAIL_PROVIDERS, mailboxesAvailable, mailboxForUser, companyMailbox, saveMailbox, clearMailbox, setCompanyDefault, verifyLogin, inviteSignup,
   googleSignInReady, googleMailboxAuthUrl, readState, finishGoogleMailbox } from '../_mailboxes.js'
 
 // Account connections. Google sign-in (start / callback / status) plus each
@@ -16,6 +16,16 @@ const validHost = (h) => /^(?=.{4,253}$)([a-z0-9-]+\.)+[a-z]{2,}$/i.test(String(
 
 export default async function handler(req, res) {
   const action = req.query.action
+
+  // Public: an invited person creates their login from the invite link.
+  if (action === 'invite-signup') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+    if (!mailboxesAvailable()) return res.status(503).json({ error: 'Sign-up is not set up on the server.' })
+    const { code, name, password } = req.body || {}
+    if (!code || String(password || '').length < 8) return res.status(400).json({ error: 'Choose a password with at least 8 characters.' })
+    try { return res.status(200).json(await inviteSignup({ code, name, password })) }
+    catch (err) { return res.status(400).json({ error: err.message }) }
+  }
 
   // Everything but the callback is for signed-in staff (Google hits the callback).
   let staff = null, bearer = null

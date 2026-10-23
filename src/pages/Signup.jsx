@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { inviteInfo, signUp, claimInvite, supabaseReady } from '../supabase'
+import { inviteInfo, signUp, signIn, claimInvite, supabaseReady } from '../supabase'
 
 // ── Create your account (invite-only) ───────────────────────────────────────
 // An admin or the office sends /signup?code=… from Settings › Team. The person
@@ -68,14 +68,30 @@ export default function Signup() {
     if (!canSubmit) return
     setBusy(true); setError('')
     try {
-      const res = await signUp({ email: invite.email, password, displayName: name.trim() })
-      if (res.session) {
-        const joined = await claimInvite(code.trim(), name.trim())
-        if (!joined?.joined) throw new Error('Your login was created, but the invite could not be applied. Ask your admin for a new invite.')
-        window.location.href = '/'
+      // The invite link is the proof: the server creates the login already
+      // confirmed and adds them to the team — no confirmation email to click.
+      const r = await fetch('/api/google-auth/invite-signup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim(), name: name.trim(), password }),
+      })
+      const body = await r.json().catch(() => ({}))
+      if (r.status === 404 || r.status === 503) {
+        // Older server without one-step sign-up: fall back to the email-confirm flow.
+        const res = await signUp({ email: invite.email, password, displayName: name.trim() })
+        if (res.session) {
+          const joined = await claimInvite(code.trim(), name.trim())
+          if (!joined?.joined) throw new Error('Your login was created, but the invite could not be applied. Ask your admin for a new invite.')
+          window.location.href = '/'
+          return
+        }
+        setDone('confirm')
+        setBusy(false)
         return
       }
-      setDone('confirm')
+      if (!r.ok) throw new Error(body.error || `Sign-up failed (error ${r.status}).`)
+      await signIn(body.email || invite.email, password)
+      window.location.href = '/'
+      return
     } catch (err) {
       setError(friendly(err.message))
     }
