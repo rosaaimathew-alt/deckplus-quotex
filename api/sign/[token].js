@@ -35,6 +35,37 @@ export default async function handler(req, res) {
     })
   }
 
+  // Health check for the uptime monitor: storage works, and a proposal link
+  // opens through the same path a customer's link uses (a canary proposal).
+  // Public, no customer data. Also reports which commit is live.
+  if (token === 'health') {
+    const checks = []
+    const step = async (name, fn) => {
+      try { await fn(); checks.push({ name, ok: true }) } catch (err) { checks.push({ name, ok: false, error: String(err?.message || err).slice(0, 300) }) }
+    }
+    let kv = null
+    await step('storage', async () => {
+      kv = await getKV()
+      const at = Date.now()
+      await kv.set('health:ping', { at })
+      if ((await kv.get('health:ping'))?.at !== at) throw new Error('storage read-back mismatch')
+    })
+    await step('proposal-link', async () => {
+      if (!kv) throw new Error('storage unavailable')
+      if (!(await kv.get('pview:health-canary'))) {
+        await kv.set('pview:health-canary', { proposalId: null, snapshot: { client: 'Health check', lines: [], total: 0 }, opens: [], createdAt: Date.now() })
+      }
+      const rec = await kv.get('pview:health-canary')
+      if (!rec?.snapshot) throw new Error('canary proposal missing')
+    })
+    const ok = checks.every(c => c.ok)
+    return res.status(ok ? 200 : 500).json({
+      ok, checks, ts: new Date().toISOString(),
+      commit: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+      branch: process.env.VERCEL_GIT_COMMIT_REF || null,
+    })
+  }
+
   try {
     const kv = await getKV()
 
