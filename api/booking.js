@@ -113,14 +113,18 @@ async function book(req, res) {
   }
 
   // Calendar + emails are best-effort: the booking (and the turn) is already committed.
+  let event = null
   try {
-    const eventId = await createGoogleEvent(rep, booking, settings)
-    if (eventId) await db().from('rr_bookings').update({ google_event_id: eventId }).eq('id', booking.id)
+    event = await createGoogleEvent(rep, booking, settings)
+    if (event) await db().from('rr_bookings').update({ google_event_id: event.id }).eq('id', booking.id)
   } catch (err) {
     console.error('Google event insert failed:', err.message)
   }
 
-  const ics = buildIcs(rep, booking, settings)
+  // Only attach an .ics where Google didn't already put it on their calendar.
+  const icsFile = [{ filename: 'invite.ics', content: buildIcs(rep, booking, settings), contentType: 'text/calendar; method=REQUEST' }]
+  const leadIcs = event?.invited ? undefined : icsFile
+  const repIcs  = event ? undefined : icsFile
   const leadWhen = fmtWhen(booking.starts_at, clean(body.timeZone, 64) || rep.timezone, rep.timezone)
   const repWhen  = fmtWhen(booking.starts_at, rep.timezone, 'UTC')
   await Promise.all([
@@ -132,7 +136,7 @@ async function book(req, res) {
         on <strong>${esc(leadWhen)}</strong>.</p>
         <p>Need to change it? Just reply to this email or contact ${esc(rep.name)} at ${esc(rep.email)}.</p>
         <p>— ${esc(COMPANY)}</p>`,
-      attachments: [{ filename: 'invite.ics', content: ics, contentType: 'text/calendar; method=REQUEST' }],
+      attachments: leadIcs,
     }),
     sendMail({
       to: rep.email,
@@ -144,7 +148,7 @@ async function book(req, res) {
         <strong>Phone:</strong> ${esc(phone)}<br>
         <strong>Address:</strong> ${esc(address)}<br>
         ${notes ? `<strong>Notes:</strong> ${esc(notes)}` : ''}</p>`,
-      attachments: [{ filename: 'invite.ics', content: ics, contentType: 'text/calendar; method=REQUEST' }],
+      attachments: repIcs,
     }),
   ]).then(results => results.forEach(r => r?.error && console.error('Booking email failed:', r.error)))
 

@@ -2,8 +2,8 @@
  * Strict round-robin scheduling helpers (see supabase/round_robin.sql).
  * - Availability = rep's weekly hours, minus their live bookings, minus their
  *   Google Calendar busy time when a service account is configured.
- * - Google is optional: set GOOGLE_SERVICE_ACCOUNT_JSON and have each rep share
- *   their calendar with the service account ("Make changes to events").
+ * - Google is optional: set GOOGLE_SERVICE_ACCOUNT_JSON (see docs/ROUND_ROBIN.md
+ *   for the Workspace domain-wide delegation setup).
  */
 import { createClient } from '@supabase/supabase-js'
 
@@ -88,33 +88,51 @@ export function computeSlots(rep, settings, busy, now = Date.now()) {
 }
 
 // ── Google Calendar (optional) ──────────────────────────────────────────────
-let _calendar
-async function calendar() {
-  if (_calendar !== undefined) return _calendar
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  if (!raw) return (_calendar = null)
+// GOOGLE_CALENDAR_MODE:
+//   'workspace' (default) — domain-wide delegation: the service account acts as
+//                each rep, so nothing is shared by hand and leads get a real
+//                Google invite from the rep.
+//   'shared'    — each rep shares their calendar with the service account.
+export const calendarMode = () => (process.env.GOOGLE_CALENDAR_MODE || 'workspace').toLowerCase()
+export const repCalendarId = (rep) => rep.google_calendar_id || rep.email
+
+let _key
+const _clients = new Map()
+export async function calendarFor(rep) {
+  if (_key === undefined) {
+    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+    _key = raw ? JSON.parse(raw) : null
+  }
+  if (!_key) return null
+  const subject = calendarMode() === 'workspace' ? repCalendarId(rep) : null
+  if (_clients.has(subject)) return _clients.get(subject)
   const { google } = await import('googleapis')
-  const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(raw),
+  const auth = new google.auth.JWT({
+    email: _key.client_email,
+    key: _key.private_key,
     scopes: ['https://www.googleapis.com/auth/calendar'],
+    subject: subject || undefined,
   })
-  return (_calendar = google.calendar({ version: 'v3', auth }))
+  const cal = google.calendar({ version: 'v3', auth })
+  _clients.set(subject, cal)
+  return cal
+}
+
+export async function googleBusyStrict(rep, fromMs, toMs) {
+  const cal = await calendarFor(rep)
+  if (!cal) return null
+  const id = repCalendarId(rep)
+  const { data } = await cal.freebusy.query({
+    requestBody: { timeMin: new Date(fromMs).toISOString(), timeMax: new Date(toMs).toISOString(), items: [{ id }] },
+  })
+  const entry = data.calendars?.[id]
+  if (entry?.errors?.length) throw new Error(entry.errors.map(e => e.reason).join(', '))
+  return (entry?.busy || []).map(x => [Date.parse(x.start), Date.parse(x.end)])
 }
 
 async function googleBusy(rep, fromMs, toMs) {
-  const cal = rep.google_calendar_id && await calendar()
-  if (!cal) return []
   try {
-    const { data } = await cal.freebusy.query({
-      requestBody: {
-        timeMin: new Date(fromMs).toISOString(),
-        timeMax: new Date(toMs).toISOString(),
-        items: [{ id: rep.google_calendar_id }],
-      },
-    })
-    const entry = data.calendars?.[rep.google_calendar_id]
-    if (entry?.errors?.length) throw new Error(entry.errors.map(e => e.reason).join(', '))
-    return (entry?.busy || []).map(b => [Date.parse(b.start), Date.parse(b.end)])
+    return (await googleBusyStrict(rep, fromMs, toMs)) || []
   } catch (err) {
     // Keep taking leads on a Google outage; our own bookings still block overlaps.
     console.error(`Google free/busy failed for ${rep.email}:`, err.message)
@@ -136,29 +154,34 @@ export async function repBusy(rep, settings, now = Date.now()) {
   return [...data.map(b => [Date.parse(b.starts_at), Date.parse(b.ends_at)]), ...gBusy]
 }
 
-// Puts the meeting on the rep's calendar. Service accounts can't send invites
-// without domain-wide delegation, so the lead gets an .ics by email instead.
+// Puts the meeting on the rep's calendar. In workspace mode the lead is added
+// as a guest and Google emails them a real invite (returns invited: true); in
+// shared mode service accounts can't invite guests, so we email an .ics instead.
 export async function createGoogleEvent(rep, booking, settings) {
-  const cal = rep.google_calendar_id && await calendar()
+  const cal = await calendarFor(rep)
   if (!cal) return null
+  const invite = calendarMode() === 'workspace'
+  const address = `${booking.address_street}, ${booking.address_city}, ${booking.address_state} ${booking.address_zip}`
   const { data } = await cal.events.insert({
-    calendarId: rep.google_calendar_id,
+    calendarId: invite ? 'primary' : repCalendarId(rep),
+    sendUpdates: invite ? 'all' : 'none',
     requestBody: {
-      summary: `${settings.meeting_title}: ${booking.lead_name}`,
+      summary: invite ? `${settings.meeting_title}: ${booking.lead_name} & ${rep.name}` : `${settings.meeting_title}: ${booking.lead_name}`,
       description: [
         `Lead #${booking.turn} (round robin)`,
         `Name: ${booking.lead_name}`,
         `Email: ${booking.lead_email}`,
         `Phone: ${booking.lead_phone}`,
-        `Address: ${booking.address_street}, ${booking.address_city}, ${booking.address_state} ${booking.address_zip}`,
+        `Address: ${address}`,
         booking.notes && `Notes: ${booking.notes}`,
       ].filter(Boolean).join('\n'),
-      location: `${booking.address_street}, ${booking.address_city}, ${booking.address_state} ${booking.address_zip}`,
+      location: address,
       start: { dateTime: booking.starts_at },
       end:   { dateTime: booking.ends_at },
+      attendees: invite ? [{ email: booking.lead_email, displayName: booking.lead_name }] : undefined,
     },
   })
-  return data.id
+  return { id: data.id, invited: invite }
 }
 
 const icsDate = (iso) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
