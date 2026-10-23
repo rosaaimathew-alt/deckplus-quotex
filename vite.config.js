@@ -95,6 +95,7 @@ export default defineConfig({
       '/api/drive':         'http://localhost:3001',
       '/api/sign':          'http://localhost:3001',
       '/api/analyze':       'http://localhost:3001',
+      '/api/booking':       'http://localhost:3001',
     },
   },
 })

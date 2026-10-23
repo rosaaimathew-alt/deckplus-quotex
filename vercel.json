@@ -5,13 +5,12 @@
     "api/email.js":                     { "maxDuration": 15 },
     "api/messages.js":                  { "maxDuration": 10 },
     "api/ai-chat.js":                   { "maxDuration": 30 },
-    "api/store.js":                     { "maxDuration": 10 },
-    "api/auth/login.js":                { "maxDuration": 10 },
     "api/google-auth/[action].js":      { "maxDuration": 10 },
     "api/drive/upload.js":              { "maxDuration": 60 },
     "api/drive/backup.js":              { "maxDuration": 30 },
     "api/sign/[token].js":              { "maxDuration": 10 },
-    "api/co/[token].js":                { "maxDuration": 10 }
+    "api/co/[token].js":                { "maxDuration": 10 },
+    "api/booking.js":                   { "maxDuration": 15 }
   },
   "headers": [
     {
@@ -28,6 +27,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/book", "destination": "/book.html" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
