@@ -300,9 +300,9 @@
     const demo = (() => {
       // Mirrors the real reps' rules: Mon–Fri 8–5, last start 4:00, per-rep length and buffer.
       const reps = [
-        { id: 'demo-1', name: 'Ace', email: 'ace@deck.plus', minutes: 90, buffer: 120 },
-        { id: 'demo-2', name: 'Greg', email: 'greg@deck.plus', minutes: 60, buffer: 90 },
-        { id: 'demo-3', name: 'Mathew', email: 'matt@deck.plus', minutes: 60, buffer: 90, fridayLast: 14 * 60 },
+        { id: 'demo-1', name: 'Ace', email: 'ace@deck.plus', phone: '(561) 409-7290', minutes: 90, buffer: 120 },
+        { id: 'demo-2', name: 'Greg', email: 'greg@deck.plus', phone: '(704) 430-7746', minutes: 60, buffer: 90 },
+        { id: 'demo-3', name: 'Mathew', email: 'matt@deck.plus', phone: '(203) 895-9281', minutes: 60, buffer: 90, fridayLast: 14 * 60 },
       ]
       const store = {
         get: () => { try { return JSON.parse(sessionStorage.getItem('rr-demo2')) || { turn: 0, taken: [] } } catch { return { turn: 0, taken: [] } } },

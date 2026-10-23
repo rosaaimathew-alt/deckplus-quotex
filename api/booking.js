@@ -9,7 +9,7 @@
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
-import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs } from './_round-robin.js'
+import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
@@ -157,14 +157,23 @@ async function book(req, res) {
   const repIcs  = event ? undefined : icsFile
   const leadWhen = fmtWhen(booking.starts_at, clean(body.timeZone, 64) || rep.timezone, rep.timezone)
   const repWhen  = fmtWhen(booking.starts_at, rep.timezone, 'UTC')
+  // Prefer sending from the rep's own Gmail (replies reach them); fall back to the shared mailer.
+  const send = async (msg) => {
+    try {
+      if (await sendAsRep(rep, msg)) return { success: true }
+    } catch (err) {
+      console.error(`Gmail send as ${rep.email} failed, falling back:`, err.message)
+    }
+    return sendMail(msg)
+  }
   await Promise.all([
-    sendMail({
+    send({
       to: email,
       subject: `Confirmed: ${settings.meeting_title} with ${rep.name} — ${leadWhen}`,
       html: leadEmailHtml({ name: lead.first_name, rep, settings, when: leadWhen, address }),
       attachments: leadIcs,
     }),
-    sendMail({
+    send({
       to: rep.email,
       subject: `New lead #${booking.turn}: ${name} — ${repWhen}`,
       html: `<p>You're up — a new ${esc(settings.meeting_title)} was booked with you.</p>
