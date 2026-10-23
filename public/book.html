@@ -167,7 +167,7 @@
         <div class="brand"><b>DECK<i>plus</i></b><span>Outdoor Additions</span></div>
         <div>
           <p class="who" id="repFact" hidden><span class="avatar" id="repInitial"></span><span id="repName"></span></p>
-          <h1 id="title">Free In&#8209;Home Estimate</h1>
+          <h1 id="title">Free Estimate and Design Consultation</h1>
         </div>
         <ul class="facts">
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="duration">30 min</span></li>
@@ -308,7 +308,7 @@
       return async (method, body) => {
         await new Promise(r => setTimeout(r, 300))
         const rep = reps[saved.turn % 3]
-        if (method === 'GET') return [200, { rep: { id: rep.id, name: rep.name.split(' ')[0] }, meetingTitle: 'Free Estimate', slotMinutes: 30, slots: slots() }]
+        if (method === 'GET') return [200, { rep: { id: rep.id, name: rep.name.split(' ')[0] }, meetingTitle: 'Free Estimate and Design Consultation', slotMinutes: 30, slots: slots() }]
         saved = { turn: saved.turn + 1, taken: [...saved.taken, body.start] }
         store.set(saved)
         return [200, { ok: true, booking: { start: body.start, repName: rep.name } }]
@@ -353,6 +353,7 @@
         state.rep = data.rep
         state.minutes = data.slotMinutes || 30
         $('duration').textContent = `${state.minutes} min`
+        if (data.meetingTitle) $('title').textContent = data.meetingTitle
         if (data.rep) {
           $('repFact').hidden = false
           $('repName').textContent = `with ${data.rep.name}`

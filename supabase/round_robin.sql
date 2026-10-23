@@ -33,7 +33,7 @@ create table if not exists rr_reps (
 create table if not exists rr_settings (
   id               boolean primary key default true check (id),
   last_rep_id      uuid references rr_reps(id) on delete set null,
-  meeting_title    text not null default 'Free Estimate',
+  meeting_title    text not null default 'Free Estimate and Design Consultation',
   slot_minutes     int  not null default 30  check (slot_minutes between 5 and 480),
   buffer_minutes   int  not null default 0   check (buffer_minutes between 0 and 240),
   min_notice_hours int  not null default 2   check (min_notice_hours between 0 and 720),
