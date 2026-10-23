@@ -524,7 +524,7 @@
         if (!res.ok) throw new Error(data.error)
         const when = new Date(data.booking.start)
         $('doneTitle').textContent = `You're scheduled, ${f.firstName.value.trim()}`
-        $('doneText').textContent = `A calendar invitation and confirmation have been sent to ${f.email.value.trim()}.`
+        $('doneText').textContent = `Your confirmation and calendar invite are on their way to ${f.email.value.trim()}.`
         $('rWhen').textContent = `${fmtDay(when)} at ${fmtTime(when)}`
         $('rWho').textContent = data.booking.repName
         const repFull = data.booking.repName

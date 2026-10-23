@@ -9,7 +9,7 @@
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
-import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep, googleBusyStrict, calendarMode } from './_round-robin.js'
+import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep, googleBusyStrict, calendarMode, googleCalendarLink } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
@@ -62,7 +62,7 @@ const fmtWhen = (iso, timeZone, fallbackZone) => {
 }
 
 // Customer confirmation: the appointment, what happens next, and their consultant's direct contact.
-function leadEmailHtml({ name, rep, settings, when, address }) {
+function leadEmailHtml({ name, rep, settings, when, address, calendarUrl }) {
   const contact = [
     rep.phone && `<a href="tel:${esc(rep.phone.replace(/[^\d+]/g, ''))}" style="color:#1392ae;text-decoration:none;">${esc(rep.phone)}</a>`,
     `<a href="mailto:${esc(rep.email)}" style="color:#1392ae;text-decoration:none;">${esc(rep.email)}</a>`,
@@ -75,6 +75,8 @@ function leadEmailHtml({ name, rep, settings, when, address }) {
       <tr><td style="padding:12px 16px;color:#6b7682;border-top:1px solid #e3e8ed;">Where</td><td style="padding:12px 16px;font-weight:bold;color:#1f2b38;border-top:1px solid #e3e8ed;">${esc(address)}</td></tr>
       <tr><td style="padding:12px 16px;color:#6b7682;border-top:1px solid #e3e8ed;">With</td><td style="padding:12px 16px;font-weight:bold;color:#1f2b38;border-top:1px solid #e3e8ed;">${esc(rep.name)}</td></tr>
     </table>
+    <p style="margin:0 0 20px;"><a href="${esc(calendarUrl)}" style="display:inline-block;background:#ea7d25;color:#ffffff;font-weight:bold;padding:12px 22px;border-radius:4px;text-decoration:none;">Add to Google Calendar</a>
+      <span style="color:#6b7682;font-size:13px;">&nbsp;or open the attached invite.ics</span></p>
     <p style="margin:20px 0 6px;font-weight:bold;color:#1f2b38;">What happens next</p>
     <p style="margin:0 0 16px;"><strong>I'll call you within 24 hours</strong> to go over a few preliminary
       questions about your project, so we can make the most of our appointment.</p>
@@ -179,7 +181,7 @@ async function book(req, res) {
 
   // Only attach an .ics where Google didn't already put it on their calendar.
   const icsFile = [{ filename: 'invite.ics', content: buildIcs(rep, booking, settings), contentType: 'text/calendar; method=REQUEST' }]
-  const leadIcs = event?.invited ? undefined : icsFile
+  const leadIcs = icsFile
   const repIcs  = event ? undefined : icsFile
   const leadWhen = fmtWhen(booking.starts_at, clean(body.timeZone, 64) || rep.timezone, rep.timezone)
   const repWhen  = fmtWhen(booking.starts_at, rep.timezone, 'UTC')
@@ -200,7 +202,7 @@ async function book(req, res) {
     send({
       to: email,
       subject: `Confirmed: ${settings.meeting_title} with ${rep.name} — ${leadWhen}`,
-      html: leadEmailHtml({ name: lead.first_name, rep, settings, when: leadWhen, address }),
+      html: leadEmailHtml({ name: lead.first_name, rep, settings, when: leadWhen, address, calendarUrl: googleCalendarLink(rep, booking, settings) }),
       attachments: leadIcs,
     }),
     send({
