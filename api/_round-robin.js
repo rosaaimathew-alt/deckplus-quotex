@@ -58,13 +58,25 @@ const toMinutes = (hhmm) => {
   return h * 60 + (m || 0)
 }
 
+// Per-rep overrides fall back to the shared rr_settings row.
+export function repRules(rep, settings) {
+  return {
+    minutes: rep.appointment_minutes ?? settings.slot_minutes,        // appointment length
+    buffer:  rep.buffer_after_minutes ?? settings.buffer_minutes,     // kept free after each appointment
+    every:   settings.start_every_minutes ?? 30,                      // start times offered every N minutes
+  }
+}
+
 /**
  * Every bookable slot start (epoch ms) for `rep` from now through days_ahead.
- * `busy` is a list of [startMs, endMs] the rep is unavailable.
+ * `busy` is a list of [startMs, endMs, isBooking]: our own bookings get the
+ * buffer after them; other calendar events only block their own time (plus the
+ * new appointment's buffer, so it never runs into them).
  */
 export function computeSlots(rep, settings, busy, now = Date.now()) {
-  const step   = settings.slot_minutes * 60_000
-  const buffer = settings.buffer_minutes * 60_000
+  const rules  = repRules(rep, settings)
+  const length = rules.minutes * 60_000
+  const buffer = rules.buffer * 60_000
   const earliest = now + settings.min_notice_hours * 3_600_000
   const { y, m, d } = todayIn(rep.timezone, now)
   const slots = []
@@ -72,14 +84,16 @@ export function computeSlots(rep, settings, busy, now = Date.now()) {
   for (let i = 0; i <= settings.days_ahead; i++) {
     const day = new Date(Date.UTC(y, m - 1, d + i))
     const ranges = rep.hours?.[String(day.getUTCDay())] || []
+    // rep.last_start (optional "HH:MM"): latest time an appointment may begin.
+    const lastStart = rep.last_start ? toMinutes(rep.last_start) : Infinity
     for (const [from, to] of ranges) {
       const endMin = toMinutes(to)
-      for (let min = toMinutes(from); min + settings.slot_minutes <= endMin; min += settings.slot_minutes) {
+      for (let min = toMinutes(from); min + rules.minutes <= endMin && min <= lastStart; min += rules.every) {
         const start = zonedToUtc(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(),
           Math.floor(min / 60), min % 60, rep.timezone)
-        const end = start + step
+        const end = start + length
         if (start < earliest) continue
-        if (busy.some(([bs, be]) => start < be + buffer && end + buffer > bs)) continue
+        if (busy.some(([bs, be, isBooking]) => start < be + (isBooking ? buffer : 0) && end + buffer > bs)) continue
         slots.push(start)
       }
     }
@@ -151,7 +165,7 @@ export async function repBusy(rep, settings, now = Date.now()) {
     googleBusy(rep, fromMs, toMs),
   ])
   if (error) throw error
-  return [...data.map(b => [Date.parse(b.starts_at), Date.parse(b.ends_at)]), ...gBusy]
+  return [...data.map(b => [Date.parse(b.starts_at), Date.parse(b.ends_at), true]), ...gBusy]
 }
 
 // Puts the meeting on the rep's calendar. In workspace mode the lead is added

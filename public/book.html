@@ -283,22 +283,30 @@
 
     // ?demo — sample data so the page can be tried before the database is set up.
     const demo = (() => {
-      const reps = [{ id: 'demo-1', name: 'Alex Morgan' }, { id: 'demo-2', name: 'Brianna Lee' }, { id: 'demo-3', name: 'Chris Walker' }]
+      // Mirrors the real reps' rules: Mon–Fri 8–5, last start 4:00, per-rep length and buffer.
+      const reps = [
+        { id: 'demo-1', name: 'Ace', minutes: 90, buffer: 120 },
+        { id: 'demo-2', name: 'Greg', minutes: 60, buffer: 90 },
+        { id: 'demo-3', name: 'Mathew', minutes: 60, buffer: 90 },
+      ]
       const store = {
-        get: () => { try { return JSON.parse(sessionStorage.getItem('rr-demo')) || { turn: 0, taken: [] } } catch { return { turn: 0, taken: [] } } },
-        set: (v) => { try { sessionStorage.setItem('rr-demo', JSON.stringify(v)) } catch { /* private mode */ } },
+        get: () => { try { return JSON.parse(sessionStorage.getItem('rr-demo2')) || { turn: 0, taken: [] } } catch { return { turn: 0, taken: [] } } },
+        set: (v) => { try { sessionStorage.setItem('rr-demo2', JSON.stringify(v)) } catch { /* private mode */ } },
       }
       let saved = store.get()
-      const slots = () => {
-        const out = [], now = new Date()
+      const slots = (rep) => {
+        const out = [], now = new Date(), M = 60_000
+        const mine = saved.taken.filter(t => t.rep === rep.id).map(t => [Date.parse(t.start), Date.parse(t.start) + rep.minutes * M])
         for (let d = 1; d <= 14; d++) {
           const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d)
-          if (day.getDay() === 0) continue
-          const end = day.getDay() === 6 ? 13 * 60 : 17 * 60
-          for (let m = 9 * 60; m < end; m += 30) {
-            if ((d * 7 + m / 30) % 4 === 0 || (d % 5 === 0 && m < 12 * 60)) continue   // times already taken
-            const iso = new Date(day.getFullYear(), day.getMonth(), day.getDate(), m / 60 | 0, m % 60).toISOString()
-            if (!saved.taken.includes(iso)) out.push(iso)
+          if (day.getDay() === 0 || day.getDay() === 6) continue
+          const last = Math.min(16 * 60, 17 * 60 - rep.minutes)
+          for (let m = 8 * 60; m <= last; m += 30) {
+            if ((d * 7 + m / 30) % 5 === 0 || (d % 4 === 0 && m < 12 * 60)) continue   // sample busy times
+            const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), m / 60 | 0, m % 60).getTime()
+            const end = start + rep.minutes * M
+            if (mine.some(([bs, be]) => start < be + rep.buffer * M && end + rep.buffer * M > bs)) continue
+            out.push(new Date(start).toISOString())
           }
         }
         return out
@@ -306,8 +314,8 @@
       return async (method, body) => {
         await new Promise(r => setTimeout(r, 300))
         const rep = reps[saved.turn % 3]
-        if (method === 'GET') return [200, { rep: { id: rep.id, name: rep.name.split(' ')[0] }, meetingTitle: 'Free Estimate and Design Consultation', slotMinutes: 30, slots: slots() }]
-        saved = { turn: saved.turn + 1, taken: [...saved.taken, body.start] }
+        if (method === 'GET') return [200, { rep: { id: rep.id, name: rep.name }, meetingTitle: 'Free Estimate and Design Consultation', slotMinutes: rep.minutes, slots: slots(rep) }]
+        saved = { turn: saved.turn + 1, taken: [...saved.taken, { rep: rep.id, start: body.start }] }
         store.set(saved)
         return [200, { ok: true, booking: { start: body.start, repName: rep.name } }]
       }
@@ -350,7 +358,7 @@
         if (!res.ok) throw new Error(data.error)
         state.rep = data.rep
         state.minutes = data.slotMinutes || 30
-        $('duration').textContent = `${state.minutes} min`
+        $('duration').textContent = state.minutes % 60 === 0 ? `${state.minutes / 60} hr` : state.minutes > 60 ? `${Math.floor(state.minutes / 60)} hr ${state.minutes % 60} min` : `${state.minutes} min`
         if (data.meetingTitle) $('title').textContent = data.meetingTitle
         if (data.rep) {
           $('repFact').hidden = false

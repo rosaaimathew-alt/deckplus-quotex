@@ -9,7 +9,7 @@
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
-import { db, loadTurn, repBusy, computeSlots, createGoogleEvent, buildIcs } from './_round-robin.js'
+import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
@@ -69,7 +69,7 @@ async function getSlots(res) {
   return res.status(200).json({
     rep: { id: rep.id, name: rep.name.split(' ')[0] },
     meetingTitle: settings.meeting_title,
-    slotMinutes: settings.slot_minutes,
+    slotMinutes: repRules(rep, settings).minutes,
     slots,
   })
 }
@@ -99,7 +99,7 @@ async function book(req, res) {
     return res.status(409).json({ error: 'That time is no longer available — please pick another.', code: 'slot_taken' })
   }
 
-  const endMs = startMs + settings.slot_minutes * 60_000
+  const endMs = startMs + repRules(rep, settings).minutes * 60_000
   const { data: booking, error } = await db().rpc('rr_book', {
     p_expected_rep: rep.id,
     p_start: new Date(startMs).toISOString(),

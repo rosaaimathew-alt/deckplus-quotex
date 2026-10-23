@@ -22,8 +22,8 @@ create table if not exists rr_reps (
   active             boolean not null default true,
   timezone           text not null default 'America/New_York',
   hours              jsonb not null default '{
-    "1": [["09:00","17:00"]], "2": [["09:00","17:00"]], "3": [["09:00","17:00"]],
-    "4": [["09:00","17:00"]], "5": [["09:00","17:00"]]
+    "1": [["08:00","17:00"]], "2": [["08:00","17:00"]], "3": [["08:00","17:00"]],
+    "4": [["08:00","17:00"]], "5": [["08:00","17:00"]]
   }'::jsonb,
   google_calendar_id text,           -- usually the rep's Gmail/Workspace address
   created_at         timestamptz not null default now()
@@ -60,6 +60,14 @@ create table if not exists rr_bookings (
 create index if not exists rr_bookings_rep_time on rr_bookings (rep_id, starts_at);
 
 -- Required lead details (added after the first version; safe on existing tables).
+-- Latest time an appointment may start, per rep (null = any time that fits in hours).
+alter table rr_reps add column if not exists last_start text check (last_start ~ '^[0-2][0-9]:[0-5][0-9]$');
+-- Per-rep appointment length and buffer kept free after each appointment (null = use rr_settings).
+alter table rr_reps add column if not exists appointment_minutes  int check (appointment_minutes between 5 and 480);
+alter table rr_reps add column if not exists buffer_after_minutes int check (buffer_after_minutes between 0 and 480);
+-- How often start times are offered (8:00, 8:30, 9:00…).
+alter table rr_settings add column if not exists start_every_minutes int not null default 30 check (start_every_minutes between 5 and 240);
+
 alter table rr_bookings add column if not exists lead_first_name text;
 alter table rr_bookings add column if not exists lead_last_name  text;
 alter table rr_bookings add column if not exists address_street  text;
