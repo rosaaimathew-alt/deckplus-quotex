@@ -14,7 +14,7 @@ import { sendMail } from './_mailer.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
-const COMPANY = process.env.COMPANY_NAME || 'Your Company'
+const COMPANY = process.env.COMPANY_NAME || 'Deck Plus'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -59,6 +59,36 @@ const fmtWhen = (iso, timeZone, fallbackZone) => {
   } catch {
     return new Date(iso).toLocaleString('en-US', { ...opts, timeZone: fallbackZone })
   }
+}
+
+// Customer confirmation: the appointment, what happens next, and their consultant's direct contact.
+function leadEmailHtml({ name, rep, settings, when, address }) {
+  const first = rep.name.split(' ')[0]
+  const contact = [
+    rep.phone && `<a href="tel:${esc(rep.phone.replace(/[^\d+]/g, ''))}" style="color:#1392ae;text-decoration:none;">${esc(rep.phone)}</a>`,
+    `<a href="mailto:${esc(rep.email)}" style="color:#1392ae;text-decoration:none;">${esc(rep.email)}</a>`,
+  ].filter(Boolean).join('<br>')
+  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#2f3943;font-size:15px;line-height:1.55;max-width:560px;">
+    <p>Hi ${esc(name)},</p>
+    <p>Thank you for choosing ${esc(COMPANY)}! Your <strong>${esc(settings.meeting_title)}</strong> is confirmed.</p>
+    <table cellpadding="0" cellspacing="0" style="border:1px solid #e3e8ed;border-radius:8px;width:100%;margin:16px 0;">
+      <tr><td style="padding:12px 16px;color:#6b7682;width:90px;">When</td><td style="padding:12px 16px;font-weight:bold;color:#1f2b38;">${esc(when)}</td></tr>
+      <tr><td style="padding:12px 16px;color:#6b7682;border-top:1px solid #e3e8ed;">Where</td><td style="padding:12px 16px;font-weight:bold;color:#1f2b38;border-top:1px solid #e3e8ed;">${esc(address)}</td></tr>
+      <tr><td style="padding:12px 16px;color:#6b7682;border-top:1px solid #e3e8ed;">With</td><td style="padding:12px 16px;font-weight:bold;color:#1f2b38;border-top:1px solid #e3e8ed;">${esc(rep.name)}</td></tr>
+    </table>
+    <p style="margin:20px 0 6px;font-weight:bold;color:#1f2b38;">What happens next</p>
+    <p style="margin:0 0 16px;"><strong>${esc(first)} will call you within 24 hours</strong> to go over a few preliminary
+      questions about your project, so we can make the most of your appointment.</p>
+    <table cellpadding="0" cellspacing="0" style="background:#eef7fa;border-radius:8px;width:100%;margin:0 0 16px;">
+      <tr><td style="padding:14px 16px;">
+        <div style="color:#6b7682;font-size:13px;">Your design consultant</div>
+        <div style="font-weight:bold;color:#1f2b38;font-size:16px;margin:2px 0 4px;">${esc(rep.name)}</div>
+        ${contact}
+      </td></tr>
+    </table>
+    <p>Need to reschedule or have a question before then? Reach out to ${esc(first)} directly, or just reply to this email.</p>
+    <p>— The ${esc(COMPANY)} Team</p>
+  </div>`
 }
 
 async function getSlots(res) {
@@ -131,11 +161,7 @@ async function book(req, res) {
     sendMail({
       to: email,
       subject: `Confirmed: ${settings.meeting_title} with ${rep.name} — ${leadWhen}`,
-      html: `<p>Hi ${esc(name)},</p>
-        <p>You're booked for a <strong>${esc(settings.meeting_title)}</strong> with <strong>${esc(rep.name)}</strong>
-        on <strong>${esc(leadWhen)}</strong>.</p>
-        <p>Need to change it? Just reply to this email or contact ${esc(rep.name)} at ${esc(rep.email)}.</p>
-        <p>— ${esc(COMPANY)}</p>`,
+      html: leadEmailHtml({ name: lead.first_name, rep, settings, when: leadWhen, address }),
       attachments: leadIcs,
     }),
     sendMail({
@@ -154,7 +180,7 @@ async function book(req, res) {
 
   return res.status(200).json({
     ok: true,
-    booking: { start: booking.starts_at, end: booking.ends_at, repName: rep.name },
+    booking: { start: booking.starts_at, end: booking.ends_at, repName: rep.name, repPhone: rep.phone || null, repEmail: rep.email },
   })
 }
 

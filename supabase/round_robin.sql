@@ -61,6 +61,9 @@ create table if not exists rr_bookings (
 create index if not exists rr_bookings_rep_time on rr_bookings (rep_id, starts_at);
 
 -- Required lead details (added after the first version; safe on existing tables).
+-- Rep's direct phone, shown to the customer in their confirmation.
+alter table rr_reps add column if not exists phone text;
+
 -- Latest time an appointment may start, per rep (null = any time that fits in hours).
 alter table rr_reps add column if not exists last_start text check (last_start ~ '^[0-2][0-9]:[0-5][0-9]$');
 -- Per-rep appointment length and buffer kept free after each appointment (null = use rr_settings).
