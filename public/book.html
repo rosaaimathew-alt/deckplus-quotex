@@ -6,27 +6,30 @@
   <title>Schedule Your Free Estimate | Deck Plus</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <style>
     /* ── Brand ─────────────────────────────────────────────────────────────
-       Every look-and-feel choice lives here so the page can match the Deck Plus
-       website exactly. Embeds can also override any of these per page with
-       data-* attributes (see /embed.js). */
+       Deck Plus: navy panel + white booking panel, teal for selection, orange
+       for the call to action. Every look-and-feel choice lives here; embeds
+       can override any of it with data-* attributes (see /embed.js). */
     :root {
-      --bg: #ffffff;            /* page background (transparent when embedded) */
-      --surface: #ffffff;       /* inputs, day chips */
-      --border: #cfd4d9;
-      --text: #333a42;
-      --heading: #1f2b38;       /* deck.plus navy headings */
-      --muted: #6b7480;
-      --accent: #2a8db1;        /* deck.plus teal: form button, times, selection */
+      --page: #f4f6f8;          /* standalone page background (transparent when embedded) */
+      --card: #ffffff;
+      --line: #e3e8ed;
+      --border: #cfd6dd;
+      --text: #2f3943;
+      --heading: #1f2b38;
+      --muted: #6b7682;
+      --accent: #2a8db1;        /* teal: selection, links, available days */
       --accent-text: #ffffff;
-      --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
-      --cta: #f0690f;           /* deck.plus orange (eyebrow, highlights) */
+      --accent-soft: color-mix(in srgb, var(--accent) 12%, #ffffff);
+      --cta: #f0690f;           /* orange: primary buttons, eyebrow */
+      --cta-hover: #d95c08;
+      --cta-text: #ffffff;
       --danger: #c62828;
-      --ok: #2a8db1;
-      --radius: 3px;            /* inputs, chips, time buttons */
-      --btn-radius: 3px;        /* main buttons */
+      --radius: 4px;
+      --card-radius: 10px;
+      --btn-radius: 4px;
       --btn-transform: none;
       --btn-tracking: normal;
       --font: "Inter", "Helvetica Neue", Arial, sans-serif;
@@ -34,102 +37,214 @@
       --heading-weight: 700;
       --font-size: 16px;
     }
-    html.embedded { --bg: transparent; }
-    html.embedded .wrap { max-width: none; padding: 4px 3px; }   /* the host page supplies the margins */
+    html.embedded { --page: transparent; }
+
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font: var(--font-size)/1.5 var(--font); }
-    h1, h2 { font-family: var(--heading-font); font-weight: var(--heading-weight); color: var(--heading); letter-spacing: -0.01em; text-wrap: balance; }
-    .eyebrow { color: var(--cta); font-weight: 600; margin: 0 0 6px; }
+    body { margin: 0; background: var(--page); color: var(--text); font: var(--font-size)/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+    h1, h2, h3 { font-family: var(--heading-font); color: var(--heading); margin: 0; text-wrap: balance; letter-spacing: -0.015em; }
+    button { font: inherit; color: inherit; }
     .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    ::placeholder { color: var(--muted); opacity: 1; }
-    .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
-    h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 6px; }
-    .sub { color: var(--muted); margin: 0 0 20px; }
-    .days { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 16px; scrollbar-width: thin; }
-    .day { flex: 0 0 auto; min-width: 68px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
-      background: var(--surface); color: var(--text); text-align: center; cursor: pointer; font: inherit; }
-    .day small { display: block; color: var(--muted); font-size: .75rem; }
-    .day[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
-    .day[aria-pressed="true"] small { color: inherit; }
-    .slot:focus-visible, .day:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cta); outline-offset: 2px; }
-    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-    .slot { padding: 11px 0; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--surface);
-      color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
-    .slot:hover, .slot:focus-visible { background: var(--accent); color: var(--accent-text); outline: none; }
-    form { display: grid; gap: 12px; }
-    label { display: grid; gap: 4px; font-weight: 600; font-size: .9rem; }
-    .grid2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
-    .grid3 { display: grid; gap: 12px; grid-template-columns: 2fr 1fr 1fr; }
-    @media (max-width: 420px) { .grid3 { grid-template-columns: 1fr 1fr; } .grid3 > :first-child { grid-column: 1 / -1; } }
-    .err { color: var(--danger); font-weight: 400; font-size: .8rem; min-height: 0; }
-    .err:empty { display: none; }
-    [aria-invalid="true"] { border-color: var(--danger); }
-    .opt { font-weight: 400; }
-    input, select, textarea { font: inherit; padding: 10px 20px; min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius);
-      background: var(--surface); color: var(--text); width: 100%; }
-    textarea { min-height: 96px; padding-top: 12px; resize: vertical; }
-    select:invalid { color: var(--muted); }
-    .chosen { padding: 12px; margin-bottom: 16px; border-radius: var(--radius); background: var(--accent-soft); }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn { padding: 12px 22px; border-radius: var(--btn-radius); border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text);
-      font: inherit; font-weight: 500; cursor: pointer; text-transform: var(--btn-transform); letter-spacing: var(--btn-tracking); }
-    .btn.ghost { background: transparent; color: var(--accent); border-color: var(--border); }
-    .demo { padding: 8px 12px; margin-bottom: 16px; border-radius: var(--radius); border: 1px dashed var(--accent); color: var(--muted); font-size: .85rem; }
-    .btn:disabled { opacity: .6; cursor: default; }
-    .msg { padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--danger); color: var(--danger); margin-bottom: 12px; }
-    .done { text-align: center; padding: 24px 0; }
-    .done .check { width: 56px; height: 56px; margin: 0 auto 8px; border-radius: 50%; background: var(--accent); color: var(--accent-text);
-      display: grid; place-items: center; font-size: 1.75rem; }
-    .hp { position: absolute; left: -9999px; }
-    .muted { color: var(--muted); }
     [hidden] { display: none !important; }
+    :focus-visible { outline: 2px solid var(--cta); outline-offset: 2px; }
+
+    .page { padding: 32px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); }
+    html.embedded .page { padding: 2px; }
+    .card { position: relative; max-width: 1060px; margin: 0 auto; background: var(--card); border-radius: var(--card-radius);
+      border: 1px solid var(--line); box-shadow: 0 1px 8px rgba(16, 32, 48, .08); overflow: hidden;
+      display: grid; grid-template-columns: 1fr; }
+    @media (min-width: 760px) { .card { grid-template-columns: 300px 1fr; min-height: 600px; } }
+
+    /* ── Left: what you're booking (Calendly-style) ── */
+    .aside { padding: 24px; display: grid; gap: 18px; align-content: start; border-bottom: 1px solid var(--line); }
+    @media (min-width: 760px) { .aside { padding: 32px 28px; border-bottom: 0; border-right: 1px solid var(--line); } }
+    .back { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--accent);
+      display: grid; place-items: center; cursor: pointer; }
+    .back:hover { background: var(--accent-soft); }
+    .brand { display: flex; align-items: center; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .brand b { font-weight: 800; color: var(--heading); letter-spacing: -.02em; font-size: 1.15rem; }
+    .brand b i { font-style: normal; color: var(--cta); }
+    .brand span { color: var(--muted); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; }
+    .who { color: var(--muted); font-weight: 600; font-size: .95rem; margin: 0 0 2px; display: flex; align-items: center; gap: 10px; }
+    .avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff;
+      display: grid; place-items: center; font-size: .95rem; font-weight: 700; }
+    .aside h1 { font-size: 1.6rem; line-height: 1.2; font-weight: var(--heading-weight); }
+    .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; color: var(--muted); font-weight: 500; }
+    .facts li { display: flex; align-items: flex-start; gap: 10px; }
+    .facts svg { flex: none; width: 20px; height: 20px; margin-top: 1px; }
+    .facts .picked { color: var(--accent); font-weight: 600; }
+    .blurb { margin: 0; color: var(--text); font-size: .92rem; }
+    .trust { list-style: none; margin: 0; padding: 18px 0 0; border-top: 1px solid var(--line); display: grid; gap: 8px; font-size: .85rem; color: var(--text); }
+    .trust li { display: flex; align-items: center; gap: 8px; }
+    .trust svg { flex: none; width: 16px; height: 16px; color: var(--cta); }
+    .call { margin: 0; font-size: .85rem; color: var(--muted); }
+    .call strong { color: var(--heading); }
+    @media (max-width: 759px) { .trust, .call, .blurb { display: none; } }
+
+    /* ── Right: calendar + times ── */
+    .main { padding: 24px 20px 28px; min-width: 0; }
+    @media (min-width: 760px) { .main { padding: 32px 32px 36px; } }
+    .main h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 20px; }
+    .picker { display: grid; gap: 24px; }
+    @media (min-width: 1000px) { .picker { grid-template-columns: minmax(0, 1fr) 0; transition: grid-template-columns .2s; }
+      .picker.has-day { grid-template-columns: minmax(0, 1fr) 230px; } }
+    .month { display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 18px; }
+    .month h3 { font-size: 1rem; font-weight: 500; min-width: 140px; text-align: center; color: var(--text); }
+    .nav { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--accent-soft); color: var(--accent); cursor: pointer;
+      display: grid; place-items: center; }
+    .nav:disabled { background: none; color: var(--border); cursor: default; }
+    .grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 6px; text-align: center; max-width: 420px; margin: 0 auto; }
+    .dow { font-size: .72rem; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--text); padding-bottom: 8px; }
+    .date { position: relative; width: 44px; height: 44px; margin: 0 auto; border-radius: 50%; border: 0; background: none;
+      color: var(--muted); font-size: 1rem; font-variant-numeric: tabular-nums; cursor: default; }
+    .date.open { background: var(--accent-soft); color: var(--accent); font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
+    .date.open:hover { background: color-mix(in srgb, var(--accent) 22%, #fff); }
+    .date[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+    .date.today::after { content: ""; position: absolute; left: 50%; bottom: 6px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
+    .tz { margin: 22px auto 0; max-width: 420px; font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+    .tz svg { flex: none; }
+
+    .times { min-width: 0; overflow: hidden; }
+    .times h3 { font-size: .95rem; font-weight: 500; margin: 6px 0 16px; color: var(--text); }
+    .slotlist { display: grid; gap: 10px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
+    .slot { width: 100%; height: 50px; border: 1px solid color-mix(in srgb, var(--accent) 50%, #fff); border-radius: var(--radius); background: var(--card);
+      color: var(--accent); font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+    .slot:hover { border: 2px solid var(--accent); }
+    .chosen-slot { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .chosen-slot span { height: 50px; display: grid; place-items: center; border-radius: var(--radius); background: #5f6b77; color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .chosen-slot button { height: 50px; border: 0; border-radius: var(--radius); background: var(--accent); color: var(--accent-text); font-weight: 700; cursor: pointer; }
+    .chosen-slot button:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 26px; border-radius: var(--btn-radius);
+      border: 0; background: var(--cta); color: var(--cta-text); font-weight: 600; cursor: pointer; text-transform: var(--btn-transform);
+      letter-spacing: var(--btn-tracking); transition: background .15s; }
+    .btn:hover { background: var(--cta-hover); }
+    .btn:disabled { opacity: .6; cursor: default; }
+    .btn.wide { width: 100%; }
+    .link { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+
+    form { display: grid; gap: 12px; }
+    .row2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+    .row3 { display: grid; gap: 12px; grid-template-columns: 2fr 1fr 1fr; }
+    @media (max-width: 480px) { .row3 { grid-template-columns: 1fr 1fr; } .row3 > :first-child { grid-column: 1 / -1; } }
+    label { display: grid; gap: 4px; min-width: 0; }
+    input, select, textarea { font: inherit; width: 100%; min-height: 48px; padding: 11px 18px; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--card); color: var(--text); }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); outline-offset: 0; }
+    select:invalid { color: var(--muted); }
+    textarea { min-height: 96px; resize: vertical; }
+    ::placeholder { color: var(--muted); opacity: 1; }
+    [aria-invalid="true"] { border-color: var(--danger); }
+    .err { color: var(--danger); font-size: .8rem; }
+    .err:empty { display: none; }
+    .fine { font-size: .8rem; color: var(--muted); margin: 4px 0 0; text-align: center; }
+
+    .msg { padding: 12px 14px; margin-bottom: 16px; border-radius: var(--radius); border: 1px solid var(--danger); color: var(--danger);
+      background: color-mix(in srgb, var(--danger) 6%, #fff); font-size: .92rem; }
+
+    .done { text-align: center; padding: 24px 0; display: grid; gap: 14px; justify-items: center; }
+    .done .check { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; }
+    .done h2 { font-size: 1.6rem; }
+    .receipt { width: 100%; max-width: 420px; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); margin: 0; }
+    .receipt div { display: grid; grid-template-columns: 90px 1fr; gap: 12px; padding: 12px 16px; }
+    .receipt div + div { border-top: 1px solid var(--line); }
+    .receipt dt { color: var(--muted); font-size: .85rem; }
+    .receipt dd { margin: 0; color: var(--heading); font-weight: 600; }
+
+    .loading { color: var(--muted); padding: 40px 0; text-align: center; }
+    .preview { position: absolute; top: 0; right: 0; border-radius: 0 0 0 8px !important; padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase; background: var(--accent-soft); color: var(--accent); }
+    .hp { position: absolute; left: -9999px; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
 </head>
 <body>
-  <main class="wrap">
-    <div id="demoBanner" class="demo" hidden>Preview mode — sample times and reps, nothing is actually booked.</div>
-    <p class="eyebrow" id="eyebrow">Transform Your Outdoor Space</p>
-    <h1 id="title">Schedule Your Free Estimate</h1>
-    <p class="sub" id="subtitle">Loading available times…</p>
-    <div id="error" class="msg" role="alert" hidden></div>
+  <div class="page">
+    <div class="card">
+      <span class="preview" id="previewTag" hidden>Preview</span>
 
-    <section id="pick" hidden>
-      <div class="days" id="days" role="group" aria-label="Choose a day"></div>
-      <div class="slots" id="slots" role="group" aria-label="Choose a time"></div>
-    </section>
+      <aside class="aside">
+        <button type="button" class="back" id="back" aria-label="Back to times" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+        <div class="brand"><b>DECK<i>plus</i></b><span>Outdoor Additions</span></div>
+        <div>
+          <p class="who" id="repFact" hidden><span class="avatar" id="repInitial"></span><span id="repName"></span></p>
+          <h1 id="title">Free In&#8209;Home Estimate</h1>
+        </div>
+        <ul class="facts">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="duration">30 min</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span>At your home</span></li>
+          <li id="pickedFact" class="picked" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span id="pickedText"></span></li>
+        </ul>
+        <p class="blurb">A Deck Plus design consultant visits your home, measures your space and talks through decks, screened porches and patios. No cost, no obligation.</p>
+        <ul class="trust">
+          <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm-1.2 13.6-3.5-3.5 1.4-1.4 2.1 2.1 4.6-4.6 1.4 1.4-6 6z"/></svg>Licensed &amp; Insured</li>
+          <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm-1.2 13.6-3.5-3.5 1.4-1.4 2.1 2.1 4.6-4.6 1.4 1.4-6 6z"/></svg>Trex Pro Platinum Certified</li>
+          <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm-1.2 13.6-3.5-3.5 1.4-1.4 2.1 2.1 4.6-4.6 1.4 1.4-6 6z"/></svg>200+ 5-Star Reviews</li>
+        </ul>
+        <p class="call">Questions? Call <strong>(704) 993-7696</strong></p>
+      </aside>
 
-    <section id="details" hidden>
-      <div class="chosen" id="chosen"></div>
-      <form id="form" novalidate>
-        <div class="grid2">
-          <label><span class="sr">First name</span><input name="firstName" autocomplete="given-name" required maxlength="60" placeholder="First Name" /><span class="err" data-for="firstName"></span></label>
-          <label><span class="sr">Last name</span><input name="lastName" autocomplete="family-name" required maxlength="60" placeholder="Last Name" /><span class="err" data-for="lastName"></span></label>
-        </div>
-        <label><span class="sr">Street address</span><input name="street" autocomplete="address-line1" required maxlength="160" placeholder="Street Address" /><span class="err" data-for="street"></span></label>
-        <div class="grid3">
-          <label><span class="sr">City</span><input name="city" autocomplete="address-level2" required maxlength="80" placeholder="City" /><span class="err" data-for="city"></span></label>
-          <label><span class="sr">State</span><select name="state" autocomplete="address-level1" required><option value="">State</option><option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option><option>CO</option><option>CT</option><option>DE</option><option>DC</option><option>FL</option><option>GA</option><option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option><option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option><option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option><option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option><option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option><option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option><option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option><option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option><option>PR</option></select><span class="err" data-for="state"></span></label>
-          <label><span class="sr">ZIP code</span><input name="zip" autocomplete="postal-code" inputmode="numeric" required maxlength="10" placeholder="Zip Code" /><span class="err" data-for="zip"></span></label>
-        </div>
-        <label><span class="sr">Phone number</span><input name="phone" type="tel" autocomplete="tel" required maxlength="20" placeholder="Phone Number" /><span class="err" data-for="phone"></span></label>
-        <label><span class="sr">Email address</span><input name="email" type="email" autocomplete="email" required maxlength="200" placeholder="Email Address" /><span class="err" data-for="email"></span></label>
-        <label><span class="sr">Project details (optional)</span><textarea name="notes" maxlength="2000" placeholder="Tell us about your project (optional)"></textarea></label>
-        <label class="hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off" /></label>
-        <div class="row">
-          <button class="btn" type="submit" id="submit">Book My Estimate</button>
-          <button class="btn ghost" type="button" id="back">Back</button>
-        </div>
-      </form>
-    </section>
+      <main class="main">
+        <div id="error" class="msg" role="alert" hidden></div>
+        <p class="loading" id="loading">Loading available times…</p>
 
-    <section id="done" class="done" hidden>
-      <div class="check">✓</div>
-      <h2 id="doneTitle">Your Free Estimate Is Booked</h2>
-      <p id="doneText" class="muted"></p>
-      <button class="btn ghost" type="button" id="again" hidden>Book another (preview)</button>
-    </section>
-  </main>
+        <section id="pick" hidden>
+          <h2>Select a Date &amp; Time</h2>
+          <div class="picker" id="picker">
+            <div>
+              <div class="month">
+                <button type="button" class="nav" id="prevMonth" aria-label="Previous month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+                <h3 id="monthLabel"></h3>
+                <button type="button" class="nav" id="nextMonth" aria-label="Next month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+              </div>
+              <div class="grid" id="calendar" role="grid" aria-label="Choose a day"></div>
+              <p class="tz"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="tz"></span></p>
+            </div>
+            <div class="times" id="times" hidden>
+              <h3 id="dayLabel"></h3>
+              <div class="slotlist" id="slots"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="details" hidden>
+          <h2>Enter Details</h2>
+          <form id="form" novalidate>
+            <div class="row2">
+              <label><span class="sr">First name</span><input id="f-first" name="firstName" autocomplete="given-name" required maxlength="60" placeholder="First Name" /><span class="err" data-for="firstName"></span></label>
+              <label><span class="sr">Last name</span><input id="f-last" name="lastName" autocomplete="family-name" required maxlength="60" placeholder="Last Name" /><span class="err" data-for="lastName"></span></label>
+            </div>
+            <label><span class="sr">Street address</span><input id="f-street" name="street" autocomplete="address-line1" required maxlength="160" placeholder="Street Address" /><span class="err" data-for="street"></span></label>
+            <div class="row3">
+              <label><span class="sr">City</span><input id="f-city" name="city" autocomplete="address-level2" required maxlength="80" placeholder="City" /><span class="err" data-for="city"></span></label>
+              <label><span class="sr">State</span><select id="f-state" name="state" autocomplete="address-level1" required><option value="">State</option><option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option><option>CO</option><option>CT</option><option>DE</option><option>DC</option><option>FL</option><option>GA</option><option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option><option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option><option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option><option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option><option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option><option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option><option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option><option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option><option>PR</option></select><span class="err" data-for="state"></span></label>
+              <label><span class="sr">ZIP code</span><input id="f-zip" name="zip" autocomplete="postal-code" inputmode="numeric" required maxlength="10" placeholder="Zip Code" /><span class="err" data-for="zip"></span></label>
+            </div>
+            <div class="row2">
+              <label><span class="sr">Phone number</span><input id="f-phone" name="phone" type="tel" autocomplete="tel" required maxlength="20" placeholder="Phone Number" /><span class="err" data-for="phone"></span></label>
+              <label><span class="sr">Email address</span><input id="f-email" name="email" type="email" autocomplete="email" required maxlength="200" placeholder="Email Address" /><span class="err" data-for="email"></span></label>
+            </div>
+            <label><span class="sr">Project details (optional)</span><textarea id="f-notes" name="notes" maxlength="2000" placeholder="Tell us about your project — deck, screened porch, patio… (optional)"></textarea></label>
+            <label class="hp" aria-hidden="true">Website <input id="f-website" name="website" tabindex="-1" autocomplete="off" /></label>
+            <button class="btn wide" type="submit" id="submit">Book My Free Estimate</button>
+            <p class="fine">No cost, no obligation. We'll email your confirmation right away.</p>
+          </form>
+        </section>
+
+        <section id="done" class="done" hidden>
+          <div class="check"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>
+          <h2 id="doneTitle">You're scheduled</h2>
+          <p class="hint" id="doneText"></p>
+          <dl class="receipt">
+            <div><dt>When</dt><dd id="rWhen"></dd></div>
+            <div><dt>With</dt><dd id="rWho"></dd></div>
+            <div><dt>Where</dt><dd id="rWhere"></dd></div>
+          </dl>
+          <button class="link" type="button" id="again" hidden>Book another (preview)</button>
+        </section>
+      </main>
+    </div>
+  </div>
 
   <script>
     const params = new URLSearchParams(location.search)
@@ -137,12 +252,14 @@
     const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
     const DEMO = params.has('demo')
     if (window.parent !== window) document.documentElement.classList.add('embedded')
+    const $ = (id) => document.getElementById(id)
 
     // Per-embed brand overrides (validated so a link can't inject arbitrary CSS).
     const THEME_PARAMS = {
-      bg: ['--bg', 'color'], surface: ['--surface', 'color'], border: ['--border', 'color'], text: ['--text', 'color'],
-      muted: ['--muted', 'color'], accent: ['--accent', 'color'], accentText: ['--accent-text', 'color'],
-      accentSoft: ['--accent-soft', 'color'], radius: ['--radius', 'length'], btnRadius: ['--btn-radius', 'length'],
+      page: ['--page', 'color'], card: ['--card', 'color'], panel: ['--panel', 'color'], border: ['--border', 'color'],
+      text: ['--text', 'color'], heading: ['--heading', 'color'], muted: ['--muted', 'color'],
+      accent: ['--accent', 'color'], accentText: ['--accent-text', 'color'], cta: ['--cta', 'color'], ctaText: ['--cta-text', 'color'],
+      radius: ['--radius', 'length'], cardRadius: ['--card-radius', 'length'], btnRadius: ['--btn-radius', 'length'],
       btnTransform: ['--btn-transform', 'transform'], btnTracking: ['--btn-tracking', 'length'],
       font: ['--font', 'font'], headingFont: ['--heading-font', 'font'], headingWeight: ['--heading-weight', 'weight'],
       fontSize: ['--font-size', 'length'],
@@ -160,42 +277,42 @@
       if (kind === 'length' && /^-?[\d.]+$/.test(v)) v += 'px'
       if (kind === 'font') {
         // Load it from Google Fonts if it lives there; harmless if it doesn't.
-        const link = Object.assign(document.createElement('link'), { rel: 'stylesheet',
-          href: `https://fonts.googleapis.com/css2?family=${encodeURIComponent(v)}:wght@400;600;700&display=swap` })
-        document.head.append(link)
-        v = `"${v}", ui-sans-serif, system-ui, sans-serif`
+        document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet',
+          href: `https://fonts.googleapis.com/css2?family=${encodeURIComponent(v)}:wght@400;600;700;800&display=swap` }))
+        v = `"${v}", "Helvetica Neue", Arial, sans-serif`
       }
+      if (key === 'cta') document.documentElement.style.setProperty('--cta-hover', `color-mix(in srgb, ${v} 88%, #000)`)
       document.documentElement.style.setProperty(prop, v)
     }
-    if (params.get('title') === 'none') { document.getElementById('title').hidden = true; document.getElementById('eyebrow').hidden = true }
 
     // ?demo — sample data so the page can be tried before the database is set up.
     const demo = (() => {
-      const reps = [{ id: 'demo-1', name: 'Alex' }, { id: 'demo-2', name: 'Brianna' }, { id: 'demo-3', name: 'Chris' }]
+      const reps = [{ id: 'demo-1', name: 'Alex Morgan' }, { id: 'demo-2', name: 'Brianna Lee' }, { id: 'demo-3', name: 'Chris Walker' }]
       const store = {
         get: () => { try { return JSON.parse(sessionStorage.getItem('rr-demo')) || { turn: 0, taken: [] } } catch { return { turn: 0, taken: [] } } },
         set: (v) => { try { sessionStorage.setItem('rr-demo', JSON.stringify(v)) } catch { /* private mode */ } },
       }
-      let state = store.get()
+      let saved = store.get()
       const slots = () => {
         const out = [], now = new Date()
-        for (let d = 1; out.length < 60 && d < 21; d++) {
+        for (let d = 1; d <= 14; d++) {
           const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d)
-          if (day.getDay() === 0 || day.getDay() === 6) continue
-          for (let m = 9 * 60; m < 17 * 60; m += 30) {
-            if ((d * 7 + m / 30) % 5 === 0) continue   // a few already-taken times
+          if (day.getDay() === 0) continue
+          const end = day.getDay() === 6 ? 13 * 60 : 17 * 60
+          for (let m = 9 * 60; m < end; m += 30) {
+            if ((d * 7 + m / 30) % 4 === 0 || (d % 5 === 0 && m < 12 * 60)) continue   // times already taken
             const iso = new Date(day.getFullYear(), day.getMonth(), day.getDate(), m / 60 | 0, m % 60).toISOString()
-            if (!state.taken.includes(iso)) out.push(iso)
+            if (!saved.taken.includes(iso)) out.push(iso)
           }
         }
         return out
       }
       return async (method, body) => {
-        await new Promise(r => setTimeout(r, 350))
-        if (method === 'GET') return [200, { rep: reps[state.turn % 3], meetingTitle: 'Free Estimate', slotMinutes: 30, slots: slots() }]
-        const rep = reps[state.turn % 3]
-        state = { turn: state.turn + 1, taken: [...state.taken, body.start] }
-        store.set(state)
+        await new Promise(r => setTimeout(r, 300))
+        const rep = reps[saved.turn % 3]
+        if (method === 'GET') return [200, { rep: { id: rep.id, name: rep.name.split(' ')[0] }, meetingTitle: 'Free Estimate', slotMinutes: 30, slots: slots() }]
+        saved = { turn: saved.turn + 1, taken: [...saved.taken, body.start] }
+        store.set(saved)
         return [200, { ok: true, booking: { start: body.start, repName: rep.name } }]
       }
     })()
@@ -206,32 +323,43 @@
       return { ok: res.ok, status: res.status, data: await res.json() }
     }
     if (DEMO) {
-      document.getElementById('demoBanner').hidden = false
-      document.getElementById('again').hidden = false
-      document.getElementById('again').onclick = () => { document.getElementById('form').reset(); load() }
+      $('previewTag').hidden = false
+      $('again').hidden = false
+      $('again').onclick = () => { $('form').reset(); state.start = null; state.day = null; load() }
     }
 
-    const $ = (id) => document.getElementById(id)
     const dayKey = (d) => d.toLocaleDateString('en-CA', { timeZone: TZ })
+    const keyToDate = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d) }
     const fmtTime = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    const fmtFull = (d) => d.toLocaleString([], { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-    let state = { rep: null, byDay: new Map(), day: null, start: null }
+    const fmtDay = (d) => d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+    let state = { rep: null, byDay: new Map(), day: null, start: null, month: null, minutes: 30 }
 
     function show(section) {
+      $('loading').hidden = true
       for (const id of ['pick', 'details', 'done']) $(id).hidden = id !== section
+      $('back').hidden = section !== 'details'
+      $('pickedFact').hidden = section === 'pick'
+      if (state.start) $('pickedText').textContent = `${fmtTime(state.start)}, ${fmtDay(state.start)}`
       resize()
     }
     function error(text) { $('error').textContent = text || ''; $('error').hidden = !text; resize() }
 
     async function load(notice) {
       error(notice)
-      $('subtitle').textContent = 'Loading available times…'
+      for (const id of ['pick', 'details', 'done']) $(id).hidden = true
+      $('loading').hidden = false
       try {
         const res = await api('GET')
         const data = res.data
         if (!res.ok) throw new Error(data.error)
         state.rep = data.rep
-        if (data.meetingTitle) $('title').textContent = 'Schedule Your ' + data.meetingTitle
+        state.minutes = data.slotMinutes || 30
+        $('duration').textContent = `${state.minutes} min`
+        if (data.rep) {
+          $('repFact').hidden = false
+          $('repName').textContent = `with ${data.rep.name}`
+          $('repInitial').textContent = data.rep.name[0]
+        }
         state.byDay = new Map()
         for (const iso of data.slots) {
           const d = new Date(iso)
@@ -240,48 +368,85 @@
           state.byDay.get(k).push(d)
         }
         if (!data.rep || !state.byDay.size) {
-          $('subtitle').textContent = 'No times are open right now — please check back soon.'
-          $('pick').hidden = true
+          $('loading').textContent = 'No times are open right now. Please call us at (704) 993-7696 and we will get you scheduled.'
           return resize()
         }
-        $('subtitle').textContent = `${data.slotMinutes}-minute appointment with ${data.rep.name} · times shown in ${TZ.replace(/_/g, ' ')}`
-        if (!state.byDay.has(state.day)) state.day = state.byDay.keys().next().value
-        renderDays()
+        if (!state.byDay.has(state.day)) { state.day = null; state.start = null }
+        const d = keyToDate(state.day || state.byDay.keys().next().value)
+        state.month = new Date(d.getFullYear(), d.getMonth(), 1)
+        $('tz').textContent = TZ.replace(/_/g, ' ').replace(/\//g, ' / ')
+        render()
         show('pick')
       } catch (e) {
-        $('subtitle').textContent = ''
-        error(e.message || 'Could not load times. Please refresh.')
+        $('loading').hidden = true
+        error(e.message || 'Could not load times. Please refresh the page.')
       }
     }
 
-    function renderDays() {
-      $('days').replaceChildren(...[...state.byDay.entries()].map(([k, slots]) => {
+    function render() {
+      const m = state.month
+      $('monthLabel').textContent = m.toLocaleDateString([], { month: 'long', year: 'numeric' })
+      const keys = [...state.byDay.keys()]
+      const first = keyToDate(keys[0]), last = keyToDate(keys[keys.length - 1])
+      $('prevMonth').disabled = m <= new Date(first.getFullYear(), first.getMonth(), 1)
+      $('nextMonth').disabled = m >= new Date(last.getFullYear(), last.getMonth(), 1)
+
+      const cells = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => {
+        const el = document.createElement('div'); el.className = 'dow'; el.textContent = d; el.setAttribute('role', 'columnheader'); return el
+      })
+      for (let i = 0; i < m.getDay(); i++) cells.push(document.createElement('span'))
+      const daysIn = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate()
+      const todayKey = dayKey(new Date())
+      for (let n = 1; n <= daysIn; n++) {
+        const k = dayKey(new Date(m.getFullYear(), m.getMonth(), n, 12))
         const b = document.createElement('button')
-        b.className = 'day'; b.type = 'button'
-        b.setAttribute('aria-pressed', String(k === state.day))
-        b.innerHTML = `<small>${slots[0].toLocaleDateString([], { weekday: 'short' })}</small>
-          <strong>${slots[0].toLocaleDateString([], { month: 'short', day: 'numeric' })}</strong>`
-        b.onclick = () => { state.day = k; renderDays() }
-        return b
-      }))
-      $('slots').replaceChildren(...state.byDay.get(state.day).map(d => {
-        const b = document.createElement('button')
-        b.className = 'slot'; b.type = 'button'; b.textContent = fmtTime(d)
-        b.onclick = () => pickSlot(d)
-        return b
-      }))
+        b.type = 'button'; b.className = 'date'; b.textContent = n
+        if (k === todayKey) b.classList.add('today')
+        if (state.byDay.has(k)) {
+          b.classList.add('open')
+          b.setAttribute('aria-pressed', String(k === state.day))
+          b.setAttribute('aria-label', fmtDay(keyToDate(k)) + ', times available')
+          b.onclick = () => { state.day = k; state.start = null; render(); if (window.innerWidth < 1000) $('times').scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+        } else {
+          b.disabled = true
+          b.setAttribute('aria-label', fmtDay(keyToDate(k)) + ', unavailable')
+        }
+        cells.push(b)
+      }
+      $('calendar').replaceChildren(...cells)
+
+      $('picker').classList.toggle('has-day', !!state.day)
+      $('times').hidden = !state.day
+      if (state.day) {
+        $('dayLabel').textContent = fmtDay(keyToDate(state.day))
+        $('slots').replaceChildren(...state.byDay.get(state.day).map(d => {
+          if (+d === +state.start) {
+            // Calendly-style: the chosen time splits into the time + a Next button.
+            const row = document.createElement('div'); row.className = 'chosen-slot'
+            const t = document.createElement('span'); t.textContent = fmtTime(d)
+            const next = document.createElement('button'); next.type = 'button'; next.id = 'continue'; next.textContent = 'Next'
+            next.onclick = goDetails
+            row.append(t, next)
+            return row
+          }
+          const b = document.createElement('button')
+          b.type = 'button'; b.className = 'slot'; b.textContent = fmtTime(d)
+          b.onclick = () => { state.start = d; render(); $('continue').focus({ preventScroll: true }) }
+          return b
+        }))
+      }
       resize()
     }
 
-    function pickSlot(d) {
-      state.start = d
+    $('prevMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1); render() }
+    $('nextMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1); render() }
+
+    function goDetails() {
       error()
-      $('chosen').innerHTML = ''
-      $('chosen').append(Object.assign(document.createElement('strong'), { textContent: fmtFull(d) }),
-        document.createTextNode(` with ${state.rep.name}`))
       show('details')
-      $('form').elements.firstName.focus()
+      $('f-first').focus()
     }
+    $('back').onclick = () => { error(); show('pick') }
 
     // Same rules the server enforces (api/booking.js validateLead); the server has the final say.
     const FIELDS = ['firstName', 'lastName', 'street', 'city', 'state', 'zip', 'phone', 'email']
@@ -321,8 +486,6 @@
       }
     })
 
-    $('back').onclick = () => { error(); show('pick') }
-
     $('form').onsubmit = async (ev) => {
       ev.preventDefault()
       const f = ev.target.elements
@@ -332,20 +495,25 @@
       error(); $('submit').disabled = true; $('submit').textContent = 'Booking…'
       try {
         const res = await api('POST', {
-            repId: state.rep.id, start: state.start.toISOString(), timeZone: TZ,
-            ...Object.fromEntries(FIELDS.map(n => [n, f[n].value])), notes: f.notes.value, website: f.website.value,
+          repId: state.rep.id, start: state.start.toISOString(), timeZone: TZ,
+          ...Object.fromEntries(FIELDS.map(n => [n, f[n].value])), notes: f.notes.value, website: f.website.value,
         })
         const data = res.data
         if (res.status === 409) return load(data.error)
         if (data.fields) { showFieldErrors(data.fields); throw new Error(data.error) }
         if (!res.ok) throw new Error(data.error)
-        $('doneText').textContent = `${fmtFull(new Date(data.booking.start))} with ${data.booking.repName}. A confirmation is on its way to ${f.email.value}.`
+        const when = new Date(data.booking.start)
+        $('doneTitle').textContent = `You're scheduled, ${f.firstName.value.trim()}`
+        $('doneText').textContent = `A calendar invitation and confirmation have been sent to ${f.email.value.trim()}.`
+        $('rWhen').textContent = `${fmtDay(when)} at ${fmtTime(when)}`
+        $('rWho').textContent = data.booking.repName
+        $('rWhere').textContent = `${f.street.value.trim()}, ${f.city.value.trim()}, ${f.state.value} ${f.zip.value.trim()}`
         show('done')
         parent.postMessage({ type: 'rr-booked', start: data.booking.start }, '*')
       } catch (e) {
-        error(e.message || 'Booking failed — please try again.')
+        error(e.message || 'Booking failed. Please try again.')
       } finally {
-        $('submit').disabled = false; $('submit').textContent = 'Book My Estimate'
+        $('submit').disabled = false; $('submit').textContent = 'Book My Free Estimate'
       }
     }
 
