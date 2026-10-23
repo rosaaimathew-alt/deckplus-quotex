@@ -9,7 +9,7 @@
 -- the same rep or skip one. Nothing here is readable by the anon key; the
 -- booking API talks to it with the service key.
 
-create extension if not exists btree_gist;
+create extension if not exists btree_gist with schema extensions;
 
 -- ── Reps ────────────────────────────────────────────────────────────────────
 -- hours: weekday (0 = Sunday … 6 = Saturday) → list of [start, end] in the
@@ -147,6 +147,8 @@ alter table rr_bookings enable row level security;
 
 revoke execute on function rr_book(uuid, timestamptz, timestamptz, jsonb) from public, anon, authenticated;
 revoke execute on function rr_next_rep() from public, anon, authenticated;
+grant execute on function rr_book(uuid, timestamptz, timestamptz, jsonb) to service_role;
+grant execute on function rr_next_rep() to service_role;
 
 drop policy if exists rr_reps_staff     on rr_reps;
 drop policy if exists rr_settings_staff on rr_settings;
