@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Users, Copy, X, KeyRound, CheckCircle2, UserMinus } from 'lucide-react'
 import { useStore } from '../store'
-import { createInvite, listInvites, revokeInvite, changePassword, removeMember } from '../supabase'
+import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword } from '../supabase'
 import { DEMO } from '../demo'
 
 // ── Settings › Team ──────────────────────────────────────────────────────────
@@ -42,6 +42,18 @@ export function TeamCard() {
       useStore.setState(s => ({ members: (s.members || []).filter(x => x.id !== m.id) }))
     } catch (e) { setError(e.message) }
     setRemoving('')
+  }
+
+  // Admin: a new temporary password for someone who's locked out (no email needed).
+  const [resetting, setResetting] = useState('')
+  const [tempPw, setTempPw] = useState(null)   // { name, password }
+  const canReset = (m) => isAdmin && !DEMO && m.id !== me?.id
+  const resetPw = async (m) => {
+    if (!window.confirm(`Give ${m.displayName || m.email} a new temporary password?\n\nTheir old password stops working. You'll see the new one here to pass along.`)) return
+    setResetting(m.id); setError(''); setTempPw(null)
+    try { setTempPw({ name: m.displayName || m.email, email: m.email, password: await resetMemberPassword(m.id) }) }
+    catch (e) { setError(e.message) }
+    setResetting('')
   }
 
   const refresh = useCallback(async () => {
@@ -140,12 +152,29 @@ export function TeamCard() {
       )}
 
       <div>
+        {tempPw && (
+          <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-900">
+            <p>New temporary password for <b>{tempPw.name}</b>:</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <code className="font-mono text-base bg-white border border-emerald-200 rounded px-2 py-0.5 select-all">{tempPw.password}</code>
+              <button onClick={() => { navigator.clipboard?.writeText(tempPw.password); setCopied('pw'); setTimeout(() => setCopied(''), 2000) }} className="text-xs underline">{copied === 'pw' ? 'Copied!' : 'Copy'}</button>
+              <button onClick={() => setTempPw(null)} className="text-xs text-emerald-700 ml-auto">Done</button>
+            </div>
+            <p className="text-xs text-emerald-800 mt-1.5">Send it to them. They sign in at deckplus.app with {tempPw.email} and this password, then can pick their own under Settings → Change password.</p>
+          </div>
+        )}
         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">On the team ({members.length})</p>
         <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
           {members.map(m => (
             <div key={m.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <p className="flex-1 min-w-0 truncate text-gray-800">{m.displayName || m.email}<span className="text-gray-400"> · {m.email}</span></p>
               <span className="text-xs text-gray-500">{roleLabel(m.role)}{m.id === me?.id ? ' (you)' : ''}</span>
+              {canReset(m) && (
+                <button onClick={() => resetPw(m)} disabled={!!resetting} title={`Give ${m.displayName || m.email} a new temporary password`}
+                  className="flex items-center gap-1 text-xs text-gray-600 hover:bg-gray-100 rounded px-2 py-1 disabled:opacity-50">
+                  <KeyRound size={13} /> {resetting === m.id ? 'Resetting…' : 'Reset password'}
+                </button>
+              )}
               {canRemove(m) && (
                 <button onClick={() => remove(m)} disabled={!!removing} title={`Remove ${m.displayName || m.email} from the team`}
                   className="flex items-center gap-1 text-xs text-red-600 hover:bg-red-50 rounded px-2 py-1 disabled:opacity-50">

@@ -76,6 +76,15 @@ export async function removeMember(userId, orgId = _orgId) {
   if (error) throw error
   if (!data?.length) throw new Error('Could not remove them — only an admin can remove people from the team.')
 }
+// Admin: give someone on the team a new temporary password (no email). Returns it.
+export async function resetMemberPassword(userId) {
+  need()
+  const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+  const pick = (n) => Array.from(crypto.getRandomValues(new Uint32Array(n)), v => abc[v % abc.length]).join('')
+  const temp = `Deck-${pick(4)}-${pick(4)}`
+  await rpc('admin_set_member_password', { p_user: userId, p_password: temp })
+  return temp
+}
 export const claimInvite  = (code, name) => rpc('claim_invite', { p_code: code || null, p_name: name || null })
 
 // Creates the login. Returns { session } when signed in straight away, or

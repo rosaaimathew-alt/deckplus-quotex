@@ -186,3 +186,24 @@ begin
   return jsonb_build_object('ok', true, 'email', em, 'role', r.role);
 end $$;
 grant execute on function public.invite_signup_s(text, text, text, text) to anon, authenticated;
+
+-- ── Admin reset password (Settings › Team › Reset password) ─────────────────
+-- An admin gives someone on their own team a new temporary password; no email.
+create or replace function public.admin_set_member_password(p_user uuid, p_password text)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare me public.org_members; target public.org_members;
+begin
+  select * into me from public.org_members where user_id = auth.uid();
+  if not found or me.role <> 'admin' then raise exception 'Only an admin can reset passwords.' using errcode = '42501'; end if;
+  select * into target from public.org_members where user_id = p_user and org_id = me.org_id;
+  if not found then raise exception 'That person is not on your team.' using errcode = '42501'; end if;
+  if length(coalesce(p_password, '')) < 8 then raise exception 'The new password must be at least 8 characters.'; end if;
+  update auth.users set
+    encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')),
+    email_confirmed_at = coalesce(email_confirmed_at, now()),
+    updated_at = now()
+  where id = p_user;
+  return jsonb_build_object('ok', true, 'email', target.email);
+end $$;
+revoke all on function public.admin_set_member_password(uuid, text) from public, anon;
+grant execute on function public.admin_set_member_password(uuid, text) to authenticated;

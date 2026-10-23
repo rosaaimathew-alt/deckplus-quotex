@@ -84,6 +84,7 @@ export default function ResetPassword() {
               className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
               {busy ? 'Sending…' : 'Send reset link'}
             </button>
+            <p className="text-xs text-gray-500 text-center">Fastest way back in: ask your admin to reset your password from Settings → Team. They'll give you a temporary one right away.</p>
           </form>
         )}
         <p className="text-center text-sm text-gray-500 mt-4"><a href="/login" className="text-blue-600 font-medium hover:underline">Back to sign in</a></p>
