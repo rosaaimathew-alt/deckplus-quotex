@@ -222,7 +222,7 @@ export async function createGoogleEvent(rep, booking, settings) {
         booking.notes && `Notes: ${booking.notes}`,
         '',
         `Your design consultant: ${[rep.name, rep.phone, rep.email].filter(Boolean).join(' · ')}`,
-        `${rep.name.split(' ')[0]} will call within 24 hours to go over a few preliminary questions about the project.`,
+        `${rep.name} will call within 24 hours to go over a few preliminary questions about the project.`,
       ].filter(v => v !== false && v != null).join('\n'),
       location: address,
       start: { dateTime: booking.starts_at },

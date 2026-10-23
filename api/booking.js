@@ -117,7 +117,7 @@ async function getSlots(res) {
   const busy = await repBusy(rep, settings)
   const slots = computeSlots(rep, settings, busy).map(ms => new Date(ms).toISOString())
   return res.status(200).json({
-    rep: { id: rep.id, name: rep.name.split(' ')[0] },
+    rep: { id: rep.id, name: rep.name },
     meetingTitle: settings.meeting_title,
     slotMinutes: repRules(rep, settings).minutes,
     slots,

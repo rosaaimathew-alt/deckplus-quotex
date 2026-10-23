@@ -300,9 +300,9 @@
     const demo = (() => {
       // Mirrors the real reps' rules: Mon–Fri 8–5, last start 4:00, per-rep length and buffer.
       const reps = [
-        { id: 'demo-1', name: 'Ace', email: 'ace@deck.plus', phone: '(561) 409-7290', minutes: 90, buffer: 120 },
-        { id: 'demo-2', name: 'Greg', email: 'greg@deck.plus', phone: '(704) 430-7746', minutes: 60, buffer: 90 },
-        { id: 'demo-3', name: 'Mathew', email: 'matt@deck.plus', phone: '(203) 895-9281', minutes: 60, buffer: 90, fridayLast: 14 * 60 },
+        { id: 'demo-1', name: 'Ace Costa', email: 'ace@deck.plus', phone: '(561) 409-7290', minutes: 90, buffer: 120 },
+        { id: 'demo-2', name: 'Greg Handzlik', email: 'greg@deck.plus', phone: '(704) 430-7746', minutes: 60, buffer: 90 },
+        { id: 'demo-3', name: 'Matt Rosa', email: 'matt@deck.plus', phone: '(203) 895-9281', minutes: 60, buffer: 90, fridayLast: 14 * 60 },
       ]
       const store = {
         get: () => { try { return JSON.parse(sessionStorage.getItem('rr-demo2')) || { turn: 0, taken: [] } } catch { return { turn: 0, taken: [] } } },
@@ -527,9 +527,9 @@
         $('doneText').textContent = `A calendar invitation and confirmation have been sent to ${f.email.value.trim()}.`
         $('rWhen').textContent = `${fmtDay(when)} at ${fmtTime(when)}`
         $('rWho').textContent = data.booking.repName
-        const repFirst = data.booking.repName.split(' ')[0]
-        $('nextText').textContent = `${repFirst} will call you within 24 hours to go over a few preliminary questions about your project, so we can make the most of your appointment.`
-        $('cInitial').textContent = repFirst[0]
+        const repFull = data.booking.repName
+        $('nextText').textContent = `${repFull} will call you within 24 hours to go over a few preliminary questions about your project, so we can make the most of your appointment.`
+        $('cInitial').textContent = repFull[0]
         $('cName').textContent = data.booking.repName
         $('cContact').textContent = [data.booking.repPhone, data.booking.repEmail].filter(Boolean).join('\n')
         $('rWhere').textContent = `${f.street.value.trim()}, ${f.city.value.trim()}, ${f.state.value} ${f.zip.value.trim()}`
