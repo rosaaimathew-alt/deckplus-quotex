@@ -61,6 +61,10 @@ create table if not exists rr_bookings (
 create index if not exists rr_bookings_rep_time on rr_bookings (rep_id, starts_at);
 
 -- Required lead details (added after the first version; safe on existing tables).
+-- Why a booking's Google event or emails didn't go out (null = fine).
+alter table rr_bookings add column if not exists google_error text;
+alter table rr_bookings add column if not exists email_error  text;
+
 -- Rep's direct phone, shown to the customer in their confirmation.
 alter table rr_reps add column if not exists phone text;
 

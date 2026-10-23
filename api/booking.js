@@ -9,7 +9,7 @@
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
-import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep } from './_round-robin.js'
+import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep, googleBusyStrict, calendarMode } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
@@ -91,6 +91,29 @@ function leadEmailHtml({ name, rep, settings, when, address }) {
   </div>`
 }
 
+// GET /api/booking?check=google — is each rep's calendar reachable? (read-only)
+async function checkGoogle(res) {
+  const out = { mode: calendarMode(), googleKey: 'missing', reps: [] }
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  if (raw) {
+    try { out.googleKey = JSON.parse(raw).client_email ? 'ok' : 'not a service-account key' }
+    catch { out.googleKey = 'not valid JSON — paste the whole file, from { to }' }
+  }
+  out.database = process.env.SUPABASE_SERVICE_KEY ? 'ok' : 'SUPABASE_SERVICE_KEY missing'
+  if (out.database === 'ok') {
+    const { data } = await db().from('rr_reps').select('*').eq('active', true).order('position')
+    for (const rep of data || []) {
+      try {
+        const busy = await googleBusyStrict(rep, Date.now(), Date.now() + 86_400_000)
+        out.reps.push({ rep: rep.name, calendar: busy ? 'ok' : 'skipped (no key)' })
+      } catch (err) {
+        out.reps.push({ rep: rep.name, calendar: String(err?.response?.data?.error_description || err?.message || err).slice(0, 200) })
+      }
+    }
+  }
+  return res.status(200).json(out)
+}
+
 async function getSlots(res) {
   const { rep, settings } = await loadTurn()
   if (!rep) return res.status(200).json({ rep: null, slots: [] })
@@ -143,12 +166,18 @@ async function book(req, res) {
   }
 
   // Calendar + emails are best-effort: the booking (and the turn) is already committed.
+  // Why Google/email didn't happen is saved on the booking (google_error / email_error)
+  // so it can be diagnosed from the database without server logs.
+  const why = (err) => String(err?.response?.data?.error_description || err?.response?.data?.error?.message
+    || err?.response?.data?.error || err?.message || err).slice(0, 500)
   let event = null
+  let googleError = null
   try {
     event = await createGoogleEvent(rep, booking, settings)
-    if (event) await db().from('rr_bookings').update({ google_event_id: event.id }).eq('id', booking.id)
+    if (!event) googleError = 'not attempted: GOOGLE_SERVICE_ACCOUNT_JSON is not set'
   } catch (err) {
-    console.error('Google event insert failed:', err.message)
+    googleError = why(err)
+    console.error('Google event insert failed:', googleError)
   }
 
   // Only attach an .ics where Google didn't already put it on their calendar.
@@ -158,13 +187,17 @@ async function book(req, res) {
   const leadWhen = fmtWhen(booking.starts_at, clean(body.timeZone, 64) || rep.timezone, rep.timezone)
   const repWhen  = fmtWhen(booking.starts_at, rep.timezone, 'UTC')
   // Prefer sending from the rep's own Gmail (replies reach them); fall back to the shared mailer.
+  const emailErrors = []
   const send = async (msg) => {
     try {
       if (await sendAsRep(rep, msg)) return { success: true }
     } catch (err) {
-      console.error(`Gmail send as ${rep.email} failed, falling back:`, err.message)
+      emailErrors.push(`gmail as ${rep.email}: ${why(err)}`)
+      console.error(`Gmail send as ${rep.email} failed, falling back:`, why(err))
     }
-    return sendMail(msg)
+    const r = await sendMail(msg)
+    if (r?.error) emailErrors.push(`fallback mailer: ${r.error}`)
+    return r
   }
   await Promise.all([
     send({
@@ -187,6 +220,12 @@ async function book(req, res) {
     }),
   ]).then(results => results.forEach(r => r?.error && console.error('Booking email failed:', r.error)))
 
+  await db().from('rr_bookings').update({
+    google_event_id: event?.id || null,
+    google_error: googleError,
+    email_error: emailErrors.length ? emailErrors.join(' | ').slice(0, 1000) : null,
+  }).eq('id', booking.id)
+
   return res.status(200).json({
     ok: true,
     booking: { start: booking.starts_at, end: booking.ends_at, repName: rep.name, repPhone: rep.phone || null, repEmail: rep.email },
@@ -200,6 +239,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
   if (req.method === 'OPTIONS') return res.status(200).end()
   try {
+    if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
     if (req.method === 'GET')  return await getSlots(res)
     if (req.method === 'POST') return await book(req, res)
     return res.status(405).json({ error: 'Method not allowed' })
