@@ -300,7 +300,7 @@
         for (let d = 1; d <= 14; d++) {
           const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d)
           if (day.getDay() === 0 || day.getDay() === 6) continue
-          const last = Math.min(16 * 60, 17 * 60 - rep.minutes)
+          const last = 16 * 60   // last start 4:00, even if it runs past 5
           for (let m = 8 * 60; m <= last; m += 30) {
             if ((d * 7 + m / 30) % 5 === 0 || (d % 4 === 0 && m < 12 * 60)) continue   // sample busy times
             const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), m / 60 | 0, m % 60).getTime()

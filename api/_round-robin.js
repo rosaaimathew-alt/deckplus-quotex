@@ -85,10 +85,13 @@ export function computeSlots(rep, settings, busy, now = Date.now()) {
     const day = new Date(Date.UTC(y, m - 1, d + i))
     const ranges = rep.hours?.[String(day.getUTCDay())] || []
     // rep.last_start (optional "HH:MM"): latest time an appointment may begin.
+    // When set it wins, even if that appointment runs past the end of the day;
+    // otherwise every appointment has to finish within the hours.
     const lastStart = rep.last_start ? toMinutes(rep.last_start) : Infinity
     for (const [from, to] of ranges) {
       const endMin = toMinutes(to)
-      for (let min = toMinutes(from); min + rules.minutes <= endMin && min <= lastStart; min += rules.every) {
+      const fits = (min) => rep.last_start ? min < endMin && min <= lastStart : min + rules.minutes <= endMin
+      for (let min = toMinutes(from); fits(min); min += rules.every) {
         const start = zonedToUtc(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(),
           Math.floor(min / 60), min % 60, rep.timezone)
         const end = start + length
