@@ -63,7 +63,6 @@ const fmtWhen = (iso, timeZone, fallbackZone) => {
 
 // Customer confirmation: the appointment, what happens next, and their consultant's direct contact.
 function leadEmailHtml({ name, rep, settings, when, address }) {
-  const first = rep.name.split(' ')[0]
   const contact = [
     rep.phone && `<a href="tel:${esc(rep.phone.replace(/[^\d+]/g, ''))}" style="color:#1392ae;text-decoration:none;">${esc(rep.phone)}</a>`,
     `<a href="mailto:${esc(rep.email)}" style="color:#1392ae;text-decoration:none;">${esc(rep.email)}</a>`,
@@ -77,17 +76,15 @@ function leadEmailHtml({ name, rep, settings, when, address }) {
       <tr><td style="padding:12px 16px;color:#6b7682;border-top:1px solid #e3e8ed;">With</td><td style="padding:12px 16px;font-weight:bold;color:#1f2b38;border-top:1px solid #e3e8ed;">${esc(rep.name)}</td></tr>
     </table>
     <p style="margin:20px 0 6px;font-weight:bold;color:#1f2b38;">What happens next</p>
-    <p style="margin:0 0 16px;"><strong>${esc(first)} will call you within 24 hours</strong> to go over a few preliminary
-      questions about your project, so we can make the most of your appointment.</p>
+    <p style="margin:0 0 16px;"><strong>I'll call you within 24 hours</strong> to go over a few preliminary
+      questions about your project, so we can make the most of our appointment.</p>
     <table cellpadding="0" cellspacing="0" style="background:#eef7fa;border-radius:8px;width:100%;margin:0 0 16px;">
       <tr><td style="padding:14px 16px;">
-        <div style="color:#6b7682;font-size:13px;">Your design consultant</div>
-        <div style="font-weight:bold;color:#1f2b38;font-size:16px;margin:2px 0 4px;">${esc(rep.name)}</div>
+        <div style="font-weight:bold;color:#1f2b38;font-size:16px;margin:0 0 4px;">${esc(rep.name)}</div>
         ${contact}
       </td></tr>
     </table>
-    <p>Need to reschedule or have a question before then? Reach out to ${esc(first)} directly, or just reply to this email.</p>
-    <p>— The ${esc(COMPANY)} Team</p>
+    <p>Need to reschedule or have a question before then? Reach out to me directly, or just reply to this email.</p>
   </div>`
 }
 
