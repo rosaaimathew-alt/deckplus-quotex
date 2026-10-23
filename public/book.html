@@ -287,7 +287,7 @@
       const reps = [
         { id: 'demo-1', name: 'Ace', minutes: 90, buffer: 120 },
         { id: 'demo-2', name: 'Greg', minutes: 60, buffer: 90 },
-        { id: 'demo-3', name: 'Mathew', minutes: 60, buffer: 90 },
+        { id: 'demo-3', name: 'Mathew', minutes: 60, buffer: 90, fridayLast: 14 * 60 },
       ]
       const store = {
         get: () => { try { return JSON.parse(sessionStorage.getItem('rr-demo2')) || { turn: 0, taken: [] } } catch { return { turn: 0, taken: [] } } },
@@ -300,7 +300,7 @@
         for (let d = 1; d <= 14; d++) {
           const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d)
           if (day.getDay() === 0 || day.getDay() === 6) continue
-          const last = 16 * 60   // last start 4:00, even if it runs past 5
+          const last = day.getDay() === 5 && rep.fridayLast ? rep.fridayLast : 16 * 60   // last start, even if it runs past 5
           for (let m = 8 * 60; m <= last; m += 30) {
             if ((d * 7 + m / 30) % 5 === 0 || (d % 4 === 0 && m < 12 * 60)) continue   // sample busy times
             const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), m / 60 | 0, m % 60).getTime()

@@ -13,7 +13,8 @@ create extension if not exists btree_gist with schema extensions;
 
 -- ── Reps ────────────────────────────────────────────────────────────────────
 -- hours: weekday (0 = Sunday … 6 = Saturday) → list of [start, end] in the
--- rep's own timezone. A missing or empty weekday means no bookings that day.
+-- rep's own timezone, optionally [start, end, last start] to override
+-- last_start for that day. A missing or empty weekday means no bookings that day.
 create table if not exists rr_reps (
   id                 uuid primary key default gen_random_uuid(),
   name               text not null,
