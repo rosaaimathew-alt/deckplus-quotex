@@ -17,17 +17,17 @@ export const DECK_COLLECTIONS = [
   { key: 'Trex TRANSCEND',           group: 'Trex',            fam: 'Trex TRANSCEND',                     rate: 61.6, steps: true,  landing: true,  redeck: { item: 'Trex Transcend Re-Deck', rate: 42.9 },        fascia: 'trex' },
   { key: 'Trex LINEAGE',             group: 'Trex',            fam: 'Trex LINEAGE',                       rate: 61.6, steps: true,  landing: true,  redeck: { item: 'Trex Lineage Re-Deck', rate: 47.3 },          fascia: 'trex' },
   { key: 'Trex SIGNATURE',           group: 'Trex',            fam: 'Trex SIGNATURE',                     rate: 73.7, steps: true,  landing: true,  redeck: null,                                                    fascia: 'trexsig' },
-  { key: 'TimberTech PRIME/+',       group: 'TimberTech',      fam: 'TimberTech PRIME/+',                 rate: 48.4, steps: true,  landing: true,  redeck: { item: 'TimberTech Prime+ Re-Deck', rate: 35.2 },     fascia: 'ttc' },
-  { key: 'TimberTech TERRAIN/+',     group: 'TimberTech',      fam: 'TimberTech TERRAIN/+',               rate: 52.8, steps: true,  landing: true,  redeck: { item: 'TimberTech Terrain+ Re-Deck', rate: 37.4 },   fascia: 'ttc' },
-  { key: 'TimberTech RESERVE',       group: 'TimberTech',      fam: 'TimberTech RESERVE',                 rate: 56.1, steps: true,  landing: true,  redeck: { item: 'TimberTech Reserve Re-Deck', rate: 42.9 },    fascia: 'ttc' },
-  { key: 'TimberTech HARVEST PVC',   group: 'TimberTech PVC',  fam: 'TimberTech HARVEST PVC',             rate: 62.7, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech LANDMARK PVC',  group: 'TimberTech PVC',  fam: 'TimberTech LANDMARK PVC',            rate: 62.7, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech VINTAGE PVC',   group: 'TimberTech PVC',  fam: 'TimberTech VINTAGE PVC',             rate: 66,   steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech PVC MULTI WIDTH 7.25"/3.5"', group: 'TimberTech PVC', fam: 'TimberTech PVC MULTI WIDTH 7.25"/3.5"', rate: 70, steps: false, landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech PVC 2" MAX',    group: 'TimberTech PVC',  fam: 'TimberTech PVC 2" MAX',              rate: 78,   steps: true,  landing: false, redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech PVC 3.5" (NARROW)', group: 'TimberTech PVC', fam: 'TimberTech PVC 3.5" (NARROW)',    rate: 78,   steps: false, landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech PVC 7.25" (WIDE)',  group: 'TimberTech PVC', fam: 'TimberTech PVC 7.25" (WIDE)',     rate: 80,   steps: false, landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech VINTAGE T&G',   group: 'TimberTech PVC',  fam: 'TimberTech VINTAGE T&G',             rate: 80.3, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech PRIME/+',       group: 'TimberTech',      fam: 'TimberTech PRIME/+',                 rate: 50.82, steps: true,  landing: true,  redeck: { item: 'TimberTech Prime+ Re-Deck', rate: 36.96 },     fascia: 'ttc' },
+  { key: 'TimberTech TERRAIN/+',     group: 'TimberTech',      fam: 'TimberTech TERRAIN/+',               rate: 55.44, steps: true,  landing: true,  redeck: { item: 'TimberTech Terrain+ Re-Deck', rate: 39.27 },   fascia: 'ttc' },
+  { key: 'TimberTech RESERVE',       group: 'TimberTech',      fam: 'TimberTech RESERVE',                 rate: 58.91, steps: true,  landing: true,  redeck: { item: 'TimberTech Reserve Re-Deck', rate: 45.05 },    fascia: 'ttc' },
+  { key: 'TimberTech HARVEST PVC',   group: 'TimberTech PVC',  fam: 'TimberTech HARVEST PVC',             rate: 65.84, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech LANDMARK PVC',  group: 'TimberTech PVC',  fam: 'TimberTech LANDMARK PVC',            rate: 65.84, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech VINTAGE PVC',   group: 'TimberTech PVC',  fam: 'TimberTech VINTAGE PVC',             rate: 69.3,   steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech PVC MULTI WIDTH 7.25"/3.5"', group: 'TimberTech PVC', fam: 'TimberTech PVC MULTI WIDTH 7.25"/3.5"', rate: 73.5, steps: false, landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech PVC 2" MAX',    group: 'TimberTech PVC',  fam: 'TimberTech PVC 2" MAX',              rate: 81.9,   steps: true,  landing: false, redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech PVC 3.5" (NARROW)', group: 'TimberTech PVC', fam: 'TimberTech PVC 3.5" (NARROW)',    rate: 81.9,   steps: false, landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech PVC 7.25" (WIDE)',  group: 'TimberTech PVC', fam: 'TimberTech PVC 7.25" (WIDE)',     rate: 84,   steps: false, landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech VINTAGE T&G',   group: 'TimberTech PVC',  fam: 'TimberTech VINTAGE T&G',             rate: 84.32, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
 ]
 
 // Rails — $ per LF.
@@ -40,8 +40,8 @@ export const DECK_RAILS = [
   { key: 'Trex Select Railing WHITE ONLY',                  rate: 121,   trex: true },
   { key: 'Trex SIGNATURE Alum. Railing',                    rate: 142,   trex: true },
   { key: 'Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY', rate: 86,    trex: true },
-  { key: 'TimberTech Alum. Railing',                        rate: 145.2 },
-  { key: 'TimberTech Railing BETWEEN POSTS ONLY',           rate: 78.1 },
+  { key: 'TimberTech Alum. Railing',                        rate: 152.46 },
+  { key: 'TimberTech Railing BETWEEN POSTS ONLY',           rate: 82.01 },
   { key: 'Iron Rod Railing LF',                             rate: 0, custom: true },   // "Custom" on the sheet
 ]
 export const BRONZE_BALUSTERS = { item: 'BRONZE balusters (special order) ADD LF', rate: 6 }
@@ -51,8 +51,8 @@ export const DECK_FASCIA = {
   pvcwhite: { item: 'PVC WHITE FASCIA LF',                     rate: 13 },
   trex:     { item: 'TREX ENHANCE/TRANSCEND/LINEAGE FASCIA LF', rate: 27.5 },
   trexsig:  { item: 'TREX SIGNATURE FASCIA LF',                rate: 35.2 },
-  ttc:      { item: 'TimberTech COMPOSITE FASCIA LF',          rate: 22 },
-  ttp:      { item: 'TimberTech PVC FASCIA LF',                rate: 33 },
+  ttc:      { item: 'TimberTech COMPOSITE FASCIA LF',          rate: 23.1 },
+  ttp:      { item: 'TimberTech PVC FASCIA LF',                rate: 34.65 },
 }
 
 // Skirting (3 open sides × height). Lattice is sold per 4×8 sheet.
@@ -76,8 +76,8 @@ export const DECK_ITEMS = {
   border1:     { item: '1-Board border SF',                                   rate: 3 },
   border2:     { item: '2-boards border SF',                                  rate: 6 },
   boxstep:     { item: 'Box steps PER STEP',                                  rate: 100 },
-  cortexComp:  { item: 'TimberTech COMPOSITE cortex (UP TO 15 STEPS)',        rate: 550 },
-  cortexPvc:   { item: 'TimberTech PVC cortex (UP TO 15 STEPS)',              rate: 660 },
+  cortexComp:  { item: 'TimberTech COMPOSITE cortex (UP TO 15 STEPS)',        rate: 577.5 },
+  cortexPvc:   { item: 'TimberTech PVC cortex (UP TO 15 STEPS)',              rate: 693 },
   high:        { item: "Deck above 8' high - add",                            rate: 5 },
   freestand:   { item: 'Free standing deck',                                  rate: 5 },
   lvl:         { item: 'PT LVL (Framing) LF',                                 rate: 150 },

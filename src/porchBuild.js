@@ -36,7 +36,20 @@ export const deckSlug = (key) => String(key).toLowerCase().replace(/[^a-z0-9]+/g
 const PT_DECK_RATE = DECK_COLLECTIONS.find(c => c.key === 'PT')?.rate || 0
 // Porch floor upgrade prices the office has set; the rest default to the
 // collection's deck $/SF less PT until set in Item Catalog → Formulas.
-const FLOOR_UPGRADE_RATES = { 'TimberTech RESERVE': 15.4 }
+// TimberTech: raised 5% (Oct 2026) from their earlier prices.
+const FLOOR_UPGRADE_RATES = {
+  'TimberTech RESERVE': 16.17,
+  'TimberTech PRIME/+': 16.17,
+  'TimberTech TERRAIN/+': 20.79,
+  'TimberTech HARVEST PVC': 31.19,
+  'TimberTech LANDMARK PVC': 31.19,
+  'TimberTech VINTAGE PVC': 34.65,
+  'TimberTech PVC MULTI WIDTH 7.25"/3.5"': 38.85,
+  'TimberTech PVC 2" MAX': 47.25,
+  'TimberTech PVC 3.5" (NARROW)': 47.25,
+  'TimberTech PVC 7.25" (WIDE)': 49.35,
+  'TimberTech VINTAGE T&G': 49.67,
+}
 const DECK_FLOOR_ROWS = Object.fromEntries(DECK_COLLECTIONS.filter(c => c.key !== 'PT').map(c => [
   `deckfloor_${deckSlug(c.key)}`, R(`${c.key} porch floor upgrade`, 'SF', FLOOR_UPGRADE_RATES[c.key] ?? +(c.rate - PT_DECK_RATE).toFixed(2), 'flooring', { floor: true, deckColl: c.key }),
 ]))
@@ -141,15 +154,15 @@ export const PORCH_BUILD_DEFAULTS = {
   rail_trex_select:         R('Trex Select railing (white only)',            'LF', 121,   'stepsrail', { rail: true }),
   rail_trex_signature:      R('Trex Signature aluminum railing',             'LF', 142,   'stepsrail', { rail: true }),
   rail_trex_signature_between: R('Trex Signature aluminum, between posts',   'LF', 86,    'stepsrail', { rail: true }),
-  rail_tt_alum:             R('TimberTech aluminum railing',                 'LF', 145.2, 'stepsrail', { rail: true }),
-  rail_tt_between:          R('TimberTech railing, between posts',           'LF', 78.1,  'stepsrail', { rail: true }),
+  rail_tt_alum:             R('TimberTech aluminum railing',                 'LF', 152.46, 'stepsrail', { rail: true }),
+  rail_tt_between:          R('TimberTech railing, between posts',           'LF', 82.01,  'stepsrail', { rail: true }),
 
   // Deck fascia — per LF
   fascia_pvc:            R('PVC white fascia',                           'LF', 13,   'stepsrail', { fascia: true }),
   fascia_trex:           R('Trex Enhance / Transcend / Lineage fascia',  'LF', 27.5, 'stepsrail', { fascia: true }),
   fascia_trex_signature: R('Trex Signature fascia',                      'LF', 35.2, 'stepsrail', { fascia: true }),
-  fascia_tt_composite:   R('TimberTech composite fascia',                'LF', 22,   'stepsrail', { fascia: true }),
-  fascia_tt_pvc:         R('TimberTech PVC fascia',                      'LF', 33,   'stepsrail', { fascia: true }),
+  fascia_tt_composite:   R('TimberTech composite fascia',                'LF', 23.1,   'stepsrail', { fascia: true }),
+  fascia_tt_pvc:         R('TimberTech PVC fascia',                      'LF', 34.65,   'stepsrail', { fascia: true }),
 
   // Deck upgrades
   box_step:      R('Box steps',                                 'EA', 100,  'stepsrail', { option: true }),
