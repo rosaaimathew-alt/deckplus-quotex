@@ -131,3 +131,58 @@ alter policy finance_cards_org_all on public.finance_cards
 alter policy job_costs_org_all on public.job_costs
   using (org_id = auth_org() and auth_role() in ('office','admin','pm'))
   with check (org_id = auth_org() and auth_role() in ('office','admin','pm'));
+
+-- ── One-step invite sign-up (no confirmation email) ─────────────────────────
+-- The invite link is the proof of the address: creates the login already
+-- confirmed (or finishes one left half-done by the old confirm-email flow),
+-- joins the team with the invite's role and marks the invite used. Called by
+-- the server (api/google-auth/[action].js → invite-signup) with the server
+-- secret; like the other *_s functions, the secret check is what keeps it
+-- server-only.
+create or replace function public.invite_signup_s(p_code text, p_name text, p_password text, s text)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare r public.org_invites; em text; uid uuid; nm text; inst uuid;
+begin
+  if not public.server_secret_ok(s) then raise exception 'Not allowed' using errcode = '42501'; end if;
+  select * into r from public.org_invites where code = p_code;
+  if not found then raise exception 'This invite link is not valid.'; end if;
+  if r.revoked_at is not null then raise exception 'This invite was cancelled. Ask the office for a new one.'; end if;
+  if r.used_at is not null then raise exception 'This invite has already been used. Sign in instead.'; end if;
+  if r.expires_at < now() then raise exception 'This invite has expired. Ask the office for a new one.'; end if;
+  if length(coalesce(p_password, '')) < 8 then raise exception 'Choose a password with at least 8 characters.'; end if;
+  em := lower(trim(r.email));
+  nm := coalesce(nullif(trim(p_name), ''), nullif(trim(r.display_name), ''), split_part(em, '@', 1));
+
+  select id into uid from auth.users where lower(email) = em limit 1;
+  if uid is not null then
+    if exists (select 1 from public.org_members where user_id = uid) then
+      raise exception 'You already have an account. Sign in instead.';
+    end if;
+    update auth.users set
+      encrypted_password = extensions.crypt(p_password, extensions.gen_salt('bf')),
+      email_confirmed_at = coalesce(email_confirmed_at, now()),
+      raw_user_meta_data = coalesce(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('display_name', nm, 'email_verified', true),
+      confirmation_token = '', updated_at = now()
+    where id = uid;
+  else
+    uid := gen_random_uuid();
+    select instance_id into inst from auth.users where instance_id is not null limit 1;
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+      confirmation_token, recovery_token, email_change_token_new, email_change, email_change_token_current,
+      phone_change, phone_change_token, reauthentication_token, is_sso_user, is_anonymous)
+    values (coalesce(inst, '00000000-0000-0000-0000-000000000000'), uid, 'authenticated', 'authenticated', em,
+      extensions.crypt(p_password, extensions.gen_salt('bf')), now(),
+      '{"provider":"email","providers":["email"]}'::jsonb, jsonb_build_object('display_name', nm, 'email_verified', true), now(), now(),
+      '', '', '', '', '', '', '', '', false, false);
+  end if;
+  if not exists (select 1 from auth.identities where user_id = uid and provider = 'email') then
+    insert into auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
+    values (uid::text, uid, jsonb_build_object('sub', uid::text, 'email', em, 'email_verified', true, 'phone_verified', false), 'email', now(), now(), now());
+  end if;
+
+  insert into public.org_members (user_id, org_id, role, display_name, email) values (uid, r.org_id, r.role, nm, em);
+  update public.org_invites set used_at = now(), used_by = uid where code = r.code;
+  return jsonb_build_object('ok', true, 'email', em, 'role', r.role);
+end $$;
+grant execute on function public.invite_signup_s(text, text, text, text) to anon, authenticated;
