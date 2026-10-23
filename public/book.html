@@ -5,23 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Book a Consultation</title>
   <style>
+    /* ── Brand ─────────────────────────────────────────────────────────────
+       Every look-and-feel choice lives here so the page can match the Deck Plus
+       website exactly. Embeds can also override any of these per page with
+       data-* attributes (see /embed.js). */
     :root {
-      --bg: #ffffff; --surface: #f7f8fa; --border: #e3e6eb; --text: #14171c; --muted: #5d6573;
-      --accent: #1f6feb; --accent-text: #ffffff; --accent-soft: #e8f0fd; --danger: #c62828; --ok: #1b7f3b;
-      --radius: 10px;
+      --bg: #ffffff;            /* page background (transparent when embedded) */
+      --surface: #f7f7f5;       /* inputs, day chips */
+      --border: #dcdcd7;
+      --text: #1d1d1f;
+      --muted: #6b6b70;
+      --accent: #b0894f;        /* buttons, selected states */
+      --accent-text: #ffffff;   /* text on accent */
+      --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);   /* selected day, chosen-time banner */
+      --danger: #b3261e;
+      --ok: #2e7d32;
+      --radius: 6px;            /* inputs, chips, time buttons */
+      --btn-radius: 6px;        /* main buttons */
+      --btn-transform: none;    /* e.g. uppercase */
+      --btn-tracking: normal;   /* letter-spacing on buttons */
+      --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --heading-font: var(--font);
+      --heading-weight: 700;
+      --font-size: 15px;
     }
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-        --bg: #111418; --surface: #1a1e24; --border: #2c323b; --text: #eef1f5; --muted: #9aa3b0;
-        --accent: #4d8dff; --accent-text: #0b0d10; --accent-soft: #1b2a44; --danger: #ff6b6b; --ok: #4cc27a;
-      }
-    }
-    :root[data-theme="dark"] {
-      --bg: #111418; --surface: #1a1e24; --border: #2c323b; --text: #eef1f5; --muted: #9aa3b0;
-      --accent: #4d8dff; --accent-text: #0b0d10; --accent-soft: #1b2a44; --danger: #ff6b6b; --ok: #4cc27a;
-    }
+    html.embedded { --bg: transparent; }
+    html.embedded .wrap { max-width: none; padding: 4px 3px; }   /* the host page supplies the margins */
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: var(--font-size)/1.5 var(--font); }
+    h1, h2 { font-family: var(--heading-font); font-weight: var(--heading-weight); }
     .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
     h1 { font-size: 1.35rem; margin: 0 0 4px; }
     .sub { color: var(--muted); margin: 0 0 20px; }
@@ -48,9 +60,10 @@
     textarea { min-height: 80px; resize: vertical; }
     .chosen { padding: 12px; margin-bottom: 16px; border-radius: var(--radius); background: var(--accent-soft); }
     .row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn { padding: 12px 18px; border-radius: var(--radius); border: 0; background: var(--accent); color: var(--accent-text);
-      font: inherit; font-weight: 700; cursor: pointer; }
-    .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+    .btn { padding: 12px 18px; border-radius: var(--btn-radius); border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text);
+      font: inherit; font-weight: 700; cursor: pointer; text-transform: var(--btn-transform); letter-spacing: var(--btn-tracking); }
+    .btn.ghost { background: transparent; color: var(--accent); border-color: var(--border); }
+    .demo { padding: 8px 12px; margin-bottom: 16px; border-radius: var(--radius); border: 1px dashed var(--accent); color: var(--muted); font-size: .85rem; }
     .btn:disabled { opacity: .6; cursor: default; }
     .msg { padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--danger); color: var(--danger); margin-bottom: 12px; }
     .done { text-align: center; padding: 24px 0; }
@@ -62,6 +75,7 @@
 </head>
 <body>
   <main class="wrap">
+    <div id="demoBanner" class="demo" hidden>Preview mode — sample times and reps, nothing is actually booked.</div>
     <h1 id="title">Book a Consultation</h1>
     <p class="sub" id="subtitle">Loading available times…</p>
     <div id="error" class="msg" role="alert" hidden></div>
@@ -99,6 +113,7 @@
       <div class="check">✓</div>
       <h2 id="doneTitle">You're booked!</h2>
       <p id="doneText" class="muted"></p>
+      <button class="btn ghost" type="button" id="again" hidden>Book another (preview)</button>
     </section>
   </main>
 
@@ -106,7 +121,81 @@
     const params = new URLSearchParams(location.search)
     const API = '/api/booking'
     const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
-    if (params.get('theme')) document.documentElement.dataset.theme = params.get('theme')
+    const DEMO = params.has('demo')
+    if (window.parent !== window) document.documentElement.classList.add('embedded')
+
+    // Per-embed brand overrides (validated so a link can't inject arbitrary CSS).
+    const THEME_PARAMS = {
+      bg: ['--bg', 'color'], surface: ['--surface', 'color'], border: ['--border', 'color'], text: ['--text', 'color'],
+      muted: ['--muted', 'color'], accent: ['--accent', 'color'], accentText: ['--accent-text', 'color'],
+      accentSoft: ['--accent-soft', 'color'], radius: ['--radius', 'length'], btnRadius: ['--btn-radius', 'length'],
+      btnTransform: ['--btn-transform', 'transform'], btnTracking: ['--btn-tracking', 'length'],
+      font: ['--font', 'font'], headingFont: ['--heading-font', 'font'], headingWeight: ['--heading-weight', 'weight'],
+      fontSize: ['--font-size', 'length'],
+    }
+    const OK = {
+      color: (v) => CSS.supports('color', v),
+      length: (v) => /^-?\d+(\.\d+)?(px|rem|em)?$/.test(v),
+      transform: (v) => /^(none|uppercase|lowercase|capitalize)$/.test(v),
+      weight: (v) => /^[1-9]00$/.test(v),
+      font: (v) => /^[A-Za-z0-9 \-]{1,40}$/.test(v),
+    }
+    for (const [key, [prop, kind]] of Object.entries(THEME_PARAMS)) {
+      let v = params.get(key)
+      if (!v || !OK[kind](v)) continue
+      if (kind === 'length' && /^-?[\d.]+$/.test(v)) v += 'px'
+      if (kind === 'font') {
+        // Load it from Google Fonts if it lives there; harmless if it doesn't.
+        const link = Object.assign(document.createElement('link'), { rel: 'stylesheet',
+          href: `https://fonts.googleapis.com/css2?family=${encodeURIComponent(v)}:wght@400;600;700&display=swap` })
+        document.head.append(link)
+        v = `"${v}", ui-sans-serif, system-ui, sans-serif`
+      }
+      document.documentElement.style.setProperty(prop, v)
+    }
+    if (params.get('title') === 'none') document.getElementById('title').hidden = true
+
+    // ?demo — sample data so the page can be tried before the database is set up.
+    const demo = (() => {
+      const reps = [{ id: 'demo-1', name: 'Alex' }, { id: 'demo-2', name: 'Brianna' }, { id: 'demo-3', name: 'Chris' }]
+      const store = {
+        get: () => { try { return JSON.parse(sessionStorage.getItem('rr-demo')) || { turn: 0, taken: [] } } catch { return { turn: 0, taken: [] } } },
+        set: (v) => { try { sessionStorage.setItem('rr-demo', JSON.stringify(v)) } catch { /* private mode */ } },
+      }
+      let state = store.get()
+      const slots = () => {
+        const out = [], now = new Date()
+        for (let d = 1; out.length < 60 && d < 21; d++) {
+          const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d)
+          if (day.getDay() === 0 || day.getDay() === 6) continue
+          for (let m = 9 * 60; m < 17 * 60; m += 30) {
+            if ((d * 7 + m / 30) % 5 === 0) continue   // a few already-taken times
+            const iso = new Date(day.getFullYear(), day.getMonth(), day.getDate(), m / 60 | 0, m % 60).toISOString()
+            if (!state.taken.includes(iso)) out.push(iso)
+          }
+        }
+        return out
+      }
+      return async (method, body) => {
+        await new Promise(r => setTimeout(r, 350))
+        if (method === 'GET') return [200, { rep: reps[state.turn % 3], meetingTitle: 'Consultation', slotMinutes: 30, slots: slots() }]
+        const rep = reps[state.turn % 3]
+        state = { turn: state.turn + 1, taken: [...state.taken, body.start] }
+        store.set(state)
+        return [200, { ok: true, booking: { start: body.start, repName: rep.name } }]
+      }
+    })()
+    async function api(method, body) {
+      if (DEMO) { const [status, data] = await demo(method, body); return { ok: status < 300, status, data } }
+      const res = await fetch(API, method === 'GET' ? { cache: 'no-store' } : {
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      return { ok: res.ok, status: res.status, data: await res.json() }
+    }
+    if (DEMO) {
+      document.getElementById('demoBanner').hidden = false
+      document.getElementById('again').hidden = false
+      document.getElementById('again').onclick = () => { document.getElementById('form').reset(); load() }
+    }
 
     const $ = (id) => document.getElementById(id)
     const dayKey = (d) => d.toLocaleDateString('en-CA', { timeZone: TZ })
@@ -124,8 +213,8 @@
       error(notice)
       $('subtitle').textContent = 'Loading available times…'
       try {
-        const res = await fetch(API, { cache: 'no-store' })
-        const data = await res.json()
+        const res = await api('GET')
+        const data = res.data
         if (!res.ok) throw new Error(data.error)
         state.rep = data.rep
         if (data.meetingTitle) { $('title').textContent = 'Book a ' + data.meetingTitle; document.title = $('title').textContent }
@@ -228,15 +317,11 @@
       if (Object.keys(problems).length) return error('Please complete the highlighted fields.')
       error(); $('submit').disabled = true; $('submit').textContent = 'Booking…'
       try {
-        const res = await fetch(API, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const res = await api('POST', {
             repId: state.rep.id, start: state.start.toISOString(), timeZone: TZ,
             ...Object.fromEntries(FIELDS.map(n => [n, f[n].value])), notes: f.notes.value, website: f.website.value,
-          }),
         })
-        const data = await res.json()
+        const data = res.data
         if (res.status === 409) return load(data.error)
         if (data.fields) { showFieldErrors(data.fields); throw new Error(data.error) }
         if (!res.ok) throw new Error(data.error)
