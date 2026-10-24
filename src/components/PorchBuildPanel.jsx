@@ -317,7 +317,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
         </Field>
         {inp.floor === 'deck' && (
           <Field label="Deck fascia" hint={inp.fascia?.lf == null || inp.fascia.lf === ''
-              ? `Auto: ${result.fasciaLF} LF, the deck's exposed perimeter (${inp.tie === 'free' ? 'all four sides' : 'front + two sides'}). Type a number to override.`
+              ? `Auto: ${result.fasciaLF} LF — the deck's exposed perimeter ${result.fasciaDeckLF} (${inp.tie === 'free' ? 'all four sides' : 'front + two sides'})${result.fasciaStepLF ? ` + both sides of the steps ${result.fasciaStepLF}` : ''}${result.fasciaLandingLF ? ` + landings ${result.fasciaLandingLF}` : ''}. Type a number to override.`
               : 'Overridden. Clear the box to go back to the automatic perimeter.'}>
             <div className="flex gap-2">
               <select className={selCls} value={inp.fascia?.product || ''} onChange={e => setSub('fascia', { product: e.target.value })}>

@@ -55,7 +55,11 @@ export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
     }
 
     const fasciaOpt = fascia === 'PVC white' ? DECK_FASCIA.pvcwhite : fascia === 'Matching' && coll.fascia ? DECK_FASCIA[coll.fascia] : null
-    if (fasciaOpt) push('fascia', fasciaOpt.item.replace(/ LF$/, ''), fasciaOpt.item, 'LF', t.openLF, fasciaOpt.rate, { calc: '3 open sides' })
+    if (fasciaOpt) {
+      const fasciaLF = t.openLF + t.stairFasciaLF + t.landingFasciaLF
+      const calc = [`deck 3 open sides ${t.openLF}`, t.stairFasciaLF ? `stair sides ${t.stairFasciaLF}` : '', t.landingFasciaLF ? `landings ${t.landingFasciaLF}` : ''].filter(Boolean).join(' + ')
+      push('fascia', fasciaOpt.item.replace(/ LF$/, ''), fasciaOpt.item, 'LF', fasciaLF, fasciaOpt.rate, { calc })
+    }
 
     if (border !== 'None') {
       const b = border === '2-board' ? DECK_ITEMS.border2 : DECK_ITEMS.border1

@@ -11,7 +11,7 @@
 // that collection's deck $/SF less PT (the PT floor is already in the porch).
 
 import { scopeFor, countWords } from './lib/scopeText'
-import { DECK_COLLECTIONS, STEP_FACTOR, matchCollection } from './lib/deckPricing'
+import { DECK_COLLECTIONS, STEP_FACTOR, matchCollection, stairSideFt, landingFasciaFt } from './lib/deckPricing'
 
 export const BOARD_FACE_IN  = 5.5    // 1×6 decking face width → 12/5.5 LF of board per SF
 export const RISER_MAX_IN   = 8.25   // max riser → step count from deck height
@@ -472,10 +472,16 @@ export function computePorchBuild(input, ratesIn) {
     add(`decklanding_${deckSlug(landingColl)}`, n(inp.landings.count) * LANDING_SF, `${n(inp.landings.count)} × 4′×4′`)
   }
   if (inp.railing?.product && n(inp.railing.lf) > 0 && rates[inp.railing.product]?.rail) add(inp.railing.product, n(inp.railing.lf))
-  // Fascia follows the deck's exposed perimeter unless the rep overrides the LF.
-  const fasciaLF = inp.fascia?.lf == null || inp.fascia.lf === '' ? exposedPerimeterFt(inp) : n(inp.fascia.lf)
+  // Fascia follows the deck's exposed perimeter plus both sides of the steps and
+  // each landing's open sides, unless the rep overrides the LF.
+  const autoFascia = inp.fascia?.lf == null || inp.fascia.lf === ''
+  const stepFasciaLF = stepColl && risers > 0 ? 2 * stairSideFt(risers) : 0
+  const landingFasciaLF = landingColl ? n(inp.landings.count) * landingFasciaFt(4, 4) : 0
+  const fasciaLF = autoFascia ? exposedPerimeterFt(inp) + stepFasciaLF + landingFasciaLF : n(inp.fascia.lf)
   if (inp.floor === 'deck' && inp.fascia?.product && fasciaLF > 0 && rates[inp.fascia.product]?.fascia)
-    add(inp.fascia.product, fasciaLF, inp.fascia?.lf == null || inp.fascia.lf === '' ? 'exposed perimeter' : undefined)
+    add(inp.fascia.product, fasciaLF, autoFascia
+      ? ['exposed perimeter', stepFasciaLF ? `+ step sides ${stepFasciaLF}` : '', landingFasciaLF ? `+ landings ${landingFasciaLF}` : ''].filter(Boolean).join(' ')
+      : undefined)
 
   // Electrical package (one choice)
   if (inp.elecPackage && rates[inp.elecPackage]?.elecPkg) add(inp.elecPackage, 1)
@@ -495,7 +501,8 @@ export function computePorchBuild(input, ratesIn) {
     .filter(g => g.lines.length)
   const total = lines.reduce((s, l) => s + l.total, 0)
   const cost  = lines.reduce((s, l) => s + l.costTotal, 0)
-  return { lines, groups, total, cost, area, roof, layout, risers, fasciaLF: exposedPerimeterFt(inp) }
+  return { lines, groups, total, cost, area, roof, layout, risers,
+    fasciaLF: exposedPerimeterFt(inp) + stepFasciaLF + landingFasciaLF, fasciaDeckLF: exposedPerimeterFt(inp), fasciaStepLF: stepFasciaLF, fasciaLandingLF: landingFasciaLF }
 }
 
 // ── Scope wording: catalog item per rate key ─────────────────────────────────

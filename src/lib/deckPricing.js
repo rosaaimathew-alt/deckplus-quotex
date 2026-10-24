@@ -135,6 +135,14 @@ export const stepsForHeight = (heightFt) => num(heightFt) > 0 ? Math.ceil((num(h
 // Suggested run-out (ft, rounded up to the half foot) for that many steps.
 export const runOutForSteps = (steps) => steps > 0 ? Math.ceil((steps * TREAD_IN) / 6) / 2 : 0
 
+// Fascia down one side of a stair run, along the stringer: each step adds the
+// diagonal of an 11″ tread and an 8¼″ riser (13¾″); rounded up to the half foot.
+export const STEP_DIAGONAL_IN = Math.hypot(TREAD_IN, RISER_MAX_IN)
+export const stairSideFt = (steps) => steps > 0 ? Math.ceil((steps * STEP_DIAGONAL_IN) / 6) / 2 : 0
+// Fascia around a landing: its three open sides (front + two sides); the fourth
+// side meets the deck or the stairs.
+export const landingFasciaFt = (width, depth) => (num(width) > 0 && num(depth) > 0 ? num(width) + 2 * num(depth) : 0)
+
 // The measurements the price is built from.
 //   deck: W × D ft, plus bump-outs [{ width, depth }] (width = side on the deck)
 //   stairs: [{ across, steps }]   landings: [{ width, depth }]
@@ -150,5 +158,8 @@ export function deckTakeoff({ width, depth, sections = [], stairs = [], landings
   const stairRailLF = stairs.reduce((s, x) => s + 2 * runOutForSteps(num(x.steps)), 0)
   const stepCount = stairs.reduce((s, x) => s + num(x.steps), 0)
   const landingSF = landings.reduce((s, x) => s + num(x.width) * num(x.depth), 0)
-  return { deckSF, sectionSF, openLF, stepSF, stairRailLF, stepCount, landingSF }
+  // Fascia beyond the deck: both sides of every stair run, and each landing's open sides.
+  const stairFasciaLF   = stairs.reduce((s, x) => s + 2 * stairSideFt(num(x.steps)), 0)
+  const landingFasciaLF = landings.reduce((s, x) => s + landingFasciaFt(x.width, x.depth), 0)
+  return { deckSF, sectionSF, openLF, stepSF, stairRailLF, stepCount, landingSF, stairFasciaLF, landingFasciaLF }
 }
