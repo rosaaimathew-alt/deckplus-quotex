@@ -408,6 +408,12 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
                       <button type="button" title={`Back to ${fmtQty(r.autoQty)}`} onClick={() => clearOv(r.key)} className="text-gray-300 hover:text-[var(--brand-600)]"><RotateCcw size={12} /></button>
                     )}
                   </div>
+                  {/* A typed quantity wins over the calculator: say so, and what it would be. */}
+                  {qtyOv[r.key] != null && !r.custom && n(r.qty) !== n(r.autoQty) && (
+                    <button type="button" onClick={() => clearOv(r.key)} className="block w-full text-right text-[11px] text-amber-700 hover:underline mt-0.5">
+                      Typed · calculator says {fmtQty(r.autoQty)} — use it
+                    </button>
+                  )}
                 </td>
                 <td className="py-1.5 px-1 text-center text-xs text-gray-500">{r.unit}</td>
                 <td className="py-1.5 px-1">
