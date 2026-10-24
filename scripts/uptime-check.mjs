@@ -26,6 +26,10 @@ async function get(path, opts = {}) {
 await check('Server health (storage + proposal store)', async () => {
   const r = await get('/api/sign/health')
   if (r.status !== 200 || !r.json?.ok) throw new Error(`HTTP ${r.status}: ${r.text.slice(0, 300)}`)
+  // The live site must be built from main: when another branch was published
+  // over it (Oct 23) customers' proposal links broke.
+  const want = process.env.EXPECT_BRANCH
+  if (want && r.json.branch !== want) throw new Error(`the live site is running branch "${r.json.branch}" (commit ${r.json.commit}), not ${want}`)
   return `live commit ${r.json.commit || '?'} from ${r.json.branch || '?'}`
 })
 await check('Customer proposal link (API)', async () => {

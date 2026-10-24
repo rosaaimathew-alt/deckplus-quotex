@@ -1,0 +1,74 @@
+# Uptime monitor for deckplus.app. Every 10 minutes (and a few minutes after
+# every push to main, once Vercel has published it) this runs
+# scripts/uptime-check.mjs against the live site. If anything fails twice in a
+# row it opens a GitHub issue titled "ALERT: deckplus.app ..." — GitHub emails
+# the owner and pushes to the GitHub mobile app — and closes it again once the
+# site is healthy.
+name: Uptime monitor
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SITE: https://deckplus.app
+      EXPECT_BRANCH: main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Wait for Vercel to publish this push
+        if: github.event_name == 'push'
+        run: sleep 180
+      - name: Check the live site
+        id: check
+        run: |
+          set +e
+          node scripts/uptime-check.mjs "$SITE" > out.txt 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            echo "First run failed; re-checking in 60s to rule out a blip" >> out.txt
+            sleep 60
+            node scripts/uptime-check.mjs "$SITE" > out2.txt 2>&1
+            code=$?
+            cat out2.txt >> out.txt
+          fi
+          cat out.txt
+          echo "failed=$([ $code -ne 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Raise or update the alert
+        if: steps.check.outputs.failed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="$(printf 'deckplus.app failed its health check at %s UTC.\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(date -u '+%Y-%m-%d %H:%M')" "$(cat out.txt)" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          open=$(gh issue list --state open --search 'in:title "ALERT: deckplus.app"' --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "ALERT: deckplus.app is down — customers may be affected" --body "$body"
+          fi
+          exit 1
+      - name: Close the alert once healthy
+        if: steps.check.outputs.failed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --state open --search 'in:title "ALERT: deckplus.app"' --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Recovered: every check passes again ($(date -u '+%Y-%m-%d %H:%M') UTC)."
+          done
