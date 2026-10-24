@@ -143,10 +143,54 @@ export const stairSideFt = (steps) => steps > 0 ? Math.ceil((steps * STEP_DIAGON
 // side meets the deck or the stairs.
 export const landingFasciaFt = (width, depth) => (num(width) > 0 && num(depth) > 0 ? num(width) + 2 * num(depth) : 0)
 
+// A landing's height above grade (ft): what the rep typed, else halfway down
+// from the deck (to the half foot).
+export const landingHeight = (l, deckH) => (l?.height != null && l.height !== '' ? num(l.height) : Math.round(num(deckH)) / 2)
+
+// A stair run goes from the deck or a landing (`from`: 'deck' | landing id) down
+// to grade or a landing (`to`: 'grade' | landing id); its rise is the drop
+// between the two. Older runs have neither and go from the deck to grade.
+export function stairRise(s, deckH, landings = []) {
+  const at = (id) => landings.find(l => l.id === id)
+  const top    = s?.from && s.from !== 'deck' && at(s.from) ? landingHeight(at(s.from), deckH) : num(deckH)
+  const bottom = s?.to && s.to !== 'grade' && at(s.to) ? landingHeight(at(s.to), deckH) : 0
+  return Math.max(0, top - bottom)
+}
+export const stepsForRun = (s, deckH, landings) => stepsForHeight(stairRise(s, deckH, landings))
+// Re-count every run that follows the heights (the rep hasn't typed its steps).
+export const autoStairSteps = (stairs, deckH, landings) => stairs.map(s => {
+  const steps = s.auto ? stepsForRun(s, deckH, landings) : 0
+  return steps > 0 ? { ...s, steps } : s
+})
+// A new landing goes into the stairs: the lowest run to grade now stops at the
+// landing (set halfway down that run unless the rep gave a height), and a run
+// of the same width carries on from the landing to grade.
+export function linkLanding(stairs, landing, newId, deckH, landings = []) {
+  const run = [...stairs].reverse().find(s => !s.to || s.to === 'grade')
+  if (!run) return { stairs, landing }
+  const top = stairRise({ from: run.from }, deckH, landings)
+  const placed = landing.height != null && landing.height !== '' ? landing : { ...landing, height: Math.round(top) / 2 }
+  return {
+    landing: placed,
+    stairs: [
+      ...stairs.map(s => (s === run ? { ...s, from: s.from || 'deck', to: landing.id, auto: true } : s)),
+      { id: newId, across: run.across, steps: 0, style: run.style || 'Regular', auto: true, from: landing.id, to: 'grade' },
+    ],
+  }
+}
+// A landing is removed: runs from it go with it, and runs down to it carry on
+// to wherever it led (the next landing, or grade).
+export function unlinkLanding(stairs, landingId) {
+  const onward = stairs.find(s => s.from === landingId)?.to || 'grade'
+  return stairs
+    .filter(s => s.from !== landingId)
+    .map(s => (s.to === landingId ? { ...s, to: onward === landingId ? 'grade' : onward } : s))
+}
+
 // The measurements the price is built from.
-//   deck: W × D ft, plus bump-outs [{ width, depth }] (width = side on the deck)
-//   stairs: [{ across, steps }]   landings: [{ width, depth }]
-export function deckTakeoff({ width, depth, sections = [], stairs = [], landings = [] }) {
+//   deck: W × D × H ft, plus bump-outs [{ width, depth }] (width = side on the deck)
+//   stairs: [{ across, steps, from, to }]   landings: [{ width, depth, height }]
+export function deckTakeoff({ width, depth, height = 0, sections = [], stairs = [], landings = [] }) {
   const W = num(width), D = num(depth)
   const sectionSF = sections.reduce((s, x) => s + num(x.width) * num(x.depth), 0)
   const deckSF    = W * D + sectionSF
@@ -161,5 +205,10 @@ export function deckTakeoff({ width, depth, sections = [], stairs = [], landings
   // Fascia beyond the deck: both sides of every stair run, and each landing's open sides.
   const stairFasciaLF   = stairs.reduce((s, x) => s + 2 * stairSideFt(num(x.steps)), 0)
   const landingFasciaLF = landings.reduce((s, x) => s + landingFasciaFt(x.width, x.depth), 0)
-  return { deckSF, sectionSF, openLF, stepSF, stairRailLF, stepCount, landingSF, stairFasciaLF, landingFasciaLF }
+  // Landings take railing on the same three open sides, skirting from their own
+  // height down to grade, and the over-8′ add when they sit above 8′.
+  const landingRailLF  = landingFasciaLF
+  const landingSkirtSF = landings.reduce((s, x) => s + landingFasciaFt(x.width, x.depth) * landingHeight(x, height), 0)
+  const landingHighSF  = landings.reduce((s, x) => s + (landingHeight(x, height) > 8 ? num(x.width) * num(x.depth) : 0), 0)
+  return { deckSF, sectionSF, openLF, stepSF, stairRailLF, stepCount, landingSF, stairFasciaLF, landingFasciaLF, landingRailLF, landingSkirtSF, landingHighSF }
 }

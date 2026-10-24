@@ -5,7 +5,7 @@
 // never loose catalog items. Each tool then opens pre-filled for the rep to
 // check and add, so pricing always comes from the tools.
 import { readJob } from './lib/jobBrain'
-import { DECK_COLLECTIONS, DECK_RAILS, DECK_SKIRT_OPTIONS, DECK_PAINT_OPTIONS, stepsForHeight } from './lib/deckPricing'
+import { DECK_COLLECTIONS, DECK_RAILS, DECK_SKIRT_OPTIONS, DECK_PAINT_OPTIONS, stepsForHeight, linkLanding, autoStairSteps } from './lib/deckPricing'
 import { PORCH_BUILD_DEFAULTS, PORCH_TYPES, PORCH_TIES, PORCH_FLOORS, PORCH_ROOFS } from './porchBuild'
 import { HS_CONCRETE, HS_PAVERS, HS_WALLS, HS_ACCESSORIES, HS_KITCHEN, HS_GRANITE } from './hardscape'
 import { UDC_STYLES, UDC_ELECTRICAL } from './underDeck'
@@ -32,16 +32,27 @@ export function quickToolFor(spec) {
   if (s.tool === 'deck') {
     const height = num(s.height)
     const coll = oneOf(s.collection, DECK_COLLECTIONS.map(c => c.key))
-    const stairs = Array.isArray(s.stairs) && s.stairs.length
+    let stairs = Array.isArray(s.stairs) && s.stairs.length
       ? s.stairs.map(st => {
           const given = num(st?.steps)
           const steps = given || stepsForHeight(height || 3) || 3
           return { id: uid(), across: num(st?.across) || 4, steps, style: st?.style === 'Box' ? 'Box' : 'Regular', auto: !given }
         })
       : undefined
-    const landings = Array.isArray(s.landings) && s.landings.length
+    let landings = Array.isArray(s.landings) && s.landings.length
       ? s.landings.map(l => ({ id: uid(), width: num(l?.width) || 4, depth: num(l?.depth) || 4 }))
       : undefined
+    // Stairs run from the deck down through each landing to grade (unless the
+    // job gave its own step counts).
+    if (stairs && landings && stairs.every(st => st.auto)) {
+      const placed = []
+      for (const l of landings) {
+        const r = linkLanding(stairs, l, uid(), height || 3, placed)
+        stairs = r.stairs; placed.push(r.landing)
+      }
+      landings = placed
+      stairs = autoStairSteps(stairs, height || 3, landings)
+    }
     return {
       assembly: 'deck', label: `Deck${coll ? ` · ${coll}` : ''}${size(num(s.width), num(s.depth))}`,
       saved: clean({

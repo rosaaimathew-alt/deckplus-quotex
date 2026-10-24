@@ -79,6 +79,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
   const setSub = (k, patch) => setInp(p => ({ ...p, [k]: { ...(p[k] || {}), ...patch } }))
 
   const result = useMemo(() => computePorchBuild(inp, rates), [inp, rates])
+  const railNeed = result.railStepLF + result.railLandingLF   // railing the steps and landings need
   const scopeOut = useMemo(() => buildPorchScope(inp, result, scopes, catalog), [inp, result, scopes, catalog])
   const scope = scopeOut.text
   const typeMeta = PORCH_TYPES.find(t => t.key === inp.type) || PORCH_TYPES[0]
@@ -306,7 +307,10 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             <input type="number" min="0" title="Count" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.landings?.count ?? 0} onChange={e => setSub('landings', { count: e.target.value })} />
           </div>
         </Field>
-        <Field label="Railing (LF)">
+        <Field label="Railing (LF)" hint={railNeed > 0
+            ? <>Steps and landings need {railNeed} LF ({[result.railStepLF ? `both sides of the steps ${result.railStepLF}` : '', result.railLandingLF ? `landings ${result.railLandingLF}` : ''].filter(Boolean).join(' + ')}); add the porch's own railing on top.
+                {(Number(inp.railing?.lf) || 0) < railNeed && <button type="button" className="ml-1 text-[var(--brand-700)] font-medium hover:underline" onClick={() => setSub('railing', { lf: railNeed })}>Use {railNeed} LF</button>}</>
+            : undefined}>
           <div className="flex gap-2">
             <select className={selCls} value={inp.railing?.product || ''} onChange={e => setSub('railing', { product: e.target.value })}>
               <option value="">None</option>

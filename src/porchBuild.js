@@ -11,7 +11,7 @@
 // that collection's deck $/SF less PT (the PT floor is already in the porch).
 
 import { scopeFor, countWords } from './lib/scopeText'
-import { DECK_COLLECTIONS, STEP_FACTOR, matchCollection, stairSideFt, landingFasciaFt } from './lib/deckPricing'
+import { DECK_COLLECTIONS, STEP_FACTOR, matchCollection, stairSideFt, landingFasciaFt, runOutForSteps } from './lib/deckPricing'
 
 export const BOARD_FACE_IN  = 5.5    // 1×6 decking face width → 12/5.5 LF of board per SF
 export const RISER_MAX_IN   = 8.25   // max riser → step count from deck height
@@ -501,7 +501,11 @@ export function computePorchBuild(input, ratesIn) {
     .filter(g => g.lines.length)
   const total = lines.reduce((s, l) => s + l.total, 0)
   const cost  = lines.reduce((s, l) => s + l.costTotal, 0)
-  return { lines, groups, total, cost, area, roof, layout, risers,
+  // Railing the steps and landings need (the rep types the porch's own LF):
+  // both sides of the steps, and each landing's three open sides.
+  const railStepLF = stepColl && risers > 0 ? 2 * runOutForSteps(risers) : 0
+  const railLandingLF = landingColl ? n(inp.landings.count) * landingFasciaFt(4, 4) : 0
+  return { lines, groups, total, cost, area, roof, layout, risers, railStepLF, railLandingLF,
     fasciaLF: exposedPerimeterFt(inp) + stepFasciaLF + landingFasciaLF, fasciaDeckLF: exposedPerimeterFt(inp), fasciaStepLF: stepFasciaLF, fasciaLandingLF: landingFasciaLF }
 }
 

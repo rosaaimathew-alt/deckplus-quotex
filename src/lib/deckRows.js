@@ -18,7 +18,7 @@ export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
   const coll = DECK_COLLECTIONS.find(c => c.key === collKey) || DECK_COLLECTIONS[0]
   const redeck = jobType === 'Re-deck'
   const canRedeck = !!coll.redeck
-  const t = deckTakeoff({ width, depth, sections, stairs, landings })
+  const t = deckTakeoff({ width, depth, height, sections, stairs, landings })
   const W = n(width), D = n(depth), H = n(height)
     const out = []
     const price = (item, fallback) => catalogPrice(catalog, item, fallback)
@@ -48,9 +48,9 @@ export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
       { calc: boxRuns.map(s => `stairs ${stairs.indexOf(s) + 1}: ${n(s.steps)} steps`).join(' + ') })
 
     const railOpt = DECK_RAILS.find(r => r.key === rail)
-    const railLF  = t.openLF + t.stairRailLF
+    const railLF  = t.openLF + t.stairRailLF + t.landingRailLF
     if (railOpt && railOpt.rate != null) {
-      push('rail', railOpt.key, railOpt.key, 'LF', railLF, railOpt.rate, { calc: `3 sides ${t.openLF}${t.stairRailLF ? ` + stairs ${t.stairRailLF}` : ''}` })
+      push('rail', railOpt.key, railOpt.key, 'LF', railLF, railOpt.rate, { calc: `3 sides ${t.openLF}${t.stairRailLF ? ` + stairs ${t.stairRailLF}` : ''}${t.landingRailLF ? ` + landings ${t.landingRailLF}` : ''}` })
       if (bronze) push('bronze', 'Bronze balusters (add)', BRONZE_BALUSTERS.item, 'LF', qtyOv.rail ?? railLF, BRONZE_BALUSTERS.rate)
     }
 
@@ -63,7 +63,7 @@ export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
 
     if (border !== 'None') {
       const b = border === '2-board' ? DECK_ITEMS.border2 : DECK_ITEMS.border1
-      push('border', b.item.replace(/ SF$/, ''), b.item, 'SF', t.deckSF, b.rate)
+      push('border', b.item.replace(/ SF$/, ''), b.item, 'SF', t.deckSF + t.landingSF, b.rate, { calc: `deck ${t.deckSF}${t.landingSF ? ` + landings ${t.landingSF}` : ''}` })
     }
     if (cortex !== 'None') {
       const c = cortex === 'PVC' ? DECK_ITEMS.cortexPvc : DECK_ITEMS.cortexComp
@@ -72,9 +72,9 @@ export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
 
     const sk = DECK_SKIRT_OPTIONS[skirt]
     if (sk) {
-      const skirtSF = Math.round(t.openLF * H)
+      const skirtSF = Math.round(t.openLF * H + t.landingSkirtSF)
       push('skirt', sk.item, sk.item, sk.unit, sk.sheetSF ? Math.ceil(skirtSF / sk.sheetSF) : skirtSF, sk.rate,
-        { calc: `${t.openLF} LF × ${H}′${sk.sheetSF ? ` = ${skirtSF} SF ÷ 32` : ''}` })
+        { calc: `${t.openLF} LF × ${H}′${t.landingSkirtSF ? ` + landings ${Math.round(t.landingSkirtSF)} SF` : ''}${sk.sheetSF ? ` = ${skirtSF} SF ÷ 32` : ''}` })
     }
     const pt = DECK_PAINT_OPTIONS[paint]
     if (pt) {
@@ -82,7 +82,9 @@ export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
       push('paint', pt.item, pt.item, 'SF', paintSF, pt.rate, { calc: `deck${t.stepSF ? ' + steps' : ''}${t.landingSF ? ' + landings' : ''}` })
     }
 
-    if (H > 8) push('high', DECK_ITEMS.high.item, DECK_ITEMS.high.item, 'SF', t.deckSF, DECK_ITEMS.high.rate, { calc: `${H}′ high` })
+    const highSF = (H > 8 ? t.deckSF : 0) + t.landingHighSF
+    if (highSF > 0) push('high', DECK_ITEMS.high.item, DECK_ITEMS.high.item, 'SF', highSF, DECK_ITEMS.high.rate,
+      { calc: [H > 8 ? `deck ${H}′ high` : '', t.landingHighSF ? `landings over 8′ ${t.landingHighSF}` : ''].filter(Boolean).join(' + ') })
     if (freestanding) push('freestand', DECK_ITEMS.freestand.item, DECK_ITEMS.freestand.item, 'SF', t.deckSF, DECK_ITEMS.freestand.rate)
 
     // Add-ons the rep counts on site.
