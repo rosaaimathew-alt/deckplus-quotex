@@ -213,7 +213,7 @@ export async function createGoogleEvent(rep, booking, settings) {
     calendarId: calendarMode() === 'workspace' ? 'primary' : repCalendarId(rep),
     sendUpdates: 'none',
     requestBody: {
-      summary: `${settings.meeting_title}: ${booking.lead_name}`,
+      summary: `${booking.lead_name} – ${settings.meeting_title}`,   // name first so reps can spot it at a glance
       description: [
         `Lead #${booking.turn} (round robin)`,
         `Name: ${booking.lead_name}`,
