@@ -96,7 +96,7 @@ export const PORCH_BUILD_DEFAULTS = {
   glass_gable_end:    R('Glass in gable end (gable roofs only)',            'EA', 975,  'enclosure'),
   // Sunroom
   sun_window:         R('Outside Brand Standard window (36″×60″)',          'EA', 950,  'enclosure'),
-  sun_wall:           R('Sunroom walls — Hardie / ply-beaded (non-glass area)', 'SF', 29, 'enclosure'),
+  sun_wall:           R('Sunroom knee wall — Hardie / ply-beaded',          'SF', 29, 'enclosure'),
   sun_insulation:     R('Sunroom insulation',                               'LS', 800,  'enclosure'),
   // Sunroom doors (sunrooms use these instead of the Larsen storm doors). The
   // width is the wall opening the door takes in the window layout.
@@ -300,7 +300,8 @@ export const SUN_DOOR_H    = 80
 
 // `doors` = the door widths (in), or a count of 36″ doors.
 // `doorWall` = 'side' (default: the side walls, at the house end) or 'front'.
-export function sunroomLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides', wallHeightIn = 96, doorWall = 'side' } = {}) {
+export const SUN_KNEE_IN   = 30     // default knee wall height under the windows
+export function sunroomLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides', wallHeightIn = 96, doorWall = 'side', kneeWallIn = SUN_KNEE_IN } = {}) {
   const doorWidths = Array.isArray(doors) ? doors.map(Number).filter(w => w > 0) : Array.from({ length: Math.max(0, Number(doors) || 0) }, () => SUN_WINDOW_W)
   const C = SUN_CORNER_IN
   // [name, length ft, corner buffers in inches]
@@ -340,7 +341,12 @@ export function sunroomLayout(Wft, Dft, { doors = 0, sides = 'Front + 2 sides', 
   const glassSF = windows * SUN_WINDOW_W * SUN_WINDOW_H / 144
   const doorSF  = placed.reduce((a, w) => a + w * Math.min(SUN_DOOR_H, H), 0) / 144
   const wallSF  = Math.max(0, Math.round(grossSF - glassSF - doorSF))
-  return { walls: out, windows, doors: doorsPlaced, doorsNotPlaced: doorsLeft, wallSF, totalWindows: windows }
+  // The knee wall: the wall under the windows — every enclosed wall's length,
+  // less the doors, × the knee wall height. The wall above the windows and the
+  // corners are part of the sunroom's framing, not knee wall.
+  const kneeLF = Math.max(0, out.reduce((a, w) => a + w.lengthFt, 0) - placed.reduce((a, w) => a + w, 0) / 12)
+  const kneeSF = Math.round(kneeLF * Math.max(0, Number(kneeWallIn) || 0) / 12)
+  return { walls: out, windows, doors: doorsPlaced, doorsNotPlaced: doorsLeft, wallSF, kneeLF: Math.round(kneeLF * 10) / 10, kneeSF, totalWindows: windows }
 }
 
 // ── Inputs ───────────────────────────────────────────────────────────────────
@@ -349,6 +355,7 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   type: 'screen', tie: 'wall', floor: 'deck', roof: 'shed',
   deckHeightFt: 3,                      // only when floor = deck
   wallHeightIn: 96, sides: 'Front + 2 sides',   // Eze-Breeze layout
+  kneeWallIn: SUN_KNEE_IN,              // sunroom knee wall height (in)
   doors: {},                            // { door_key: qty }
   doorWall: 'side',                     // sunroom: doors on the side walls by the house, or 'front'
   glassEnds: 0,                         // gable roofs only
@@ -428,9 +435,9 @@ export function computePorchBuild(input, ratesIn) {
   }
   if (inp.type === 'sunroom') {
     const widths = Object.entries(inp.doors || {}).flatMap(([k, q]) => rates[k]?.sunDoor ? Array.from({ length: Math.max(0, Math.floor(n(q))) }, () => n(rates[k].widthIn) || SUN_WINDOW_W) : [])
-    layout = sunroomLayout(W, D, { doors: widths, sides: inp.sides, wallHeightIn: inp.wallHeightIn, doorWall: inp.doorWall || 'side' })
+    layout = sunroomLayout(W, D, { doors: widths, sides: inp.sides, wallHeightIn: inp.wallHeightIn, doorWall: inp.doorWall || 'side', kneeWallIn: inp.kneeWallIn })
     add('sun_window', layout.windows, layout.walls.map(w => `${w.name.toLowerCase()} ${w.windows}`).join(' · '))
-    add('sun_wall', layout.wallSF, `${n(inp.wallHeightIn)}″ walls, less glass and doors`)
+    add('sun_wall', layout.kneeSF, `${layout.kneeLF} LF of wall less doors × ${n(inp.kneeWallIn)}″ knee wall`)
     add('sun_insulation', 1)
   }
   // Sunrooms take the sunroom doors; ScreenEze / Eze-Breeze take the Larsen doors.

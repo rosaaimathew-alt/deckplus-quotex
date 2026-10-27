@@ -196,9 +196,12 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           )}
           {inp.type === 'sunroom' && (
             <div className="space-y-2">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Field label="Wall height (in)">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Field label="Wall height (in)" hint="Floor to ceiling">
                   <input type="number" min="60" aria-label="Sunroom wall height (in)" className={inputCls} value={inp.wallHeightIn} onChange={e => set({ wallHeightIn: e.target.value })} />
+                </Field>
+                <Field label="Knee wall height (in)" hint="Under the windows">
+                  <input type="number" min="0" aria-label="Sunroom knee wall height (in)" className={inputCls} value={inp.kneeWallIn ?? 30} onChange={e => set({ kneeWallIn: e.target.value })} />
                 </Field>
                 <Field label="Enclosed walls">
                   <select aria-label="Sunroom enclosed walls" className={selCls} value={inp.sides} onChange={e => set({ sides: e.target.value })}>
@@ -213,7 +216,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
                 </Field>
               </div>
               <div className="text-xs text-gray-600">
-                {result.layout && <><span className="font-semibold text-gray-800">{result.layout.windows}</span> windows · <span className="font-semibold text-gray-800">{result.layout.wallSF}</span> SF of wall</>}
+                {result.layout && <><span className="font-semibold text-gray-800">{result.layout.windows}</span> windows · <span className="font-semibold text-gray-800">{result.layout.kneeSF}</span> SF of knee wall ({result.layout.kneeLF} LF of wall less doors × {Number(inp.kneeWallIn ?? 30) || 0}″)</>}
               </div>
               {result.layout?.walls && (
                 <p className="text-xs text-gray-500">

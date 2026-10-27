@@ -151,6 +151,7 @@ export function specPrefill(lines = []) {
       if (type === 'screen') { put.check('jt_screen'); put.check('ss_screeneze') }
       if (type === 'open') put.check('jt_open')
       if (type === 'ezebreeze' || type === 'sunroom') put.check('jt_3season')
+      if (type === 'sunroom' && n(pb.kneeWallIn ?? 30) > 0) put.value('kneeHeight', `${n(pb.kneeWallIn ?? 30)}″`)
       if (type === 'ezebreeze') { put.check('ss_ezebreeze'); put.check('post_6lam'); put.check('mw_vertical') }
       if (!pb.conversion) {
         const roof = PORCH_ROOFS.find(r => r.key === pb.roof)
