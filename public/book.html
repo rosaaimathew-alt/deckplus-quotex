@@ -49,6 +49,27 @@
 
     .page { padding: 32px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); }
     html.embedded .page { padding: 2px; }
+
+    /* ── Compact embed (?compact / data-compact): just the scheduler ──────────
+       No logo/side panel, no card chrome (the host section supplies it), every
+       time visible at once so the embed never scrolls inside itself. */
+    .chead { display: none; }
+    html.compact .aside, html.compact .preview { display: none; }
+    html.compact .card { grid-template-columns: 1fr; min-height: 0; border: 0; box-shadow: none; background: transparent; border-radius: 0; overflow: visible; }
+    html.compact .main { padding: 4px 2px 8px; }
+    html.compact .chead { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .chead strong { display: block; color: var(--heading); font-size: 1.05rem; line-height: 1.3; }
+    .chead span { display: block; color: var(--muted); font-size: .88rem; }
+    .chead .picked { color: var(--accent); font-weight: 600; }
+    .chead .back { flex: none; }
+    html.compact .main h2 { font-size: 1.1rem; margin-bottom: 14px; }
+    html.compact .picker { grid-template-columns: 1fr !important; gap: 18px; }
+    @media (min-width: 700px) { html.compact .picker.has-day { grid-template-columns: minmax(0, 1fr) minmax(0, 290px) !important; } }
+    html.compact .slotlist { max-height: none; overflow: visible; padding-right: 0; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+    html.compact .chosen-slot { grid-column: 1 / -1; }
+    html.compact .date { width: 40px; height: 40px; }
+    html.compact .grid { row-gap: 4px; }
+    html.compact .tz { margin-top: 14px; }
     .card { position: relative; max-width: 1060px; margin: 0 auto; background: var(--card); border-radius: var(--card-radius);
       border: 1px solid var(--line); box-shadow: 0 1px 8px rgba(16, 32, 48, .08); overflow: hidden;
       display: grid; grid-template-columns: 1fr; }
@@ -188,6 +209,10 @@
       </aside>
 
       <main class="main">
+        <div class="chead">
+          <button type="button" class="back" id="cBack" aria-label="Back to times" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+          <div><strong id="cTitle">Free Estimate and Design Consultation</strong><span id="cMeta"></span><span class="picked" id="cPicked" hidden></span></div>
+        </div>
         <div id="error" class="msg" role="alert" hidden></div>
         <p class="loading" id="loading">Loading available times…</p>
 
@@ -263,6 +288,7 @@
     const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
     const DEMO = params.has('demo')
     if (window.parent !== window) document.documentElement.classList.add('embedded')
+    if (params.has('compact')) document.documentElement.classList.add('compact')
     const $ = (id) => document.getElementById(id)
 
     // Per-embed brand overrides (validated so a link can't inject arbitrary CSS).
@@ -357,8 +383,10 @@
       $('loading').hidden = true
       for (const id of ['pick', 'details', 'done']) $(id).hidden = id !== section
       $('back').hidden = section !== 'details'
+      $('cBack').hidden = section !== 'details'
       $('pickedFact').hidden = section === 'pick'
-      if (state.start) $('pickedText').textContent = `${fmtTime(state.start)}, ${fmtDay(state.start)}`
+      $('cPicked').hidden = section === 'pick'
+      if (state.start) $('pickedText').textContent = $('cPicked').textContent = `${fmtTime(state.start)}, ${fmtDay(state.start)}`
       resize()
     }
     function error(text) { $('error').textContent = text || ''; $('error').hidden = !text; resize() }
@@ -375,6 +403,8 @@
         state.minutes = data.slotMinutes || 30
         $('duration').textContent = state.minutes % 60 === 0 ? `${state.minutes / 60} hr` : state.minutes > 60 ? `${Math.floor(state.minutes / 60)} hr ${state.minutes % 60} min` : `${state.minutes} min`
         if (data.meetingTitle) $('title').textContent = data.meetingTitle
+        if (data.meetingTitle) $('cTitle').textContent = data.meetingTitle
+        $('cMeta').textContent = [$('duration').textContent, 'At your home', data.rep && `with ${data.rep.name}`].filter(Boolean).join(' · ')
         if (data.rep) {
           $('repFact').hidden = false
           $('repName').textContent = `with ${data.rep.name}`
@@ -466,7 +496,7 @@
       show('details')
       $('f-first').focus()
     }
-    $('back').onclick = () => { error(); show('pick') }
+    $('back').onclick = $('cBack').onclick = () => { error(); show('pick') }
 
     // Same rules the server enforces (api/booking.js validateLead); the server has the final say.
     const FIELDS = ['firstName', 'lastName', 'street', 'city', 'state', 'zip', 'phone', 'email']
@@ -543,7 +573,7 @@
     }
 
     // Tell the embedding page how tall we are (see /embed.js).
-    function resize() { parent.postMessage({ type: 'rr-height', height: document.documentElement.scrollHeight }, '*') }
+    function resize() { parent.postMessage({ type: 'rr-height', height: Math.ceil(document.querySelector('.page').getBoundingClientRect().height) }, '*') }
     new ResizeObserver(resize).observe(document.body)
 
     load()
