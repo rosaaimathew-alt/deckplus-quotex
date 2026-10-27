@@ -70,6 +70,18 @@
     html.compact .date { width: 40px; height: 40px; }
     html.compact .grid { row-gap: 4px; }
     html.compact .tz { margin-top: 14px; }
+    .dayhead { display: flex; align-items: center; gap: 10px; }
+    .dayback { display: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--accent-soft); color: var(--accent); cursor: pointer; place-items: center; flex: none; }
+    /* Narrow compact embed works like Calendly on a phone: the day's times
+       replace the calendar in the same box (with a back arrow), so the block
+       keeps one size instead of growing into a long list. */
+    @media (max-width: 699px) {
+      html.compact .picker.has-day .calcol { display: none; }
+      html.compact .dayback { display: grid; }
+      html.compact .times h3 { margin-top: 0; }
+      html.compact .slotlist { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      html.compact .slot, html.compact .chosen-slot span, html.compact .chosen-slot button { height: 46px; font-size: .95rem; }
+    }
     .card { position: relative; max-width: 1060px; margin: 0 auto; background: var(--card); border-radius: var(--card-radius);
       border: 1px solid var(--line); box-shadow: 0 1px 8px rgba(16, 32, 48, .08); overflow: hidden;
       display: grid; grid-template-columns: 1fr; }
@@ -219,7 +231,7 @@
         <section id="pick" hidden>
           <h2>Select a Date &amp; Time</h2>
           <div class="picker" id="picker">
-            <div>
+            <div class="calcol">
               <div class="month">
                 <button type="button" class="nav" id="prevMonth" aria-label="Previous month"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
                 <h3 id="monthLabel"></h3>
@@ -229,7 +241,7 @@
               <p class="tz"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="tz"></span></p>
             </div>
             <div class="times" id="times" hidden>
-              <h3 id="dayLabel"></h3>
+              <h3 class="dayhead"><button type="button" class="dayback" id="dayBack" aria-label="Back to calendar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><span id="dayLabel"></span></h3>
               <div class="slotlist" id="slots"></div>
             </div>
           </div>
@@ -288,7 +300,8 @@
     const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
     const DEMO = params.has('demo')
     if (window.parent !== window) document.documentElement.classList.add('embedded')
-    if (params.has('compact')) document.documentElement.classList.add('compact')
+    const COMPACT = params.has('compact')
+    if (COMPACT) document.documentElement.classList.add('compact')
     const $ = (id) => document.getElementById(id)
 
     // Per-embed brand overrides (validated so a link can't inject arbitrary CSS).
@@ -456,7 +469,10 @@
           b.classList.add('open')
           b.setAttribute('aria-pressed', String(k === state.day))
           b.setAttribute('aria-label', fmtDay(keyToDate(k)) + ', times available')
-          b.onclick = () => { state.day = k; state.start = null; render(); if (window.innerWidth < 1000) $('times').scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+          b.onclick = () => {
+            state.day = k; state.start = null; render()
+            if (window.innerWidth < 1000 && !COMPACT) $('times').scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
         } else {
           b.disabled = true
           b.setAttribute('aria-label', fmtDay(keyToDate(k)) + ', unavailable')
@@ -465,6 +481,9 @@
       }
       $('calendar').replaceChildren(...cells)
 
+      // Keep the box one steady size when the times replace the calendar.
+      if (!state.day) $('pick').style.minHeight = ''
+      else if (COMPACT && !$('pick').style.minHeight && $('calendar').offsetParent) $('pick').style.minHeight = $('pick').offsetHeight + 'px'
       $('picker').classList.toggle('has-day', !!state.day)
       $('times').hidden = !state.day
       if (state.day) {
@@ -488,6 +507,7 @@
       resize()
     }
 
+    $('dayBack').onclick = () => { state.day = null; state.start = null; render() }
     $('prevMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1); render() }
     $('nextMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1); render() }
 
