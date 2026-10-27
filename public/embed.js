@@ -10,6 +10,7 @@
  *   data-font="Montserrat" data-heading-font="Playfair Display" data-heading-weight="700"
  *   data-font-size="16" data-radius="0" data-btn-radius="0" data-btn-transform="uppercase"
  *   data-btn-tracking="1" data-title="none" (hide the heading)
+ *   data-compact="1"  just the scheduler: no logo/side panel, no card border
  * The iframe grows to fit its content; a 'rr-booked' message is re-dispatched
  * on window as a CustomEvent so you can fire analytics/conversion pixels.
  */
@@ -28,9 +29,10 @@
   var frame = document.createElement('iframe')
   frame.src = src
   frame.title = 'Schedule your free estimate'
-  frame.style.cssText = 'width:100%;border:0;min-height:420px;display:block;background:transparent;color-scheme:normal;'
+  frame.style.cssText = 'width:100%;border:0;height:620px;display:block;overflow:hidden;background:transparent;color-scheme:normal;'
   frame.setAttribute('allowtransparency', 'true')
   frame.setAttribute('loading', 'lazy')
+  frame.setAttribute('scrolling', 'no')   // the frame grows to fit, so it never needs its own scrollbar
   host.appendChild(frame)
 
   window.addEventListener('message', function (e) {
