@@ -12,13 +12,16 @@ const n = (v) => Number(v) || 0
 export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
   const {
     jobType = 'New deck', collKey, width = 0, depth = 0, height = 0, sections = [], stairs = [], landings = [],
+    sizeMode = 'dims', areaSF = 0, openEdgeLF = '',
     rail = 'None', bronze = false, fascia = 'None', border = 'None', cortex = 'None', skirt = 'None', paint = 'None',
     freestanding = false, extras = {}, qtyOv = {}, rateOv = {},
   } = state
   const coll = DECK_COLLECTIONS.find(c => c.key === collKey) || DECK_COLLECTIONS[0]
   const redeck = jobType === 'Re-deck'
   const canRedeck = !!coll.redeck
-  const t = deckTakeoff({ width, depth, height, sections, stairs, landings })
+  const t = deckTakeoff({ width, depth, height, sections, stairs, landings, sizeMode, areaSF, openEdgeLF })
+  const sizeCalc = t.bySF ? `${t.deckSF} SF entered` : `${n(width)}×${n(depth)}${t.sectionSF ? ` + ${t.sectionSF} bump-outs` : ''}`
+  const edge = t.bySF ? `open edge ${t.openLF}${t.openLFEstimated ? ' (estimate)' : ''}` : `3 sides ${t.openLF}`
   const W = n(width), D = n(depth), H = n(height)
     const out = []
     const price = (item, fallback) => catalogPrice(catalog, item, fallback)
@@ -30,8 +33,8 @@ export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
     }
 
     // Deck surface: the collection's Deck $/SF, or its Re-Deck $/SF.
-    if (redeck && canRedeck) push('deck', `${coll.redeck.item}`, coll.redeck.item, 'SF', t.deckSF, coll.redeck.rate, { calc: `${W}×${D}${t.sectionSF ? ` + ${t.sectionSF} bump-outs` : ''}` })
-    else push('deck', `${coll.fam} Deck`, `${coll.fam} Deck`, 'SF', t.deckSF, coll.rate, { calc: `${W}×${D}${t.sectionSF ? ` + ${t.sectionSF} bump-outs` : ''}` })
+    if (redeck && canRedeck) push('deck', `${coll.redeck.item}`, coll.redeck.item, 'SF', t.deckSF, coll.redeck.rate, { calc: sizeCalc })
+    else push('deck', `${coll.fam} Deck`, `${coll.fam} Deck`, 'SF', t.deckSF, coll.rate, { calc: sizeCalc })
 
     if (t.stepSF > 0) {
       const item = coll.steps ? `${coll.fam} Steps` : `${coll.fam} Deck`
@@ -50,14 +53,14 @@ export function deckPriceRows(state = {}, catalog = [], customComponents = []) {
     const railOpt = DECK_RAILS.find(r => r.key === rail)
     const railLF  = t.openLF + t.stairRailLF + t.landingRailLF
     if (railOpt && railOpt.rate != null) {
-      push('rail', railOpt.key, railOpt.key, 'LF', railLF, railOpt.rate, { calc: `3 sides ${t.openLF}${t.stairRailLF ? ` + stairs ${t.stairRailLF}` : ''}${t.landingRailLF ? ` + landings ${t.landingRailLF}` : ''}` })
+      push('rail', railOpt.key, railOpt.key, 'LF', railLF, railOpt.rate, { calc: `${edge}${t.stairRailLF ? ` + stairs ${t.stairRailLF}` : ''}${t.landingRailLF ? ` + landings ${t.landingRailLF}` : ''}` })
       if (bronze) push('bronze', 'Bronze balusters (add)', BRONZE_BALUSTERS.item, 'LF', qtyOv.rail ?? railLF, BRONZE_BALUSTERS.rate)
     }
 
     const fasciaOpt = fascia === 'PVC white' ? DECK_FASCIA.pvcwhite : fascia === 'Matching' && coll.fascia ? DECK_FASCIA[coll.fascia] : null
     if (fasciaOpt) {
       const fasciaLF = t.openLF + t.stairFasciaLF + t.landingFasciaLF
-      const calc = [`deck 3 open sides ${t.openLF}`, t.stairFasciaLF ? `stair sides ${t.stairFasciaLF}` : '', t.landingFasciaLF ? `landings ${t.landingFasciaLF}` : ''].filter(Boolean).join(' + ')
+      const calc = [`deck ${edge}`, t.stairFasciaLF ? `stair sides ${t.stairFasciaLF}` : '', t.landingFasciaLF ? `landings ${t.landingFasciaLF}` : ''].filter(Boolean).join(' + ')
       push('fascia', fasciaOpt.item.replace(/ LF$/, ''), fasciaOpt.item, 'LF', fasciaLF, fasciaOpt.rate, { calc })
     }
 

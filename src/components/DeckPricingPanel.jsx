@@ -46,6 +46,10 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
   const [collKey, setCollKey]   = useState(S?.collKey ?? (matchCollection(initial?.collection) || 'Trex ENHANCE'))
   const [width, setWidth]       = useState(S?.width ?? initial?.width ?? 20)
   const [depth, setDepth]       = useState(S?.depth ?? initial?.depth ?? 16)
+  // Irregular decks: price from the total SF and the open edge instead of W × D.
+  const [sizeMode, setSizeMode] = useState(S?.sizeMode ?? 'dims')
+  const [areaSF, setAreaSF]     = useState(S?.areaSF ?? '')
+  const [openEdgeLF, setOpenEdgeLF] = useState(S?.openEdgeLF ?? '')
   const [height, setHeight]     = useState(S?.height ?? startH)
   const [sections, setSections] = useState(() => S?.sections ?? (initial?.extraSections || []).map(s => ({ id: uid(), width: s.width, depth: s.depth })))
   // Stairs and landings start together: fresh stairs run from the deck down
@@ -81,14 +85,14 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
   const coll   = DECK_COLLECTIONS.find(c => c.key === collKey) || DECK_COLLECTIONS[0]
   const redeck = jobType === 'Re-deck'
   const canRedeck = !!coll.redeck
-  const t = deckTakeoff({ width, depth, height, sections, stairs, landings })
+  const t = deckTakeoff({ width, depth, height, sections, stairs, landings, sizeMode, areaSF, openEdgeLF })
   const W = n(width), D = n(depth), H = n(height)
 
   // ── Rows: one per price-list line in use ──────────────────────────────────
   const rows = useMemo(() => deckPriceRows(
-    { jobType, collKey, width, depth, height, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv },
+    { jobType, collKey, width, depth, height, sizeMode, areaSF, openEdgeLF, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv },
     catalog, customComponents,
-  ), [catalog, jobType, collKey, width, depth, height, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, customComponents, qtyOv, rateOv])
+  ), [catalog, jobType, collKey, width, depth, height, sizeMode, areaSF, openEdgeLF, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, customComponents, qtyOv, rateOv])
 
   const price = rows.reduce((s, r) => s + r.line, 0)
   const cost  = rows.reduce((s, r) => s + r.lineCost, 0)
@@ -101,11 +105,14 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
   const description = (() => {
     const lines = (scopeTemplate || '').split('\n').map(s => s.trim()).filter(Boolean)
     const fb = (r, text) => r ? scopeFor(catalog, r.item, { sqft: r.qty, lf: r.qty, count: r.qty }, text) : null
-    if (redeck && canRedeck) lines.push(scopeFor(catalog, coll.redeck.item, { size: [W, D], sqft: t.deckSF },
-      `Remove the existing decking and install new ${coll.key} decking on the existing joists, approximately ${ft(W)}x${ft(D)}.`))
-    else lines.push(scopeFor(catalog, `${coll.fam} Deck`, { size: [W, D] },
-      `Build a pressure treated wood deck platform approximately ${ft(W)}x${ft(D)}.\n• ${coll.key} decking as flooring, installed with hidden fasteners.`))
-    if (sections.length) lines.push('Deck layout as per drawing.')
+    // An irregular deck (total SF) is sized by its square feet, not W × D.
+    const size = t.bySF ? `${t.deckSF} SF` : `${ft(W)}x${ft(D)}`
+    const sized = (text) => (t.bySF ? text.replace(/__’x__’/g, size) : text)
+    if (redeck && canRedeck) lines.push(sized(scopeFor(catalog, coll.redeck.item, { size: t.bySF ? null : [W, D], sqft: t.deckSF },
+      `Remove the existing decking and install new ${coll.key} decking on the existing joists, approximately ${size}.`)))
+    else lines.push(sized(scopeFor(catalog, `${coll.fam} Deck`, { size: t.bySF ? null : [W, D] },
+      `Build a pressure treated wood deck platform approximately ${size}.\n• ${coll.key} decking as flooring, installed with hidden fasteners.`)))
+    if (t.bySF || sections.length) lines.push('Deck layout as per drawing.')
     if (row('border')) lines.push(fb(row('border'), `${border} border.`))
     if (row('fascia')) lines.push(fb(row('fascia'), `${row('fascia').label} around the deck.`))
     for (const s of stairs) {
@@ -135,7 +142,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
     onAdd([{
       id: lineId(),
       catalogId: null,
-      name: `${coll.key} ${redeck && canRedeck ? 'Re-Deck' : 'Open Deck'} — ${W}′×${D}′ (${t.deckSF} SF)`,
+      name: `${coll.key} ${redeck && canRedeck ? 'Re-Deck' : 'Open Deck'} — ${t.bySF ? `${t.deckSF} SF` : `${W}′×${D}′ (${t.deckSF} SF)`}`,
       section: 'Deck',
       description,
       unit: 'EA',
@@ -146,7 +153,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
       costSub: 0,
       // Everything needed to reopen this deck in the builder (never shown to the customer).
       breakdown: toBreakdown(rows, { jic }),   // the price list the office gets with the job
-      builder: { tool: 'deck', state: { jobType, collKey, width, depth, height, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv, jic } },
+      builder: { tool: 'deck', state: { jobType, collKey, width, depth, height, sizeMode, areaSF, openEdgeLF, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv, jic } },
     }])
   }
 
@@ -263,15 +270,35 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
       {redeck && <p className="text-xs text-gray-500 -mt-1 mb-3">Re-deck price includes demo of the old decking and resetting the existing joists.</p>}
       {jobType === 'New deck' && !canRedeck && <p className="text-xs text-gray-400 -mt-1 mb-3">The price list has no re-deck price for {coll.key}.</p>}
 
-      {/* Deck size */}
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        {field('Across — width (ft)', width, v => { setWidth(v); setQtyOv({}) })}
-        {field('Out — depth (ft)', depth, v => { setDepth(v); setQtyOv({}) })}
-        {field('Height (ft)', height, changeHeight, { step: 0.5 })}
+      {/* Deck size: width × depth, or the total SF for irregular decks */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs font-medium text-gray-500">Size by</span>
+        <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50" role="group" aria-label="Size by">
+          {[['dims', 'Width × depth'], ['sf', 'Total SF (irregular deck)']].map(([k, label]) => (
+            <button key={k} type="button" onClick={() => { setSizeMode(k); setQtyOv({}) }}
+              className={`px-3 py-1 text-xs rounded-md transition-colors ${sizeMode === k ? 'bg-white shadow-sm font-semibold text-gray-900' : 'text-gray-500'}`}>{label}</button>
+          ))}
+        </div>
       </div>
+      {sizeMode === 'sf' ? (
+        <>
+          <div className="grid grid-cols-3 gap-3 mb-1">
+            {field('Deck area (SF)', areaSF, v => { setAreaSF(v); setQtyOv({}) }, { placeholder: 'e.g. 412' })}
+            {field('Open edge (LF)', openEdgeLF, v => { setOpenEdgeLF(v); setQtyOv({}) }, { placeholder: t.deckSF > 0 ? `~${t.openLF} estimate` : 'not on the house' })}
+            {field('Height (ft)', height, changeHeight, { step: 0.5 })}
+          </div>
+          <p className="text-[11px] text-gray-400 mb-3">Open edge = every edge not against the house; it drives railing, fascia and skirting.{t.openLFEstimated && t.deckSF > 0 ? ` Left blank, it's estimated at ${t.openLF} LF (three sides of a square of the same area). Type the real number for an accurate price.` : ''}</p>
+        </>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          {field('Across — width (ft)', width, v => { setWidth(v); setQtyOv({}) })}
+          {field('Out — depth (ft)', depth, v => { setDepth(v); setQtyOv({}) })}
+          {field('Height (ft)', height, changeHeight, { step: 0.5 })}
+        </div>
+      )}
 
-      {/* Bump-outs */}
-      <Section title={`Bump-outs / walkways${t.sectionSF ? ` · ${t.sectionSF} SF` : ''}`} onAdd={() => { setSections(s => [...s, { id: uid(), width: 4, depth: 4 }]); setQtyOv({}) }} addLabel="Add bump-out"
+      {/* Bump-outs (width × depth decks only) */}
+      {sizeMode !== 'sf' && <Section title={`Bump-outs / walkways${t.sectionSF ? ` · ${t.sectionSF} SF` : ''}`} onAdd={() => { setSections(s => [...s, { id: uid(), width: 4, depth: 4 }]); setQtyOv({}) }} addLabel="Add bump-out"
         empty="Rectangle only. Add a bump-out for L-shapes and odd layouts.">
         {sections.map((s, i) => (
           <Row key={s.id} label={`Bump-out ${i + 1}`} onRemove={() => { setSections(cur => cur.filter(x => x.id !== s.id)); setQtyOv({}) }}>
@@ -283,7 +310,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
             <span className="text-xs text-gray-400">out ft = {n(s.width) * n(s.depth)} SF</span>
           </Row>
         ))}
-      </Section>
+      </Section>}
 
       {/* Stairs */}
       <Section title={`Stairs${t.stepSF ? ` · ${fmtQty(t.stepSF)} SF` : ''}`} onAdd={addStair} addLabel="Add stairs"

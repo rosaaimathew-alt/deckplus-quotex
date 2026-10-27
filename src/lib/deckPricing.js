@@ -190,13 +190,20 @@ export function unlinkLanding(stairs, landingId) {
 // The measurements the price is built from.
 //   deck: W × D × H ft, plus bump-outs [{ width, depth }] (width = side on the deck)
 //   stairs: [{ across, steps, from, to }]   landings: [{ width, depth, height }]
-export function deckTakeoff({ width, depth, height = 0, sections = [], stairs = [], landings = [] }) {
+//   Irregular decks (sizeMode 'sf'): the rep types the total SF and the open
+//   edge (LF, every edge not on the house); left blank, the open edge is
+//   estimated as three sides of a square of that area.
+export function deckTakeoff({ width, depth, height = 0, sections = [], stairs = [], landings = [], sizeMode, areaSF, openEdgeLF }) {
+  const bySF = sizeMode === 'sf'
   const W = num(width), D = num(depth)
-  const sectionSF = sections.reduce((s, x) => s + num(x.width) * num(x.depth), 0)
-  const deckSF    = W * D + sectionSF
+  const sectionSF = bySF ? 0 : sections.reduce((s, x) => s + num(x.width) * num(x.depth), 0)
+  const deckSF    = bySF ? num(areaSF) : W * D + sectionSF
   // Open sides: the two sides and the front — not the house side — plus the two
   // sides of each bump-out (its front replaces deck edge it covers).
-  const openLF    = (W > 0 || D > 0 ? 2 * D + W : 0) + sections.reduce((s, x) => s + 2 * num(x.depth), 0)
+  const openLFEstimated = bySF && !(num(openEdgeLF) > 0)
+  const openLF    = bySF
+    ? (openLFEstimated ? (deckSF > 0 ? Math.round(3 * Math.sqrt(deckSF)) : 0) : num(openEdgeLF))
+    : (W > 0 || D > 0 ? 2 * D + W : 0) + sections.reduce((s, x) => s + 2 * num(x.depth), 0)
   const stepSF    = stairs.reduce((s, x) => s + num(x.steps) * num(x.across) * STEP_FACTOR, 0)
   // Rail down both sides of the run (steps × 11″ treads).
   const stairRailLF = stairs.reduce((s, x) => s + 2 * runOutForSteps(num(x.steps)), 0)
@@ -210,5 +217,5 @@ export function deckTakeoff({ width, depth, height = 0, sections = [], stairs = 
   const landingRailLF  = landingFasciaLF
   const landingSkirtSF = landings.reduce((s, x) => s + landingFasciaFt(x.width, x.depth) * landingHeight(x, height), 0)
   const landingHighSF  = landings.reduce((s, x) => s + (landingHeight(x, height) > 8 ? num(x.width) * num(x.depth) : 0), 0)
-  return { deckSF, sectionSF, openLF, stepSF, stairRailLF, stepCount, landingSF, stairFasciaLF, landingFasciaLF, landingRailLF, landingSkirtSF, landingHighSF }
+  return { bySF, openLFEstimated, deckSF, sectionSF, openLF, stepSF, stairRailLF, stepCount, landingSF, stairFasciaLF, landingFasciaLF, landingRailLF, landingSkirtSF, landingHighSF }
 }
