@@ -106,7 +106,8 @@ function pageStyle(el) {
   el.style.breakBefore = 'auto'
 }
 
-export async function buildContractPdf(root) {
+// only: print just these sections (e.g. the scope of work); drop: leave these out.
+export async function buildContractPdf(root, { only, drop } = {}) {
   const { toCanvas } = await import('html-to-image')
   const { default: jsPDF } = await import('jspdf')
 
@@ -117,6 +118,7 @@ export async function buildContractPdf(root) {
   const clone = root.cloneNode(true)
   clone.style.cssText = `width:${PAGE_W_PX}px;max-width:${PAGE_W_PX}px;margin:0;padding:0;border-radius:0;box-shadow:none;overflow:visible;background:#fff;`
   clone.querySelectorAll('.no-print').forEach(el => el.remove())
+  if (drop) clone.querySelectorAll(drop).forEach(el => el.remove())
   clone.querySelectorAll('.print-only').forEach(el => { el.style.display = el.tagName === 'SPAN' ? 'inline' : 'block' })
   // Wide tables (the audit log) fit the page instead of scrolling off its edge.
   clone.querySelectorAll('[data-pdf-block] .overflow-x-auto').forEach(el => { el.style.overflow = 'visible'; el.style.margin = '0' })
@@ -133,9 +135,12 @@ export async function buildContractPdf(root) {
       img.complete && img.naturalWidth > 0 ? (img.decode?.().catch(() => {}) ?? Promise.resolve()) : new Promise(r => { img.onload = img.onerror = r })))
     if (document.fonts?.ready) await document.fonts.ready
 
-    const blocks = Array.from(clone.querySelectorAll('.dp-page, [data-pdf-block]'))
-      .filter(el => !el.parentElement.closest('.dp-page, [data-pdf-block]'))
-    if (!blocks.length) blocks.push(clone)
+    const blocks = Array.from(clone.querySelectorAll(only || '.dp-page, [data-pdf-block]'))
+      .filter(el => !el.parentElement.closest(only || '.dp-page, [data-pdf-block]'))
+    if (!blocks.length) {
+      if (only) throw new Error('This contract has no scope of work page.')
+      blocks.push(clone)
+    }
 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter', compress: true })
     const pageW = pdf.internal.pageSize.getWidth()
@@ -180,6 +185,15 @@ export async function downloadContractPdf(root, fileName) {
   const pdf = await buildContractPdf(root)
   pdf.save(fileName)
 }
+
+// Just the scope of work, without prices or the payment schedule — for the
+// HOA / architectural review packet.
+export async function downloadScopePdf(root, fileName) {
+  const pdf = await buildContractPdf(root, { only: '.dp-scope', drop: '.dp-scope-prices' })
+  pdf.save(fileName)
+}
+export const scopeFileName = (contractNum, client) =>
+  `Scope-of-Work-${contractNum || ''}-${client || 'Client'}.pdf`.replace(/[^\w.-]+/g, '-').replace(/-+/g, '-')
 
 export const signedContractFileName = (record) => {
   const name = record?.contractData?.dp?.values?.clientName || record?.contractData?.client || 'Client'

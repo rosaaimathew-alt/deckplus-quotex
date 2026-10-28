@@ -412,7 +412,7 @@ function ScopePages({ values, scopeLines, projectSummary, total, payments, scope
         <div className={scopeSlot ? 'print-only dp-scope-lines' : 'dp-scope-lines'}>{renderScopeLines(scopeLines, renderBold)}</div>
       </div>
       {priced.length > 0 && (
-        <table className="dp-grid dp-pricing dp-mt-lg">
+        <table className="dp-grid dp-pricing dp-scope-prices dp-mt-lg">
           <thead><tr><th>ITEM</th><th className="dp-price">PRICE</th></tr></thead>
           <tbody>
             {priced.map((l, i) => <tr key={l.id ?? i}><td>{(l.name || '').toUpperCase()}</td><td className="dp-price">{Number(l.price) < 0 ? `−$${fmt(-l.price)}` : `$${fmt(l.price)}`}</td></tr>)}
@@ -421,7 +421,7 @@ function ScopePages({ values, scopeLines, projectSummary, total, payments, scope
         </table>
       )}
       {payments.length > 0 && (
-        <table className="dp-grid dp-pricing dp-mt">
+        <table className="dp-grid dp-pricing dp-scope-prices dp-mt">
           <thead><tr><th>PAYMENT SCHEDULE</th><th className="dp-price">%</th><th className="dp-price">AMOUNT</th></tr></thead>
           <tbody>
             {payments.map((p, i) => <tr key={i}><td>{p.label}</td><td className="dp-price">{Math.round(p.pct * 100)}%</td><td className="dp-price">${fmt(p.amount)}</td></tr>)}

@@ -9,7 +9,7 @@ import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, required
 import { specPrefill } from '../contract/specPrefill'
 import { scopeLinesFor, normalizeScope, remapEdit, draftOf, scopeEdits, applyLearned, learnedHints, linePrice } from '../lib/scopeLearning'
 import { mergeLines } from '../lib/hiddenLines'
-import { buildContractPdf } from '../lib/contractPdf'
+import { buildContractPdf, downloadScopePdf, scopeFileName } from '../lib/contractPdf'
 
 // ── Contract page ────────────────────────────────────────────────────────────
 // Builds the Deck Plus contract packet for a Won proposal. The packet's wording
@@ -241,6 +241,7 @@ export default function ContractView() {
 
   // Signing
   const contractDocRef = useRef(null)
+  const [scopeBusy, setScopeBusy] = useState(false)
   useLayoutEffect(() => { if (DEMO) scrubDemoContract(contractDocRef.current) })
   const [showSignModal, setShowSignModal] = useState(false)
   const [googleAuthed, setGoogleAuthed]   = useState(false)
@@ -439,6 +440,14 @@ export default function ContractView() {
     } catch (err) { setSignError(err.message) }
   }
 
+  // Just the scope of work, without prices — for the HOA packet.
+  const saveScopeForHoa = async () => {
+    setScopeBusy(true)
+    try { await downloadScopePdf(contractDocRef.current, scopeFileName(contractNum, client)) }
+    catch (err) { alert(`Could not make the PDF: ${err.message}`) }
+    finally { setScopeBusy(false) }
+  }
+
   const handleUploadToDrive = async () => {
     setSigning(true); setSignError(''); setSignResult(null)
     try {
@@ -608,6 +617,10 @@ export default function ContractView() {
         </div>
         <button onClick={() => saveDraft()} className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"><Save size={14} /> Save Draft</button>
         {savedAt && <span className="text-xs text-gray-400">Saved {new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+        <button onClick={saveScopeForHoa} disabled={scopeBusy} title="Just the scope of work, without prices — for the HOA"
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60">
+          {scopeBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Scope for HOA
+        </button>
         <button onClick={() => window.print()} className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"><Printer size={14} /> Print / Save PDF</button>
         <button onClick={() => { setSignResult(null); setSignError(''); setShowSignModal(true) }}
           className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold text-white" style={{ background: '#16a34a' }}>

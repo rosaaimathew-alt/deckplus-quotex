@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { Printer, Loader2, Download } from 'lucide-react'
+import { Printer, Loader2, Download, FileText } from 'lucide-react'
 import SignedContractDoc from '../components/SignedContractDoc'
 import SignedAuditTrail from '../components/SignedAuditTrail'
-import { downloadContractPdf, signedContractFileName } from '../lib/contractPdf'
+import { downloadContractPdf, downloadScopePdf, scopeFileName, signedContractFileName } from '../lib/contractPdf'
 
 // ── Signed contract view (/view/:recordId) ───────────────────────────────────
 // Renders the packet exactly as it was sent, with every party's signatures and
@@ -51,6 +51,12 @@ export default function ContractViewFull() {
     catch (err) { alert(`Could not make the PDF: ${err.message}`) }
     finally { setPdfBusy(false) }
   }
+  const saveScope = async () => {
+    setPdfBusy('scope')
+    try { await downloadScopePdf(docRef.current, scopeFileName(contractNum, d?.dp?.values?.clientName || d?.client)) }
+    catch (err) { alert(`Could not make the PDF: ${err.message}`) }
+    finally { setPdfBusy(false) }
+  }
   const branding  = d?.branding || {}
   const logo      = branding?.logo || '/contract/deckplus-logo.png'
 
@@ -67,8 +73,11 @@ export default function ContractViewFull() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"><Printer size={14} /> Print</button>
-            <button onClick={savePdf} disabled={pdfBusy} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-60">
-              {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {pdfBusy ? 'Making PDF…' : 'Download PDF'}
+            <button onClick={saveScope} disabled={!!pdfBusy} title="Just the scope of work, without prices — for the HOA" className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60">
+              {pdfBusy === 'scope' ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Scope for HOA
+            </button>
+            <button onClick={savePdf} disabled={!!pdfBusy} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-60">
+              {pdfBusy === true ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {pdfBusy === true ? 'Making PDF…' : 'Download PDF'}
             </button>
           </div>
         </div>
