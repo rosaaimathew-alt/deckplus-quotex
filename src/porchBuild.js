@@ -75,7 +75,7 @@ export const PORCH_BUILD_DEFAULTS = {
   freestanding_add:   R('Freestanding structure add',                      'SF', 7,    'structure'),
   deck_over_8:        R('Deck above 8′ high add',                          'SF', 5,    'structure'),
   pt_lvl:             R('PT LVL framing (porch depth)',                     'LF', 150,  'structure'),
-  lvl_engineering:    R('LVL engineering (every LVL project)',              'LS', 1000, 'structure'),
+  lvl_engineering:    R('Engineering (LVL projects & semi-vaulted roofs)',   'LS', 1000, 'structure'),
   gable_over_19:      R('Gable / semi-vaulted wider than 19′ add',         'LS', 1000, 'structure'),
   hip_roof:           R('Hip roof',                                         'LS', 3000, 'structure'),
   hot_tub_reinforce:  R('Reinforce deck for hot tub / porch',               'LS', 2000, 'structure'),
@@ -93,6 +93,7 @@ export const PORCH_BUILD_DEFAULTS = {
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
   door_savannah:      R('Larsen Savannah door',                             'EA', 650,  'enclosure', { door: true }),
   door_savannah_pet:  R('Larsen Savannah Pet door',                         'EA', 815,  'enclosure', { door: true }),
+  door_lip:           R('Door lip unit (per door)',                         'EA', 130,  'enclosure'),
   glass_gable_end:    R('Glass in gable end (gable / semi-vaulted roofs)',  'EA', 975,  'enclosure'),
   // Sunroom
   sun_window:         R('Outside Brand Standard window (36″×60″)',          'EA', 950,  'enclosure'),
@@ -398,7 +399,6 @@ export function computePorchBuild(input, ratesIn) {
                  total: q * n(r.rate), costTotal: q * n(r.cost), group: r.group, note })
   }
 
-  // Freestanding forces a gable roof (confirmed rule).
   const tie  = inp.tie
   // Freestanding porches take a gable or a semi-vaulted roof (gable unless semi-vault is chosen).
   const roof = tie === 'free' ? (inp.roof === 'semivault' ? 'semivault' : 'gable') : inp.roof
@@ -411,11 +411,13 @@ export function computePorchBuild(input, ratesIn) {
   if (tie === 'free') add('freestanding_add', area)
   if (inp.floor === 'deck' && n(inp.deckHeightFt) > 8) add('deck_over_8', area)
 
-  // Roof style
+  // Roof style: gable and hip take a PT LVL and engineering; every semi-vaulted
+  // roof takes the engineering ($1,000).
   if (roof === 'gable' || roof === 'hip') {
     add('pt_lvl', D, 'porch depth')
     add('lvl_engineering', 1)
   }
+  if (roof === 'semivault') add('lvl_engineering', 1, 'semi-vaulted roof')
   // Same over-19′ flat fee for gable and semi-vaulted roofs
   if ((roof === 'gable' || roof === 'semivault') && W > 19) add('gable_over_19', 1)
   if (roof === 'hip') {
@@ -445,6 +447,11 @@ export function computePorchBuild(input, ratesIn) {
   // Sunrooms take the sunroom doors; ScreenEze / Eze-Breeze take the Larsen doors.
   if (inp.type !== 'open') for (const [k, q] of Object.entries(inp.doors || {})) {
     if (inp.type === 'sunroom' ? rates[k]?.sunDoor : rates[k]?.door) add(k, n(q))
+  }
+  // Every Larsen storm door takes a lip unit.
+  if (inp.type !== 'open' && inp.type !== 'sunroom') {
+    const larsen = Object.entries(inp.doors || {}).reduce((a, [k, q]) => a + (rates[k]?.door ? n(q) : 0), 0)
+    add('door_lip', larsen, `${larsen} door${larsen === 1 ? '' : 's'}`)
   }
   if ((roof === 'gable' || roof === 'semivault') && n(inp.glassEnds) > 0) add('glass_gable_end', n(inp.glassEnds))
 
@@ -558,7 +565,7 @@ export const PORCH_CATALOG_NAMES = {
   elec_heater_black: 'Infratech Heater 5000w 40inch SS BLACK', elec_fan_ucs: 'Fan w/ switch for pergola/UCS system', elec_can_ucs: 'Can lights for UCS system',
 }
 // Lines whose wording is already in the structure text (or are internal fees)
-const SCOPE_SKIP = new Set(['hip_roof', 'gable_over_19', 'deck_over_8'])
+const SCOPE_SKIP = new Set(['hip_roof', 'gable_over_19', 'deck_over_8', 'door_lip'])
 const ROOF_WORDS = { shed: 'Shed roof', gable: 'A-Frame gable roof', semivault: 'Semi Vaulted roof', hip: 'Hip roof' }
 
 // One priced line → its scope wording

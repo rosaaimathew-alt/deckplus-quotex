@@ -71,6 +71,7 @@ export const PORCH_COMPONENT_DEFAULTS = {
   window:    { label: 'Eze-Breeze window unit',     unit: 'EA', rate: 700,  cost: 0 },    // per window (Deck Plus, 700 going forward)
   transom:   { label: 'Transom unit (wall > 105″)', unit: 'EA', rate: 130,  cost: 0 },    // per transom (Deck Plus sheet)
   door:      { label: 'Exit / storm door (36″)',    unit: 'EA', rate: 900,  cost: 560 },  // per door
+  lip:       { label: 'Door lip unit',              unit: 'EA', rate: 130,  cost: 0 },    // per door
   finishing: { label: 'Paint, seal & refinish',     unit: 'LS', rate: 1500, cost: 800 },  // flat per porch
 }
 

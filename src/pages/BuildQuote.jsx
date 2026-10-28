@@ -101,6 +101,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
       case 'window':    return totalWindows
       case 'transom':   return totalTransoms
       case 'door':      return Dr
+      case 'lip':       return Dr
       case 'finishing': return 1
       default:          return 0
     }
@@ -111,6 +112,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
     { key: 'window',    label: r('window').label,    unit: r('window').unit,    rate: r('window').rate,    cost: r('window').cost,    qty: null, fromRates: true },
     { key: 'transom',   label: r('transom').label,   unit: r('transom').unit,   rate: r('transom').rate,   cost: r('transom').cost,   qty: null, fromRates: true, transomOnly: true },
     { key: 'door',      label: r('door').label,      unit: r('door').unit,      rate: r('door').rate,      cost: r('door').cost,      qty: null, fromRates: true, doorOnly: true },
+    { key: 'lip',       label: r('lip').label,       unit: r('lip').unit,       rate: r('lip').rate,       cost: r('lip').cost,       qty: null, fromRates: true, doorOnly: true },
     { key: 'finishing', label: r('finishing').label, unit: r('finishing').unit, rate: r('finishing').rate, cost: r('finishing').cost, qty: null, fromRates: true },
     ...customComponents.map(toCustomComp),
   ])
