@@ -76,9 +76,14 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
     groups[groups.length - 1].rows.push(r)
   }
 
-  const cellHtml = (c) => c?.state
-    ? `<span class="c ${c.state}" title="${esc(c.result)}">${MARK[c.state]} ${md(c.date)}</span>`
-    : '<span class="c none">·</span>'
+  // One column of chips — only the inspections this job has — so the page
+  // fits on letter paper however many inspection types are in use.
+  const chips = (r) => {
+    const list = cols.filter(c => r.cells[c.key]?.state)
+    return list.length
+      ? list.map(c => { const x = r.cells[c.key]; return `<span class="c ${x.state}" title="${esc(c.title)}: ${esc(x.result)}"><b>${esc(c.label)}</b> ${MARK[x.state]} ${md(x.date)}</span>` }).join('')
+      : '<span class="muted">none yet</span>'
+  }
 
   const rowHtml = (r) => `
     <tr class="${r.failed ? 'failed' : ''}">
@@ -86,9 +91,9 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
         <b>${esc(r.p.client)}</b>${r.failed ? ' <span class="flag">FAILED</span>' : ''}
         ${r.type ? `<div class="type">${esc(r.type)}</div>` : ''}
         <div class="sub">${esc(r.p.address)}</div>
-        <div class="sub mono">${esc(r.building?.record || r.p.imported?.permit || '')}${r.building?.recordStatus ? ` · ${esc(r.building.recordStatus)}` : ''}</div>
+        <div class="sub"><span class="mono">${esc(r.building?.record || r.p.imported?.permit || '')}</span>${r.building?.recordStatus ? ` · ${esc(r.building.recordStatus)}` : ''}</div>
       </td>
-      ${cols.map(c => `<td class="cell">${cellHtml(r.cells[c.key])}</td>`).join('')}
+      <td class="ins">${chips(r)}</td>
       <td class="wk">${r.week.length ? r.week.map(i => `<div>${md(i.date)} ${esc(i.code)} <b class="${/^pass/i.test(i.result) ? 'ok' : 'bad'}">${esc(i.result)}</b></div>`).join('') : '<span class="muted">—</span>'}</td>
       <td class="next">${r.next ? esc(r.next) : '<span class="muted">—</span>'}</td>
       <td class="note">${r.note
@@ -107,6 +112,7 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
   .muted { color: #999; }
   .stats { display: flex; gap: 14px; margin: 6px 0 10px; font-size: 12px; }
   .stats b { font-size: 14px; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   th { text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: #555; border-bottom: 1px solid #999; padding: 4px; }
   td { border-bottom: 1px solid #ddd; padding: 5px 4px; vertical-align: top; }
@@ -116,12 +122,12 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
   .job b { font-size: 12px; }
   .type { color: #333; } .sub { color: #777; font-size: 10px; } .mono { font-family: ui-monospace, Menlo, monospace; }
   .flag { color: #b00; font-size: 9px; font-weight: 700; border: 1px solid #b00; border-radius: 3px; padding: 0 3px; }
-  th.cell, td.cell { width: 54px; text-align: center; white-space: nowrap; }
-  .c { display: inline-block; min-width: 46px; white-space: nowrap; border-radius: 4px; padding: 1px 2px; font-size: 10px; border: 1px solid; }
+  td.ins { line-height: 1.9; }
+  .c { display: inline-block; white-space: nowrap; border-radius: 4px; padding: 0 4px; margin: 0 3px 0 0; font-size: 10px; line-height: 1.5; border: 1px solid; }
+  .c b { font-weight: 700; }
   .c.pass { background: #dcfce7; border-color: #86efac; } .c.fail { background: #fee2e2; border-color: #fca5a5; }
   .c.sched { background: #dbeafe; border-color: #93c5fd; } .c.void { background: #f3f4f6; border-color: #d1d5db; color: #666; }
-  .c.none { border-color: transparent; color: #ccc; }
-  .wk { width: 120px; } .next { width: 120px; } .note { width: 32%; }
+  .job { overflow-wrap: anywhere; }
   .ok { color: #15803d; } .bad { color: #b91c1c; }
   .meta { color: #555; font-size: 10px; margin-bottom: 2px; }
   .legend { margin-top: 8px; color: #666; font-size: 9px; }
@@ -146,13 +152,12 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
     <span><b>${scheduled}</b> with a next inspection set</span>
   </div>
   <table>
+    <colgroup><col style="width:26%"><col style="width:20%"><col style="width:11%"><col style="width:12%"><col style="width:31%"></colgroup>
     <thead><tr>
-      <th>Job</th>
-      ${cols.map(c => `<th class="cell" title="${esc(c.title)}">${esc(c.label)}</th>`).join('')}
-      <th class="wk">This week</th><th class="next">Next inspection</th><th class="note">Last note on file</th>
+      <th>Job</th><th>Inspections</th><th>This week</th><th>Next inspection</th><th>Last note on file</th>
     </tr></thead>
     <tbody>
-      ${groups.map(g => `<tr class="pmrow"><td colspan="${cols.length + 4}">PM ${esc(g.pm)} · ${g.rows.length} job${g.rows.length === 1 ? '' : 's'}</td></tr>${g.rows.map(rowHtml).join('')}`).join('')}
+      ${groups.map(g => `<tr class="pmrow"><td colspan="5">PM ${esc(g.pm)} · ${g.rows.length} job${g.rows.length === 1 ? '' : 's'}</td></tr>${g.rows.map(rowHtml).join('')}`).join('')}
     </tbody>
   </table>
   <div class="legend">✓ passed · ✗ failed / inaccessible / partial (latest result) · ◷ scheduled at the county · – cancelled.
