@@ -90,6 +90,19 @@ function leadEmailHtml({ name, rep, settings, when, address, calendarUrl }) {
   </div>`
 }
 
+// POST /api/booking?track=1 — one anonymous funnel step from the booking page.
+const TRACK_EVENTS = new Set(['view', 'day', 'time', 'form', 'booked'])
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const BOT_RE = /bot|crawl|spider|slurp|preview|headless|lighthouse|pingdom|monitor/i
+async function trackEvent(req, res) {
+  const { v, s, e, page } = req.body || {}
+  if (!TRACK_EVENTS.has(e) || !UUID_RE.test(v) || !UUID_RE.test(s)) return res.status(400).json({ error: 'bad event' })
+  if (BOT_RE.test(req.headers?.['user-agent'] || '')) return res.status(204).end()
+  const { error } = await db().from('rr_events').insert({ visitor_id: v, session_id: s, event: e, page: clean(page, 200) || null })
+  if (error) console.error('Tracking insert failed:', error.message)
+  return res.status(204).end()
+}
+
 // GET /api/booking?check=google — is each rep's calendar reachable? (read-only)
 async function checkGoogle(res) {
   const out = { mode: calendarMode(), googleKey: 'missing', reps: [] }
@@ -238,6 +251,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
   if (req.method === 'OPTIONS') return res.status(200).end()
   try {
+    if (req.method === 'POST' && req.query?.track) return await trackEvent(req, res)
     if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
     if (req.method === 'GET')  return await getSlots(res)
     if (req.method === 'POST') return await book(req, res)
