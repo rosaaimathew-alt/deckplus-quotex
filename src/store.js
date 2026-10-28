@@ -912,6 +912,22 @@ export const useStore = create(
           }),
         })),
 
+      // County permit results from the inspection pulse. Stages the county
+      // has passed are checked off; nothing is ever unchecked.
+      setCountyPermit: (proposalId, countyPermit, passedStages = []) =>
+        set((s) => ({
+          proposals: s.proposals.map((p) => {
+            if (p.id !== proposalId) return p
+            const done = p.jobData?.completedStages || []
+            const add = passedStages.filter(k => !done.includes(k))
+            return {
+              ...p,
+              countyPermit,
+              ...(add.length ? { jobData: { ...(p.jobData || {}), completedStages: [...done, ...add] } } : {}),
+            }
+          }),
+        })),
+
       toggleJobStage: (proposalId, stageKey) =>
         set((s) => ({
           proposals: s.proposals.map((p) => {
@@ -1314,6 +1330,9 @@ export const useStore = create(
       // the welcome email a customer gets once the contract is fully signed.
       companySignature: null,       // { enabled, signatureDataUrl, printedName, title, adoptedBy, adoptedAt }
       welcomeEmail: null,           // { enabled, subject, body }
+      // Inspection pulse: when it last ran / started, shared by the office.
+      permitPulse: null,            // { lastRunAt, startedAt, by }
+      setPermitPulse: (v) => set({ permitPulse: v }),
       setCompanySignature: (v) => set({ companySignature: v }),
       setWelcomeEmail: (v) => set({ welcomeEmail: v }),
       setOfficeView: (v) => { try { localStorage.setItem('qx_office_view', v) } catch { /* private mode */ } set({ officeView: v }) },
@@ -1370,7 +1389,7 @@ const SETTINGS_DEFAULTS = () => ({
   deckFormulaLocked: false, porchFormulaLocked: false,
   deckScopeTemplate: DECK_SCOPE_DEFAULT, porchScopeTemplate: PORCH_SCOPE_DEFAULT,
   paymentScheduleLearning: {}, scopeExamples: [], historyImported: false, calendarHiddenJobs: [],
-  contractPrefix: 'DP', companySignature: null, welcomeEmail: null,
+  contractPrefix: 'DP', companySignature: null, welcomeEmail: null, permitPulse: null,
   porchBuildRates: {}, porchBuildLocked: false, porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
   subscriptions: [],
 })
