@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, contractNumberFor } from '../store'
+import { DEMO } from '../demo'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
 import JobFinancials from '../components/JobFinancials'
 import JobPriceList from '../components/JobPriceList'
 import PermitsTab from '../components/PermitsTab'
-import { usePermitAccess, permitTracked, permitAlerts } from '../lib/permitTracking'
+import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
+import { startPulse } from '../lib/permitPulse'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1734,13 +1736,14 @@ function JobCard({ proposal }) {
   const receiptCount  = (jobData.receipts || []).length
   const costCount     = (allExpenses || []).filter(e => e.jobId === proposal.id).length
   const showPermits   = !!permitAccess && permitTracked(proposal)
-  const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0 }
+  const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0, needsPick: false }
+  const nextInsp      = showPermits ? jobData.nextInspection : null
 
   const saveNote = () => { updateJobData(proposal.id, { notes: noteText }); setEditingNote(false) }
 
   const TABS = [
     { key: 'stages',  label: 'Stages' },
-    ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring ? ` (${permitFlags.failed + permitFlags.expiring})` : ''}` }] : []),
+    ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0) ? ` (${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0)})` : ''}` }] : []),
     { key: 'budget',  label: 'Budget' },
     { key: 'pricelist', label: 'Price list' },
     { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
@@ -1769,6 +1772,8 @@ function JobCard({ proposal }) {
             <span className="font-semibold text-gray-900 text-sm">{proposal.client}</span>
             {openWarranty > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> {openWarranty} warranty</span>}
             {permitFlags.failed > 0 && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Failed inspection</span>}
+            {permitFlags.needsPick && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Pick permit</span>}
+            {nextInsp?.code && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><CalendarDays size={11} /> {inspectionLabel(nextInsp.code)}{nextInsp.date ? ` · ${fmtDate(nextInsp.date)}` : ''}</span>}
             {permitAccess === 'edit' && permitFlags.expiring > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><Clock size={11} /> Permit expiring</span>}
           </div>
           <p className="text-xs text-gray-400 mt-0.5 truncate">
@@ -1966,6 +1971,17 @@ export default function Jobs() {
   const [stageFilter, setStageFilter] = useState(null)   // current-stage chip (from the old Scheduler view)
   const permitAccess = usePermitAccess()
   const [permitsOnly, setPermitsOnly] = useState(false)   // office: open Mecklenburg jobs only
+  const permitPulse = useStore(s => s.permitPulse)
+  const me = useStore(s => s.me)
+  const [pulseBusy, setPulseBusy] = useState(false)
+  const [pulseMsg, setPulseMsg] = useState('')
+  const checkCountyNow = async () => {
+    setPulseBusy(true); setPulseMsg('')
+    try {
+      const out = await startPulse(me?.displayName || me?.email || 'office', { force: true })
+      if (out) setPulseMsg(`Checked ${out.done} job${out.done === 1 ? '' : 's'}${out.failed ? `, ${out.failed} couldn't be read` : ''}.`)
+    } catch (e) { setPulseMsg(e.message) } finally { setPulseBusy(false) }
+  }
 
   // A job's phase: closed, in-progress (≥1 stage done, not closed), or not-started.
   const phaseOf = (p) => {
@@ -2057,6 +2073,23 @@ export default function Jobs() {
           </button>
         )}
       </div>
+
+      {permitAccess && permitsOnly && (
+        <div className="flex items-center gap-3 flex-wrap mb-4 -mt-2 text-xs text-gray-500">
+          <span>
+            County site {permitPulse?.lastRunAt
+              ? <>last checked {new Date(permitPulse.lastRunAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</>
+              : 'not checked yet'} · checks every morning and afternoon
+          </span>
+          {permitAccess === 'edit' && !DEMO && (
+            <button onClick={checkCountyNow} disabled={pulseBusy}
+              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50">
+              {pulseBusy ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />} {pulseBusy ? 'Checking the county site…' : 'Check county now'}
+            </button>
+          )}
+          {pulseMsg && <span className="text-gray-600">{pulseMsg}</span>}
+        </div>
+      )}
 
       {stageGroups.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap mb-4 -mt-1">
