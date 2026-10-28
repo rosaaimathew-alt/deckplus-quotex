@@ -4,6 +4,8 @@ import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
 import JobFinancials from '../components/JobFinancials'
 import JobPriceList from '../components/JobPriceList'
+import PermitsTab from '../components/PermitsTab'
+import { usePermitAccess, permitTracked, permitAlerts } from '../lib/permitTracking'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1713,6 +1715,7 @@ function JobCard({ proposal }) {
   const [showReminder, setShowReminder] = useState(false)
   const [showCloseOut, setShowCloseOut] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const permitAccess = usePermitAccess()
 
   const jobData = proposal.jobData || {}
   const completedStages = jobData.completedStages || []
@@ -1730,11 +1733,14 @@ function JobCard({ proposal }) {
   const logCount      = (jobData.dailyLogs || []).length
   const receiptCount  = (jobData.receipts || []).length
   const costCount     = (allExpenses || []).filter(e => e.jobId === proposal.id).length
+  const showPermits   = !!permitAccess && permitTracked(proposal)
+  const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0 }
 
   const saveNote = () => { updateJobData(proposal.id, { notes: noteText }); setEditingNote(false) }
 
   const TABS = [
     { key: 'stages',  label: 'Stages' },
+    ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring ? ` (${permitFlags.failed + permitFlags.expiring})` : ''}` }] : []),
     { key: 'budget',  label: 'Budget' },
     { key: 'pricelist', label: 'Price list' },
     { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
@@ -1762,6 +1768,8 @@ function JobCard({ proposal }) {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900 text-sm">{proposal.client}</span>
             {openWarranty > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> {openWarranty} warranty</span>}
+            {permitFlags.failed > 0 && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Failed inspection</span>}
+            {permitAccess === 'edit' && permitFlags.expiring > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><Clock size={11} /> Permit expiring</span>}
           </div>
           <p className="text-xs text-gray-400 mt-0.5 truncate">
             {projectTypes} · ${fmt(contractTotalOf(proposal))} · <span className="font-mono">{contractNum}</span>
@@ -1934,6 +1942,7 @@ function JobCard({ proposal }) {
                 </div>
               </div>
             )}
+            {tab === 'permits' && showPermits && <PermitsTab proposal={proposal} stages={stages} readOnly={permitAccess !== 'edit'} />}
             {tab === 'budget'  && <BudgetTab proposal={proposal} />}
             {tab === 'pricelist' && <JobPriceList proposal={proposal} />}
             {tab === 'costs'   && <JobFinancials proposal={proposal} />}
@@ -1955,6 +1964,8 @@ export default function Jobs() {
   const [filter, setFilter] = useState('active')
   const [query,  setQuery]  = useState('')
   const [stageFilter, setStageFilter] = useState(null)   // current-stage chip (from the old Scheduler view)
+  const permitAccess = usePermitAccess()
+  const [permitsOnly, setPermitsOnly] = useState(false)   // office: open Mecklenburg jobs only
 
   // A job's phase: closed, in-progress (≥1 stage done, not closed), or not-started.
   const phaseOf = (p) => {
@@ -1985,6 +1996,7 @@ export default function Jobs() {
   const filtered = wonJobs.filter(p => {
     const phase = phaseOf(p)
     if (stageFilter && (phase === 'closed' || currentStageOf(p) !== stageFilter)) return false
+    if (permitAccess && permitsOnly && !permitTracked(p)) return false
     if (filter === 'active'      && phase === 'closed')        return false
     if (filter === 'in-progress' && phase !== 'in-progress')   return false
     if (filter === 'not-started' && phase !== 'not-started')   return false
@@ -2036,6 +2048,14 @@ export default function Jobs() {
             placeholder="Search name or contract #…" value={query} onChange={e => setQuery(e.target.value)} />
           {query && <button onClick={() => setQuery('')} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>}
         </div>
+        {permitAccess && (
+          <button onClick={() => setPermitsOnly(v => !v)}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors self-start sm:self-auto ${permitsOnly
+              ? 'bg-[var(--brand-600)] border-[var(--brand-600)] text-white'
+              : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+            <ShieldCheck size={13} /> Mecklenburg permits <span className="opacity-70">{wonJobs.filter(permitTracked).length}</span>
+          </button>
+        )}
       </div>
 
       {stageGroups.length > 0 && (
