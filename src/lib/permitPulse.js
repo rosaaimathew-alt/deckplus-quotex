@@ -50,6 +50,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
             address: p.address,
             client: p.client,
             pick: p.jobData?.countyPick || null,
+            record: (String(p.imported?.permit || '').match(/[A-Z]{2,5}-[A-Z]{2,5}-\d{2}-\d{4,7}/i) || [])[0] || '',
             knownNotes: Object.keys(knownNotes(p.countyPermit)),
           })),
         }),

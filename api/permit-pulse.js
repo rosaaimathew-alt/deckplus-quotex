@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
 import { requireAuth, staffRole } from './_auth.js'
-import { searchByAddress, fetchPermit, fetchInspectionNotes, recordUrl } from './_accela.js'
+import { searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, RECORD_RE } from './_accela.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
@@ -89,6 +89,17 @@ export async function checkJob(job) {
   rows = rows.filter(r => sameAddress(addr, r.address))
   const building = rows.filter(r => BUILDING_RE.test(r.record))
 
+  // A permit # the office typed in: used only if it's for this same house
+  // number, so it can never land on another customer's permit.
+  if (!job.pick && job.record) {
+    const [hit] = await searchByRecord(job.record)
+    if (hit && parseAddress(hit.address).number === addr.number && BUILDING_RE.test(hit.record)) {
+      job.pick = hit.capIds
+      if (!rows.some(r => r.record === hit.record)) rows.push(hit)
+      if (!building.some(r => r.record === hit.record)) building.push(hit)
+    }
+  }
+
   let main = null
   if (Array.isArray(job.pick) && job.pick.length === 3) {
     main = building.find(r => r.capIds.join('-') === job.pick.join('-')) || null
@@ -148,6 +159,7 @@ export default async function handler(req, res) {
     address: String(j?.address || '').slice(0, 200),
     client: String(j?.client || '').slice(0, 120),
     pick: Array.isArray(j?.pick) ? j.pick.map(String).slice(0, 3) : null,
+    record: RECORD_RE.test(String(j?.record || '').trim().toUpperCase()) ? String(j.record).trim().toUpperCase() : '',
     knownNotes: Array.isArray(j?.knownNotes) ? j.knownNotes.slice(0, 500) : [],
   })).filter(j => j.id)
 

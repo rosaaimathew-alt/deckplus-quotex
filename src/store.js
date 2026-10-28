@@ -912,6 +912,22 @@ export const useStore = create(
           }),
         })),
 
+      // A job sold outside the app, added so its permits and inspections can be
+      // tracked. Status 'Imported' keeps it out of every sales number.
+      addOffPlatformJob: ({ client, address, pm, jobType, permit, county }) => {
+        const id = get().nextProposalId
+        const now = new Date().toISOString()
+        set((s) => ({
+          nextProposalId: id + 1,
+          proposals: [{
+            id, client, address, status: 'Imported', statusChangedAt: now, createdAt: now,
+            ownerId: null, pmId: null, total: 0, lines: [], reminders: [], activities: [], jobData: {},
+            imported: { source: 'Added by office', pm, jobType, permit, county, importedAt: now, addedBy: s.me?.displayName || s.me?.email || '' },
+          }, ...s.proposals],
+        }))
+        return id
+      },
+
       // County permit results from the inspection pulse. Stages the county
       // has passed are checked off; nothing is ever unchecked.
       setCountyPermit: (proposalId, countyPermit, passedStages = []) =>
