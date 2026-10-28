@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { PERMIT_KEYS, isInspectionKey, today, daysUntil } from '../lib/permitTracking'
 import { CheckCircle2, AlertTriangle, Clock, Plus, X, FileText, ShieldCheck } from 'lucide-react'
 
-// Office edits everything here; PMs (readOnly) see inspection status only.
+// Office / Admin edit everything here; PMs (readOnly) see inspection status only.
 // The data model is described in lib/permitTracking.js.
 
 const RESULTS = ['Passed', 'Failed', 'Partial', 'Cancelled']

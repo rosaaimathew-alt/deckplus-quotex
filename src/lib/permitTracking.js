@@ -17,10 +17,10 @@ import { useStore } from '../store'
 import { DEMO } from '../demo'
 import { locateAddress } from './permitFees'
 
-// 'edit' (Office), 'view' (PMs) or null (everyone else)
+// 'edit' (Office / Admin), 'view' (PMs) or null (everyone else)
 export function usePermitAccess() {
   const me = useStore(s => s.me)
-  if (DEMO || me?.role === 'office') return 'edit'
+  if (DEMO || me?.role === 'office' || me?.role === 'admin') return 'edit'
   if (me?.role === 'pm') return 'view'
   return null
 }
