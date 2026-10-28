@@ -31,6 +31,7 @@ export function usePermitAccess() {
 
 export function permitTracked(proposal) {
   if ((proposal.jobData?.completedStages || []).includes('closed')) return false
+  if (proposal.imported?.county) return proposal.imported.county === 'Mecklenburg'
   return locateAddress(proposal.address).county === 'Mecklenburg'
 }
 
@@ -52,8 +53,17 @@ export function permitAlerts(proposal, stages) {
   const jobData = proposal.jobData || {}
   const completed = jobData.completedStages || []
   const keys = stages.map(s => s.key)
-  const { byStage } = countyByStage(proposal, keys)
-  const failed = keys.filter(isInspectionKey)
+  const { byStage, other } = countyByStage(proposal, keys)
+  // County inspections no stage covers (e.g. a job with no type set yet):
+  // grouped by permit + inspection code, failing if the latest failed and
+  // none has passed.
+  const groups = {}
+  for (const i of other) (groups[`${i.record}:${i.code}`] ||= []).push(i)
+  const otherFailed = Object.values(groups).filter(g => {
+    g.sort((a, b) => (a.date || '').localeCompare(b.date || '') || Number(a.id) - Number(b.id))
+    return !countyPassed(g) && isFailResult(countyLast(g)?.result)
+  }).length
+  const failed = otherFailed + keys.filter(isInspectionKey)
     .filter(k => !completed.includes(k))
     .filter(k => {
       const ours = lastAttempt(jobData.inspections?.[k])

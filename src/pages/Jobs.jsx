@@ -8,6 +8,7 @@ import JobPriceList from '../components/JobPriceList'
 import PermitsTab from '../components/PermitsTab'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
+import { isJob } from '../lib/attention'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1770,6 +1771,7 @@ function JobCard({ proposal }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900 text-sm">{proposal.client}</span>
+            {proposal.imported && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Imported{proposal.imported.pm ? ` · PM ${proposal.imported.pm}` : ''}</span>}
             {openWarranty > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> {openWarranty} warranty</span>}
             {permitFlags.failed > 0 && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Failed inspection</span>}
             {permitFlags.needsPick && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Pick permit</span>}
@@ -1777,7 +1779,9 @@ function JobCard({ proposal }) {
             {permitAccess === 'edit' && permitFlags.expiring > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><Clock size={11} /> Permit expiring</span>}
           </div>
           <p className="text-xs text-gray-400 mt-0.5 truncate">
-            {projectTypes} · ${fmt(contractTotalOf(proposal))} · <span className="font-mono">{contractNum}</span>
+            {proposal.imported
+              ? <>{proposal.address}{proposal.imported.permit ? <> · <span className="font-mono">{proposal.imported.permit}</span></> : null}</>
+              : <>{projectTypes} · ${fmt(contractTotalOf(proposal))} · <span className="font-mono">{contractNum}</span></>}
           </p>
         </div>
 
@@ -2000,7 +2004,7 @@ export default function Jobs() {
     return stages.length === 0 ? 'Needs setup' : (stages.find(s => !done.includes(s.key) && s.key !== 'closed')?.label || 'Ready to close')
   }
 
-  const wonJobs = proposals.filter(p => p.status === 'Won')
+  const wonJobs = proposals.filter(isJob)
   const stageGroups = (() => {
     const map = new Map()
     wonJobs.filter(p => phaseOf(p) !== 'closed').forEach(p => {

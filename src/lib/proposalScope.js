@@ -13,7 +13,8 @@ export function useScopedProposals() {
   const canChoose  = role === 'manager' && !!me
   const mineOnly   = canChoose && officeView === 'mine'
   return {
-    proposals: mineOnly ? all.filter(p => p.ownerId === me.id) : all,
+    // Jobs imported from the office's sheet aren't proposals — keep them out of sales views
+    proposals: (mineOnly ? all.filter(p => p.ownerId === me.id) : all).filter(p => p.status !== 'Imported'),
     canChoose, mineOnly, setMineOnly: (on) => setOfficeView(on ? 'mine' : 'everyone'),
   }
 }

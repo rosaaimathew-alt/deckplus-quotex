@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { useStore } from '../store'
 import { useNav } from '../nav'
-import { attentionItems, isJobClosed } from '../lib/attention'
+import { attentionItems, isJobClosed, isJob } from '../lib/attention'
 import { getStages } from './Jobs'
 import NeedsAttention from '../components/NeedsAttention'
 import { TodoCard } from '../components/TodoPanel'
@@ -25,7 +25,7 @@ export default function PMHome() {
     const end = new Date(start); end.setDate(end.getDate() + 7)
     const out = []
     for (const p of proposals) {
-      if (p.status !== 'Won' || isJobClosed(p)) continue
+      if (!isJob(p) || isJobClosed(p)) continue
       const stages = getStages(p) || []
       const done = p.jobData?.completedStages || []
       for (const [key, date] of Object.entries(p.jobData?.stageDates || {})) {

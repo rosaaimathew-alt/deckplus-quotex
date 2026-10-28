@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useStore } from '../store'
 import { getStages } from './Jobs'
+import { isJob } from '../lib/attention'
 import {
   ChevronLeft, ChevronRight, Plus, X, Eye, EyeOff, Trash2, CalendarDays,
   MapPin, HardHat, Circle, CheckCircle2, Square, ListChecks,
@@ -26,7 +27,7 @@ function useCalendarEvents() {
   const calendarHiddenJobs = useStore(s => s.calendarHiddenJobs) || []
 
   return useMemo(() => {
-    const wonJobs = proposals.filter(p => p.status === 'Won')
+    const wonJobs = proposals.filter(isJob)
     const jobs = wonJobs.map(p => {
       const start = p.jobData?.startDate || null
       const end   = p.jobData?.targetDate || start
