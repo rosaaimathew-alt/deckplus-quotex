@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { DEMO } from '../demo'
 import { getStages } from './Jobs'
@@ -22,16 +22,29 @@ const CELL = {
   sched: 'bg-blue-100 text-blue-800 border-blue-200',
   void:  'bg-gray-100 text-gray-500 border-gray-200',
 }
-const SHORT = { Passed: '✓', Failed: 'Fail', Inaccessible: 'Inacc', 'Partial Approval': 'Partial', Cancelled: 'Canc', Rescheduled: 'Resch', Scheduled: 'Sched' }
+const MARK = { pass: '✓', fail: '✗', sched: '◷', void: '–' }
 
 function Cell({ cell, title }) {
   if (!cell?.state) return <span className="block text-center text-gray-200">·</span>
   return (
     <span title={`${title}: ${cell.result}${cell.date ? ` ${cell.date}` : ''}`}
-      className={`block text-center text-[11px] leading-tight font-medium border rounded-md px-1 py-0.5 whitespace-nowrap ${CELL[cell.state]}`}>
-      {SHORT[cell.result] || cell.result} {md(cell.date)}
+      className={`block text-center text-[11px] leading-tight font-medium border rounded-md px-0.5 py-0.5 whitespace-nowrap min-w-[3rem] ${CELL[cell.state]}`}>
+      {MARK[cell.state]} {md(cell.date)}
     </span>
   )
+}
+
+// lg and up: one grid row per job (matches Tailwind's lg breakpoint)
+function useWide() {
+  const q = '(min-width: 1024px)'
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches)
+  useEffect(() => {
+    const m = window.matchMedia(q)
+    const on = () => setWide(m.matches)
+    m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [])
+  return wide
 }
 
 // The office types the next inspection straight into the row, like the sheet.
@@ -44,14 +57,14 @@ function NextCell({ proposal, edit }) {
     updateJobData(proposal.id, { nextInspection: v.code ? v : null })
   }
   return (
-    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+    <div className="flex lg:flex-col gap-1" onClick={e => e.stopPropagation()}>
       <select value={next.code || ''} onChange={e => save({ code: e.target.value })}
-        className="text-xs border border-gray-200 rounded-md px-1 py-1 bg-white max-w-[8.5rem]">
+        className="text-xs border border-gray-200 rounded-md px-1 py-1 bg-white w-full">
         <option value="">—</option>
         {INSPECTION_TYPES.map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
       </select>
       <input type="date" value={next.date || ''} onChange={e => save({ date: e.target.value })} disabled={!next.code}
-        className="text-xs border border-gray-200 rounded-md px-1 py-1 bg-white disabled:opacity-40 w-[7.5rem]" />
+        className="text-xs border border-gray-200 rounded-md px-1 py-1 bg-white disabled:opacity-40 w-full" />
     </div>
   )
 }
@@ -80,6 +93,10 @@ export default function InspectionBoard() {
   }).sort((a, b) => String(a.p.client || '').localeCompare(String(b.p.client || ''))), [proposals])
 
   const pms = [...new Set(jobs.map(j => j.pm).filter(Boolean))].sort()
+  // Only the inspection columns some job actually has
+  const cols = BOARD_COLUMNS.filter(c => jobs.some(j => j.cells[c.key]))
+  const grid = `1.25rem minmax(0,1fr) repeat(${cols.length}, 3.4rem) 11.5rem`
+  const wide = useWide()
   const shown = jobs.filter(j => {
     if (pm && j.pm !== pm) return false
     if (attention && !j.failed && !j.problem) return false
@@ -164,71 +181,68 @@ export default function InspectionBoard() {
         </label>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
-        <table className="w-full text-sm min-w-[1200px]">
-          <thead>
-            <tr className="text-[10px] uppercase tracking-wider text-gray-400 border-b border-gray-100">
-              <th className="text-left font-semibold px-3 py-2 w-6"></th>
-              <th className="text-left font-semibold px-2 py-2">Client</th>
-              <th className="text-left font-semibold px-2 py-2">PM</th>
-              <th className="text-left font-semibold px-2 py-2">Permit</th>
-              {BOARD_COLUMNS.map(c => <th key={c.key} title={c.title} className="font-semibold px-1 py-2 w-[4.5rem] min-w-[4.5rem] text-center">{c.label}</th>)}
-              <th className="text-left font-semibold px-2 py-2 min-w-[17rem]">Next inspection</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.length === 0 && (
-              <tr><td colSpan={5 + BOARD_COLUMNS.length} className="px-4 py-10 text-center text-sm text-gray-400">
-                {jobs.length ? 'No jobs match these filters.' : 'No ongoing Mecklenburg jobs yet.'}
-              </td></tr>
-            )}
-            {shown.map(j => {
-              const isOpen = open === j.p.id
-              return (
-                <Fragment key={j.p.id}>
-                  <tr onClick={() => setOpen(isOpen ? null : j.p.id)}
-                    className={`border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${isOpen ? 'bg-gray-50' : ''}`}>
-                    <td className="px-3 py-2 text-gray-400">{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                    <td className="px-2 py-2">
-                      <div className="font-medium text-gray-900 flex items-center gap-1.5">
-                        {j.p.client}
-                        {j.failed && <AlertTriangle size={12} className="text-red-500" />}
-                      </div>
-                      <div className="text-[11px] text-gray-400 truncate max-w-[15rem]">{j.p.address}</div>
-                    </td>
-                    <td className="px-2 py-2 text-xs text-gray-600">{j.pm || '—'}</td>
-                    <td className="px-2 py-2 text-xs whitespace-nowrap">
-                      {j.building ? (
+      {/* Fits the screen — no sideways scrolling. On wide screens each job is one
+          row with a column per inspection; on narrow ones the cells wrap under it. */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+        <div className="hidden lg:grid items-center gap-x-1 px-3 py-2 text-[10px] uppercase tracking-wider text-gray-400 font-semibold" style={{ gridTemplateColumns: grid }}>
+          <span />
+          <span>Job</span>
+          {cols.map(c => <span key={c.key} title={c.title} className="text-center">{c.label}</span>)}
+          <span>Next inspection</span>
+        </div>
+        {shown.length === 0 && (
+          <p className="px-4 py-10 text-center text-sm text-gray-400">{jobs.length ? 'No jobs match these filters.' : 'No ongoing Mecklenburg jobs yet.'}</p>
+        )}
+        {shown.map(j => {
+          const isOpen = open === j.p.id
+          return (
+            <div key={j.p.id} className={isOpen ? 'bg-gray-50/70' : ''}>
+              <div onClick={() => setOpen(isOpen ? null : j.p.id)}
+                className="cursor-pointer hover:bg-gray-50 px-3 py-2 flex flex-wrap gap-2 lg:grid lg:items-center lg:gap-x-1"
+                style={wide ? { gridTemplateColumns: grid } : undefined}>
+                <span className="text-gray-400 pt-0.5">{isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
+                <div className="min-w-0 w-[calc(100%-2rem)] lg:w-auto">
+                  <div className="font-medium text-gray-900 text-sm flex items-center gap-1.5 flex-wrap">
+                    <span className="truncate">{j.p.client}</span>
+                    {j.failed && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
+                    {j.pm && <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">PM {j.pm}</span>}
+                  </div>
+                  <div className="text-[11px] text-gray-400 truncate">{j.p.address}</div>
+                  <div className="text-[11px] mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    {j.building ? (
+                      <>
                         <a href={j.building.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                          className="font-mono text-blue-700 hover:underline inline-flex items-center gap-1">{j.building.record} <ExternalLink size={10} /></a>
-                      ) : j.problem ? (
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${j.problem === 'Pick permit' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>{j.problem}</span>
-                      ) : <span className="text-gray-300">not checked</span>}
-                      {j.building && <div className="text-[11px] text-gray-400">{j.building.recordStatus || j.building.status}</div>}
-                    </td>
-                    {BOARD_COLUMNS.map(c => <td key={c.key} className="px-1 py-2"><Cell cell={j.cells[c.key]} title={c.title} /></td>)}
-                    <td className="px-2 py-2 text-xs text-gray-700 whitespace-nowrap">
-                      <NextCell proposal={j.p} edit={access === 'edit'} />
-                    </td>
-                  </tr>
-                  {isOpen && (
-                    <tr className="bg-gray-50/60 border-b border-gray-100">
-                      <td colSpan={5 + BOARD_COLUMNS.length} className="px-4 py-4">
-                        <div className="sticky left-4 max-w-4xl">
-                          <PermitsTab proposal={j.p} stages={getStages(j.p) || []} readOnly={access !== 'edit'} />
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              )
-            })}
-          </tbody>
-        </table>
+                          className="font-mono text-blue-700 hover:underline inline-flex items-center gap-0.5">{j.building.record} <ExternalLink size={9} /></a>
+                        <span className="text-gray-400">{j.building.recordStatus || j.building.status}</span>
+                      </>
+                    ) : j.problem ? (
+                      <span className={`px-1.5 py-0.5 rounded-full font-medium ${j.problem === 'Pick permit' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>{j.problem}</span>
+                    ) : <span className="text-gray-300">not checked yet</span>}
+                  </div>
+                </div>
+                {/* inspection cells: a column each on wide screens, a wrapped row of labelled chips otherwise */}
+                {cols.map(c => (
+                  <div key={c.key} className={`lg:block ${j.cells[c.key] ? '' : 'max-lg:hidden'}`}>
+                    <span className="lg:hidden text-[9px] font-semibold text-gray-400 block text-center">{c.label}</span>
+                    <Cell cell={j.cells[c.key]} title={c.title} />
+                  </div>
+                ))}
+                <div className="w-full lg:w-auto text-xs text-gray-700">
+                  <NextCell proposal={j.p} edit={access === 'edit'} />
+                </div>
+              </div>
+              {isOpen && (
+                <div className="px-4 pb-4 pt-1">
+                  <PermitsTab proposal={j.p} stages={getStages(j.p) || []} readOnly={access !== 'edit'} />
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <p className="text-[11px] text-gray-400 flex items-center gap-1.5">
-        <ShieldCheck size={12} /> Green passed · red failed / inaccessible / partial (latest result) · blue scheduled at the county · gray cancelled.
+        <ShieldCheck size={12} /> ✓ green passed · ✗ red failed / inaccessible / partial (latest result) · ◷ blue scheduled at the county · – gray cancelled. Hover a cell for the result.
         FT footing · SL slab · FR framing · ER / EF electrical rough / final · MI / MF mechanical rough / final · FI building final.
       </p>
     </div>
