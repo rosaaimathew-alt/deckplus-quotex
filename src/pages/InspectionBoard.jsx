@@ -4,11 +4,13 @@ import { DEMO } from '../demo'
 import { getStages } from './Jobs'
 import PermitsTab from '../components/PermitsTab'
 import { isJob } from '../lib/attention'
-import { startPulse } from '../lib/permitPulse'
+import { startPulse, runPermitPulse } from '../lib/permitPulse'
+import { locateAddress } from '../lib/permitFees'
 import {
   usePermitAccess, permitTracked, BOARD_COLUMNS, boardCells, countyFinaled, inspectionLabel, INSPECTION_TYPES,
 } from '../lib/permitTracking'
-import { Search, X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { Search, X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck, Printer, Plus, Trash2 } from 'lucide-react'
+import { buildWeeklyReportHtml } from '../lib/inspectionReport'
 
 // ── Inspections board (Projects › Inspections) ───────────────────────────────
 // Every ongoing Mecklenburg job on one screen, one column per inspection, the
@@ -31,6 +33,82 @@ function Cell({ cell, title }) {
       className={`block text-center text-[11px] leading-tight font-medium border rounded-md px-0.5 py-0.5 whitespace-nowrap min-w-[3rem] ${CELL[cell.state]}`}>
       {MARK[cell.state]} {md(cell.date)}
     </span>
+  )
+}
+
+// A job sold outside the app, added so the office can track its permits.
+// It's stored with status 'Imported', which every sales number leaves out.
+function AddJobModal({ pms, onClose, onAdded }) {
+  const addOffPlatformJob = useStore(s => s.addOffPlatformJob)
+  const [f, setF] = useState({ client: '', street: '', city: '', zip: '', pm: '', jobType: '', permit: '' })
+  const [err, setErr] = useState('')
+  const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
+  const address = [f.street.trim(), f.city.trim(), `NC ${f.zip.trim()}`.trim()].filter(Boolean).join(', ')
+
+  const save = () => {
+    if (!f.client.trim() || !f.street.trim()) return setErr('Client name and street address are needed.')
+    if (!/^\d+\s+\S/.test(f.street.trim())) return setErr('The street address needs the house number, e.g. "1320 Betsy Dr".')
+    if (!/^\d{5}$/.test(f.zip.trim())) return setErr('Add the 5-digit ZIP code. The county is looked up by it.')
+    const loc = locateAddress(address)
+    if (loc.county !== 'Mecklenburg') return setErr(`That ZIP is ${loc.county ? `in ${loc.county} County` : 'not one we know'}. The board only tracks Mecklenburg County jobs for now.`)
+    const id = addOffPlatformJob({
+      client: f.client.trim(), address, pm: f.pm.trim(), jobType: f.jobType.trim(),
+      permit: f.permit.trim().toUpperCase(), county: 'Mecklenburg',
+    })
+    onAdded(id)
+  }
+
+  const input = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300'
+  const label = 'block text-xs font-medium text-gray-600 mb-1'
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start sm:items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-5 space-y-3" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Add a job sold outside the app</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+        </div>
+        <p className="text-xs text-gray-500">Only for tracking its permit and inspections. It isn't counted as a sale anywhere: no revenue, win rate or commission changes.</p>
+        <div>
+          <label className={label}>Client *</label>
+          <input className={input} value={f.client} onChange={set('client')} placeholder="Last, First — e.g. Ashley, Sara" autoFocus />
+        </div>
+        <div>
+          <label className={label}>Street address *</label>
+          <input className={input} value={f.street} onChange={set('street')} placeholder="1320 Betsy Dr" />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <label className={label}>City</label>
+            <input className={input} value={f.city} onChange={set('city')} placeholder="Charlotte" />
+          </div>
+          <div>
+            <label className={label}>ZIP *</label>
+            <input className={input} value={f.zip} onChange={set('zip')} placeholder="28211" inputMode="numeric" maxLength={5} />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={label}>PM</label>
+            <input className={input} value={f.pm} onChange={set('pm')} list="qx-pm-list" placeholder="B" />
+            <datalist id="qx-pm-list">{pms.map(x => <option key={x} value={x} />)}</datalist>
+          </div>
+          <div className="col-span-2">
+            <label className={label}>Job type</label>
+            <input className={input} value={f.jobType} onChange={set('jobType')} placeholder="16'x14' Gable Roof Screen Porch" />
+          </div>
+        </div>
+        <div>
+          <label className={label}>County permit # (if issued)</label>
+          <input className={`${input} font-mono`} value={f.permit} onChange={set('permit')} placeholder="RES-ADD-26-000807" />
+          <p className="text-[11px] text-gray-400 mt-1">Leave blank and the app finds the permit by address once the county issues it.</p>
+        </div>
+        {err && <p className="text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={save} className="flex-1 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:opacity-90">Add to the board</button>
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Cancel</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -90,7 +168,7 @@ export default function InspectionBoard() {
     const problem = cp?.needsPick ? 'Pick permit' : (cp?.error && !cp?.permits?.length) ? 'Not found' : ''
     const building = (cp?.permits || []).find(x => x.role === 'building')
     // What the job is: as sold in the app, else the county permit's description
-    const type = p.jobData?.projectTypeOverride
+    const type = p.imported?.jobType || p.jobData?.projectTypeOverride
       || [...(p.contractDraft?.projectTypes || p.projectTypes || [])].join(', ')
       || building?.description || ''
     return { p, cells, failed, problem, building, type, pm: p.imported?.pm || '', finaled: countyFinaled(p) }
@@ -116,6 +194,23 @@ export default function InspectionBoard() {
     pick: jobs.filter(j => j.problem === 'Pick permit').length,
     missing: jobs.filter(j => j.problem === 'Not found').length,
     sched: jobs.filter(j => Object.values(j.cells).some(c => c.state === 'sched') || j.p.jobData?.nextInspection?.code).length,
+  }
+
+  const company = useStore(s => s.branding?.companyName)
+  const deleteProposal = useStore(s => s.deleteProposal)
+  const [adding, setAdding] = useState(false)
+  const onAdded = (id) => {
+    setAdding(false); setOpen(id); setQuery('')
+    if (!DEMO) runPermitPulse({ ids: [id] }).catch(e => setMsg(e.message))
+  }
+  // Prints what's on screen (the PM / search / attention filters apply)
+  const printReport = () => {
+    const w = window.open('', '_blank')
+    if (!w) { setMsg('Allow pop-ups for this site to print the report.'); return }
+    w.document.write(buildWeeklyReportHtml({ jobs: shown, company }))
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 300)
   }
 
   const checkNow = async () => {
@@ -146,6 +241,17 @@ export default function InspectionBoard() {
             </p>
           )}
         </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {access === 'edit' && (
+            <button onClick={() => setAdding(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-gray-300">
+              <Plus size={13} /> Add job
+            </button>
+          )}
+          <button onClick={printReport} disabled={!shown.length}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--brand-600)] text-white hover:opacity-90 disabled:opacity-40">
+            <Printer size={13} /> Print weekly report
+          </button>
         {access === 'edit' && !DEMO && (
           <div className="flex items-center gap-2">
             {msg && <span className="text-xs text-gray-600">{msg}</span>}
@@ -155,6 +261,7 @@ export default function InspectionBoard() {
             </button>
           </div>
         )}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs">
@@ -237,14 +344,22 @@ export default function InspectionBoard() {
                 </div>
               </div>
               {isOpen && (
-                <div className="px-4 pb-4 pt-1">
+                <div className="px-4 pb-4 pt-1 space-y-2">
                   <PermitsTab proposal={j.p} stages={getStages(j.p) || []} readOnly={access !== 'edit'} />
+                  {access === 'edit' && j.p.status === 'Imported' && (
+                    <button onClick={() => { if (window.confirm(`Remove ${j.p.client} from the inspections board?`)) { deleteProposal(j.p.id); setOpen(null) } }}
+                      className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-600">
+                      <Trash2 size={11} /> Remove this job from the board
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           )
         })}
       </div>
+
+      {adding && <AddJobModal pms={pms} onClose={() => setAdding(false)} onAdded={onAdded} />}
 
       <p className="text-[11px] text-gray-400 flex items-center gap-1.5">
         <ShieldCheck size={12} /> ✓ green passed · ✗ red failed / inaccessible / partial (latest result) · ◷ blue scheduled at the county · – gray cancelled. Hover a cell for the result.
