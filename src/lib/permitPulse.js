@@ -2,13 +2,14 @@
 // Sends the ongoing Mecklenburg County jobs to /api/permit-pulse in small
 // batches, and saves what the county site says on each job (countyPermit),
 // checking off the stages the county has passed. Run by components/PermitPulse
-// twice a day, or by "Check county now".
+// at 8 AM and 1 PM (and right away for jobs never checked), or by "Check county now".
 import { useStore } from '../store'
 import { getStages } from '../pages/Jobs'
 import { permitTracked, countyPassedStages, pulseDue } from './permitTracking'
 import { isJob } from './attention'
 
-const BATCH = 6
+// Jobs per request: one parallel round on the server, well inside its 60 s
+const BATCH = 3
 
 // Notes we already have, by inspection id, so the server only opens the
 // "View Details" page of inspections it hasn't read before.
@@ -74,8 +75,15 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
       done++
     }
     onProgress?.({ done, failed, total: jobs.length })
+    useStore.getState().setPermitPulseProgress?.({ done: done + failed, total: jobs.length })
   }
+  useStore.getState().setPermitPulseProgress?.(null)
   return { done, failed, total: jobs.length }
+}
+
+// Tracked jobs the county site has never been read for (e.g. just imported).
+export function uncheckedJobIds() {
+  return useStore.getState().proposals.filter(p => isJob(p) && permitTracked(p) && !p.countyPermit).map(p => p.id)
 }
 
 // The scheduled run (and "Check county now", with force). The run is marked
@@ -88,7 +96,13 @@ export async function startPulse(by, { force = false } = {}) {
   const { permitPulse, setPermitPulse } = useStore.getState()
   if (running) return null
   if (!force) {
-    if (!pulseDue(permitPulse?.lastRunAt)) return null
+    if (!pulseDue(permitPulse?.lastRunAt)) {
+      // Not time for the full check, but fill in jobs never checked
+      const ids = uncheckedJobIds()
+      if (!ids.length) return null
+      running = true
+      try { return await runPermitPulse({ ids }) } finally { running = false; useStore.getState().setPermitPulseProgress?.(null) }
+    }
     const started = permitPulse?.startedAt && Date.now() - new Date(permitPulse.startedAt) < STALE_START_MS
     if (started && (!permitPulse.lastRunAt || permitPulse.startedAt > permitPulse.lastRunAt)) return null
   }
@@ -104,5 +118,6 @@ export async function startPulse(by, { force = false } = {}) {
     throw e
   } finally {
     running = false
+    useStore.getState().setPermitPulseProgress?.(null)
   }
 }

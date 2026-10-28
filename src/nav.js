@@ -10,7 +10,7 @@ import { useMemo } from 'react'
 import {
   House, Handshake, HardHat, ChartColumn, Package, List, Columns3, Users, Eye,
   ClipboardCheck, FileSignature, CalendarDays, Wrench, TrendingUp, Wallet, Target,
-  Upload, Sparkles, Calculator, Hammer,
+  Upload, Sparkles, Calculator, Hammer, ShieldCheck,
 } from 'lucide-react'
 import { useStore } from './store'
 import { canAccessRoute } from './plans'
@@ -41,6 +41,7 @@ export const DESTINATIONS = [
     hint: 'Jobs, the schedule and crews', keywords: 'operations work won',
     tabs: [
       { key: 'jobs',       label: 'Jobs',       icon: Hammer, access: '/jobs', hint: 'Stages, change orders, logs, warranty', keywords: 'job management stages change order daily log warranty costs receipts payment close out' },
+      { key: 'inspections', label: 'Inspections', icon: ShieldCheck, access: ['/jobs', '/subs'], hint: 'Mecklenburg permits and inspections, every job on one screen', keywords: 'permit inspection county mecklenburg footing framing final failed' },
       { key: 'calendar',   label: 'Calendar',   icon: CalendarDays, access: '/scheduler', hint: 'Start dates, milestones, planned work', keywords: 'schedule scheduler dates planner milestones' },
       { key: 'crews',      label: 'Subcontractors', icon: Wrench, access: '/subs', hint: 'Subs, insurance and incidents', keywords: 'subs crews coi insurance trades' },
       { key: 'checklists', label: 'Checklists', icon: ClipboardCheck, access: '/checklists', hint: 'Shared team checklists', keywords: 'punch list todo tasks' },
