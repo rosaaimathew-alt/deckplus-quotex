@@ -314,8 +314,11 @@
     })()
     const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
     const DEMO = params.has('demo')
-    if (window.parent !== window) document.documentElement.classList.add('embedded')
-    const COMPACT = params.has('compact')
+    const EMBEDDED = window.parent !== window
+    if (EMBEDDED) document.documentElement.classList.add('embedded')
+    // Embedded on a website it's always the compact scheduler (whatever embed
+    // code was pasted); ?full keeps the full layout with the logo panel.
+    const COMPACT = params.has('compact') || (EMBEDDED && !params.has('full'))
     if (COMPACT) document.documentElement.classList.add('compact')
     const $ = (id) => document.getElementById(id)
 
