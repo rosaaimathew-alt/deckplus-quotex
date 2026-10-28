@@ -297,6 +297,21 @@
   <script>
     const params = new URLSearchParams(location.search)
     const API = '/api/booking'
+
+    // Anonymous visit tracking: a random ID per browser (no cookies, nothing
+    // personal) and each step at most once per visit. See rr_funnel_daily.
+    const track = (() => {
+      const id = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16)))
+      let visitor
+      try { visitor = localStorage.getItem('rr-vid'); if (!visitor) { visitor = id(); localStorage.setItem('rr-vid', visitor) } } catch { visitor = id() }
+      const session = id(), sent = new Set()
+      return (event) => {
+        if (params.has('demo') || sent.has(event)) return
+        sent.add(event)
+        fetch(API + '?track=1', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ v: visitor, s: session, e: event, page: document.referrer.slice(0, 200) }) }).catch(() => {})
+      }
+    })()
     const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
     const DEMO = params.has('demo')
     if (window.parent !== window) document.documentElement.classList.add('embedded')
@@ -440,6 +455,7 @@
         $('tz').textContent = TZ.replace(/_/g, ' ').replace(/\//g, ' / ')
         render()
         show('pick')
+        track('view')
       } catch (e) {
         $('loading').hidden = true
         error(e.message || 'Could not load times. Please refresh the page.')
@@ -470,7 +486,7 @@
           b.setAttribute('aria-pressed', String(k === state.day))
           b.setAttribute('aria-label', fmtDay(keyToDate(k)) + ', times available')
           b.onclick = () => {
-            state.day = k; state.start = null; render()
+            state.day = k; state.start = null; render(); track('day')
             if (window.innerWidth < 1000 && !COMPACT) $('times').scrollIntoView({ behavior: 'smooth', block: 'start' })
           }
         } else {
@@ -500,7 +516,7 @@
           }
           const b = document.createElement('button')
           b.type = 'button'; b.className = 'slot'; b.textContent = fmtTime(d)
-          b.onclick = () => { state.start = d; render(); $('continue').focus({ preventScroll: true }) }
+          b.onclick = () => { state.start = d; render(); track('time'); $('continue').focus({ preventScroll: true }) }
           return b
         }))
       }
@@ -512,6 +528,7 @@
     $('nextMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1); render() }
 
     function goDetails() {
+      track('form')
       error()
       show('details')
       $('f-first').focus()
@@ -584,6 +601,7 @@
         $('cContact').textContent = [data.booking.repPhone, data.booking.repEmail].filter(Boolean).join('\n')
         $('rWhere').textContent = `${f.street.value.trim()}, ${f.city.value.trim()}, ${f.state.value} ${f.zip.value.trim()}`
         show('done')
+        track('booked')
         parent.postMessage({ type: 'rr-booked', start: data.booking.start }, '*')
       } catch (e) {
         error(e.message || 'Booking failed. Please try again.')

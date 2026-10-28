@@ -178,3 +178,29 @@ create policy rr_bookings_staff on rr_bookings for all using (auth_role() in ('o
 --   ('Rep One',   'rep1@example.com', 1, 'America/New_York', 'rep1@example.com'),
 --   ('Rep Two',   'rep2@example.com', 2, 'America/New_York', 'rep2@example.com'),
 --   ('Rep Three', 'rep3@example.com', 3, 'America/New_York', 'rep3@example.com');
+
+-- ── Anonymous visit tracking (booking page funnel) ──────────────────────────
+-- One row per step per visit; visitor_id is a random per-browser ID, nothing personal.
+create table if not exists rr_events (
+  id         bigint generated always as identity primary key,
+  visitor_id uuid not null,
+  session_id uuid not null,
+  event      text not null check (event in ('view','day','time','form','booked')),
+  page       text,
+  created_at timestamptz not null default now()
+);
+create index if not exists rr_events_time on rr_events (created_at);
+alter table rr_events enable row level security;
+drop policy if exists rr_events_staff on rr_events;
+create policy rr_events_staff on rr_events for select using (auth_role() in ('office','admin'));
+
+-- Unique visitors per day (Eastern) and how far they got.
+create or replace view rr_funnel_daily with (security_invoker = true) as
+select (created_at at time zone 'America/New_York')::date as day,
+       count(distinct visitor_id) filter (where event = 'view')   as visitors,
+       count(distinct session_id) filter (where event = 'view')   as visits,
+       count(distinct visitor_id) filter (where event = 'day')    as picked_day,
+       count(distinct visitor_id) filter (where event = 'time')   as picked_time,
+       count(distinct visitor_id) filter (where event = 'form')   as started_form,
+       count(distinct visitor_id) filter (where event = 'booked') as booked
+from rr_events group by 1 order by 1 desc;
