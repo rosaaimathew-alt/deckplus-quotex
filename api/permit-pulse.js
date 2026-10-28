@@ -108,18 +108,23 @@ export async function checkJob(job) {
   const trades = rows.filter(r => TRADE_RE.test(r.record) && near(r.date) &&
     (nameWords(r.projectName).join(' ') === nameWords(main.projectName).join(' ') || r.description === main.description))
 
+  // The permits side by side, then the notes we don't have yet, a few at a
+  // time — the first check of a job reads them all, so this is what's slow.
   const known = new Set((job.knownNotes || []).map(String))
-  let notesLeft = MAX_NEW_NOTES
-  const permits = []
-  for (const r of [main, ...trades]) {
-    const p = await fetchPermit(r.capIds)
-    for (const ins of p.completed) {
-      if (known.has(ins.id) || notesLeft <= 0) continue
-      notesLeft--
-      try { ins.notes = await fetchInspectionNotes(p.record, r.capIds, ins.id) } catch { /* next pulse tries again */ }
-    }
-    permits.push({ ...summary(r), role: r === main ? 'building' : 'trade', recordStatus: p.recordStatus, expires: p.expires, upcoming: p.upcoming, completed: p.completed })
-  }
+  const pages = await Promise.all([main, ...trades].map(r => fetchPermit(r.capIds)))
+  const todo = []
+  pages.forEach((p, k) => {
+    const r = k === 0 ? main : trades[k - 1]
+    for (const ins of p.completed) if (!known.has(ins.id)) todo.push({ ins, record: p.record, capIds: r.capIds })
+  })
+  await inBatches(todo.slice(0, MAX_NEW_NOTES), 4, async (t) => {
+    if (Date.now() > job.deadline) return   // out of time: the next pulse reads the rest
+    try { t.ins.notes = await fetchInspectionNotes(t.record, t.capIds, t.ins.id) } catch { /* next pulse tries again */ }
+  })
+  const permits = pages.map((p, k) => {
+    const r = k === 0 ? main : trades[k - 1]
+    return { ...summary(r), role: k === 0 ? 'building' : 'trade', recordStatus: p.recordStatus, expires: p.expires, upcoming: p.upcoming, completed: p.completed }
+  })
   return { permits }
 }
 
@@ -147,7 +152,8 @@ export default async function handler(req, res) {
   })).filter(j => j.id)
 
   const results = {}
-  await inBatches(jobs, 3, async (job) => {
+  const deadline = Date.now() + 40000   // leave room inside the 60 s limit
+  await inBatches(jobs.map(j => ({ ...j, deadline })), 3, async (job) => {
     const checkedAt = new Date().toISOString()
     try {
       results[job.id] = { ...(await checkJob(job)), checkedAt }

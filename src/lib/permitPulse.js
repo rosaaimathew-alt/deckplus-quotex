@@ -36,7 +36,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
   const jobs = proposals
     .filter(p => isJob(p) && permitTracked(p))
     .filter(p => !ids || ids.includes(p.id))
-  let done = 0, failed = 0
+  let done = 0, failed = 0, lastError = null
   for (let i = 0; i < jobs.length; i += BATCH) {
     const batch = jobs.slice(i, i + BATCH)
     let results = {}
@@ -58,8 +58,10 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
       if (!res.ok) throw new Error(body.error || `The permit check failed (${res.status})`)
       results = body.results || {}
     } catch (e) {
+      // Keep going with the rest; these jobs are tried again on the next check
       failed += batch.length
-      if (i === 0) throw e   // nothing worked at all — tell the person who asked
+      lastError = e
+      useStore.getState().setPermitPulseProgress?.({ done: done + failed, total: jobs.length })
       continue
     }
     for (const p of batch) {
@@ -78,6 +80,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
     useStore.getState().setPermitPulseProgress?.({ done: done + failed, total: jobs.length })
   }
   useStore.getState().setPermitPulseProgress?.(null)
+  if (!done && lastError) throw lastError   // nothing worked at all — tell the person who asked
   return { done, failed, total: jobs.length }
 }
 
