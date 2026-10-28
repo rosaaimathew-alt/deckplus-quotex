@@ -1333,6 +1333,9 @@ export const useStore = create(
       // Inspection pulse: when it last ran / started, shared by the office.
       permitPulse: null,            // { lastRunAt, startedAt, by }
       setPermitPulse: (v) => set({ permitPulse: v }),
+      // This screen's running check, for the progress line ({ done, total } or null)
+      permitPulseProgress: null,
+      setPermitPulseProgress: (v) => set({ permitPulseProgress: v }),
       setCompanySignature: (v) => set({ companySignature: v }),
       setWelcomeEmail: (v) => set({ welcomeEmail: v }),
       setOfficeView: (v) => { try { localStorage.setItem('qx_office_view', v) } catch { /* private mode */ } set({ officeView: v }) },

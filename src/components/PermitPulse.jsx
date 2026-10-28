@@ -4,7 +4,8 @@ import { DEMO } from '../demo'
 import { startPulse } from '../lib/permitPulse'
 
 // Runs the inspection pulse in the background for office / admin: the first
-// screen open after 7 AM, and again after 1 PM (see lib/permitTracking.js).
+// screen open after 8 AM, and again after 1 PM (see lib/permitTracking.js),
+// and fills in any job that has never been checked as soon as it appears.
 export default function PermitPulse() {
   const me = useStore(s => s.me)
   const orgLoaded = useStore(s => s.orgLoaded)

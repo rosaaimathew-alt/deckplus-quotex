@@ -150,9 +150,9 @@ export function countyPassedStages(proposal, stageKeys) {
 }
 
 // ── When the pulse runs ──────────────────────────────────────────────────────
-// Twice a day: the first office/admin screen open after 7 AM, and again after
-// 1 PM. Returns the start of the slot we're in (or the last one, if before 7 AM).
-export const PULSE_HOURS = [7, 13]
+// Twice a day: the first office/admin screen open after 8 AM, and again after
+// 1 PM. Returns the start of the slot we're in (or the last one, if before 8 AM).
+export const PULSE_HOURS = [8, 13]
 export function currentPulseSlot(now = new Date()) {
   const at = (d, h) => { const x = new Date(d); x.setHours(h, 0, 0, 0); return x }
   for (const h of [...PULSE_HOURS].reverse()) { const s = at(now, h); if (s <= now) return s }
@@ -162,3 +162,58 @@ export function currentPulseSlot(now = new Date()) {
 export function pulseDue(lastRunAt, now = new Date()) {
   return !lastRunAt || new Date(lastRunAt) < currentPulseSlot(now)
 }
+
+// ── Inspections board columns ────────────────────────────────────────────────
+// One column per inspection, the way the office's Inspection Track sheet
+// reads. The county files building inspections on the building permit and
+// electrical / mechanical ones on their own trade permits.
+export const BOARD_COLUMNS = [
+  { key: 'FT', label: 'FT', title: 'Footing' },
+  { key: 'SL', label: 'SL', title: 'Slab' },
+  { key: 'FR', label: 'FR', title: 'Framing' },
+  { key: 'ER', label: 'ER', title: 'Electrical rough' },
+  { key: 'MI', label: 'MI', title: 'Mechanical rough' },
+  { key: 'EF', label: 'EF', title: 'Electrical final' },
+  { key: 'MF', label: 'MF', title: 'Mechanical final' },
+  { key: 'FI', label: 'FI', title: 'Building final' },
+]
+
+function boardColumnOf(permit, ins) {
+  const kind = (String(permit.record || '').split('-')[1] || '').toUpperCase()
+  const code = ins.code
+  if (kind === 'ELC') return code === 'RF' ? 'ER' : code === 'FI' ? 'EF' : code === 'SL' ? 'SL' : null
+  if (kind === 'MEC' || kind === 'PLM') return code === 'RF' ? 'MI' : code === 'FI' ? 'MF' : null
+  if (code === 'FT' || /footing/i.test(ins.name || '')) return 'FT'
+  if (code === 'SL' || code === 'MS') return 'SL'
+  if (code === 'FR' || code === 'FF') return 'FR'
+  if (code === 'FI') return 'FI'
+  return null
+}
+
+// { FT: { state: 'pass'|'fail'|'sched'|'void', result, date, list }, … }
+export function boardCells(proposal) {
+  const cols = {}
+  for (const p of proposal.countyPermit?.permits || []) {
+    for (const ins of p.completed || []) {
+      const k = boardColumnOf(p, ins); if (!k) continue
+      ;(cols[k] ||= { list: [], upcoming: [] }).list.push({ ...ins, record: p.record })
+    }
+    for (const ins of p.upcoming || []) {
+      const k = boardColumnOf(p, ins); if (!k) continue
+      ;(cols[k] ||= { list: [], upcoming: [] }).upcoming.push({ ...ins, record: p.record })
+    }
+  }
+  for (const c of Object.values(cols)) {
+    c.list.sort((a, b) => (a.date || '').localeCompare(b.date || '') || Number(a.id) - Number(b.id))
+    const last = c.list[c.list.length - 1]
+    const passed = c.list.filter(i => isPassResult(i.result)).pop()
+    if (passed) Object.assign(c, { state: 'pass', result: passed.result, date: passed.date })
+    else if (c.upcoming.length) Object.assign(c, { state: 'sched', result: 'Scheduled', date: c.upcoming[0].date })
+    else if (last && isFailResult(last.result)) Object.assign(c, { state: 'fail', result: last.result, date: last.date })
+    else if (last) Object.assign(c, { state: 'void', result: last.result, date: last.date })
+  }
+  return cols
+}
+
+export const countyFinaled = (proposal) =>
+  (proposal.countyPermit?.permits || []).some(p => p.role === 'building' && /closed|final/i.test(p.recordStatus || p.status || ''))
