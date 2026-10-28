@@ -24,6 +24,9 @@ const daysSince = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime
 
 export const contractStatusOf = (p) => (!p.contractDraft ? 'not-started' : p.contractDraft.signed ? 'signed' : 'in-progress')
 export const isJobClosed = (p) => (p.jobData?.completedStages || []).includes('closed')
+// A job on the Jobs page: a won deal, or an ongoing job brought in from the
+// office's project sheet (status 'Imported' — never counted as a sale).
+export const isJob = (p) => p.status === 'Won' || p.status === 'Imported'
 
 // Each item: { key, tone, title, detail, count, people: [{ id, name, note }], to, cta }
 export function attentionItems({ proposals = [], jobCosts = {}, can = () => true, role = 'manager' }) {

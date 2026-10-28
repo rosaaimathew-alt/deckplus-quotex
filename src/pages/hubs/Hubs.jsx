@@ -8,7 +8,7 @@ import { Plus } from 'lucide-react'
 import Hub from '../../components/Hub'
 import { useNav } from '../../nav'
 import { useStore } from '../../store'
-import { nextReminderDate, isJobClosed } from '../../lib/attention'
+import { nextReminderDate, isJobClosed, isJob } from '../../lib/attention'
 
 import ProposalTracker from '../ProposalTracker'
 import ClientList from '../ClientList'
@@ -69,7 +69,7 @@ export function ProjectsHub() {
     const won = proposals.filter(p => p.status === 'Won')
     const open = won.filter(p => !isJobClosed(p))
     return {
-      jobs:      { count: open.length },
+      jobs:      { count: proposals.filter(p => isJob(p) && !isJobClosed(p)).length },
       calendar:  { count: open.filter(p => !p.jobData?.startDate).length, countTone: 'alert' },
     }
   }, [proposals])

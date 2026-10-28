@@ -39,7 +39,9 @@ export function parseAddress(address) {
   const a = String(address || '')
   const [street = ''] = a.split(',')
   const m = street.trim().match(/^(\d+)\s+(.+)$/)
-  const zip = (a.match(/\b(\d{5})(?:-\d{4})?\b(?![\s\S]*\b\d{5}\b)/) || [])[1] || ''
+  // The ZIP is the last 5-digit number after the street, never the house number
+  const rest = a.slice(street.length)
+  const zip = (rest.match(/\b(\d{5})(?:-\d{4})?\b(?![\s\S]*\b\d{5}\b)/) || [])[1] || ''
   if (!m) return { number: '', name: '', zip }
   const words = m[2].toLowerCase().replace(/[.#]/g, ' ').split(/\s+/).filter(Boolean)
   while (words.length > 1 && (SUFFIXES.has(words[words.length - 1]) || DIRS.has(words[words.length - 1]))) words.pop()

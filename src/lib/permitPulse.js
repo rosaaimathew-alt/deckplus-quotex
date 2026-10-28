@@ -6,6 +6,7 @@
 import { useStore } from '../store'
 import { getStages } from '../pages/Jobs'
 import { permitTracked, countyPassedStages, pulseDue } from './permitTracking'
+import { isJob } from './attention'
 
 const BATCH = 6
 
@@ -32,7 +33,7 @@ function withNotes(result, prev) {
 export async function runPermitPulse({ ids, onProgress } = {}) {
   const { proposals, setCountyPermit } = useStore.getState()
   const jobs = proposals
-    .filter(p => p.status === 'Won' && permitTracked(p))
+    .filter(p => isJob(p) && permitTracked(p))
     .filter(p => !ids || ids.includes(p.id))
   let done = 0, failed = 0
   for (let i = 0; i < jobs.length; i += BATCH) {

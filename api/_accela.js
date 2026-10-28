@@ -233,15 +233,25 @@ export function parseNotes(lines) {
 const SEARCH_URL = `${BASE}/Cap/CapHome.aspx?module=Building&TabName=Building`
 const F = 'ctl00$PlaceHolderMain$generalSearchForm$'
 
+// A record by its number ("RES-ADD-26-000807"), via the same search form.
+export async function searchByRecord(record) {
+  const rec = String(record || '').trim().toUpperCase()
+  if (!RECORD_RE.test(rec)) return []
+  return runSearch({ [`${F}txtGSPermitNumber`]: rec })
+}
+
 export async function searchByAddress(number, street) {
   const num = String(number || '').replace(/\D/g, '').slice(0, 8)
   const name = String(street || '').replace(/[^A-Za-z0-9 '-]/g, '').trim().slice(0, 40)
   if (!num || !name) return []
+  return runSearch({ [`${F}txtGSNumber$ChildControl0`]: num, [`${F}txtGSStreetName`]: name })
+}
+
+async function runSearch(values) {
   const request = client()
   const page = await request(SEARCH_URL)
   const fields = formFields(page.text)
-  fields.set(`${F}txtGSNumber$ChildControl0`, num)
-  fields.set(`${F}txtGSStreetName`, name)
+  for (const [k, v] of Object.entries(values)) fields.set(k, v)
   fields.set('ctl00$ScriptManager1', 'ctl00$PlaceHolderMain$updatePanel|ctl00$PlaceHolderMain$btnNewSearch')
   fields.set('__EVENTTARGET', 'ctl00$PlaceHolderMain$btnNewSearch')
   fields.set('__EVENTARGUMENT', '')
