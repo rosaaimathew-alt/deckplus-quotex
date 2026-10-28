@@ -177,7 +177,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           )}
           {inp.type === 'ezebreeze' && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Field label="Wall height (in)" hint={Number(inp.wallHeightIn) > PORCH_WINDOW_MAX_H ? 'Over 105″ → one transom per window' : undefined}>
+              <Field label="Wall height (in)" hint={Number(inp.wallHeightIn) > PORCH_WINDOW_MAX_H ? `Over ${PORCH_WINDOW_MAX_H}″ → one transom per window` : undefined}>
                 <input type="number" min="60" aria-label="Wall height (in)" className={inputCls} value={inp.wallHeightIn} onChange={e => set({ wallHeightIn: e.target.value })} />
               </Field>
               <Field label="Enclosed walls">

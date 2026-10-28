@@ -322,3 +322,14 @@ Margin displays read "cost not set" rather than 100% while a cost is 0.
 - Pavilion / freestanding "extra electrical": which item and price?
 - Hip: confirm LVL + engineering are on top of the 3000; flat ceiling price.
 - Inclusion lists for open vs ScreenEze porches (for scope text).
+
+## Rule changes confirmed Oct 28, 2026 (these override the tables above)
+- **PT LVL:** $50/LF × porch depth (was $150). Still added on gable and hip roofs.
+- **Engineer letter:** $1,800 (was $1,000 "LVL engineering"). Added on every gable, hip
+  and **every semi-vaulted roof** (freestanding included). Never charged twice.
+- **Freestanding:** +$7/SF (confirmed). Takes a gable **or a semi-vaulted** roof.
+- **Eze-Breeze transoms:** one per window when the wall is **over 100″** (was 105″).
+- **Door lip unit:** $130 per Larsen storm door (ScreenEze / Eze-Breeze, and the
+  porch conversion tool). Not on sunroom glass doors.
+- **Gable glass:** offered on gable and semi-vaulted roofs.
+- **Border:** no extra material — blocking and labor at $3/SF of the floor, 1- or 2-board.

@@ -40,7 +40,7 @@ function freshIds(lines) {
 const PORCH_WINDOW_MAX_W = 54    // Eze-Breeze unit max width (in)
 const PORCH_WINDOW_GRAB   = 2.5  // frame overlap onto each column (in)
 const PORCH_COL_W         = 5.5  // 6×6 column width (in)
-const PORCH_WINDOW_MAX_H  = 105  // Eze-Breeze max height (in); over → transom
+const PORCH_WINDOW_MAX_H  = 100  // Eze-Breeze max height (in); over → transom
 const PORCH_DOOR_W        = 36   // exit-door opening (in)
 const PORCH_CLEAR_SPAN    = PORCH_WINDOW_MAX_W - 2 * PORCH_WINDOW_GRAB   // 49" of wall each window fills
 const PORCH_MODULE        = PORCH_CLEAR_SPAN + PORCH_COL_W               // 54.5" per window+column
@@ -219,7 +219,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
         {wallSet.map((ln, i) => (
           <p key={i}>{i === 0 ? 'Front' : `Side ${i}`} wall {ln}′ ({Math.round(ln * 12)}″){i === 0 && Dr > 0 ? `, ${Dr} door${Dr !== 1 ? 's' : ''}` : ''} → <strong>{layout[i].windows} window{layout[i].windows !== 1 ? 's' : ''}</strong>{layout[i].windows > 0 ? ` @ ${Math.round(layout[i].winWidth)}″ each` : ''}</p>
         ))}
-        <p className="pt-0.5 border-t border-[var(--brand-100)]">Total: <strong>{totalWindows} windows</strong> · <strong>{totalColumns} columns</strong>{Dr > 0 ? <> · <strong>{Dr} door{Dr !== 1 ? 's' : ''}</strong></> : ''}{overHeight ? <> · wall {Hin}″ &gt; 105″ → <strong>{totalTransoms} transoms</strong></> : ''}</p>
+        <p className="pt-0.5 border-t border-[var(--brand-100)]">Total: <strong>{totalWindows} windows</strong> · <strong>{totalColumns} columns</strong>{Dr > 0 ? <> · <strong>{Dr} door{Dr !== 1 ? 's' : ''}</strong></> : ''}{overHeight ? <> · wall {Hin}″ &gt; {PORCH_WINDOW_MAX_H}″ → <strong>{totalTransoms} transoms</strong></> : ''}</p>
       </div>
 
       {/* Component table */}

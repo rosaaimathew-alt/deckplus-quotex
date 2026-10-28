@@ -74,8 +74,8 @@ export const PORCH_BUILD_DEFAULTS = {
   // Structural add-ons
   freestanding_add:   R('Freestanding structure add',                      'SF', 7,    'structure'),
   deck_over_8:        R('Deck above 8′ high add',                          'SF', 5,    'structure'),
-  pt_lvl:             R('PT LVL framing (porch depth)',                     'LF', 150,  'structure'),
-  lvl_engineering:    R('Engineering (LVL projects & semi-vaulted roofs)',   'LS', 1000, 'structure'),
+  pt_lvl:             R('PT LVL framing (porch depth)',                     'LF', 50,   'structure'),
+  lvl_engineering:    R('Engineer letter (LVL projects & semi-vaulted roofs)', 'LS', 1800, 'structure'),
   gable_over_19:      R('Gable / semi-vaulted wider than 19′ add',         'LS', 1000, 'structure'),
   hip_roof:           R('Hip roof',                                         'LS', 3000, 'structure'),
   hot_tub_reinforce:  R('Reinforce deck for hot tub / porch',               'LS', 2000, 'structure'),
@@ -89,7 +89,7 @@ export const PORCH_BUILD_DEFAULTS = {
   screeneze_upcharge: R('ScreenEze screens',                               'SF', 3,    'enclosure'),
   lam_column_pkg:     R('6×6 laminated column package',                     'LS', 2000, 'enclosure'),
   eze_window:         R('Eze-Breeze window unit',                           'EA', 700,  'enclosure'),
-  eze_transom:        R('Eze-Breeze transom (wall over 105″)',              'EA', 130,  'enclosure'),
+  eze_transom:        R('Eze-Breeze transom (wall over 100″)',              'EA', 130,  'enclosure'),
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
   door_savannah:      R('Larsen Savannah door',                             'EA', 650,  'enclosure', { door: true }),
   door_savannah_pet:  R('Larsen Savannah Pet door',                         'EA', 815,  'enclosure', { door: true }),
@@ -260,7 +260,7 @@ export const PORCH_ROOFS  = [
 export const PORCH_WINDOW_MAX_W = 54    // Eze-Breeze unit max width (in)
 export const PORCH_WINDOW_GRAB  = 2.5   // frame overlap onto each column (in)
 export const PORCH_COL_W        = 5.5   // 6×6 column width (in)
-export const PORCH_WINDOW_MAX_H = 105   // over this wall height → transom per window
+export const PORCH_WINDOW_MAX_H = 100   // over this wall height → transom per window
 export const PORCH_DOOR_W       = 36    // exit-door opening (in)
 const PORCH_CLEAR_SPAN = PORCH_WINDOW_MAX_W - 2 * PORCH_WINDOW_GRAB   // 49″ of wall per window
 const PORCH_MODULE     = PORCH_CLEAR_SPAN + PORCH_COL_W               // 54.5″ per window+column
