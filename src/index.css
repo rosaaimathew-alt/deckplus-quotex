@@ -92,6 +92,18 @@
     page-break-after: avoid !important;
   }
 
+  /* Signature lines and yes/no boxes stay whole too. */
+  .contract-doc .dp-sigline,
+  .contract-doc .dp-sigcols,
+  .contract-doc .dp-yesno {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* The audit log prints at full width instead of scrolling off the page. */
+  [data-pdf-block] .overflow-x-auto { overflow: visible !important; }
+  [data-pdf-block] tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+
   /* Signature blocks (name line + date line + label) must stay together. */
   .contract-sig {
     break-inside: avoid !important;

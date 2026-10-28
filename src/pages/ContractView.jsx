@@ -9,6 +9,7 @@ import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, required
 import { specPrefill } from '../contract/specPrefill'
 import { scopeLinesFor, normalizeScope, remapEdit, draftOf, scopeEdits, applyLearned, learnedHints, linePrice } from '../lib/scopeLearning'
 import { mergeLines } from '../lib/hiddenLines'
+import { buildContractPdf } from '../lib/contractPdf'
 
 // ── Contract page ────────────────────────────────────────────────────────────
 // Builds the Deck Plus contract packet for a Won proposal. The packet's wording
@@ -441,54 +442,7 @@ export default function ContractView() {
   const handleUploadToDrive = async () => {
     setSigning(true); setSignError(''); setSignResult(null)
     try {
-      const { toCanvas } = await import('html-to-image')
-      const { default: jsPDF } = await import('jspdf')
-      const LETTER_PX = 816
-      const original  = contractDocRef.current
-      const overlay   = document.createElement('div')
-      overlay.style.cssText = `position:fixed;top:0;left:0;z-index:99999;width:${LETTER_PX}px;opacity:0;pointer-events:none;background:#ffffff;`
-      const clone = original.cloneNode(true)
-      clone.style.cssText = `width:${LETTER_PX}px;max-width:${LETTER_PX}px;margin:0;border-radius:0;box-shadow:none;overflow:visible;background:#ffffff;`
-      clone.querySelectorAll('.no-print').forEach(el => el.remove())
-      clone.querySelectorAll('.print-only').forEach(el => { el.style.display = el.tagName === 'SPAN' ? 'inline' : 'block' })
-      overlay.appendChild(clone)
-      document.body.appendChild(overlay)
-      await Promise.all(Array.from(clone.querySelectorAll('img')).map(img => img.complete && img.naturalWidth > 0 ? Promise.resolve() : new Promise(resolve => { img.onload = img.onerror = resolve })))
-      await new Promise(r => setTimeout(r, 300))
-      const cloneTop  = clone.getBoundingClientRect().top
-      const contentH  = Math.max(clone.scrollHeight, clone.getBoundingClientRect().height)
-      const breakYsPx = Array.from(clone.querySelectorAll('.pdf-page-break')).map(el => el.getBoundingClientRect().top - cloneTop).filter(y => y > 1).sort((a, b) => a - b)
-      // Safe places to end a page: under a whole paragraph, list item, table row or heading.
-      const cutYsPx = Array.from(clone.querySelectorAll('p, li, tr, h1, h2, img, .dp-clause, .dp-sigcols')).map(el => el.getBoundingClientRect().bottom - cloneTop).sort((a, b) => a - b)
-      const canvas  = await toCanvas(clone, { pixelRatio: 1.5, backgroundColor: '#ffffff', cacheBust: true })
-      document.body.removeChild(overlay)
-      const imgData = canvas.toDataURL('image/jpeg', 0.75)
-      const pdf     = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter', compress: true })
-      const pageW   = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight()
-      const imgH    = (canvas.height * pageW) / canvas.width
-      const pxToPt  = imgH / contentH
-      const boundaries = [0, ...breakYsPx.map(y => y * pxToPt), imgH]
-      const cuts = cutYsPx.map(y => y * pxToPt)
-      let isFirst = true
-      for (let i = 0; i < boundaries.length - 1; i++) {
-        let y = boundaries[i]
-        const end = boundaries[i + 1]
-        while (y < end - 1) {
-          if (!isFirst) pdf.addPage()
-          isFirst = false
-          // End this page under the last whole block that fits (never mid-line);
-          // fall back to a full page only when no block ends in its lower 40%.
-          let next = Math.min(y + pageH, end)
-          if (next < end) {
-            const fit = cuts.filter(c => c > y + pageH * 0.6 && c <= y + pageH)
-            if (fit.length) next = fit[fit.length - 1]
-          }
-          pdf.addImage(imgData, 'JPEG', 0, -y, pageW, imgH)
-          const coverTop = next - y
-          if (coverTop < pageH) { pdf.setFillColor(255, 255, 255); pdf.rect(0, coverTop, pageW, pageH - coverTop + 2, 'F') }
-          y = next
-        }
-      }
+      const pdf = await buildContractPdf(contractDocRef.current)
       const pdfBase64 = pdf.output('datauristring').split(',')[1]
       const fileName  = `Contract-${(client || 'Client').replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`
       const res = await fetch(`/api/drive/upload`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdfBase64, fileName }) })
