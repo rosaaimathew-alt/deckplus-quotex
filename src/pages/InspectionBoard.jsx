@@ -89,7 +89,11 @@ export default function InspectionBoard() {
     const failed = Object.values(cells).some(c => c.state === 'fail')
     const problem = cp?.needsPick ? 'Pick permit' : (cp?.error && !cp?.permits?.length) ? 'Not found' : ''
     const building = (cp?.permits || []).find(x => x.role === 'building')
-    return { p, cells, failed, problem, building, pm: p.imported?.pm || '', finaled: countyFinaled(p) }
+    // What the job is: as sold in the app, else the county permit's description
+    const type = p.jobData?.projectTypeOverride
+      || [...(p.contractDraft?.projectTypes || p.projectTypes || [])].join(', ')
+      || building?.description || ''
+    return { p, cells, failed, problem, building, type, pm: p.imported?.pm || '', finaled: countyFinaled(p) }
   }).sort((a, b) => String(a.p.client || '').localeCompare(String(b.p.client || ''))), [proposals])
 
   const pms = [...new Set(jobs.map(j => j.pm).filter(Boolean))].sort()
@@ -103,7 +107,7 @@ export default function InspectionBoard() {
     if (hideFinaled && j.finaled) return false
     if (query) {
       const q = query.toLowerCase()
-      return [j.p.client, j.p.address, j.building?.record, j.p.imported?.permit].some(v => String(v || '').toLowerCase().includes(q))
+      return [j.p.client, j.p.address, j.type, j.building?.record, j.p.imported?.permit].some(v => String(v || '').toLowerCase().includes(q))
     }
     return true
   })
@@ -164,7 +168,7 @@ export default function InspectionBoard() {
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-64">
           <Search size={13} className="text-gray-400 shrink-0" />
           <input className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
-            placeholder="Client, address or permit #…" value={query} onChange={e => setQuery(e.target.value)} />
+            placeholder="Client, address, job type or permit #…" value={query} onChange={e => setQuery(e.target.value)} />
           {query && <button onClick={() => setQuery('')} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>}
         </div>
         {pms.length > 0 && (
@@ -207,6 +211,7 @@ export default function InspectionBoard() {
                     {j.failed && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
                     {j.pm && <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">PM {j.pm}</span>}
                   </div>
+                  {j.type && <div className="text-xs text-gray-700 truncate" title={j.type}>{j.type}</div>}
                   <div className="text-[11px] text-gray-400 truncate">{j.p.address}</div>
                   <div className="text-[11px] mt-0.5 flex items-center gap-1.5 flex-wrap">
                     {j.building ? (
