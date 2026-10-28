@@ -912,6 +912,38 @@ export const useStore = create(
           }),
         })),
 
+      // A job sold outside the app, added so its permits and inspections can be
+      // tracked. Status 'Imported' keeps it out of every sales number.
+      addOffPlatformJob: ({ client, address, pm, jobType, permit, county }) => {
+        const id = get().nextProposalId
+        const now = new Date().toISOString()
+        set((s) => ({
+          nextProposalId: id + 1,
+          proposals: [{
+            id, client, address, status: 'Imported', statusChangedAt: now, createdAt: now,
+            ownerId: null, pmId: null, total: 0, lines: [], reminders: [], activities: [], jobData: {},
+            imported: { source: 'Added by office', pm, jobType, permit, county, importedAt: now, addedBy: s.me?.displayName || s.me?.email || '' },
+          }, ...s.proposals],
+        }))
+        return id
+      },
+
+      // County permit results from the inspection pulse. Stages the county
+      // has passed are checked off; nothing is ever unchecked.
+      setCountyPermit: (proposalId, countyPermit, passedStages = []) =>
+        set((s) => ({
+          proposals: s.proposals.map((p) => {
+            if (p.id !== proposalId) return p
+            const done = p.jobData?.completedStages || []
+            const add = passedStages.filter(k => !done.includes(k))
+            return {
+              ...p,
+              countyPermit,
+              ...(add.length ? { jobData: { ...(p.jobData || {}), completedStages: [...done, ...add] } } : {}),
+            }
+          }),
+        })),
+
       toggleJobStage: (proposalId, stageKey) =>
         set((s) => ({
           proposals: s.proposals.map((p) => {
@@ -1314,6 +1346,12 @@ export const useStore = create(
       // the welcome email a customer gets once the contract is fully signed.
       companySignature: null,       // { enabled, signatureDataUrl, printedName, title, adoptedBy, adoptedAt }
       welcomeEmail: null,           // { enabled, subject, body }
+      // Inspection pulse: when it last ran / started, shared by the office.
+      permitPulse: null,            // { lastRunAt, startedAt, by }
+      setPermitPulse: (v) => set({ permitPulse: v }),
+      // This screen's running check, for the progress line ({ done, total } or null)
+      permitPulseProgress: null,
+      setPermitPulseProgress: (v) => set({ permitPulseProgress: v }),
       setCompanySignature: (v) => set({ companySignature: v }),
       setWelcomeEmail: (v) => set({ welcomeEmail: v }),
       setOfficeView: (v) => { try { localStorage.setItem('qx_office_view', v) } catch { /* private mode */ } set({ officeView: v }) },
@@ -1370,7 +1408,7 @@ const SETTINGS_DEFAULTS = () => ({
   deckFormulaLocked: false, porchFormulaLocked: false,
   deckScopeTemplate: DECK_SCOPE_DEFAULT, porchScopeTemplate: PORCH_SCOPE_DEFAULT,
   paymentScheduleLearning: {}, scopeExamples: [], historyImported: false, calendarHiddenJobs: [],
-  contractPrefix: 'DP', companySignature: null, welcomeEmail: null,
+  contractPrefix: 'DP', companySignature: null, welcomeEmail: null, permitPulse: null,
   porchBuildRates: {}, porchBuildLocked: false, porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
   subscriptions: [],
 })

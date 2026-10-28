@@ -8,11 +8,13 @@ import { Plus } from 'lucide-react'
 import Hub from '../../components/Hub'
 import { useNav } from '../../nav'
 import { useStore } from '../../store'
-import { nextReminderDate, isJobClosed } from '../../lib/attention'
+import { nextReminderDate, isJobClosed, isJob } from '../../lib/attention'
 
 import ProposalTracker from '../ProposalTracker'
 import ClientList from '../ClientList'
 import Jobs from '../Jobs'
+import InspectionBoard from '../InspectionBoard'
+import { permitTracked, boardCells } from '../../lib/permitTracking'
 import ContractsList from '../ContractsList'
 import PMCalendar from '../PMCalendar'
 import Subcontractors from '../Subcontractors'
@@ -69,13 +71,15 @@ export function ProjectsHub() {
     const won = proposals.filter(p => p.status === 'Won')
     const open = won.filter(p => !isJobClosed(p))
     return {
-      jobs:      { count: open.length },
+      jobs:      { count: proposals.filter(p => isJob(p) && !isJobClosed(p)).length },
+      inspections: { count: proposals.filter(p => isJob(p) && permitTracked(p) && Object.values(boardCells(p)).some(c => c.state === 'fail')).length, countTone: 'alert' },
       calendar:  { count: open.filter(p => !p.jobData?.startDate).length, countTone: 'alert' },
     }
   }, [proposals])
 
   const tabs = withRender(tabsOf('projects'), {
     jobs:       () => <Jobs />,
+    inspections: () => <InspectionBoard />,
     calendar:   () => <PMCalendar />,
     crews:      () => <Subcontractors />,
     checklists: () => <Checklists />,

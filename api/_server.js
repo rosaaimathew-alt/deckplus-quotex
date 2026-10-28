@@ -12,6 +12,7 @@ import messagesHandler from './messages.js'
 import inboundHandler from './inbound-email.js'
 import aiChatHandler from './ai-chat.js'
 import bookingHandler from './booking.js'
+import permitPulseHandler from './permit-pulse.js'
 import { getAuthUrl, handleCallback, isAuthenticated, uploadToDrive } from './_google-drive.js'
 import { createHmac } from 'crypto'
 
@@ -35,6 +36,7 @@ app.post('/api/inbound-email', (req, res) => inboundHandler(req, res))
 app.post('/api/ai-chat',       (req, res) => aiChatHandler(req, res))
 app.get('/api/booking',        (req, res) => bookingHandler(req, res))
 app.post('/api/booking',       (req, res) => bookingHandler(req, res))
+app.post('/api/permit-pulse',  (req, res) => permitPulseHandler(req, res))
 
 // ── Auth ─────────────────────────────────────────────────────────────────
 app.post('/api/auth/login', (req, res) => {

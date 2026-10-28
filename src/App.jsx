@@ -19,6 +19,7 @@ import Legal from './pages/Legal'
 import EsignCertificate from './pages/EsignCertificate'
 import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub } from './pages/hubs/Hubs'
 import CommandPalette from './components/CommandPalette'
+import PermitPulse from './components/PermitPulse'
 import AuthGuard, { logout } from './components/AuthGuard'
 import { useStore, bootstrapOrg } from './store'
 import { applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR } from './brand'
@@ -332,6 +333,9 @@ function AppShell() {
 
       {/* Pinned to-do — floats on every page when pinned */}
       <TodoDock />
+
+      {/* Mecklenburg inspection pulse (office / admin, twice a day) */}
+      <PermitPulse />
     </div>
   )
 }
