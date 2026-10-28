@@ -93,7 +93,7 @@ export const PORCH_BUILD_DEFAULTS = {
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
   door_savannah:      R('Larsen Savannah door',                             'EA', 650,  'enclosure', { door: true }),
   door_savannah_pet:  R('Larsen Savannah Pet door',                         'EA', 815,  'enclosure', { door: true }),
-  glass_gable_end:    R('Glass in gable end (gable roofs only)',            'EA', 975,  'enclosure'),
+  glass_gable_end:    R('Glass in gable end (gable / semi-vaulted roofs)',  'EA', 975,  'enclosure'),
   // Sunroom
   sun_window:         R('Outside Brand Standard window (36″×60″)',          'EA', 950,  'enclosure'),
   sun_wall:           R('Sunroom knee wall — Hardie / ply-beaded',          'SF', 29, 'enclosure'),
@@ -172,8 +172,9 @@ export const PORCH_BUILD_DEFAULTS = {
   lattice_sheet: R('Engineered lattice, stained (4×8 sheet)',   'EA', 270,  'stepsrail', { option: true }),
   skirt_pt:      R('PT skirt, stained',                         'SF', 10,   'stepsrail', { option: true }),
   skirt_trex:    R('Trex skirt',                                'SF', 33,   'stepsrail', { option: true }),
-  border_1:      R('1-board border',                            'LF', 3,    'stepsrail', { option: true }),
-  border_2:      R('2-board border',                            'LF', 6,    'stepsrail', { option: true }),
+  // Border: no extra material — blocking and labor, $3 per SF of the porch floor.
+  border_1:      R('1-board border (blocking + labor)',         'SF', 3,    'stepsrail', { option: true }),
+  border_2:      R('2-board border (blocking + labor)',         'SF', 3,    'stepsrail', { option: true }),
 
   // Electrical — packages (pick one) from the Porch price list
   elec_simple:   R('SIMPLE electric package (1 fan / 1 flood / 1 outlet)',                       'LS', 1850, 'electrical', { elecPkg: true }),
@@ -241,7 +242,7 @@ export const PORCH_TYPES = [
 export const PORCH_TIES   = [
   { key: 'wall', label: 'Wall tie' },
   { key: 'roof', label: 'Roof tie' },
-  { key: 'free', label: 'Freestanding (gable only)' },
+  { key: 'free', label: 'Freestanding (gable or semi-vault)' },
 ]
 export const PORCH_FLOORS = [
   { key: 'deck',  label: 'New PT deck (included)' },
@@ -399,7 +400,8 @@ export function computePorchBuild(input, ratesIn) {
 
   // Freestanding forces a gable roof (confirmed rule).
   const tie  = inp.tie
-  const roof = tie === 'free' ? 'gable' : inp.roof
+  // Freestanding porches take a gable or a semi-vaulted roof (gable unless semi-vault is chosen).
+  const roof = tie === 'free' ? (inp.roof === 'semivault' ? 'semivault' : 'gable') : inp.roof
   // Eze-Breeze porches price their structure on the screen-porch rows (windows
   // are added on top); sunrooms on the open-porch rows.
   const typeForBase = inp.type === 'ezebreeze' ? 'screen' : inp.type === 'sunroom' ? 'open' : inp.type
@@ -444,7 +446,7 @@ export function computePorchBuild(input, ratesIn) {
   if (inp.type !== 'open') for (const [k, q] of Object.entries(inp.doors || {})) {
     if (inp.type === 'sunroom' ? rates[k]?.sunDoor : rates[k]?.door) add(k, n(q))
   }
-  if (roof === 'gable' && n(inp.glassEnds) > 0) add('glass_gable_end', n(inp.glassEnds))
+  if ((roof === 'gable' || roof === 'semivault') && n(inp.glassEnds) > 0) add('glass_gable_end', n(inp.glassEnds))
 
   // Structural toggles
   if (inp.hotTub) add('hot_tub_reinforce', 1)

@@ -162,8 +162,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             </div>
           )}
         </Field>
-        <Field label="Roof connection"><Seg options={PORCH_TIES} value={inp.tie} onChange={v => set({ tie: v, roof: v === 'free' ? 'gable' : inp.roof })} /></Field>
-        <Field label="Roof style" hint={inp.tie === 'free' ? 'Freestanding porches are always gable.' : result.roof === 'gable' || result.roof === 'hip' ? 'Adds PT LVL for the depth + LVL engineering.' : result.roof === 'semivault' ? 'Over 19′ wide adds the same flat fee as a gable.' : undefined}>
+        <Field label="Roof connection"><Seg options={PORCH_TIES} value={inp.tie} onChange={v => set({ tie: v, roof: v === 'free' && inp.roof !== 'semivault' ? 'gable' : inp.roof })} /></Field>
+        <Field label="Roof style" hint={inp.tie === 'free' ? 'Freestanding porches take a gable or semi-vaulted roof.' : result.roof === 'gable' || result.roof === 'hip' ? 'Adds PT LVL for the depth + LVL engineering.' : result.roof === 'semivault' ? 'Over 19′ wide adds the same flat fee as a gable.' : undefined}>
           <Seg options={PORCH_ROOFS} value={result.roof} onChange={v => set({ roof: v })} disabledKeys={inp.tie === 'free' ? ['shed', 'hip'] : []} />
         </Field>
       </div>
@@ -242,7 +242,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
               ))}
             </div>
           </div>
-          {result.roof === 'gable' && (
+          {(result.roof === 'gable' || result.roof === 'semivault') && (
             <div className="flex items-center gap-2 text-sm text-gray-700">
               <span>Glass in gable ends</span>
               <input type="number" min="0" max="2" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.glassEnds} onChange={e => set({ glassEnds: e.target.value })} />
@@ -349,31 +349,38 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
         </Field>
       </div>
 
-      {/* ── Options with a quantity ───────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 p-4 space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Options (ceilings, roof, walls, deck upgrades, electrical extras)</p>
-          <select className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white" value="" onChange={e => addOption(e.target.value)}>
-            <option value="">+ Add option…</option>
-            {optionsByGroup.map(g => (
-              <optgroup key={g.key} label={g.label}>
-                {g.keys.map(k => <option key={k} value={k} disabled={inp.extras?.[k] != null}>{rates[k].label} — {rates[k].rate}/{rates[k].unit}</option>)}
-              </optgroup>
-            ))}
-          </select>
+      {/* ── Options with a quantity, each under its own category ─────────── */}
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Options</p>
+        <p className="text-xs text-gray-400 -mt-1">SF options start at the porch area, LF options at the width; adjust the quantity as needed.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {optionsByGroup.map(g => {
+            const added = g.keys.filter(k => inp.extras?.[k] != null)
+            return (
+              <div key={g.key} className="rounded-xl border border-gray-200 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-gray-700">{g.label}</p>
+                  <select aria-label={`Add ${g.label} option`} className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white max-w-[60%]" value="" onChange={e => addOption(e.target.value)}>
+                    <option value="">+ Add…</option>
+                    {g.keys.map(k => <option key={k} value={k} disabled={inp.extras?.[k] != null}>{rates[k].label} — {rates[k].rate}/{rates[k].unit}</option>)}
+                  </select>
+                </div>
+                {added.length === 0
+                  ? <p className="text-xs text-gray-400">None added.</p>
+                  : added.map(k => (
+                    <div key={k} className="flex items-center gap-2 text-sm">
+                      <span className="flex-1 text-gray-700 text-xs">{rates[k]?.label}</span>
+                      <input type="number" min="0" aria-label={`${rates[k]?.label} quantity`} className="w-20 text-sm border border-gray-300 rounded-lg px-2 py-1 text-right" value={inp.extras[k]}
+                        onChange={e => set({ extras: { ...inp.extras, [k]: e.target.value } })} />
+                      <span className="w-6 text-xs text-gray-400">{rates[k]?.unit}</span>
+                      <span className="w-16 text-right text-gray-600 text-xs">{money((Number(inp.extras[k]) || 0) * (rates[k]?.rate || 0))}</span>
+                      <button onClick={() => removeOption(k)} aria-label={`Remove ${rates[k]?.label}`} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
+                    </div>
+                  ))}
+              </div>
+            )
+          })}
         </div>
-        {Object.keys(inp.extras || {}).length === 0
-          ? <p className="text-xs text-gray-400">None added. SF options default to the porch area, LF options to the width; adjust the quantity as needed.</p>
-          : Object.entries(inp.extras).map(([k, q]) => (
-            <div key={k} className="flex items-center gap-2 text-sm">
-              <span className="flex-1 text-gray-700">{rates[k]?.label}</span>
-              <input type="number" min="0" className="w-20 text-sm border border-gray-300 rounded-lg px-2 py-1 text-right" value={q}
-                onChange={e => set({ extras: { ...inp.extras, [k]: e.target.value } })} />
-              <span className="w-8 text-xs text-gray-400">{rates[k]?.unit}</span>
-              <span className="w-20 text-right text-gray-600">{money((Number(q) || 0) * (rates[k]?.rate || 0))}</span>
-              <button onClick={() => removeOption(k)} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
-            </div>
-          ))}
       </div>
 
       {/* ── Breakdown (office view) ───────────────────────────────────── */}

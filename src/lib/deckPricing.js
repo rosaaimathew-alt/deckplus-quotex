@@ -73,8 +73,10 @@ export const DECK_PAINT_OPTIONS = {
 
 // Everything else on the sheet, by catalog name.
 export const DECK_ITEMS = {
+  // Border: no extra material — the price is the extra blocking and labor,
+  // $3 per SF of the deck (1- or 2-board alike).
   border1:     { item: '1-Board border SF',                                   rate: 3 },
-  border2:     { item: '2-boards border SF',                                  rate: 6 },
+  border2:     { item: '2-boards border SF',                                  rate: 3 },
   boxstep:     { item: 'Box steps PER STEP',                                  rate: 100 },
   cortexComp:  { item: 'TimberTech COMPOSITE cortex (UP TO 15 STEPS)',        rate: 577.5 },
   cortexPvc:   { item: 'TimberTech PVC cortex (UP TO 15 STEPS)',              rate: 693 },
