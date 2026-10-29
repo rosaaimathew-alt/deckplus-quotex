@@ -177,8 +177,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
       {/* ── The three cost drivers ─────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Field label="Porch type"><Seg options={PORCH_TYPES} value={inp.type} onChange={v => set({ type: v })} /></Field>
-        <Field label="Width along the house (ft)"><input type="number" min="1" aria-label="Width (ft)" className={inputCls} value={inp.width} onChange={e => set({ width: e.target.value })} /></Field>
-        <Field label="Depth out from the house (ft)" hint={`${result.area} SF floor area`}><input type="number" min="1" aria-label="Depth (ft)" className={inputCls} value={inp.depth} onChange={e => set({ depth: e.target.value })} /></Field>
+        <Field label="Width (ft)"><input type="number" min="1" aria-label="Width (ft)" className={inputCls} value={inp.width} onChange={e => set({ width: e.target.value })} /></Field>
+        <Field label="Depth (ft)" hint={`${result.area} SF floor area`}><input type="number" min="1" aria-label="Depth (ft)" className={inputCls} value={inp.depth} onChange={e => set({ depth: e.target.value })} /></Field>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Field label="Sits on">

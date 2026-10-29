@@ -291,8 +291,8 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
         </>
       ) : (
         <div className="grid grid-cols-3 gap-3 mb-3">
-          {field('Across — width (ft)', width, v => { setWidth(v); setQtyOv({}) })}
-          {field('Out — depth (ft)', depth, v => { setDepth(v); setQtyOv({}) })}
+          {field('Width (ft)', width, v => { setWidth(v); setQtyOv({}) })}
+          {field('Depth (ft)', depth, v => { setDepth(v); setQtyOv({}) })}
           {field('Height (ft)', height, changeHeight, { step: 0.5 })}
         </div>
       )}
