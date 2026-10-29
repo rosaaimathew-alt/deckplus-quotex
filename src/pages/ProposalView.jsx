@@ -7,6 +7,7 @@ import { DEFAULT_BRAND_COLOR } from '../brand'
 import { toCanvas } from 'html-to-image'
 import jsPDF from 'jspdf'
 import { customerLines, discountOf } from '../lib/hiddenLines'
+import { priceRangeOf, rangeText, depositPctOf } from '../lib/priceRange'
 
 const fmt = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -55,7 +56,7 @@ export default function ProposalView() {
           client: parsed.client, email: parsed.email, phone: parsed.phone, address: parsed.address,
           expiration: parsed.expiration,
           total: parsed.lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0),
-          lines: parsed.lines, isAlaCarte: parsed.isAlaCarte || false, showBreakdown: parsed.showBreakdown,
+          lines: parsed.lines, isAlaCarte: parsed.isAlaCarte || false, showBreakdown: parsed.showBreakdown, priceRange: parsed.priceRange || null,
           margin: parsed.margin, projectTypes: parsed.projectTypes || [], projectSummary: parsed.projectSummary || '',
         })
         proposalIdRef.current = existing.id
@@ -70,6 +71,7 @@ export default function ProposalView() {
           lines: parsed.lines,
           isAlaCarte: parsed.isAlaCarte || false,
           showBreakdown: parsed.showBreakdown,
+          priceRange: parsed.priceRange || null,
           margin: parsed.margin,
           projectTypes: parsed.projectTypes || [],
           projectSummary: parsed.projectSummary || '',
@@ -103,6 +105,8 @@ export default function ProposalView() {
 
   const { client, email, phone, address, expiration, lines, isAlaCarte, showBreakdown = true } = data
   const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0)
+  // Price range: the customer sees a range instead of any price; the app keeps the exact one.
+  const range = isAlaCarte ? null : priceRangeOf(subtotal, data.priceRange)
   // Lines hidden on a summed proposal count in the total but are never shown.
   const shownLines = customerLines(lines, { showBreakdown, isAlaCarte })
   // Discount: shown under the items as Project Total → Discount → Total.
@@ -130,7 +134,7 @@ export default function ProposalView() {
     }).join('\n\n')
 
     // Lump sum: the total only (no per-line prices), like the proposal itself.
-    const pricingText = (showBreakdown || isAlaCarte) ? shownLines.map((l, i) =>
+    const pricingText = range ? '' : (showBreakdown || isAlaCarte) ? shownLines.map((l, i) =>
       `${i + 1}. ${l.name}  |  ${l.qty} ${l.unit} × $${l.unitPrice}  =  $${fmt(l.qty * l.unitPrice)}`
     ).join('\n') : ''
 
@@ -157,9 +161,9 @@ export default function ProposalView() {
       '',
       pricingText,
       '',
-      disc ? `PROJECT TOTAL: $${fmt(beforeDiscount)}` : '',
-      disc ? `${disc.label.toUpperCase()}: -$${fmt(disc.amount)}` : '',
-      isAlaCarte ? '' : `TOTAL: $${fmt(subtotal)}`,
+      disc && !range ? `PROJECT TOTAL: $${fmt(beforeDiscount)}` : '',
+      disc && !range ? `${disc.label.toUpperCase()}: -$${fmt(disc.amount)}` : '',
+      range ? `ESTIMATED INVESTMENT: ${rangeText(range)}` : isAlaCarte ? '' : `TOTAL: $${fmt(subtotal)}`,
     ].filter(Boolean).join('\n')
 
     navigator.clipboard.writeText(text).then(() => {
@@ -311,6 +315,11 @@ export default function ProposalView() {
           <Send size={14} /> Send to Client
         </button>
       </div>
+      {range && (
+        <div className="no-print bg-[var(--brand-50)] border-b border-[var(--brand-200)] px-6 py-2 text-sm text-gray-700">
+          The customer sees <strong>{rangeText(range)}</strong>. Exact price on our side: <strong>${fmt(subtotal)}</strong> (not shown to the customer).
+        </div>
+      )}
 
       {/* Send Email Modal */}
       {showSend && (
@@ -453,6 +462,12 @@ export default function ProposalView() {
               The following options are priced individually — please indicate which you would like to proceed with.
             </p>
           )}
+          {range ? (
+            <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }} className="border-t-2 border-b border-black py-4 flex items-baseline justify-between gap-4">
+              <span className="text-xs font-semibold uppercase tracking-widest text-black">Estimated investment</span>
+              <span className="text-xl font-bold text-black">{rangeText(range)}</span>
+            </div>
+          ) : (<>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b-2 border-black">
@@ -505,6 +520,7 @@ export default function ProposalView() {
               </div>
             </div>
           )}
+          </>)}
         </div>
 
         {/* Terms & Signature */}
@@ -517,7 +533,7 @@ export default function ProposalView() {
                 : 'This proposal is valid for 30 days from the date above.'
               }
             </p>
-            <p><span className="font-semibold text-black">Payment:</span> A {subtotal >= 30000 && subtotal <= 100000 ? '10%' : '20%'} deposit is required to schedule work. Progress payments will follow different stages of completion as labeled in a scope of work document drafted once the proposal has been accepted.</p>
+            <p><span className="font-semibold text-black">Payment:</span> A {depositPctOf(subtotal)}% deposit is required to schedule work. Progress payments will follow different stages of completion as labeled in a scope of work document drafted once the proposal has been accepted.</p>
             <p><span className="font-semibold text-black">Site Conditions:</span> Pricing is based on normal site conditions. Any unforeseen conditions may result in additional costs with prior written approval.</p>
             <p><span className="font-semibold text-black">Warranty:</span> All projects include a standard 1-year warranty on materials and a 5-year structural warranty.</p>
             <p className="font-semibold text-black pt-1">Addendums</p>

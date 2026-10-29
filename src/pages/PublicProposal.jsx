@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { rangeText } from '../lib/priceRange'
 
 // Public, read-only proposal a customer opens from the email link. Fetching it
 // records the open server-side (that's the tracking) and returns a display-only
@@ -100,8 +101,14 @@ export default function PublicProposal() {
             </div>
           )}
 
-          {/* Pricing table */}
+          {/* Pricing: a price range only, or the table */}
           <p style={sectionLabel}>{s.isAlaCarte ? 'Options & Pricing' : 'Pricing'}</p>
+          {s.priceRange ? (
+            <div style={{ borderTop: `2px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, padding: '14px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: SOFT }}>Estimated investment</span>
+              <span style={{ fontSize: 20, fontWeight: 700, color: INK }}>{rangeText(s.priceRange)}</span>
+            </div>
+          ) : (<>
           {s.isAlaCarte && (
             <p style={{ margin: '0 0 12px', fontSize: 12, fontStyle: 'italic', color: SOFT }}>
               These options are priced individually — check the ones you’d like and reply to let us know.
@@ -154,12 +161,13 @@ export default function PublicProposal() {
               <span style={{ fontSize: 20, fontWeight: 700, color: INK }}>${fmt(subtotal)}</span>
             </div>
           )}
+          </>)}
 
           {/* Terms & Conditions — mirrors the PDF */}
           <div style={{ background: TINT, border: `1px solid ${FAINT}`, borderRadius: 8, padding: '16px 18px', marginTop: 26, fontSize: 12, color: SOFT, lineHeight: 1.7 }}>
             <p style={{ margin: '0 0 8px', fontWeight: 600, color: INK }}>Terms &amp; Conditions</p>
             <p style={{ margin: '0 0 8px' }}>{expiry ? `This proposal is valid until ${expiry}.` : 'This proposal is valid for 30 days from the date above.'}</p>
-            <p style={{ margin: '0 0 8px' }}><strong style={{ color: INK }}>Payment:</strong> A {subtotal >= 30000 && subtotal <= 100000 ? '10%' : '20%'} deposit is required to schedule work. Progress payments will follow different stages of completion as labeled in a scope of work document drafted once the proposal has been accepted.</p>
+            <p style={{ margin: '0 0 8px' }}><strong style={{ color: INK }}>Payment:</strong> A {s.depositPct || (subtotal >= 30000 && subtotal <= 100000 ? 10 : 20)}% deposit is required to schedule work. Progress payments will follow different stages of completion as labeled in a scope of work document drafted once the proposal has been accepted.</p>
             <p style={{ margin: '0 0 8px' }}><strong style={{ color: INK }}>Site Conditions:</strong> Pricing is based on normal site conditions. Any unforeseen conditions may result in additional costs with prior written approval.</p>
             <p style={{ margin: '0 0 8px' }}><strong style={{ color: INK }}>Warranty:</strong> All projects include a standard 1-year warranty on materials and a 5-year structural warranty.</p>
             <p style={{ margin: '0 0 4px', fontWeight: 600, color: INK }}>Addendums</p>

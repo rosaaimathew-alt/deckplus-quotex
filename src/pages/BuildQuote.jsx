@@ -22,6 +22,7 @@ import { JicField } from '../components/Jic'
 import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import { toBreakdown } from '../lib/priceList'
+import { priceRangeOf, rangeText, RANGE_PCT } from '../lib/priceRange'
 
 const MARGIN_DEFAULT = 30
 
@@ -324,6 +325,8 @@ export default function BuildQuote() {
 
   const [isAlaCarte, setIsAlaCarte] = useState(false)
   const [showBreakdown, setShowBreakdown] = useState(false)   // new quotes start as Lump Sum (one summed total)
+  // Show the customer a price range instead of the exact price (null = off).
+  const [priceRange, setPriceRange] = useState(null)
   const [projectTypes, setProjectTypes] = useState([])
   const [projectSummary, setProjectSummary] = useState('')
   // Permit & jurisdiction fees are worked out from the address (src/lib/permitFees.js).
@@ -378,6 +381,7 @@ export default function BuildQuote() {
         if (d.feeOverrides) setFeeOverrides(d.feeOverrides)
         if (d.showBreakdown !== undefined) setShowBreakdown(d.showBreakdown)
         if (d.isAlaCarte !== undefined) setIsAlaCarte(!!d.isAlaCarte)
+        setPriceRange(d.priceRange || null)
         if (d.projectTypes) setProjectTypes(d.projectTypes)
         if (d.projectSummary) setProjectSummary(d.projectSummary)
         setRevisingParentId(d.parentId || null)
@@ -402,6 +406,7 @@ export default function BuildQuote() {
       setFeeOverrides(d.feeOverrides || {})
       setIsAlaCarte(d.isAlaCarte || false)
       setShowBreakdown(d.showBreakdown ?? false)
+      setPriceRange(d.priceRange || null)
       setProjectTypes(d.projectTypes || [])
       setProjectSummary(d.projectSummary || '')
       setRevisingParentId(d.revisingParentId || null)
@@ -416,7 +421,7 @@ export default function BuildQuote() {
   const startFresh = () => {
     localStorage.removeItem(DRAFT_KEY)
     setClient(''); setEmail(''); setPhone(''); setAddress(''); setExpiration('')
-    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false)
+    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false); setPriceRange(null)
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
     setDraftProposalId(null); setDraftClient(''); setRevisingClient(''); setRestoredFrom(null)
     setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({}); setDiscount(null)
@@ -428,10 +433,10 @@ export default function BuildQuote() {
     if (isEmpty) return
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
-      isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
+      isAlaCarte, showBreakdown, priceRange, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
       feeDismissed, feeEdits, feeOverrides, discount,
     }))
-  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount])
+  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount])
 
   // Permit fees for this address + work, as quote lines (derived, never stored twice)
   const feePlan = useMemo(() => requiredFees({ address, lines, projectTypes, catalog: catalogRaw, overrides: feeOverrides }),
@@ -651,6 +656,7 @@ export default function BuildQuote() {
   const goToProposal = () => {
     sessionStorage.setItem('proposal', JSON.stringify({
       client, email, phone, address, expiration, lines: allLines.map(l => { const c = { ...l }; delete c.why; return c }), margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
+      priceRange: !isAlaCarte && priceRange ? priceRange : null,
       feeDismissed, feeOverrides, discount: discountLine ? discount : null,
       ...(revisingParentId && sameClient(revisingClient, client) ? { parentId: revisingParentId } : {}),
       ...(draftProposalId && sameClient(draftClient, client) ? { proposalId: draftProposalId } : {}),
@@ -1195,6 +1201,40 @@ export default function BuildQuote() {
                 <button onClick={() => setDiscount(null)} title="Remove discount" className="p-1 text-gray-400 hover:text-red-500"><X size={15} /></button>
               </div>
             )}
+          </div>
+
+          {/* Price range: the customer sees a range, the app keeps the exact price */}
+          <div className="px-4 py-3 border-t border-gray-100">
+            {isAlaCarte ? (
+              <p className="text-xs text-gray-400 flex items-center gap-1.5"><EyeOff size={13} /> Price ranges apply to a project total — not available on à la carte proposals.</p>
+            ) : !priceRange ? (
+              <button onClick={() => setPriceRange({ low: '', high: '' })} className="flex items-center gap-1.5 text-sm text-[var(--brand-700)] hover:underline">
+                <EyeOff size={14} /> Show the customer a price range instead of the price
+              </button>
+            ) : (() => {
+              const auto = priceRangeOf(subtotal, {})
+              const shown = priceRangeOf(subtotal, priceRange)
+              const outside = subtotal < shown.low || subtotal > shown.high
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700"><EyeOff size={14} className="text-[var(--brand-600)]" /> Customer sees a range</span>
+                    <span className="text-sm text-gray-500">$</span>
+                    <input type="number" min="0" step="500" aria-label="Range low" value={priceRange.low} placeholder={String(auto.low)}
+                      onChange={e => setPriceRange(r => ({ ...r, low: e.target.value }))} className="w-28 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right" />
+                    <span className="text-sm text-gray-500">– $</span>
+                    <input type="number" min="0" step="500" aria-label="Range high" value={priceRange.high} placeholder={String(auto.high)}
+                      onChange={e => setPriceRange(r => ({ ...r, high: e.target.value }))} className="w-28 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right" />
+                    <button onClick={() => setPriceRange(null)} title="Show the exact price again" className="p-1 text-gray-400 hover:text-red-500"><X size={15} /></button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    The customer sees <strong className="text-gray-800">{rangeText(shown)}</strong> — no line prices or exact total. Your exact price (${money2(subtotal)}) and costs stay in the app.
+                    {' '}Blank boxes use {RANGE_PCT}% under / over, to the nearest $1,000.
+                  </p>
+                  {outside && <p className="text-xs font-semibold text-amber-700">The exact price is outside this range.</p>}
+                </div>
+              )
+            })()}
           </div>
         </div>
 

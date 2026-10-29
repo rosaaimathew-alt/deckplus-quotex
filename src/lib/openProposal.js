@@ -7,6 +7,7 @@ export function proposalHandoff(p) {
     expiration: p.expiration, lines: p.lines || [], margin: 0, proposalId: p.id,
     isAlaCarte: !!p.isAlaCarte,
     showBreakdown: p.showBreakdown !== false,
+    priceRange: p.priceRange || null,
     projectTypes: p.projectTypes || [],
     projectSummary: p.projectSummary || '',
   }

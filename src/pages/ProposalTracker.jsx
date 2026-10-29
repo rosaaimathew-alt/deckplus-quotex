@@ -1288,6 +1288,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
       parentId: rootId,
       showBreakdown: proposal.showBreakdown,
       isAlaCarte: !!proposal.isAlaCarte,
+      priceRange: proposal.priceRange || null,
       projectTypes: proposal.projectTypes || [],
       projectSummary: proposal.projectSummary || '',
     }))
