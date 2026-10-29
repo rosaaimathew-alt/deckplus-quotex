@@ -80,7 +80,7 @@ export const PORCH_BUILD_DEFAULTS = {
 
   // Enclosure
   screeneze_upcharge: R('ScreenEze screens',                               'SF', 3,    'enclosure'),
-  lam_column_pkg:     R('6×6 laminated column package',                     'LS', 2000, 'enclosure'),
+  lam_column_pkg:     R('6×6 laminated COX column package',                 'LS', 2000, 'enclosure'),
   eze_window:         R('Eze-Breeze window unit (new porch)',               'EA', 530,  'enclosure'),   // $700 is the conversion tool's rate
   eze_transom:        R('Eze-Breeze transom (wall over 100″)',              'EA', 130,  'enclosure'),
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
@@ -350,6 +350,7 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   type: 'screen', tie: 'wall', floor: 'deck', roof: 'shed',
   deckHeightFt: 3,                      // only when floor = deck
   wallHeightIn: 96, sides: 'Front + 2 sides',   // Eze-Breeze layout
+  lamColumns: true,                     // 6×6 lam COX column package (ScreenEze / Eze-Breeze)
   kneeWallIn: SUN_KNEE_IN,              // sunroom knee wall height (in)
   doors: {},                            // { door_key: qty }
   doorWall: 'side',                     // sunroom: doors on the side walls by the house, or 'front'
@@ -424,9 +425,11 @@ export function computePorchBuild(input, ratesIn) {
   // ScreenEze porches: screens are charged on their own line, on top of the
   // screen-porch base rate
   if (inp.type === 'screen') add('screeneze_upcharge', area)
+  // Every ScreenEze and Eze-Breeze porch takes the 6×6 laminated COX column
+  // package by default; the rep can untick it.
+  if ((inp.type === 'screen' || inp.type === 'ezebreeze') && inp.lamColumns !== false) add('lam_column_pkg', 1)
   if (inp.type === 'ezebreeze') {
     layout = porchLayout(W, D, { doors: doorQty, sides: inp.sides })
-    add('lam_column_pkg', 1)
     add('eze_window', layout.totalWindows)
     if (n(inp.wallHeightIn) > PORCH_WINDOW_MAX_H) add('eze_transom', layout.totalWindows)
   }

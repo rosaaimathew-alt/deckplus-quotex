@@ -231,6 +231,9 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           {inp.type === 'screen' && (
             <p className="text-xs text-gray-500">ScreenEze screens are added as their own line at the Builder rate per SF of porch, on top of the screen-porch price.</p>
           )}
+          {(inp.type === 'screen' || inp.type === 'ezebreeze') && (
+            <div className="sm:max-w-sm"><Check label="6×6 laminated COX column package" price={money(rates.lam_column_pkg.rate)} checked={inp.lamColumns !== false} onChange={v => set({ lamColumns: v })} /></div>
+          )}
           {inp.type === 'ezebreeze' && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Field label="Wall height (in)" hint={Number(inp.wallHeightIn) > PORCH_WINDOW_MAX_H ? `Over ${PORCH_WINDOW_MAX_H}″ → one transom per window` : undefined}>
