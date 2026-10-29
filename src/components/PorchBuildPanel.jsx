@@ -18,18 +18,19 @@ import { toBreakdown } from '../lib/priceList'
 // breakdown here.
 
 const money = (v) => '$' + Math.round(v).toLocaleString('en-US')
+const money2 = (v) => '$' + (Number(v) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })
 const inputCls = 'w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--brand-200)]'
 const selCls   = inputCls + ' bg-white'
 
 function Seg({ options, value, onChange, disabledKeys = [] }) {
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-1.5">
       {options.map(o => {
         const dis = disabledKeys.includes(o.key)
         const active = value === o.key
         return (
           <button key={o.key} type="button" disabled={dis} onClick={() => onChange(o.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border whitespace-nowrap transition-colors ${
               active ? 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]'
                      : dis ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'
                            : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'}`}>
@@ -45,20 +46,35 @@ function Seg({ options, value, onChange, disabledKeys = [] }) {
 // a label get the label's text folded into their accessible name.
 function Field({ label, children, hint }) {
   return (
-    <div className="block">
-      <span className="block text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">{label}</span>
+    <div className="block min-w-0">
+      <span className="block text-xs font-medium text-gray-600 mb-1">{label}</span>
       {children}
-      {hint && <span className="block text-[11px] text-gray-400 mt-1">{hint}</span>}
+      {hint && <span className="block text-[11px] leading-snug text-gray-500 mt-1">{hint}</span>}
     </div>
   )
 }
 
-function Check({ label, checked, onChange }) {
+// One checkbox per line: the label on the left, its price on the right.
+function Check({ label, price, checked, onChange }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-      <input type="checkbox" checked={!!checked} onChange={e => onChange(e.target.checked)} className="accent-[var(--brand-600)]" />
-      {label}
+    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none min-w-0">
+      <input type="checkbox" checked={!!checked} onChange={e => onChange(e.target.checked)} className="accent-[var(--brand-600)] shrink-0" />
+      <span className="min-w-0">{label}</span>
+      {price && <span className="ml-auto pl-2 text-xs text-gray-400 whitespace-nowrap">{price}</span>}
     </label>
+  )
+}
+
+// A titled section of the builder, with what it adds to the price.
+function Card({ title, total, children }) {
+  return (
+    <section className="rounded-xl border border-gray-200">
+      <header className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50 rounded-t-xl">
+        <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
+        {total > 0 && <span className="text-xs font-medium text-gray-500 tabular-nums">{money(total)}</span>}
+      </header>
+      <div className="p-4 space-y-4">{children}</div>
+    </section>
   )
 }
 
@@ -116,27 +132,31 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
     if (!keys.length) return null
     const added = keys.filter(k => inp.extras?.[k] != null)
     return (
-      <div className="space-y-2 pt-3 border-t border-gray-100">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-gray-600">{label}</span>
-          <select aria-label={`Add ${label}`} className="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white max-w-full" value="" onChange={e => addOption(e.target.value)}>
+      <div className="space-y-2">
+        <Field label={label}>
+          <select aria-label={`Add ${label}`} className={selCls + ' sm:max-w-sm'} value="" onChange={e => addOption(e.target.value)}>
             <option value="">+ Add…</option>
-            {keys.map(k => <option key={k} value={k} disabled={inp.extras?.[k] != null}>{rates[k].label} — {rates[k].rate}/{rates[k].unit}</option>)}
+            {keys.map(k => <option key={k} value={k} disabled={inp.extras?.[k] != null}>{rates[k].label} — {money2(rates[k].rate)}/{rates[k].unit}</option>)}
           </select>
-        </div>
-        {added.map(k => (
-          <div key={k} className="flex items-center gap-2 text-sm">
-            <span className="flex-1 text-gray-700 text-xs">{rates[k]?.label}</span>
-            <input type="number" min="0" aria-label={`${rates[k]?.label} quantity`} className="w-20 text-sm border border-gray-300 rounded-lg px-2 py-1 text-right" value={inp.extras[k]}
-              onChange={e => set({ extras: { ...inp.extras, [k]: e.target.value } })} />
-            <span className="w-6 text-xs text-gray-400">{rates[k]?.unit}</span>
-            <span className="w-16 text-right text-gray-600 text-xs">{money((Number(inp.extras[k]) || 0) * (rates[k]?.rate || 0))}</span>
-            <button onClick={() => removeOption(k)} aria-label={`Remove ${rates[k]?.label}`} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
+        </Field>
+        {added.length > 0 && (
+          <div className="rounded-lg border border-gray-100 divide-y divide-gray-100">
+            {added.map(k => (
+              <div key={k} className="grid grid-cols-[4.5rem_1.75rem_1fr_1.25rem] sm:grid-cols-[1fr_4.5rem_1.75rem_4.5rem_1.25rem] items-center gap-x-2 gap-y-1 px-3 py-1.5 text-sm">
+                <span className="col-span-4 sm:col-span-1 text-gray-700">{rates[k]?.label}</span>
+                <input type="number" min="0" aria-label={`${rates[k]?.label} quantity`} className="w-full text-sm border border-gray-300 rounded-md px-2 py-1 text-right" value={inp.extras[k]}
+                  onChange={e => set({ extras: { ...inp.extras, [k]: e.target.value } })} />
+                <span className="text-xs text-gray-400">{rates[k]?.unit}</span>
+                <span className="text-right text-gray-700 tabular-nums">{money((Number(inp.extras[k]) || 0) * (rates[k]?.rate || 0))}</span>
+                <button onClick={() => removeOption(k)} aria-label={`Remove ${rates[k]?.label}`} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
     )
   }
+  const groupTotal = (...keys) => result.groups.filter(g => keys.includes(g.key)).reduce((a, g) => a + g.total, 0)
 
   const jicAmt = jicAmount(jic, result.total)
   const total  = result.total + jicAmt               // what the customer is quoted
@@ -174,42 +194,40 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
         </div>
       </div>
 
-      {/* ── The three cost drivers ─────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ── The porch: type, size and what it sits on ─────────────────── */}
+      <Card title="Porch" total={groupTotal('structure')}>
         <Field label="Porch type"><Seg options={PORCH_TYPES} value={inp.type} onChange={v => set({ type: v })} /></Field>
-        <Field label="Width (ft)"><input type="number" min="1" aria-label="Width (ft)" className={inputCls} value={inp.width} onChange={e => set({ width: e.target.value })} /></Field>
-        <Field label="Depth (ft)" hint={`${result.area} SF floor area`}><input type="number" min="1" aria-label="Depth (ft)" className={inputCls} value={inp.depth} onChange={e => set({ depth: e.target.value })} /></Field>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Field label="Sits on">
-          <Seg options={PORCH_FLOORS} value={inp.floor} onChange={v => set({ floor: v, concrete: v === 'patio' ? inp.concrete : null })} />
+        <div className="grid grid-cols-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_minmax(0,1fr)] gap-4">
+          <Field label="Width (ft)"><input type="number" min="1" aria-label="Width (ft)" className={inputCls} value={inp.width} onChange={e => set({ width: e.target.value })} /></Field>
+          <Field label="Depth (ft)" hint={`${result.area} SF floor`}><input type="number" min="1" aria-label="Depth (ft)" className={inputCls} value={inp.depth} onChange={e => set({ depth: e.target.value })} /></Field>
+          <div className="col-span-2 md:col-span-1"><Field label="Sits on">
+            <Seg options={PORCH_FLOORS} value={inp.floor} onChange={v => set({ floor: v, concrete: v === 'patio' ? inp.concrete : null })} />
+          </Field></div>
           {inp.floor === 'deck' && (
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-xs text-gray-500">Deck height (ft)</span>
-              <input type="number" min="0" step="0.5" className="w-20 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.deckHeightFt} onChange={e => set({ deckHeightFt: e.target.value })} />
-              {Number(inp.deckHeightFt) > 8 && <span className="text-[11px] text-amber-600">over 8′ adder applies</span>}
-            </div>
+            <Field label="Deck height (ft)" hint={Number(inp.deckHeightFt) > 8 ? 'Over 8′: the high-deck add applies.' : undefined}>
+              <input type="number" min="0" step="0.5" aria-label="Deck height (ft)" className={inputCls} value={inp.deckHeightFt} onChange={e => set({ deckHeightFt: e.target.value })} />
+            </Field>
           )}
-        </Field>
-        <Field label="Roof connection" hint={inp.tie === 'free' ? 'Freestanding — not tied to the house (see Structural add-ons).' : undefined}>
-          <Seg options={PORCH_TIES.filter(t => t.key !== 'free')} value={inp.tie} onChange={v => set({ tie: v })} disabledKeys={inp.tie === 'free' ? ['wall', 'roof'] : []} />
-        </Field>
-      </div>
+        </div>
+      </Card>
 
       {/* ── Roof & ceiling ─────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 p-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Roof &amp; ceiling</p>
-        <Field label="Roof style" hint={inp.tie === 'free' ? 'Freestanding porches take a gable or semi-vaulted roof.' : result.roof === 'gable' || result.roof === 'hip' ? 'Adds PT LVL for the depth + the engineer letter.' : result.roof === 'semivault' ? 'Adds the engineer letter; over 19′ wide also adds the flat fee.' : undefined}>
-          <Seg options={PORCH_ROOFS} value={result.roof} onChange={v => set({ roof: v })} disabledKeys={inp.tie === 'free' ? ['shed', 'hip'] : []} />
-        </Field>
-        <Check label={`Roof cricket (${money(rates.roof_cricket.rate)})`} checked={inp.cricket} onChange={v => set({ cricket: v })} />
+      <Card title="Roof & ceiling" total={groupTotal('roofceiling')}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Roof connection" hint={inp.tie === 'free' ? 'Freestanding (Structural add-ons).' : undefined}>
+            <Seg options={PORCH_TIES.filter(t => t.key !== 'free')} value={inp.tie} onChange={v => set({ tie: v })} disabledKeys={inp.tie === 'free' ? ['wall', 'roof'] : []} />
+          </Field>
+          <Field label="Roof style" hint={inp.tie === 'free' ? 'Freestanding: gable or semi-vaulted.' : result.roof === 'gable' || result.roof === 'hip' ? 'Adds PT LVL for the depth + the engineer letter.' : result.roof === 'semivault' ? 'Adds the engineer letter; over 19′ wide adds the flat fee.' : undefined}>
+            <Seg options={PORCH_ROOFS} value={result.roof} onChange={v => set({ roof: v })} disabledKeys={inp.tie === 'free' ? ['shed', 'hip'] : []} />
+          </Field>
+        </div>
+        <div className="sm:max-w-sm"><Check label="Roof cricket" price={money(rates.roof_cricket.rate)} checked={inp.cricket} onChange={v => set({ cricket: v })} /></div>
         {optionPicker('roofceiling', 'Roof & ceiling upgrades')}
-      </div>
+      </Card>
 
       {/* ── Enclosure ──────────────────────────────────────────────────── */}
       {inp.type !== 'open' && (
-        <div className="rounded-xl border border-gray-200 p-4 space-y-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Enclosure</p>
+        <Card title="Enclosure" total={groupTotal('enclosure')}>
           {inp.type === 'screen' && (
             <p className="text-xs text-gray-500">ScreenEze screens are added as their own line at the Builder rate per SF of porch, on top of the screen-porch price.</p>
           )}
@@ -269,11 +287,11 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             </div>
           )}
           <div>
-            <p className="text-xs text-gray-500 mb-1.5">Doors (count per model)</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <p className="text-xs font-medium text-gray-600 mb-1">Doors (count per model)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {doorKeys.map(k => (
                 <label key={k} className="flex items-center justify-between gap-2 text-xs text-gray-700 border border-gray-200 rounded-lg px-2 py-1.5">
-                  <span className="truncate">{rates[k].label.replace('Larsen ', '')} <span className="text-gray-400">{Number(rates[k].rate) > 0 ? money(rates[k].rate) : 'no price yet'}</span></span>
+                  <span>{rates[k].label.replace('Larsen ', '')} <span className="text-gray-400">{Number(rates[k].rate) > 0 ? money(rates[k].rate) : 'no price yet'}</span></span>
                   <input type="number" min="0" className="w-12 text-sm border border-gray-300 rounded px-1 py-0.5 text-right" value={inp.doors?.[k] ?? ''} placeholder="0"
                     onChange={e => set({ doors: { ...(inp.doors || {}), [k]: e.target.value } })} />
                 </label>
@@ -281,46 +299,43 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             </div>
           </div>
           {(result.roof === 'gable' || result.roof === 'semivault') && (
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <span>Glass in gable ends</span>
-              <input type="number" min="0" max="2" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.glassEnds} onChange={e => set({ glassEnds: e.target.value })} />
-              <span className="text-xs text-gray-400">{money(rates.glass_gable_end.rate)} each, any pitch</span>
+            <div className="w-40">
+              <Field label="Glass in gable ends" hint={`${money(rates.glass_gable_end.rate)} each, any pitch`}>
+                <input type="number" min="0" max="2" aria-label="Glass in gable ends" className={inputCls} value={inp.glassEnds} onChange={e => set({ glassEnds: e.target.value })} />
+              </Field>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
-      {/* ── Structure options ─────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">Structural add-ons</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          <Check label={`Freestanding (+${money(rates.freestanding_add.rate)}/SF; gable or semi-vaulted roof)`} checked={inp.tie === 'free'}
+      {/* ── Structural add-ons ─────────────────────────────────────────── */}
+      <Card title="Structural add-ons">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2.5">
+          <Check label="Freestanding (gable or semi-vault roof)" price={`+${money(rates.freestanding_add.rate)}/SF`} checked={inp.tie === 'free'}
             onChange={v => set(v ? { tie: 'free', roof: inp.roof === 'semivault' ? 'semivault' : 'gable' } : { tie: 'wall' })} />
-          <Check label={`Reinforce deck for hot tub (${money(rates.hot_tub_reinforce.rate)})`} checked={inp.hotTub} onChange={v => set({ hotTub: v })} />
-          <Check label={`Open porch wrap / LVL engineer (${money(rates.porch_wrap.rate)})`} checked={inp.wrap} onChange={v => set({ wrap: v })} />
-          <Check label={`Seed and straw (${money(rates.seed_straw.rate)})`} checked={inp.seedStraw} onChange={v => set({ seedStraw: v })} />
+          <Check label="Reinforce deck for hot tub" price={money(rates.hot_tub_reinforce.rate)} checked={inp.hotTub} onChange={v => set({ hotTub: v })} />
+          <Check label="Open porch wrap / LVL engineer" price={money(rates.porch_wrap.rate)} checked={inp.wrap} onChange={v => set({ wrap: v })} />
+          <Check label="Seed and straw" price={money(rates.seed_straw.rate)} checked={inp.seedStraw} onChange={v => set({ seedStraw: v })} />
           <label className="flex items-center gap-2 text-sm text-gray-700">
-            <span>Metal bracing plates (posts)</span>
-            <input type="number" min="0" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.bracingPosts} onChange={e => set({ bracingPosts: e.target.value })} />
-            <span className="text-xs text-gray-400">+ letter</span>
+            <span>Metal bracing plates</span>
+            <input type="number" min="0" aria-label="Metal bracing plates (posts)" className="w-16 text-sm border border-gray-300 rounded-md px-2 py-1 text-right" value={inp.bracingPosts} onChange={e => set({ bracingPosts: e.target.value })} />
+            <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">{money(rates.bracing_plate.rate)}/post + letter</span>
           </label>
         </div>
-      </div>
+      </Card>
 
       {/* ── Walls & finishes ───────────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 p-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Walls &amp; finishes</p>
-        <Check label="Paint / stain porch (rate follows the floor type)" checked={inp.paintPorch} onChange={v => set({ paintPorch: v })} />
+      <Card title="Walls & finishes" total={groupTotal('finishes')}>
+        <div className="sm:max-w-sm"><Check label="Paint / stain porch" price="rate follows the floor" checked={inp.paintPorch} onChange={v => set({ paintPorch: v })} /></div>
         {optionPicker('finishes', 'Walls & finishes upgrades')}
-      </div>
+      </Card>
 
       {/* ── Flooring, steps, landings & railing ────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 p-4 space-y-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Flooring, steps, landings &amp; railing</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <Card title="Flooring, steps, landings & railing" total={groupTotal('flooring', 'stepsrail')}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Field label="Flooring upgrade" hint={floorUnpriced
             ? <span className="text-red-600 font-semibold">{rates[inp.flooring]?.deckColl} has no porch floor upgrade price on your sheet. Set one in Catalog → Formulas → Porch Builder, or pick another floor.</span>
-            : 'Upgrade prices from the price sheet, $/SF of porch floor over the PT floor the porch includes.'}>
+            : 'Price sheet $/SF, over the PT floor the porch includes.'}>
           <select className={selCls} value={({ floor_trex_enhance: 'deckfloor_trex_enhance', floor_trex_transcend: 'deckfloor_trex_transcend' })[inp.flooring] || inp.flooring || ''} onChange={e => set({ flooring: e.target.value || null })}>
             <option value="">None (PT floor included)</option>
             <optgroup label="Decking">
@@ -334,7 +349,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           </select>
         </Field>
         {inp.floor === 'patio' && (
-          <Field label="New concrete" hint="Slabs under 200 SF price at the small-slab rate.">
+          <Field label="New concrete" hint="Under 200 SF uses the small-slab rate.">
             <select className={selCls} value={inp.concrete || ''} onChange={e => set({ concrete: e.target.value || null })}>
               <option value="">None (existing slab)</option>
               {concreteKeys.map(k => <option key={k} value={k}>{rates[k].label} — {rates[k].rate}/SF</option>)}
@@ -342,7 +357,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           </Field>
         )}
         {inp.floor === 'deck' && (
-          <Field label="Steps" hint={result.risers ? `${result.risers} steps (deck height ÷ 8.25″) × width ft × 1.5 = SF × the collection's $/SF` : 'Set a deck height to add steps.'}>
+          <Field label="Steps · stair width (ft)" hint={result.risers ? `${result.risers} steps from the deck height × width × 1.5` : 'Set a deck height to add steps.'}>
             <div className="flex gap-2">
               <select className={selCls} value={matchCollection(inp.steps?.product) || ''} onChange={e => setSub('steps', { product: e.target.value })}>
                 <option value="">None</option>
@@ -352,7 +367,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             </div>
           </Field>
         )}
-        <Field label="Landings" hint="Each landing is 4′×4′ (16 SF) × the collection's $/SF.">
+        <Field label="Landings · count" hint="4′×4′ each.">
           <div className="flex gap-2">
             <select className={selCls} value={matchCollection(inp.landings?.product) || ''} onChange={e => setSub('landings', { product: e.target.value })}>
               <option value="">None</option>
@@ -361,8 +376,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             <input type="number" min="0" title="Count" className="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1" value={inp.landings?.count ?? 0} onChange={e => setSub('landings', { count: e.target.value })} />
           </div>
         </Field>
-        <Field label="Railing (LF)" hint={railNeed > 0
-            ? <>Steps and landings need {railNeed} LF ({[result.railStepLF ? `both sides of the steps ${result.railStepLF}` : '', result.railLandingLF ? `landings ${result.railLandingLF}` : ''].filter(Boolean).join(' + ')}); add the porch's own railing on top.
+        <Field label="Railing · LF" hint={railNeed > 0
+            ? <>Steps &amp; landings need {railNeed} LF, plus the porch's own railing.
                 {(Number(inp.railing?.lf) || 0) < railNeed && <button type="button" className="ml-1 text-[var(--brand-700)] font-medium hover:underline" onClick={() => setSub('railing', { lf: railNeed })}>Use {railNeed} LF</button>}</>
             : undefined}>
           <div className="flex gap-2">
@@ -374,9 +389,9 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           </div>
         </Field>
         {inp.floor === 'deck' && (
-          <Field label="Deck fascia" hint={inp.fascia?.lf == null || inp.fascia.lf === ''
-              ? `Auto: ${result.fasciaLF} LF — the deck's exposed perimeter ${result.fasciaDeckLF} (${inp.tie === 'free' ? 'all four sides' : 'front + two sides'})${result.fasciaStepLF ? ` + both sides of the steps ${result.fasciaStepLF}` : ''}${result.fasciaLandingLF ? ` + landings ${result.fasciaLandingLF}` : ''}. Type a number to override.`
-              : 'Overridden. Clear the box to go back to the automatic perimeter.'}>
+          <Field label="Deck fascia · LF" hint={inp.fascia?.lf == null || inp.fascia.lf === ''
+              ? `Auto ${result.fasciaLF} LF: deck ${result.fasciaDeckLF}${result.fasciaStepLF ? ` + steps ${result.fasciaStepLF}` : ''}${result.fasciaLandingLF ? ` + landings ${result.fasciaLandingLF}` : ''}. Type to override.`
+              : 'Typed. Clear the box to go back to automatic.'}>
             <div className="flex gap-2">
               <select className={selCls} value={inp.fascia?.product || ''} onChange={e => setSub('fascia', { product: e.target.value })}>
                 <option value="">None</option>
@@ -388,22 +403,21 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             </div>
           </Field>
         )}
-      </div>
-      {optionPicker('stepsrail', 'Deck & railing upgrades (box steps, skirting, border, posts, gates…)')}
-      {optionPicker('flooring', 'Flooring upgrades')}
-      </div>
+        </div>
+        {optionPicker('stepsrail', 'Deck & railing upgrades (box steps, skirting, border, posts, gates)')}
+        {optionPicker('flooring', 'Flooring upgrades')}
+      </Card>
 
-      {/* ── Electrical package ──────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 p-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Electrical</p>
+      {/* ── Electrical ─────────────────────────────────────────────────── */}
+      <Card title="Electrical" total={groupTotal('electrical')}>
         <Field label="Electrical package">
           <select aria-label="Electrical package" className={selCls} value={inp.elecPackage || ''} onChange={e => set({ elecPackage: e.target.value || null })}>
             <option value="">No electrical package</option>
             {elecPkgKeys.map(k => <option key={k} value={k}>{rates[k].label} — {money(rates[k].rate)}</option>)}
           </select>
         </Field>
-        {optionPicker('electrical', 'Extra fans, outlets, lights, heaters…')}
-      </div>
+        {optionPicker('electrical', 'Extra fans, outlets, lights, heaters')}
+      </Card>
 
       {/* ── Breakdown (office view) ───────────────────────────────────── */}
       <div className="rounded-xl border border-gray-200 overflow-hidden">
