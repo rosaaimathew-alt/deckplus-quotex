@@ -8,6 +8,7 @@ export function proposalHandoff(p) {
     isAlaCarte: !!p.isAlaCarte,
     showBreakdown: p.showBreakdown !== false,
     priceRange: p.priceRange || null,
+    upgrades: p.upgrades || [],
     projectTypes: p.projectTypes || [],
     projectSummary: p.projectSummary || '',
   }

@@ -1289,6 +1289,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
       showBreakdown: proposal.showBreakdown,
       isAlaCarte: !!proposal.isAlaCarte,
       priceRange: proposal.priceRange || null,
+      upgrades: proposal.upgrades || [],
       projectTypes: proposal.projectTypes || [],
       projectSummary: proposal.projectSummary || '',
     }))

@@ -8,6 +8,7 @@ import { toCanvas } from 'html-to-image'
 import jsPDF from 'jspdf'
 import { customerLines, discountOf } from '../lib/hiddenLines'
 import { priceRangeOf, rangeText, depositPctOf } from '../lib/priceRange'
+import { customerUpgrades } from '../lib/upgrades'
 
 const fmt = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -56,7 +57,7 @@ export default function ProposalView() {
           client: parsed.client, email: parsed.email, phone: parsed.phone, address: parsed.address,
           expiration: parsed.expiration,
           total: parsed.lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0),
-          lines: parsed.lines, isAlaCarte: parsed.isAlaCarte || false, showBreakdown: parsed.showBreakdown, priceRange: parsed.priceRange || null,
+          lines: parsed.lines, isAlaCarte: parsed.isAlaCarte || false, showBreakdown: parsed.showBreakdown, priceRange: parsed.priceRange || null, upgrades: parsed.upgrades || [],
           margin: parsed.margin, projectTypes: parsed.projectTypes || [], projectSummary: parsed.projectSummary || '',
         })
         proposalIdRef.current = existing.id
@@ -72,6 +73,7 @@ export default function ProposalView() {
           isAlaCarte: parsed.isAlaCarte || false,
           showBreakdown: parsed.showBreakdown,
           priceRange: parsed.priceRange || null,
+          upgrades: parsed.upgrades || [],
           margin: parsed.margin,
           projectTypes: parsed.projectTypes || [],
           projectSummary: parsed.projectSummary || '',
@@ -107,6 +109,8 @@ export default function ProposalView() {
   const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0)
   // Price range: the customer sees a range instead of any price; the app keeps the exact one.
   const range = isAlaCarte ? null : priceRangeOf(subtotal, data.priceRange)
+  // Optional upgrades: listed under the total, never in it.
+  const upgrades = isAlaCarte ? [] : customerUpgrades(data.upgrades)
   // Lines hidden on a summed proposal count in the total but are never shown.
   const shownLines = customerLines(lines, { showBreakdown, isAlaCarte })
   // Discount: shown under the items as Project Total → Discount → Total.
@@ -164,6 +168,8 @@ export default function ProposalView() {
       disc && !range ? `PROJECT TOTAL: $${fmt(beforeDiscount)}` : '',
       disc && !range ? `${disc.label.toUpperCase()}: -$${fmt(disc.amount)}` : '',
       range ? `ESTIMATED INVESTMENT: ${rangeText(range)}` : isAlaCarte ? '' : `TOTAL: $${fmt(subtotal)}`,
+      upgrades.length ? '\nOPTIONAL UPGRADES (not included in the total above)' : '',
+      ...upgrades.map(u => `• ${u.name}  —  $${fmt(u.price)}${u.description ? `\n  ${u.description}` : ''}`),
     ].filter(Boolean).join('\n')
 
     navigator.clipboard.writeText(text).then(() => {
@@ -521,6 +527,25 @@ export default function ProposalView() {
             </div>
           )}
           </>)}
+          {upgrades.length > 0 && (
+            <div className="mt-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+              <p className="text-xs font-semibold uppercase tracking-widest text-black">Optional upgrades</p>
+              <p className="text-xs text-black italic mb-2">Not included in the total above. Ask us to add any of these to your project.</p>
+              <table className="w-full text-sm">
+                <tbody>
+                  {upgrades.map((u, i) => (
+                    <tr key={i} className="border-b border-gray-200 align-top">
+                      <td className="py-2.5 px-1 text-black">
+                        <p className="font-medium">{u.name || '—'}</p>
+                        {u.description && <p className="text-xs leading-relaxed whitespace-pre-wrap mt-0.5">{u.description}</p>}
+                      </td>
+                      <td className="py-2.5 px-1 text-right font-semibold text-black w-28 whitespace-nowrap">+${fmt(u.price)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Terms & Signature */}

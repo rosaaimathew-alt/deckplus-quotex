@@ -1,5 +1,6 @@
 import { customerLines, discountOf } from './lib/hiddenLines'
 import { priceRangeOf, depositPctOf } from './lib/priceRange'
+import { customerUpgrades } from './lib/upgrades'
 // The single source of truth for the display-only snapshot sent to the public
 // proposal page (/p/:token). Used by every "get link" / send path so the shared
 // link always renders the proposal exactly the way the app does — including
@@ -38,6 +39,8 @@ export function buildProposalSnapshot(data = {}, branding = {}) {
       total:        Number(data.total) || subtotal,
     }),
     depositPct:     depositPctOf(Number(data.total) || subtotal),
+    // Optional upgrades: priced under the total, not part of it.
+    upgrades:       data.isAlaCarte ? [] : customerUpgrades(data.upgrades),
     projectSummary: data.projectSummary || data.contractDraft?.projectSummary || '',
     contractNum:    data.contractDraft?.contractNum || '',
     companyName:    branding?.companyName || '',

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Trash2, GripVertical, GitMerge, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark, Tag } from 'lucide-react'
+import { Search, Plus, Trash2, GripVertical, GitMerge, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark, Tag, ArrowDownToLine, ArrowUpToLine } from 'lucide-react'
 
 const money2 = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 // A saved discount line back into the builder's discount settings.
@@ -327,6 +327,8 @@ export default function BuildQuote() {
   const [showBreakdown, setShowBreakdown] = useState(false)   // new quotes start as Lump Sum (one summed total)
   // Show the customer a price range instead of the exact price (null = off).
   const [priceRange, setPriceRange] = useState(null)
+  // Optional upgrades: priced under the total on the proposal, never part of it.
+  const [upgrades, setUpgrades] = useState([])
   const [projectTypes, setProjectTypes] = useState([])
   const [projectSummary, setProjectSummary] = useState('')
   // Permit & jurisdiction fees are worked out from the address (src/lib/permitFees.js).
@@ -382,6 +384,7 @@ export default function BuildQuote() {
         if (d.showBreakdown !== undefined) setShowBreakdown(d.showBreakdown)
         if (d.isAlaCarte !== undefined) setIsAlaCarte(!!d.isAlaCarte)
         setPriceRange(d.priceRange || null)
+        setUpgrades(freshIds(d.upgrades || []))
         if (d.projectTypes) setProjectTypes(d.projectTypes)
         if (d.projectSummary) setProjectSummary(d.projectSummary)
         setRevisingParentId(d.parentId || null)
@@ -407,6 +410,7 @@ export default function BuildQuote() {
       setIsAlaCarte(d.isAlaCarte || false)
       setShowBreakdown(d.showBreakdown ?? false)
       setPriceRange(d.priceRange || null)
+      setUpgrades(freshIds(d.upgrades || []))
       setProjectTypes(d.projectTypes || [])
       setProjectSummary(d.projectSummary || '')
       setRevisingParentId(d.revisingParentId || null)
@@ -421,7 +425,7 @@ export default function BuildQuote() {
   const startFresh = () => {
     localStorage.removeItem(DRAFT_KEY)
     setClient(''); setEmail(''); setPhone(''); setAddress(''); setExpiration('')
-    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false); setPriceRange(null)
+    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false); setPriceRange(null); setUpgrades([])
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
     setDraftProposalId(null); setDraftClient(''); setRevisingClient(''); setRestoredFrom(null)
     setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({}); setDiscount(null)
@@ -429,14 +433,14 @@ export default function BuildQuote() {
 
   // Auto-save draft to localStorage whenever form state changes
   useEffect(() => {
-    const isEmpty = !client && !email && !phone && !address && lines.length === 0 && !projectSummary
+    const isEmpty = !client && !email && !phone && !address && lines.length === 0 && upgrades.length === 0 && !projectSummary
     if (isEmpty) return
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
-      isAlaCarte, showBreakdown, priceRange, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
+      isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
       feeDismissed, feeEdits, feeOverrides, discount,
     }))
-  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount])
+  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount])
 
   // Permit fees for this address + work, as quote lines (derived, never stored twice)
   const feePlan = useMemo(() => requiredFees({ address, lines, projectTypes, catalog: catalogRaw, overrides: feeOverrides }),
@@ -520,6 +524,16 @@ export default function BuildQuote() {
 
   // Removing a line un-merges anything that was merged into it.
   const removeLine = (id) => setLines(prev => prev.filter(l => l.id !== id).map(l => l.mergeInto === id ? { ...l, mergeInto: null } : l))
+  // A quote line becomes an optional upgrade (out of the total), and back.
+  const moveToUpgrades = (line) => {
+    removeLine(line.id)
+    setUpgrades(cur => [...cur, { ...line, mergeInto: null, hidden: false }])
+  }
+  const moveToQuote = (u) => {
+    setUpgrades(cur => cur.filter(x => x.id !== u.id))
+    setLines(cur => [...cur, u])
+  }
+  const updateUpgrade = (id, patch) => setUpgrades(cur => cur.map(u => u.id === id ? { ...u, ...patch } : u))
   const setMerge = (id, into) => setLines(prev => prev.map(l => l.id === id ? { ...l, mergeInto: into ?? null } : l))
   const [mergePickFor, setMergePickFor] = useState(null)   // line id whose "Merge into" picker is open
 
@@ -657,6 +671,7 @@ export default function BuildQuote() {
     sessionStorage.setItem('proposal', JSON.stringify({
       client, email, phone, address, expiration, lines: allLines.map(l => { const c = { ...l }; delete c.why; return c }), margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
       priceRange: !isAlaCarte && priceRange ? priceRange : null,
+      upgrades: upgrades.filter(u => (u.name || '').trim() || Number(u.unitPrice) > 0).map(u => { const c = { ...u }; delete c.why; return c }),
       feeDismissed, feeOverrides, discount: discountLine ? discount : null,
       ...(revisingParentId && sameClient(revisingClient, client) ? { parentId: revisingParentId } : {}),
       ...(draftProposalId && sameClient(draftClient, client) ? { proposalId: draftProposalId } : {}),
@@ -1064,6 +1079,13 @@ export default function BuildQuote() {
                             <Calculator size={13} />
                           </button>
                         )}
+                        {!isAlaCarte && !mergedTarget(line) && !lines.some(l => l.mergeInto === line.id) && (
+                          <button title="Move to optional upgrades (shown under the total, not in it)" aria-label={`Move ${line.name || 'line'} to optional upgrades`}
+                            onClick={() => moveToUpgrades(line)}
+                            className="p-1 rounded text-gray-300 hover:text-[var(--brand-600)] hover:bg-gray-100">
+                            <ArrowDownToLine size={13} />
+                          </button>
+                        )}
                         <button onClick={() => removeLine(line.id)} className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50">
                           <Trash2 size={13} />
                         </button>
@@ -1237,6 +1259,46 @@ export default function BuildQuote() {
             })()}
           </div>
         </div>
+
+        {/* Optional upgrades: priced under the total, never part of it */}
+        {!isAlaCarte && (
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Optional upgrades</p>
+                <p className="text-xs text-gray-500">Shown on the proposal under the total, each with its price. Not included in the total, the contract or the job.</p>
+              </div>
+              <button onClick={() => setUpgrades(cur => [...cur, { id: Date.now() + Math.random(), name: '', description: '', qty: 1, unit: 'EA', unitPrice: 0 }])}
+                className="flex items-center gap-1.5 text-sm text-[var(--brand-700)] hover:underline whitespace-nowrap"><Plus size={14} /> Add upgrade</button>
+            </div>
+            {upgrades.length === 0 ? (
+              <p className="px-4 py-3 text-xs text-gray-400">None yet. Add one here, or use <ArrowDownToLine size={11} className="inline -mt-0.5" /> on a quote line to move it down here.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {upgrades.map(u => (
+                  <div key={u.id} className="px-4 py-2.5 grid grid-cols-[1fr_7rem_auto] gap-x-3 gap-y-1.5 items-start">
+                    <input aria-label="Upgrade name" value={u.name} onChange={e => updateUpgrade(u.id, { name: e.target.value })} placeholder="Upgrade (e.g. TimberTech Reserve decking)"
+                      className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm font-medium" />
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-gray-400">$</span>
+                      <input type="number" min="0" aria-label="Upgrade price" value={(Number(u.qty) || 1) * (Number(u.unitPrice) || 0) || ''} placeholder="0"
+                        onChange={e => updateUpgrade(u.id, { qty: 1, unitPrice: parseFloat(e.target.value) || 0 })}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right" />
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <button title="Move into the quote (adds it to the total)" aria-label={`Move ${u.name || 'upgrade'} into the quote`} onClick={() => moveToQuote(u)}
+                        className="p-1.5 rounded text-gray-400 hover:text-[var(--brand-600)] hover:bg-gray-100"><ArrowUpToLine size={14} /></button>
+                      <button title="Remove upgrade" aria-label={`Remove ${u.name || 'upgrade'}`} onClick={() => setUpgrades(cur => cur.filter(x => x.id !== u.id))}
+                        className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50"><Trash2 size={14} /></button>
+                    </div>
+                    <textarea aria-label="Upgrade description" rows={u.description ? 2 : 1} value={u.description || ''} onChange={e => updateUpgrade(u.id, { description: e.target.value })}
+                      placeholder="What the upgrade includes (optional)" className="col-span-3 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600 resize-y" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Margin overlay */}
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">

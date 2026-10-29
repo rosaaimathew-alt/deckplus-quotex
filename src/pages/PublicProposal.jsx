@@ -163,6 +163,27 @@ export default function PublicProposal() {
           )}
           </>)}
 
+          {/* Optional upgrades — priced, not part of the total */}
+          {(s.upgrades || []).length > 0 && (
+            <div style={{ marginTop: 26 }}>
+              <p style={sectionLabel}>Optional upgrades</p>
+              <p style={{ margin: '-6px 0 10px', fontSize: 12, fontStyle: 'italic', color: SOFT }}>Not included in the total above. Ask us to add any of these to your project.</p>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                  {s.upgrades.map((u, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${FAINT}`, verticalAlign: 'top' }}>
+                      <td style={td}>
+                        <span style={{ fontWeight: 600 }}>{u.name || '—'}</span>
+                        {u.description ? <span style={{ display: 'block', fontSize: 12, marginTop: 2, whiteSpace: 'pre-wrap' }}>{u.description}</span> : null}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', fontWeight: 600, width: 120, whiteSpace: 'nowrap' }}>+${fmt(u.price)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* Terms & Conditions — mirrors the PDF */}
           <div style={{ background: TINT, border: `1px solid ${FAINT}`, borderRadius: 8, padding: '16px 18px', marginTop: 26, fontSize: 12, color: SOFT, lineHeight: 1.7 }}>
             <p style={{ margin: '0 0 8px', fontWeight: 600, color: INK }}>Terms &amp; Conditions</p>
