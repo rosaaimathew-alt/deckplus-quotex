@@ -33,25 +33,18 @@ const R = (label, unit, rate, group, extra = {}) => ({ label, unit, rate, cost: 
 
 // Every deck collection → a porch floor upgrade, steps and landing row ($/SF).
 export const deckSlug = (key) => String(key).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-const PT_DECK_RATE = DECK_COLLECTIONS.find(c => c.key === 'PT')?.rate || 0
 // Porch floor upgrade prices the office has set; the rest default to the
 // collection's deck $/SF less PT until set in Item Catalog → Formulas.
 // TimberTech: raised 5% (Oct 2026) from their earlier prices.
+// Porch floor upgrades on the price sheet ($/SF over the PT floor the porch
+// base includes). A collection that isn't on the sheet has no price until the
+// office sets one in Catalog → Formulas → Porch Builder.
 const FLOOR_UPGRADE_RATES = {
-  'TimberTech RESERVE': 16.17,
-  'TimberTech PRIME/+': 16.17,
-  'TimberTech TERRAIN/+': 20.79,
-  'TimberTech HARVEST PVC': 31.19,
-  'TimberTech LANDMARK PVC': 31.19,
-  'TimberTech VINTAGE PVC': 34.65,
-  'TimberTech PVC MULTI WIDTH 7.25"/3.5"': 38.85,
-  'TimberTech PVC 2" MAX': 47.25,
-  'TimberTech PVC 3.5" (NARROW)': 47.25,
-  'TimberTech PVC 7.25" (WIDE)': 49.35,
-  'TimberTech VINTAGE T&G': 49.67,
+  'Trex ENHANCE': 7.7,
+  'Trex TRANSCEND': 17.6,
 }
 const DECK_FLOOR_ROWS = Object.fromEntries(DECK_COLLECTIONS.filter(c => c.key !== 'PT').map(c => [
-  `deckfloor_${deckSlug(c.key)}`, R(`${c.key} porch floor upgrade`, 'SF', FLOOR_UPGRADE_RATES[c.key] ?? +(c.rate - PT_DECK_RATE).toFixed(2), 'flooring', { floor: true, deckColl: c.key }),
+  `deckfloor_${deckSlug(c.key)}`, R(`${c.key} porch floor upgrade`, 'SF', FLOOR_UPGRADE_RATES[c.key] ?? 0, 'flooring', { floor: true, deckColl: c.key }),
 ]))
 const DECK_STEP_ROWS = Object.fromEntries(DECK_COLLECTIONS.flatMap(c => [
   [`decksteps_${deckSlug(c.key)}`,   R(`${c.key} steps`,   'SF', c.rate, 'stepsrail', { steps: c.key })],
@@ -88,7 +81,7 @@ export const PORCH_BUILD_DEFAULTS = {
   // Enclosure
   screeneze_upcharge: R('ScreenEze screens',                               'SF', 3,    'enclosure'),
   lam_column_pkg:     R('6×6 laminated column package',                     'LS', 2000, 'enclosure'),
-  eze_window:         R('Eze-Breeze window unit',                           'EA', 700,  'enclosure'),
+  eze_window:         R('Eze-Breeze window unit (new porch)',               'EA', 530,  'enclosure'),   // $700 is the conversion tool's rate
   eze_transom:        R('Eze-Breeze transom (wall over 100″)',              'EA', 130,  'enclosure'),
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
   door_savannah:      R('Larsen Savannah door',                             'EA', 650,  'enclosure', { door: true }),
