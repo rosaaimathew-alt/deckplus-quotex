@@ -191,7 +191,9 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             </div>
           )}
         </Field>
-        <Field label="Roof connection"><Seg options={PORCH_TIES} value={inp.tie} onChange={v => set({ tie: v, roof: v === 'free' && inp.roof !== 'semivault' ? 'gable' : inp.roof })} /></Field>
+        <Field label="Roof connection" hint={inp.tie === 'free' ? 'Freestanding — not tied to the house (see Structural add-ons).' : undefined}>
+          <Seg options={PORCH_TIES.filter(t => t.key !== 'free')} value={inp.tie} onChange={v => set({ tie: v })} disabledKeys={inp.tie === 'free' ? ['wall', 'roof'] : []} />
+        </Field>
       </div>
 
       {/* ── Roof & ceiling ─────────────────────────────────────────────── */}
@@ -292,6 +294,8 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
       <div className="rounded-xl border border-gray-200 p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">Structural add-ons</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <Check label={`Freestanding (+${money(rates.freestanding_add.rate)}/SF; gable or semi-vaulted roof)`} checked={inp.tie === 'free'}
+            onChange={v => set(v ? { tie: 'free', roof: inp.roof === 'semivault' ? 'semivault' : 'gable' } : { tie: 'wall' })} />
           <Check label={`Reinforce deck for hot tub (${money(rates.hot_tub_reinforce.rate)})`} checked={inp.hotTub} onChange={v => set({ hotTub: v })} />
           <Check label={`Open porch wrap / LVL engineer (${money(rates.porch_wrap.rate)})`} checked={inp.wrap} onChange={v => set({ wrap: v })} />
           <Check label={`Seed and straw (${money(rates.seed_straw.rate)})`} checked={inp.seedStraw} onChange={v => set({ seedStraw: v })} />
