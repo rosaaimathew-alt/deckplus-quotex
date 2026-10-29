@@ -90,7 +90,8 @@ function leadEmailHtml({ name, rep, settings, when, address, calendarUrl }) {
   </div>`
 }
 
-// POST /api/booking?track=1 — one anonymous funnel step from the booking page.
+// POST /api/booking?step=1 — one anonymous funnel step from the booking page.
+// (Not called 'track': ad blockers drop URLs containing it, which undercounted.)
 const TRACK_EVENTS = new Set(['view', 'day', 'time', 'form', 'booked'])
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|lighthouse|pingdom|monitor/i
@@ -251,7 +252,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
   if (req.method === 'OPTIONS') return res.status(200).end()
   try {
-    if (req.method === 'POST' && req.query?.track) return await trackEvent(req, res)
+    if (req.method === 'POST' && (req.query?.step || req.query?.track)) return await trackEvent(req, res)
     if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
     if (req.method === 'GET')  return await getSlots(res)
     if (req.method === 'POST') return await book(req, res)

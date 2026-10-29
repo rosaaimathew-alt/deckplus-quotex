@@ -308,7 +308,7 @@
       return (event) => {
         if (params.has('demo') || sent.has(event)) return
         sent.add(event)
-        fetch(API + '?track=1', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+        fetch(API + '?step=1', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ v: visitor, s: session, e: event, page: document.referrer.slice(0, 200) }) }).catch(() => {})
       }
     })()
