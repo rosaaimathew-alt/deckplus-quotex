@@ -9,7 +9,7 @@
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
-import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep, googleBusyStrict, calendarMode, calendarFor, repCalendarId, googleCalendarLink } from './_round-robin.js'
+import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep, googleBusyStrict, calendarMode, googleCalendarLink } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
@@ -123,45 +123,6 @@ async function checkGoogle(res) {
         out.reps.push({ rep: rep.name, calendar: String(err?.response?.data?.error_description || err?.message || err).slice(0, 200) })
       }
     }
-  }
-  return res.status(200).json(out)
-}
-
-// GET /api/booking?check=busy — what each rep's calendars look like to the
-// booking page over the next 7 days: every event's time, which calendar it is
-// on, whether Google counts it as busy, and whether free/busy reported it.
-// Times and flags only (no titles), read-only.
-async function checkBusy(res) {
-  const out = []
-  const { data } = await db().from('rr_reps').select('*').eq('active', true).order('position')
-  const from = new Date(), to = new Date(Date.now() + 7 * 86_400_000)
-  const fmt = (v, tz) => v?.dateTime ? new Date(v.dateTime).toLocaleString('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : v?.date
-  for (const rep of data || []) {
-    const r = { rep: rep.name, calendarId: repCalendarId(rep), freebusy: [], calendars: [] }
-    try {
-      const cal = await calendarFor(rep)
-      if (!cal) { r.error = 'no Google key'; out.push(r); continue }
-      const fb = await googleBusyStrict(rep, from.getTime(), to.getTime())
-      r.freebusy = fb.map(([a, b]) => `${fmt({ dateTime: new Date(a).toISOString() }, rep.timezone)} – ${fmt({ dateTime: new Date(b).toISOString() }, rep.timezone)}`)
-      const { data: list } = await cal.calendarList.list({ maxResults: 50 })
-      for (const c of list.items || []) {
-        const entry = { name: c.primary ? 'primary' : (c.summaryOverride || c.summary), access: c.accessRole, selected: !!c.selected, events: [] }
-        try {
-          const { data: ev } = await cal.events.list({ calendarId: c.id, timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: true, orderBy: 'startTime', maxResults: 100 })
-          for (const e of ev.items || []) {
-            if (e.status === 'cancelled') continue
-            const me = (e.attendees || []).find(a => a.self)
-            entry.events.push({
-              start: fmt(e.start, rep.timezone), end: fmt(e.end, rep.timezone),
-              allDay: !!e.start?.date, showAs: e.transparency === 'transparent' ? 'free' : 'busy',
-              response: me?.responseStatus || (e.organizer?.self ? 'organizer' : null), type: e.eventType || 'default',
-            })
-          }
-        } catch (err) { entry.error = String(err?.message || err).slice(0, 120) }
-        r.calendars.push(entry)
-      }
-    } catch (err) { r.error = String(err?.response?.data?.error_description || err?.message || err).slice(0, 200) }
-    out.push(r)
   }
   return res.status(200).json(out)
 }
@@ -321,7 +282,6 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'POST' && (req.query?.step || req.query?.track)) return await trackEvent(req, res)
     if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
-    if (req.method === 'GET' && req.query?.check === 'busy')   return await checkBusy(res)
     if (req.method === 'GET')  return await getSlots(res)
     if (req.method === 'POST') return await book(req, res)
     return res.status(405).json({ error: 'Method not allowed' })
