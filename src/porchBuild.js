@@ -126,9 +126,9 @@ export const PORCH_BUILD_DEFAULTS = {
 
   // Flooring — every deck collection as a porch floor upgrade ($/SF over the PT floor)
   ...DECK_FLOOR_ROWS,
-  pt_plywood:           R('PT plywood',                                     'SF', 4.5,  'flooring', { floor: true }),
-  lvt:                  R('LVT flooring only',                              'SF', 26,   'flooring', { floor: true }),
-  lvt_concrete:         R('LVT on concrete',                                'SF', 23,   'flooring', { floor: true }),
+  pt_plywood:           R('Plywood floor',                                  'SF', 4.5,  'flooring', { floor: true, on: 'deck' }),
+  lvt:                  R('LVT on deck',                                    'SF', 20.5, 'flooring', { floor: true, on: 'deck' }),
+  lvt_concrete:         R('LVT on concrete',                                'SF', 16,   'flooring', { floor: true, on: 'patio' }),
   tile:                 R('Tile flooring only',                             'SF', 29,   'flooring', { floor: true }),
   tile_deck:            R('Tile flooring on deck',                          'SF', 36,   'flooring', { floor: true }),
   tile_membrane:        R('Tile with plywood / membrane upgrade',           'SF', 44,   'flooring', { floor: true }),

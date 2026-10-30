@@ -347,7 +347,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
                 : <option key={k} value={k} disabled>{rates[k].deckColl} — no price on the sheet yet</option>)}
             </optgroup>
             <optgroup label="Other flooring">
-              {floorKeys.filter(k => !rates[k].deckColl).map(k => <option key={k} value={k}>{rates[k].label} — ${rates[k].rate}/{rates[k].unit}</option>)}
+              {floorKeys.filter(k => !rates[k].deckColl && (!rates[k].on || rates[k].on === inp.floor || inp.flooring === k)).map(k => <option key={k} value={k}>{rates[k].label} — ${rates[k].rate}/{rates[k].unit}</option>)}
             </optgroup>
           </select>
         </Field>
