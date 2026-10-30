@@ -69,9 +69,9 @@ export function repRules(rep, settings) {
 
 /**
  * Every bookable slot start (epoch ms) for `rep` from now through days_ahead.
- * `busy` is a list of [startMs, endMs, isBooking]: our own bookings get the
- * buffer after them; other calendar events only block their own time (plus the
- * new appointment's buffer, so it never runs into them).
+ * `busy` is a list of [startMs, endMs, ...]: anything on the rep's calendar —
+ * our bookings or their own events — keeps the rep's buffer clear on both
+ * sides, so an appointment never starts right as another meeting ends.
  */
 export function computeSlots(rep, settings, busy, now = Date.now()) {
   const rules  = repRules(rep, settings)
@@ -98,7 +98,7 @@ export function computeSlots(rep, settings, busy, now = Date.now()) {
           Math.floor(min / 60), min % 60, rep.timezone)
         const end = start + length
         if (start < earliest) continue
-        if (busy.some(([bs, be, isBooking]) => start < be + (isBooking ? buffer : 0) && end + buffer > bs)) continue
+        if (busy.some(([bs, be]) => start < be + buffer && end + buffer > bs)) continue
         slots.push(start)
       }
     }
