@@ -200,8 +200,77 @@ export const BRAND_PRESETS = [
 ]
 
 // ── Dark mode injection ───────────────────────────────────────────────────────
-// Overrides the most common Tailwind utility colors with dark equivalents.
-// Uses !important so no component files need to be touched.
+// Overrides the Tailwind utility colors the app uses with dark equivalents.
+// Uses !important so no component files need to be touched. Tinted surfaces
+// (status pills, banners, stat cards) are generated for every hue so none are
+// left as bright pastels; colored text is lifted so it reads on charcoal.
+
+const SURFACE = '#26262b'   // cards
+const GROUND  = '#1c1c20'   // page
+const RAISED  = '#303036'
+const LINE    = '#3a3a41'
+const LINE_SOFT = '#2f2f35'
+
+// Tailwind hue → [500, 400, 300, 200]
+const HUES = {
+  red:     ['#ef4444', '#f87171', '#fca5a5', '#fecaca'],
+  orange:  ['#f97316', '#fb923c', '#fdba74', '#fed7aa'],
+  amber:   ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a'],
+  yellow:  ['#eab308', '#facc15', '#fde047', '#fef08a'],
+  lime:    ['#84cc16', '#a3e635', '#bef264', '#d9f99d'],
+  green:   ['#22c55e', '#4ade80', '#86efac', '#bbf7d0'],
+  emerald: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
+  teal:    ['#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4'],
+  cyan:    ['#06b6d4', '#22d3ee', '#67e8f9', '#a5f3fc'],
+  sky:     ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd'],
+  indigo:  ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe'],
+  violet:  ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe'],
+  purple:  ['#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff'],
+  fuchsia: ['#d946ef', '#e879f9', '#f0abfc', '#f5d0fe'],
+  pink:    ['#ec4899', '#f472b6', '#f9a8d4', '#fbcfe8'],
+  rose:    ['#f43f5e', '#fb7185', '#fda4af', '#fecdd3'],
+}
+const tint = (hex, pct) => `color-mix(in srgb, ${hex} ${pct}%, ${SURFACE})`
+const NEUTRALS = ['gray', 'slate', 'zinc', 'stone', 'neutral']
+
+function hueRules() {
+  const r = []
+  for (const [h, [c500, c400, c300, c200]] of Object.entries(HUES)) {
+    r.push(`html.dark .bg-${h}-50, html.dark .hover\\:bg-${h}-50:hover { background-color: ${tint(c500, 12)} !important; }`)
+    r.push(`html.dark .bg-${h}-100, html.dark .hover\\:bg-${h}-100:hover { background-color: ${tint(c500, 20)} !important; }`)
+    r.push(`html.dark .bg-${h}-200 { background-color: ${tint(c500, 30)} !important; }`)
+    r.push(`html.dark .text-${h}-500 { color: ${c400} !important; }`)
+    r.push(`html.dark .text-${h}-600, html.dark .text-${h}-700, html.dark .hover\\:text-${h}-700:hover { color: ${c300} !important; }`)
+    r.push(`html.dark .text-${h}-800, html.dark .text-${h}-900 { color: ${c200} !important; }`)
+    r.push(`html.dark .border-${h}-100, html.dark .border-${h}-200 { border-color: ${tint(c500, 32)} !important; }`)
+    r.push(`html.dark .border-${h}-300 { border-color: ${tint(c500, 50)} !important; }`)
+  }
+  return r.join('\n    ')
+}
+
+function neutralRules() {
+  const r = []
+  for (const n of NEUTRALS) {
+    r.push(`html.dark .bg-${n}-50, html.dark .bg-${n}-50\\/40, html.dark .bg-${n}-50\\/50, html.dark .bg-${n}-50\\/60, html.dark .bg-${n}-50\\/70 { background-color: ${GROUND} !important; }`)
+    r.push(`html.dark .bg-${n}-100 { background-color: ${RAISED} !important; }`)
+    r.push(`html.dark .bg-${n}-200 { background-color: #3a3a41 !important; }`)
+    r.push(`html.dark .bg-${n}-300 { background-color: #4a4a52 !important; }`)
+    r.push(`html.dark .hover\\:bg-${n}-50:hover  { background-color: #2b2b31 !important; }`)
+    r.push(`html.dark .hover\\:bg-${n}-100:hover, html.dark .hover\\:bg-${n}-200:hover { background-color: #35353c !important; }`)
+    r.push(`html.dark .text-${n}-900, html.dark .hover\\:text-${n}-900:hover { color: #f9fafb !important; }`)
+    r.push(`html.dark .text-${n}-800, html.dark .hover\\:text-${n}-800:hover { color: #f3f4f6 !important; }`)
+    r.push(`html.dark .text-${n}-700, html.dark .hover\\:text-${n}-700:hover { color: #e5e7eb !important; }`)
+    r.push(`html.dark .text-${n}-600, html.dark .hover\\:text-${n}-600:hover { color: #d1d5db !important; }`)
+    r.push(`html.dark .text-${n}-500 { color: #a1a1aa !important; }`)
+    r.push(`html.dark .text-${n}-400 { color: #8b8b94 !important; }`)
+    r.push(`html.dark .text-${n}-300 { color: #5b5b63 !important; }`)
+    r.push(`html.dark .border-${n}-50, html.dark .border-${n}-100 { border-color: ${LINE_SOFT} !important; }`)
+    r.push(`html.dark .border-${n}-200, html.dark .hover\\:border-${n}-200:hover { border-color: ${LINE} !important; }`)
+    r.push(`html.dark .border-${n}-300, html.dark .hover\\:border-${n}-300:hover { border-color: #4a4a52 !important; }`)
+    r.push(`html.dark .divide-${n}-50 > *, html.dark .divide-${n}-100 > *, html.dark .divide-${n}-200 > * { border-color: ${LINE_SOFT} !important; }`)
+  }
+  return r.join('\n    ')
+}
 
 export function applyTheme(isDark) {
   let el = document.getElementById('qx-theme')
@@ -214,70 +283,63 @@ export function applyTheme(isDark) {
   }
 
   document.documentElement.classList.add('dark')
-  el.textContent = `
-    html.dark { --brand-50: #1c1c20; color-scheme: dark; }
-    html.dark body { background-color: #1c1c20; }
+  // Screen only: printed/PDF output always stays light.
+  el.textContent = `@media screen {
+    html.dark {
+      color-scheme: dark;
+      /* Light brand tints become dark ones (pills, chips, selected rows). */
+      --brand-50:  ${GROUND};
+      --brand-100: color-mix(in srgb, var(--brand-500) 22%, ${SURFACE});
+      --brand-200: color-mix(in srgb, var(--brand-500) 34%, ${SURFACE});
+    }
+    html.dark body { background-color: ${GROUND}; }
 
-    /* Backgrounds — neutral charcoal family to match the sidebar (#26262b) */
-    html.dark .bg-white           { background-color: #26262b !important; }
-    html.dark .bg-gray-50         { background-color: #1c1c20 !important; }
-    html.dark .bg-gray-100        { background-color: #303036 !important; }
-    html.dark .bg-sky-50          { background-color: #1c1c20 !important; }
-    html.dark .bg-blue-50         { background-color: #303036 !important; }
-    html.dark .bg-green-50        { background-color: #14291f !important; }
-    html.dark .bg-red-50          { background-color: #2d1414 !important; }
-    html.dark .bg-amber-50        { background-color: #2d2010 !important; }
-    html.dark .bg-purple-50       { background-color: #1e1a2d !important; }
+    /* Surfaces — neutral charcoal family to match the sidebar */
+    html.dark .bg-white, html.dark .hover\\:bg-white:hover { background-color: ${SURFACE} !important; }
+    html.dark .bg-white\\/50, html.dark .bg-white\\/80, html.dark .bg-white.bg-opacity-60 { background-color: rgba(38,38,43,0.85) !important; }
+    html.dark .bg-brand-50, html.dark .brand-bg-light { background-color: ${GROUND} !important; }
+    html.dark .divide-white > * { border-color: ${LINE} !important; }
+    html.dark .hover\\:bg-black\\/5:hover { background-color: rgba(255,255,255,0.06) !important; }
 
-    /* Text */
-    html.dark .text-gray-900      { color: #f9fafb !important; }
-    html.dark .text-gray-800      { color: #f3f4f6 !important; }
-    html.dark .text-gray-700      { color: #e5e7eb !important; }
-    html.dark .text-gray-600      { color: #d1d5db !important; }
-    html.dark .text-gray-500      { color: #9ca3af !important; }
-    html.dark .text-gray-400      { color: #6b7280 !important; }
-    html.dark .text-gray-300      { color: #4b5563 !important; }
+    ${neutralRules()}
 
-    /* Borders */
-    html.dark .border-gray-200    { border-color: #3a3a41 !important; }
-    html.dark .border-gray-100    { border-color: #2f2f35 !important; }
-    html.dark .border-gray-300    { border-color: #4a4a52 !important; }
+    ${hueRules()}
 
-    /* Dividers */
-    html.dark .divide-gray-50  > :not([hidden]) ~ :not([hidden]) { border-color: #2f2f35 !important; }
-    html.dark .divide-white    > :not([hidden]) ~ :not([hidden]) { border-color: #3a3a41 !important; }
+    /* Brand-colored text — lift the dark brand shades so they read on charcoal */
+    html.dark .text-\\[var\\(--brand-600\\)\\], html.dark .text-\\[var\\(--brand-700\\)\\], html.dark .text-\\[var\\(--brand-800\\)\\],
+    html.dark .hover\\:text-\\[var\\(--brand-600\\)\\]:hover, html.dark .hover\\:text-\\[var\\(--brand-700\\)\\]:hover,
+    html.dark .hover\\:text-\\[var\\(--brand-800\\)\\]:hover,
+    html.dark .text-blue-600, html.dark .text-blue-700, html.dark .text-blue-800, html.dark .brand-badge { color: var(--brand-300) !important; }
+    html.dark .bg-blue-50 { background-color: color-mix(in srgb, var(--brand-500) 14%, ${SURFACE}) !important; }
+    html.dark .bg-blue-100 { background-color: var(--brand-100) !important; }
+    html.dark .border-blue-100, html.dark .border-blue-200 { border-color: var(--brand-200) !important; }
 
-    /* Hover states */
-    html.dark .hover\\:bg-gray-50:hover   { background-color: #2b2b31 !important; }
-    html.dark .hover\\:bg-gray-100:hover  { background-color: #35353c !important; }
-    html.dark .hover\\:bg-sky-50:hover    { background-color: #2b2b31 !important; }
-    html.dark .hover\\:bg-blue-50:hover   { background-color: #2b2b31 !important; }
-    html.dark .hover\\:bg-red-50:hover    { background-color: #2d1414 !important; }
+    /* Sidebar: the selected item is a soft highlight, not a white slab */
+    html.dark .brand-nav-active { background-color: rgba(255,255,255,0.10) !important; color: #fff !important; box-shadow: inset 3px 0 0 var(--brand-400) !important; }
 
     /* Inputs */
-    html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+    html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]),
     html.dark textarea,
     html.dark select {
-      background-color: #26262b !important;
+      background-color: ${GROUND} !important;
       color: #f3f4f6 !important;
-      border-color: #3a3a41 !important;
+      border-color: ${LINE} !important;
     }
+    html.dark input::placeholder, html.dark textarea::placeholder { color: #6b6b74 !important; }
+
+    /* Chart grid lines drawn with light SVG strokes */
+    html.dark svg [stroke="#f3f4f6"], html.dark svg [stroke="#e5e7eb"] { stroke: ${LINE} !important; }
+    html.dark svg [fill="#d1d5db"] { fill: #6b6b74 !important; }
 
     /* Shadows — deepen them in dark mode */
     html.dark .shadow-sm  { box-shadow: 0 1px 2px rgba(0,0,0,0.5)  !important; }
+    html.dark .shadow-md  { box-shadow: 0 4px 10px rgba(0,0,0,0.45) !important; }
     html.dark .shadow-lg  { box-shadow: 0 10px 15px rgba(0,0,0,0.6) !important; }
     html.dark .shadow-xl  { box-shadow: 0 20px 25px rgba(0,0,0,0.7) !important; }
     html.dark .shadow-2xl { box-shadow: 0 25px 50px rgba(0,0,0,0.8) !important; }
 
-    /* Sticky table headers */
-    html.dark .bg-white.bg-opacity-60 { background-color: rgba(38,38,43,0.85) !important; }
-
-    /* White text on colored backgrounds should stay white */
-    html.dark .bg-blue-600,
-    html.dark .bg-green-600,
-    html.dark .bg-sky-600,
-    html.dark .bg-sky-700,
-    html.dark .bg-red-500,
-    html.dark .bg-amber-400 { color: #fff !important; }
-  `
+    /* White text on solid colored backgrounds stays white */
+    html.dark .bg-blue-600, html.dark .bg-green-600, html.dark .bg-sky-600, html.dark .bg-sky-700,
+    html.dark .bg-red-500, html.dark .bg-red-600, html.dark .bg-amber-400, html.dark .bg-emerald-600 { color: #fff !important; }
+  }`
 }
