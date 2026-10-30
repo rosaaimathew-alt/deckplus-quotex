@@ -391,7 +391,7 @@
         const prior = saved.taken.find(t => t.email === email || t.phone === phone)
         if (prior) {
           const r = reps.find(x => x.id === prior.rep)
-          return [409, { code: 'already_booked', existing: { start: prior.start, repName: r.name, repPhone: r.phone || null, repEmail: r.email } }]
+          return [409, { code: 'already_booked', existing: { start: prior.start, end: new Date(Date.parse(prior.start) + r.minutes * 60000).toISOString(), repName: r.name, repPhone: r.phone || null, repEmail: r.email } }]
         }
         saved = { turn: saved.turn + 1, taken: [...saved.taken, { rep: rep.id, start: body.start, email, phone }] }
         store.set(saved)
@@ -629,6 +629,16 @@
       $('rWhere').textContent = `${f.street.value.trim()}, ${f.city.value.trim()}, ${f.state.value} ${f.zip.value.trim()}`
       $('rWhere').parentElement.hidden = existing
       show('done')
+      // The summary at the top should describe the appointment they have, not the one they tried.
+      if (existing) {
+        if (b.end) {
+          const m = Math.round((new Date(b.end) - when) / 60000)
+          $('duration').textContent = m % 60 === 0 ? `${m / 60} hr` : m > 60 ? `${Math.floor(m / 60)} hr ${m % 60} min` : `${m} min`
+        }
+        $('repName').textContent = `with ${b.repName}`; $('repInitial').textContent = b.repName[0]
+        $('cMeta').textContent = [b.end && $('duration').textContent, 'At your home', `with ${b.repName}`].filter(Boolean).join(' · ')
+        $('pickedText').textContent = $('cPicked').textContent = `${fmtTime(when)}, ${fmtDay(when)}`
+      }
     }
 
     // Tell the embedding page how tall we are (see /embed.js).
