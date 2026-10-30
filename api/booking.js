@@ -20,7 +20,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ))
 const clean = (s, max) => String(s ?? '').trim().slice(0, max)
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_RE = /^[^\s@",()\\]+@[^\s@",()\\]+\.[^\s@",()\\]+$/   // no quotes/commas/parens: the value goes into a PostgREST filter
 const STREET_RE = /^\d+[A-Za-z]?(-\d+)?\s+\S.*$/          // "123 Main St", "12B Oak Ave", "10-12 Elm Rd"
 const ZIP_RE = /^\d{5}(-\d{4})?$/
 const US_STATES = new Set(('AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV ' +
@@ -140,6 +140,26 @@ async function getSlots(res) {
   })
 }
 
+// A person's upcoming live booking, matched by email or phone (either one is enough).
+// validateLead stores every phone as (555) 555-5555, so an exact match works.
+async function existingBooking({ email, phone }) {
+  const { data, error } = await db().from('rr_bookings')
+    .select('starts_at, ends_at, rr_reps(name, phone, email)')
+    .eq('status', 'booked').gt('ends_at', new Date().toISOString())
+    .or(`lead_email.eq."${email}",lead_phone.eq."${phone}"`)
+    .order('starts_at').limit(1)
+  if (error) throw error
+  return data?.[0] || null
+}
+
+function alreadyBooked(res, b) {
+  return res.status(409).json({
+    code: 'already_booked',
+    error: 'You already have an appointment with us.',
+    existing: { start: b.starts_at, end: b.ends_at, repName: b.rr_reps?.name, repPhone: b.rr_reps?.phone || null, repEmail: b.rr_reps?.email },
+  })
+}
+
 async function book(req, res) {
   const body = req.body || {}
   if (body.website) return res.status(200).json({ ok: true })   // honeypot: bots fill every field
@@ -152,6 +172,10 @@ async function book(req, res) {
   const { email, phone } = lead
   const notes = lead.notes || null
   const address = `${lead.street}, ${lead.city}, ${lead.state} ${lead.zip}`
+
+  // One upcoming appointment per person: don't take a second one (or use up a turn).
+  const prior = await existingBooking(lead)
+  if (prior) return alreadyBooked(res, prior)
 
   const { rep, settings } = await loadTurn()
   if (!rep) return res.status(409).json({ error: 'No one is taking bookings right now.', code: 'no_active_reps' })
@@ -173,6 +197,10 @@ async function book(req, res) {
     p_lead:  lead,
   })
   if (error) {
+    if (error.message?.includes('already_booked')) {
+      const b = await existingBooking(lead)
+      if (b) return alreadyBooked(res, b)
+    }
     const code = ['turn_changed', 'slot_taken', 'no_active_reps'].find(c => error.message?.includes(c))
     if (code) return res.status(409).json({ error: 'That time was just taken — here are the latest openings.', code })
     throw error
