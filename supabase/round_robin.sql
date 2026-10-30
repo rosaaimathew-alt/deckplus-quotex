@@ -110,6 +110,8 @@ $$;
 -- p_expected_rep is the rep whose times the visitor was shown. If someone else
 -- booked in between, the turn has moved on and we refuse with 'turn_changed'
 -- so the page reloads the new turn-holder's times. Overlaps raise 'slot_taken'.
+-- Someone who already holds an upcoming booking (same email or same phone)
+-- gets 'already_booked' and no turn is used up.
 -- The booking API validates p_lead (all fields required except notes).
 drop function if exists rr_book(uuid, timestamptz, timestamptz, text, text, text, text);
 create or replace function rr_book(
@@ -125,6 +127,17 @@ declare
 begin
   -- Serialise every booking on the pointer row.
   perform 1 from rr_settings where id for update;
+
+  if exists (
+    select 1 from rr_bookings b
+    where b.status = 'booked' and b.ends_at > now()
+      and (lower(b.lead_email) = lower(p_lead->>'email')
+           or (length(regexp_replace(p_lead->>'phone', '\D', '', 'g')) >= 10
+               and right(regexp_replace(coalesce(b.lead_phone, ''), '\D', '', 'g'), 10)
+                 = right(regexp_replace(p_lead->>'phone', '\D', '', 'g'), 10)))
+  ) then
+    raise exception 'already_booked';
+  end if;
 
   v_rep := rr_next_rep();
   if v_rep.id is null then

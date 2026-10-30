@@ -387,7 +387,13 @@
         await new Promise(r => setTimeout(r, 300))
         const rep = reps[saved.turn % 3]
         if (method === 'GET') return [200, { rep: { id: rep.id, name: rep.name }, meetingTitle: 'Free Estimate and Design Consultation', slotMinutes: rep.minutes, slots: slots(rep) }]
-        saved = { turn: saved.turn + 1, taken: [...saved.taken, { rep: rep.id, start: body.start }] }
+        const email = body.email.trim().toLowerCase(), phone = body.phone.replace(/\D/g, '').slice(-10)
+        const prior = saved.taken.find(t => t.email === email || t.phone === phone)
+        if (prior) {
+          const r = reps.find(x => x.id === prior.rep)
+          return [409, { code: 'already_booked', existing: { start: prior.start, repName: r.name, repPhone: r.phone || null, repEmail: r.email } }]
+        }
+        saved = { turn: saved.turn + 1, taken: [...saved.taken, { rep: rep.id, start: body.start, email, phone }] }
         store.set(saved)
         return [200, { ok: true, booking: { start: body.start, repName: rep.name, repPhone: rep.phone || null, repEmail: rep.email } }]
       }
@@ -589,21 +595,11 @@
           ...Object.fromEntries(FIELDS.map(n => [n, f[n].value])), notes: f.notes.value, website: f.website.value,
         })
         const data = res.data
+        if (data.code === 'already_booked') return showBooking(data.existing, f, true)
         if (res.status === 409) return load(data.error)
         if (data.fields) { showFieldErrors(data.fields); throw new Error(data.error) }
         if (!res.ok) throw new Error(data.error)
-        const when = new Date(data.booking.start)
-        $('doneTitle').textContent = `You're scheduled, ${f.firstName.value.trim()}`
-        $('doneText').textContent = `Your confirmation and calendar invite are on their way to ${f.email.value.trim()}.`
-        $('rWhen').textContent = `${fmtDay(when)} at ${fmtTime(when)}`
-        $('rWho').textContent = data.booking.repName
-        const repFull = data.booking.repName
-        $('nextText').textContent = `${repFull} will call you within 24 hours to go over a few preliminary questions about your project, so we can make the most of your appointment.`
-        $('cInitial').textContent = repFull[0]
-        $('cName').textContent = data.booking.repName
-        $('cContact').textContent = [data.booking.repPhone, data.booking.repEmail].filter(Boolean).join('\n')
-        $('rWhere').textContent = `${f.street.value.trim()}, ${f.city.value.trim()}, ${f.state.value} ${f.zip.value.trim()}`
-        show('done')
+        showBooking(data.booking, f, false)
         track('booked')
         parent.postMessage({ type: 'rr-booked', start: data.booking.start }, '*')
       } catch (e) {
@@ -611,6 +607,28 @@
       } finally {
         $('submit').disabled = false; $('submit').textContent = 'Book My Free Estimate'
       }
+    }
+
+    // The confirmation screen, for a new booking or one they already had.
+    function showBooking(b, f, existing) {
+      const when = new Date(b.start)
+      const first = f.firstName.value.trim()
+      $('doneTitle').textContent = existing ? `You're already scheduled, ${first}` : `You're scheduled, ${first}`
+      $('doneText').textContent = existing
+        ? `We found an upcoming appointment under your email or phone number, so we kept that one. Need a different time? Contact ${b.repName} below.`
+        : `Your confirmation and calendar invite are on their way to ${f.email.value.trim()}.`
+      $('rWhen').textContent = `${fmtDay(when)} at ${fmtTime(when)}`
+      $('rWho').textContent = b.repName
+      $('nextText').textContent = existing
+        ? `${b.repName} is your consultant and can reschedule or answer any questions.`
+        : `${b.repName} will call you within 24 hours to go over a few preliminary questions about your project, so we can make the most of your appointment.`
+      $('cInitial').textContent = b.repName[0]
+      $('cName').textContent = b.repName
+      $('cContact').textContent = [b.repPhone, b.repEmail].filter(Boolean).join('\n')
+      // Don't echo a stored address back to whoever typed the email/phone.
+      $('rWhere').textContent = `${f.street.value.trim()}, ${f.city.value.trim()}, ${f.state.value} ${f.zip.value.trim()}`
+      $('rWhere').parentElement.hidden = existing
+      show('done')
     }
 
     // Tell the embedding page how tall we are (see /embed.js).
