@@ -13,6 +13,9 @@
     "api/booking.js":                   { "maxDuration": 15 },
     "api/permit-pulse.js":              { "maxDuration": 60 }
   },
+  "crons": [
+    { "path": "/api/booking?report=1", "schedule": "43 12 1-3,16-18 * *" }
+  ],
   "headers": [
     {
       "source": "/index.html",

@@ -76,6 +76,9 @@ alter table rr_reps add column if not exists buffer_after_minutes int check (buf
 -- How often start times are offered (8:00, 8:30, 9:00…).
 -- Office addresses blind-copied on every customer confirmation.
 alter table rr_settings add column if not exists office_bcc text[] not null default '{}';
+-- Lead reports (api/_lead-report.js): who gets them, and the last one sent.
+alter table rr_settings add column if not exists report_to text[] not null default '{}';
+alter table rr_settings add column if not exists report_sent_for text;
 alter table rr_settings add column if not exists start_every_minutes int not null default 30 check (start_every_minutes between 5 and 240);
 
 alter table rr_bookings add column if not exists lead_first_name text;
@@ -219,3 +222,18 @@ select (created_at at time zone 'America/New_York')::date as day,
        count(distinct visitor_id) filter (where event = 'form')   as started_form,
        count(distinct visitor_id) filter (where event = 'booked') as booked
 from rr_events group by 1 order by 1 desc;
+
+-- Distinct-visitor funnel for a period (used by the lead reports).
+create or replace function rr_month_funnel(p_from timestamptz, p_to timestamptz) returns json
+language sql stable set search_path = public as $$
+  select json_build_object(
+    'visitors',    count(distinct visitor_id) filter (where event = 'view'),
+    'visits',      count(distinct session_id) filter (where event = 'view'),
+    'picked_day',  count(distinct visitor_id) filter (where event = 'day'),
+    'picked_time', count(distinct visitor_id) filter (where event = 'time'),
+    'started_form',count(distinct visitor_id) filter (where event = 'form'),
+    'tracking_from', min(created_at))
+  from rr_events where created_at >= p_from and created_at < p_to
+$$;
+revoke execute on function rr_month_funnel(timestamptz, timestamptz) from public, anon, authenticated;
+grant execute on function rr_month_funnel(timestamptz, timestamptz) to service_role;
