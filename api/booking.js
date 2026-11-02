@@ -1,6 +1,7 @@
 /**
  * Public round-robin booking API (used by /book and the website embed).
  *   GET  /api/booking            → whose turn it is + their open slots
+ *   GET  /api/booking?report=1   → email the lead report that's due (cron; see _lead-report.js)
  *   POST /api/booking            → book { repId, start, firstName, lastName, street, city, state, zip, phone, email, notes? }
  *
  * The visitor only ever sees the turn-holder's times. rr_book() re-checks the
@@ -11,6 +12,7 @@ import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
 import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep, googleBusyStrict, calendarMode, googleCalendarLink } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
+import { sendDueReport } from './_lead-report.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
@@ -283,6 +285,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'POST' && (req.query?.step || req.query?.track)) return await trackEvent(req, res)
     if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
+    if (req.method === 'GET' && req.query?.report)             return await sendDueReport(res)
     if (req.method === 'GET')  return await getSlots(res)
     if (req.method === 'POST') return await book(req, res)
     return res.status(405).json({ error: 'Method not allowed' })
