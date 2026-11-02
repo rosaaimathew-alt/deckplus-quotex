@@ -146,6 +146,8 @@ export const PORCH_BUILD_DEFAULTS = {
   rail_hybrid_trex:         R('Hybrid railing, Trex cap',                    'LF', 30.8,  'stepsrail', { rail: true }),
   rail_trex_transcend:      R('Trex Transcend railing',                      'LF', 170.5, 'stepsrail', { rail: true }),
   rail_trex_select:         R('Trex Select railing (white only)',            'LF', 121,   'stepsrail', { rail: true }),
+  rail_trex_select_alum:    R('Trex Select aluminum railing',                'LF', 112,   'stepsrail', { rail: true }),
+  rail_trex_select_between: R('Trex Select aluminum, between posts',         'LF', 82,    'stepsrail', { rail: true }),
   rail_trex_signature:      R('Trex Signature aluminum railing',             'LF', 142,   'stepsrail', { rail: true }),
   rail_trex_signature_between: R('Trex Signature aluminum, between posts',   'LF', 86,    'stepsrail', { rail: true }),
   rail_tt_alum:             R('TimberTech aluminum railing',                 'LF', 152.46, 'stepsrail', { rail: true }),

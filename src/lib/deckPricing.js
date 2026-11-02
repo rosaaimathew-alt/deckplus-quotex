@@ -38,6 +38,8 @@ export const DECK_RAILS = [
   { key: 'Hybrid Railing / trex cap',                       rate: 30.8 },
   { key: 'Trex Transcend Railing',                          rate: 170.5, trex: true },
   { key: 'Trex Select Railing WHITE ONLY',                  rate: 121,   trex: true },
+  { key: 'Trex Select Alum. Railing',                       rate: 112,   trex: true },
+  { key: 'Trex Select Alum. Railing BETWEEN POSTS ONLY',    rate: 82,    trex: true },
   { key: 'Trex SIGNATURE Alum. Railing',                    rate: 142,   trex: true },
   { key: 'Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY', rate: 86,    trex: true },
   { key: 'TimberTech Alum. Railing',                        rate: 152.46 },

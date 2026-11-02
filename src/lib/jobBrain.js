@@ -85,6 +85,8 @@ function readDeck(t) {
     [/\bhybrid\b/, 'Hybrid Railing / trex cap'],
     [/2 ?x ?2|picket|wood rail/, '2x2 pickets wood rail'],
     [/transcend rail/, 'Trex Transcend Railing'],
+    [/select[^,;]*between posts/, 'Trex Select Alum. Railing BETWEEN POSTS ONLY'],
+    [/select (alum\w*|aluminum) rail/, 'Trex Select Alum. Railing'],
     [/select rail/, 'Trex Select Railing WHITE ONLY'],
     [/signature[^,;]*between posts/, 'Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY'],
     [/signature (alum\w*|aluminum )?rail/, 'Trex SIGNATURE Alum. Railing'],
