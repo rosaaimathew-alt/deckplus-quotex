@@ -142,7 +142,7 @@ export async function calendarFor(rep) {
 // so a missing Gmail grant never breaks the calendar. Returns false when not
 // available so the caller can fall back to the shared mailer.
 const _gmail = new Map()
-export async function sendAsRep(rep, { to, subject, html, attachments }) {
+export async function sendAsRep(rep, { to, bcc, subject, html, attachments }) {
   if (calendarMode() !== 'workspace' || !(await calendarFor(rep))) return false
   const from = repCalendarId(rep)
   const { google } = await import('googleapis')
@@ -156,10 +156,12 @@ export async function sendAsRep(rep, { to, subject, html, attachments }) {
     _gmail.set(from, google.gmail({ version: 'v1', auth }))
   }
   const { default: MailComposer } = await import('nodemailer/lib/mail-composer/index.js')
-  const raw = await new MailComposer({
+  const node = new MailComposer({
     from: `"${rep.name} | ${process.env.COMPANY_NAME || 'Deck Plus'}" <${from}>`,
-    to, subject, html, attachments,
-  }).compile().build()
+    to, bcc, subject, html, attachments,
+  }).compile()
+  node.keepBcc = true   // Gmail delivers to Bcc from the raw header and strips it before sending
+  const raw = await node.build()
   await _gmail.get(from).users.messages.send({ userId: 'me', requestBody: { raw: raw.toString('base64url') } })
   return true
 }

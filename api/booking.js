@@ -243,6 +243,7 @@ async function book(req, res) {
   await Promise.all([
     send({
       to: email,
+      bcc: settings.office_bcc?.length ? settings.office_bcc : undefined,   // the office gets a copy of every confirmation
       subject: `Confirmed: ${settings.meeting_title} with ${rep.name} — ${leadWhen}`,
       html: leadEmailHtml({ name: lead.first_name, rep, settings, when: leadWhen, address, calendarUrl: googleCalendarLink(rep, booking, settings) }),
       attachments: leadIcs,
