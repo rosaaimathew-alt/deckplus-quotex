@@ -78,7 +78,8 @@ alter table rr_reps add column if not exists buffer_after_minutes int check (buf
 alter table rr_settings add column if not exists office_bcc text[] not null default '{}';
 -- Lead reports (api/_lead-report.js): who gets them, and the last one sent.
 alter table rr_settings add column if not exists report_to text[] not null default '{}';
-alter table rr_settings add column if not exists report_sent_for text;
+alter table rr_settings add column if not exists report_sent_for text;        -- last monthly report, e.g. 2026-10
+alter table rr_settings add column if not exists report_week_sent_for text;   -- last weekly report (its Monday), e.g. 2026-11-02
 alter table rr_settings add column if not exists start_every_minutes int not null default 30 check (start_every_minutes between 5 and 240);
 
 alter table rr_bookings add column if not exists lead_first_name text;
