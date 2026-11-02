@@ -1,10 +1,11 @@
 /**
  * Lead reports for the booking calendar, emailed to rr_settings.report_to.
- *   1st of the month  → the whole previous month
- *   16th of the month → month to date (the 1st through the 15th)
- * A Vercel cron calls GET /api/booking?report=1 on days 1–3 and 16–18 (so a
- * failed send is retried the next day). rr_settings.report_sent_for records
- * the last report sent, so each one goes out exactly once however often the
+ *   Every Monday     → the previous week, Monday through Sunday
+ *   1st of the month → the whole previous month
+ * A Vercel cron calls GET /api/booking?report=1 daily; a report stays due for
+ * three days (Mon–Wed, or the 1st–3rd) so a failed send is retried the next
+ * day. rr_settings.report_week_sent_for / report_sent_for record the last
+ * report of each kind, so each one goes out exactly once however often the
  * URL is hit.
  */
 import { db, zonedToUtc, sendAsRep } from './_round-robin.js'
@@ -16,20 +17,30 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => (
 ))
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-// Which report is due today (Eastern), if any.
-export function dueReport(now = new Date()) {
+const pad = (v) => String(v).padStart(2, '0')
+const SHORT = (y, m, d) => new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })
+
+// The reports due today (Eastern). Each names the rr_settings column that records it.
+export function dueReports(now = new Date()) {
   const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
     .format(now).split('-').map(Number)
+  const out = []
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay()   // 0 = Sunday
+  if (weekday >= 1 && weekday <= 3) {
+    const mon = new Date(Date.UTC(y, m - 1, d - (weekday - 1) - 7))   // last week's Monday
+    const sun = new Date(mon.getTime() + 6 * 86_400_000)
+    const end = new Date(mon.getTime() + 7 * 86_400_000)
+    const [a, b] = [mon, sun].map(x => [x.getUTCFullYear(), x.getUTCMonth() + 1, x.getUTCDate()])
+    out.push({ column: 'report_week_sent_for', kind: 'week', key: `${a[0]}-${pad(a[1])}-${pad(a[2])}`,
+      title: `Week of ${SHORT(...a)}–${SHORT(...b)}, ${b[0]}`,
+      from: zonedToUtc(...a, 0, 0, TZ), to: zonedToUtc(end.getUTCFullYear(), end.getUTCMonth() + 1, end.getUTCDate(), 0, 0, TZ) })
+  }
   if (d <= 3) {
     const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1
-    return { key: `${py}-${String(pm).padStart(2, '0')}`, kind: 'month', title: `${MONTHS[pm - 1]} ${py}`,
-      from: zonedToUtc(py, pm, 1, 0, 0, TZ), to: zonedToUtc(y, m, 1, 0, 0, TZ) }
+    out.push({ column: 'report_sent_for', kind: 'month', key: `${py}-${pad(pm)}`, title: `${MONTHS[pm - 1]} ${py}`,
+      from: zonedToUtc(py, pm, 1, 0, 0, TZ), to: zonedToUtc(y, m, 1, 0, 0, TZ) })
   }
-  if (d >= 16 && d <= 18) {
-    return { key: `${y}-${String(m).padStart(2, '0')}-mid`, kind: 'mid', title: `${MONTHS[m - 1]} 1–15, ${y}`,
-      from: zonedToUtc(y, m, 1, 0, 0, TZ), to: zonedToUtc(y, m, 16, 0, 0, TZ) }
-  }
-  return null
+  return out
 }
 
 const fmt = (iso, opts) => new Date(iso).toLocaleString('en-US', { timeZone: TZ, ...opts })
@@ -70,11 +81,11 @@ export async function buildReport(period, sb = db()) {
   const h3 = (t) => `<h3 style="margin:18px 0 6px;color:#0e6e80">${t}</h3>`
   const trackedFrom = funnel?.tracking_from && Date.parse(funnel.tracking_from) > period.from + 86_400_000
     ? ` (tracking started ${fmt(funnel.tracking_from, { month: 'short', day: 'numeric' })})` : ''
-  const label = period.kind === 'mid' ? 'month-to-date lead report' : 'lead report'
+  const label = period.kind === 'week' ? 'weekly lead report' : 'monthly lead report'
 
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;max-width:720px">
 <h2 style="color:#0e6e80;margin:0 0 4px">Deck Plus booking calendar: ${esc(period.title)} ${label}</h2>
-<p style="color:#6b7280;margin:0 0 18px">Appointments booked through the website calendar${period.kind === 'mid' ? ' so far this month' : ''}.</p>
+<p style="color:#6b7280;margin:0 0 18px">Appointments booked through the website calendar ${period.kind === 'week' ? 'last week (Monday–Sunday)' : 'last month'}.</p>
 <table style="border-collapse:collapse"><tr>${card(live.length, 'appointments booked')}${card(people.length, 'unique customers')}${card(n(funnel?.visitors), 'unique visitors')}</tr></table>
 ${h3('By rep (strict rotation)')}
 <table style="border-collapse:collapse">${Object.entries(byRep).sort().map(([r, c]) => `<tr><td style="padding:4px 16px 4px 0">${esc(r)}</td><td><b>${c}</b></td></tr>`).join('') || '<tr><td>No bookings yet.</td></tr>'}</table>
@@ -94,7 +105,7 @@ ${cancelled ? `<p style="color:#6b7280;font-size:12px;margin-top:18px">${cancell
       b.lead_phone, b.lead_email, address(b), b.notes || '', flag.get(b.turn) || ''])]
     .map(r => r.map(csvCell).join(',')).join('\r\n')
 
-  const slug = period.key.replace('-mid', '-1-15')
+  const slug = period.kind === 'week' ? `week-of-${period.key}` : period.key
   return {
     subject: `${period.title} ${label}: Deck Plus booking calendar`,
     html, text,
@@ -102,35 +113,40 @@ ${cancelled ? `<p style="color:#6b7280;font-size:12px;margin-top:18px">${cancell
   }
 }
 
-// GET /api/booking?report=1 — send the report that's due, once.
+// GET /api/booking?report=1 — send whatever reports are due, each once.
 export async function sendDueReport(res) {
-  const period = dueReport()
-  if (!period) return res.status(200).json({ sent: false, reason: 'no report due today' })
+  const due = dueReports()
+  if (!due.length) return res.status(200).json({ sent: [], reason: 'no report due today' })
   const sb = db()
-  const { data: settings, error } = await sb.from('rr_settings').select('report_to, report_sent_for').eq('id', true).single()
+  const { data: settings, error } = await sb.from('rr_settings').select('report_to, report_sent_for, report_week_sent_for').eq('id', true).single()
   if (error) throw error
   const to = settings.report_to || []
-  if (!to.length) return res.status(200).json({ sent: false, reason: 'no report_to addresses' })
+  if (!to.length) return res.status(200).json({ sent: [], reason: 'no report_to addresses' })
 
-  // Claim this report so concurrent or repeated calls can't send it twice.
-  const { data: claimed, error: cErr } = await sb.from('rr_settings').update({ report_sent_for: period.key })
-    .eq('id', true).or(`report_sent_for.is.null,report_sent_for.neq.${period.key}`).select('id')
-  if (cErr) throw cErr
-  if (!claimed?.length) return res.status(200).json({ sent: false, reason: `already sent ${period.key}` })
+  const sent = [], skipped = []
+  for (const period of due) {
+    const col = period.column
+    // Claim this report so concurrent or repeated calls can't send it twice.
+    const { data: claimed, error: cErr } = await sb.from('rr_settings').update({ [col]: period.key })
+      .eq('id', true).or(`${col}.is.null,${col}.neq.${period.key}`).select('id')
+    if (cErr) throw cErr
+    if (!claimed?.length) { skipped.push(period.key); continue }
 
-  try {
-    const msg = { to, ...(await buildReport(period)) }
-    // From the first recipient's Gmail (a Deck Plus Workspace address); else the shared mailer.
-    let ok = false
-    try { ok = await sendAsRep({ name: 'Booking Calendar', email: to[0] }, msg) } catch (err) { console.error('Report via Gmail failed:', err.message) }
-    if (!ok) {
-      const r = await sendMail({ ...msg, fromName: 'Deck Plus Booking Calendar' })
-      if (r?.error) throw new Error(r.error)
+    try {
+      const msg = { to, ...(await buildReport(period)) }
+      // From the first recipient's Gmail (a Deck Plus Workspace address); else the shared mailer.
+      let ok = false
+      try { ok = await sendAsRep({ name: 'Booking Calendar', email: to[0] }, msg) } catch (err) { console.error('Report via Gmail failed:', err.message) }
+      if (!ok) {
+        const r = await sendMail({ ...msg, fromName: 'Deck Plus Booking Calendar' })
+        if (r?.error) throw new Error(r.error)
+      }
+      sent.push(period.key)
+    } catch (err) {
+      // Give the claim back so tomorrow's cron run retries.
+      await sb.from('rr_settings').update({ [col]: settings[col] }).eq('id', true)
+      throw err
     }
-    return res.status(200).json({ sent: true, report: period.key, to })
-  } catch (err) {
-    // Give the claim back so tomorrow's cron run retries.
-    await sb.from('rr_settings').update({ report_sent_for: settings.report_sent_for }).eq('id', true)
-    throw err
   }
+  return res.status(200).json({ sent, skipped, to })
 }
