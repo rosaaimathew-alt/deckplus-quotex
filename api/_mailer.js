@@ -70,13 +70,13 @@ async function candidates(sender = {}) {
  * @param {{ to, subject, html, text?, attachments?, fromName?, sender?: { userId?, email?, orgId? } }} opts
  * @returns {{ success: true, messageId, sentFrom } | { error }}
  */
-export async function sendMail({ to, subject, html, text, attachments, fromName, sender }) {
+export async function sendMail({ to, bcc, subject, html, text, attachments, fromName, sender }) {
   let firstError = null
   for (const c of await candidates(sender)) {
     const m = await c.load()
     if (!m) continue
     try {
-      const info = await m.transporter.sendMail({ from: fromHeader(fromName, m.email), to, subject, html, text, attachments })
+      const info = await m.transporter.sendMail({ from: fromHeader(fromName, m.email), to, bcc, subject, html, text, attachments })
       return { success: true, messageId: info.messageId, sentFrom: m.email }
     } catch (err) {
       console.error(`Send via ${c.label} (${m.email}) failed:`, err.message)

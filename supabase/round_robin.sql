@@ -74,6 +74,8 @@ alter table rr_reps add column if not exists last_start text check (last_start ~
 alter table rr_reps add column if not exists appointment_minutes  int check (appointment_minutes between 5 and 480);
 alter table rr_reps add column if not exists buffer_after_minutes int check (buffer_after_minutes between 0 and 480);
 -- How often start times are offered (8:00, 8:30, 9:00…).
+-- Office addresses blind-copied on every customer confirmation.
+alter table rr_settings add column if not exists office_bcc text[] not null default '{}';
 alter table rr_settings add column if not exists start_every_minutes int not null default 30 check (start_every_minutes between 5 and 240);
 
 alter table rr_bookings add column if not exists lead_first_name text;
