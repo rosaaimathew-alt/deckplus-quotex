@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, ListChecks, Wallet, ClipboardList, Wrench } from 'lucide-react'
+import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, ListChecks, Wallet, ClipboardList, Wrench, Smartphone } from 'lucide-react'
 import { Component, useEffect, useMemo, useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import PMHome from './pages/PMHome'
@@ -29,6 +29,8 @@ import { useNav, LEGACY_REDIRECTS } from './nav'
 import { nextReminderDate, contractStatusOf, isJobClosed } from './lib/attention'
 import { TodoDock } from './components/TodoPanel'
 import { DEMO, DEMO_BASENAME, resetDemo } from './demo'
+import FieldApp from './field/FieldApp'
+import { useFieldHome, useIsPhone, canUseField, setViewPref } from './field/fieldMode'
 
 const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
 
@@ -126,6 +128,19 @@ function NavItem({ d, badge, onClick }) {
   )
 }
 
+// Phone field mode vs. the full app. /field/* is always field mode; '/' is
+// field mode on a PM's phone (unless they switched to the full app); every
+// other address — and every desktop — gets the full app, so emailed links
+// and bookmarks keep working everywhere.
+function ShellSwitch() {
+  const location = useLocation()
+  const fieldHome = useFieldHome()
+  const path = location.pathname
+  if (path === '/field' || path.startsWith('/field/')) return <FieldApp />
+  if (path === '/' && fieldHome) return <FieldApp />
+  return <AppShell />
+}
+
 // ── App Shell ────────────────────────────────────────────────────────────────
 function AppShell() {
   const branding       = useStore(s => s.branding)
@@ -141,6 +156,8 @@ function AppShell() {
 
   const { destinations, can, role } = useNav()
   const badges = useBadges()
+  const isPhone = useIsPhone()
+  const showFieldSwitch = isPhone && canUseField(role)
   const isDark = theme === 'dark'
   const closeSidebar = () => setSidebarOpen(false)
   const autoExpireStaleSent = useStore(s => s.autoExpireStaleSent)
@@ -236,6 +253,12 @@ function AppShell() {
         </nav>
 
         <div className="px-3 pb-2 space-y-1">
+          {showFieldSwitch && (
+            <button onClick={() => { setViewPref('field'); closeSidebar(); navigate('/field') }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold brand-nav-inactive">
+              <Smartphone size={17} /> <span className="flex-1 text-left">Field mode</span>
+            </button>
+          )}
           <button onClick={() => { setPaletteOpen(true); closeSidebar() }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm brand-nav-inactive">
             <Search size={17} /> <span className="flex-1 text-left">Search</span>
@@ -407,7 +430,7 @@ export default function App() {
         <Route path="/legal/:doc"  element={<Legal />} />
         <Route path="/co/:token"   element={<SignBoundary><COSignPage /></SignBoundary>} />
         <Route path="/view/:recordId" element={<SignBoundary><ContractViewFull /></SignBoundary>} />
-        <Route path="*"            element={<AuthGuard><AppBoundary><BootGate><AppShell /></BootGate></AppBoundary></AuthGuard>} />
+        <Route path="*"            element={<AuthGuard><AppBoundary><BootGate><ShellSwitch /></BootGate></AppBoundary></AuthGuard>} />
       </Routes>
     </BrowserRouter>
   )

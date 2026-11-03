@@ -180,7 +180,7 @@ const STAGE_TEMPLATES = {
   ],
 }
 
-const JOB_TYPE_OPTIONS = [
+export const JOB_TYPE_OPTIONS = [
   'Porch Conversion',
   'Deck (New)',
   'Deck (Resurface / Rebuild)',

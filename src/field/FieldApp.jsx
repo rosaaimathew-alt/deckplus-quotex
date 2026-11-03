@@ -1,0 +1,632 @@
+// ── Field mode ───────────────────────────────────────────────────────────────
+// The phone app for project / paint managers. Three screens and one job page:
+//
+//   Today  — what needs you right now, and what's coming this week
+//   Jobs   — every open job, one tap to open it
+//   Paint  — jobs ready for paint (and the ones about to be)
+//   Job    — call / text / directions, the ONE next step with a big Done
+//            button, a quick note, and the full checklist if you need it
+//
+// No money, no tabs, no forms with ten fields. Everything here writes to the
+// same store as the desktop Jobs page (toggleJobStage, setJobStageDate,
+// addDailyLog), so the office sees field updates immediately.
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-router-dom'
+import {
+  Sun, CalendarDays, HardHat, PaintRoller, Phone, MessageSquare, Navigation,
+  ChevronLeft, ChevronRight, Check, CheckCircle2, Circle, AlertTriangle, Clock,
+  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2,
+} from 'lucide-react'
+import { useStore } from '../store'
+import { applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR } from '../brand'
+import { isJob, isJobClosed } from '../lib/attention'
+import { permitAlerts, permitTracked, usePermitAccess } from '../lib/permitTracking'
+import { getStages, JOB_TYPE_OPTIONS } from '../pages/Jobs'
+import { logout } from '../components/AuthGuard'
+import { DEMO, resetDemo } from '../demo'
+import { setViewPref } from './fieldMode'
+
+// ── Date helpers (local calendar days, not UTC) ─────────────────────────────
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const todayStr = () => ymd(new Date())
+const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d) }
+const dayLabel = (s) => {
+  if (!s) return ''
+  if (s === todayStr()) return 'Today'
+  if (s === addDays(1)) return 'Tomorrow'
+  if (s === addDays(-1)) return 'Yesterday'
+  return new Date(s + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+const mapsUrl = (address) => `https://maps.google.com/?q=${encodeURIComponent(address)}`
+const telUrl  = (phone) => `tel:${String(phone).replace(/[^\d+]/g, '')}`
+const smsUrl  = (phone) => `sms:${String(phone).replace(/[^\d+]/g, '')}`
+
+// Everything a field screen needs to know about one job, worked out once.
+function describeJob(p, permitAccess) {
+  const stages = getStages(p) || []
+  const jd = p.jobData || {}
+  const done = new Set(jd.completedStages || [])
+  // "Job Closed" is the office's close-out (final payment + email) — it's never
+  // a field step, so it's left out of what's next here.
+  const open = stages.filter(s => !done.has(s.key) && s.key !== 'closed')
+  const next = open[0] || null
+  const dates = jd.stageDates || {}
+  const failed = permitAccess && permitTracked(p) ? permitAlerts(p, stages).failed : 0
+  return {
+    p, stages, done, open, next,
+    nextDate: next ? dates[next.key] || (next.key === 'start' ? jd.startDate : null) : null,
+    doneCount: stages.filter(s => done.has(s.key)).length,
+    total: stages.length,
+    needsType: stages.length === 0,
+    failed,
+    paintIndex: open.findIndex(s => s.key === 'paint'), // 0 = paint is next
+    paintDate: dates.paint || null,
+  }
+}
+
+// Open jobs, described, honoring the Mine / All toggle.
+function useFieldJobs() {
+  const proposals = useStore(s => s.proposals)
+  const myId = useStore(s => s.me?.id)
+  const permitAccess = usePermitAccess()
+  const [scope, setScope] = useState(null) // null = decide automatically
+  const all = useMemo(
+    () => proposals.filter(p => isJob(p) && !isJobClosed(p)).map(p => describeJob(p, permitAccess)),
+    [proposals, permitAccess],
+  )
+  const mineList = useMemo(() => (myId ? all.filter(j => j.p.pmId === myId) : []), [all, myId])
+  const hasMine = mineList.length > 0
+  const effective = scope || (hasMine ? 'mine' : 'all')
+  return { jobs: effective === 'mine' ? mineList : all, scope: effective, setScope, hasMine }
+}
+
+// ── Little building blocks ──────────────────────────────────────────────────
+function Card({ children, className = '' }) {
+  return <section className={`bg-white rounded-2xl border border-gray-200 shadow-sm ${className}`}>{children}</section>
+}
+
+function Progress({ done, total }) {
+  const pct = total ? Math.round((done / total) * 100) : 0
+  return (
+    <div className="h-2 rounded-full bg-gray-100 overflow-hidden" aria-label={`${done} of ${total} steps done`}>
+      <div className="h-full rounded-full bg-[var(--brand-600)] transition-all" style={{ width: `${pct}%` }} />
+    </div>
+  )
+}
+
+function ScopeToggle({ scope, setScope, hasMine }) {
+  if (!hasMine) return null
+  return (
+    <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl text-sm font-semibold">
+      {[['mine', 'My jobs'], ['all', 'All jobs']].map(([k, label]) => (
+        <button key={k} onClick={() => setScope(k)}
+          className={`h-10 rounded-lg ${scope === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>{label}</button>
+      ))}
+    </div>
+  )
+}
+
+// A tappable job row used on every list screen.
+function JobRow({ j, sub, tone }) {
+  const navigate = useNavigate()
+  const toneCls = {
+    red: 'border-l-red-500', amber: 'border-l-amber-400', blue: 'border-l-[var(--brand-600)]',
+  }[tone] || 'border-l-transparent'
+  return (
+    <button onClick={() => navigate(`/field/job/${j.p.id}`)}
+      className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${toneCls} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
+      <div className="flex-1 min-w-0">
+        <p className="text-base font-semibold text-gray-900 truncate">{j.p.client || 'Unnamed job'}</p>
+        <p className="text-sm text-gray-600 truncate">{sub}</p>
+        {j.total > 0 && <div className="mt-2"><Progress done={j.doneCount} total={j.total} /></div>}
+      </div>
+      <ChevronRight size={20} className="text-gray-300 shrink-0" />
+    </button>
+  )
+}
+
+function nextLine(j) {
+  if (j.needsType) return 'Pick the job type to see its steps'
+  if (!j.next) return 'Ready for the office to close out'
+  return `Next: ${j.next.label}${j.nextDate ? ` · ${dayLabel(j.nextDate)}` : ''}`
+}
+
+// Undo toast: every Done button can be taken back for a few seconds.
+function useUndo() {
+  const [toast, setToast] = useState(null)
+  const timer = useRef(null)
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const show = (message, undo) => {
+    clearTimeout(timer.current)
+    setToast({ message, undo })
+    timer.current = setTimeout(() => setToast(null), 6000)
+  }
+  const el = toast && (
+    <div className="fixed left-3 right-3 bottom-24 z-50 flex justify-center pointer-events-none">
+      <div className="pointer-events-auto max-w-md w-full bg-gray-900 text-white rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3">
+        <CheckCircle2 size={20} className="text-green-400 shrink-0" />
+        <span className="flex-1 text-sm font-medium">{toast.message}</span>
+        {toast.undo && (
+          <button onClick={() => { toast.undo(); setToast(null) }}
+            className="flex items-center gap-1 text-sm font-bold text-amber-300 px-2 py-1"><Undo2 size={16} /> Undo</button>
+        )}
+      </div>
+    </div>
+  )
+  return [el, show]
+}
+
+// ── Today ───────────────────────────────────────────────────────────────────
+function TodayScreen() {
+  const { jobs, scope, setScope, hasMine } = useFieldJobs()
+  const me = useStore(s => s.me)
+  const today = todayStr()
+  const weekEnd = addDays(7)
+
+  const { now, week } = useMemo(() => {
+    const now = [], week = []
+    for (const j of jobs) {
+      if (j.failed) now.push({ j, tone: 'red', why: `Failed inspection — ${j.failed} to redo`, rank: 0 })
+      else if (j.next && j.nextDate && j.nextDate < today) now.push({ j, tone: 'amber', why: `Late: ${j.next.label} (was ${dayLabel(j.nextDate)})`, rank: 1 })
+      else if (j.next && j.nextDate === today) now.push({ j, tone: 'blue', why: `Today: ${j.next.label}`, rank: 2 })
+      else if (j.needsType) now.push({ j, tone: 'amber', why: 'Pick the job type', rank: 3 })
+
+      // Anything dated this week that isn't done yet (all steps, not just next)
+      const dates = j.p.jobData?.stageDates || {}
+      for (const s of j.open) {
+        const d = dates[s.key]
+        if (d && d > today && d < weekEnd) week.push({ j, date: d, label: s.label, id: `${j.p.id}-${s.key}` })
+      }
+    }
+    now.sort((a, b) => a.rank - b.rank)
+    week.sort((a, b) => a.date.localeCompare(b.date))
+    return { now, week }
+  }, [jobs, today, weekEnd])
+
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName = (me?.displayName || '').split(' ')[0]
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
+        <p className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+      </div>
+
+      <ScopeToggle scope={scope} setScope={setScope} hasMine={hasMine} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4">
+          <p className="text-3xl font-bold text-gray-900">{jobs.length}</p>
+          <p className="text-sm text-gray-500">open jobs</p>
+        </Card>
+        <Card className={`p-4 ${now.length ? 'border-amber-300' : ''}`}>
+          <p className={`text-3xl font-bold ${now.length ? 'text-amber-600' : 'text-green-600'}`}>{now.length}</p>
+          <p className="text-sm text-gray-500">need you now</p>
+        </Card>
+      </div>
+
+      <div className="space-y-2.5">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Needs you now</h2>
+        {now.length === 0 ? (
+          <Card className="p-5 flex items-center gap-3">
+            <CheckCircle2 size={26} className="text-green-500 shrink-0" />
+            <p className="text-base font-medium text-gray-800">You're all caught up.</p>
+          </Card>
+        ) : now.map(({ j, tone, why }) => <JobRow key={j.p.id} j={j} tone={tone} sub={why} />)}
+      </div>
+
+      <div className="space-y-2.5">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Coming up this week</h2>
+        {week.length === 0 ? (
+          <p className="text-sm text-gray-500 px-1">Nothing scheduled in the next 7 days.</p>
+        ) : (
+          <Card className="divide-y divide-gray-100 overflow-hidden">
+            {week.map(w => <WeekRow key={w.id} w={w} />)}
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function WeekRow({ w }) {
+  const navigate = useNavigate()
+  return (
+    <button onClick={() => navigate(`/field/job/${w.j.p.id}`)} className="w-full text-left px-4 py-3 flex items-center gap-3 active:bg-gray-50">
+      <span className="w-20 shrink-0 text-sm font-semibold text-[var(--brand-700)]">{dayLabel(w.date)}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-base font-medium text-gray-900 truncate">{w.j.p.client || 'Unnamed job'}</span>
+        <span className="block text-sm text-gray-500 truncate">{w.label}</span>
+      </span>
+      <ChevronRight size={18} className="text-gray-300 shrink-0" />
+    </button>
+  )
+}
+
+// ── Jobs ────────────────────────────────────────────────────────────────────
+function JobsScreen() {
+  const { jobs, scope, setScope, hasMine } = useFieldJobs()
+  const [q, setQ] = useState('')
+  const list = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    return jobs
+      .filter(j => !needle || `${j.p.client || ''} ${j.p.address || ''}`.toLowerCase().includes(needle))
+      .sort((a, b) => (a.p.client || '').localeCompare(b.p.client || ''))
+  }, [jobs, q])
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
+      <ScopeToggle scope={scope} setScope={setScope} hasMine={hasMine} />
+      <label className="flex items-center gap-2 h-12 px-4 rounded-2xl border border-gray-200 bg-white">
+        <Search size={18} className="text-gray-400" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Name or street"
+          className="flex-1 bg-transparent text-base text-gray-900 outline-none" />
+      </label>
+      <div className="space-y-2.5">
+        {list.length === 0 && <p className="text-sm text-gray-500 px-1">No open jobs{q ? ' match that' : ''}.</p>}
+        {list.map(j => (
+          <JobRow key={j.p.id} j={j} tone={j.failed ? 'red' : null}
+            sub={<>{j.p.address ? <span className="block truncate">{j.p.address}</span> : null}<span className="block truncate font-medium text-gray-800">{nextLine(j)}</span></>} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Paint ───────────────────────────────────────────────────────────────────
+function PaintScreen() {
+  const { jobs, scope, setScope, hasMine } = useFieldJobs()
+  const toggleJobStage = useStore(s => s.toggleJobStage)
+  const [toast, showToast] = useUndo()
+  const ready = jobs.filter(j => j.paintIndex === 0)
+  const soon  = jobs.filter(j => j.paintIndex === 1 || j.paintIndex === 2)
+
+  const markPainted = (j) => {
+    toggleJobStage(j.p.id, 'paint')
+    showToast(`Paint done — ${j.p.client || 'job'}`, () => toggleJobStage(j.p.id, 'paint'))
+  }
+
+  return (
+    <div className="space-y-5">
+      <h1 className="text-2xl font-bold text-gray-900">Paint</h1>
+      <ScopeToggle scope={scope} setScope={setScope} hasMine={hasMine} />
+
+      <div className="space-y-2.5">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Ready for paint ({ready.length})</h2>
+        {ready.length === 0 && <p className="text-sm text-gray-500 px-1">No jobs are waiting on paint.</p>}
+        {ready.map(j => (
+          <Card key={j.p.id} className="p-4 space-y-3">
+            <JobHeaderMini j={j} />
+            {j.paintDate && <p className="text-sm text-gray-600 flex items-center gap-1.5"><CalendarDays size={15} /> Scheduled {dayLabel(j.paintDate)}</p>}
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <button onClick={() => markPainted(j)}
+                className="h-14 rounded-xl bg-green-600 active:bg-green-700 text-white text-base font-bold flex items-center justify-center gap-2">
+                <Check size={22} /> Paint done
+              </button>
+              {j.p.address && (
+                <a href={mapsUrl(j.p.address)} target="_blank" rel="noreferrer" aria-label="Directions"
+                  className="h-14 w-14 rounded-xl border border-gray-200 flex items-center justify-center text-gray-700"><Navigation size={22} /></a>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <div className="space-y-2.5">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Coming soon ({soon.length})</h2>
+        {soon.length === 0 && <p className="text-sm text-gray-500 px-1">Nothing lined up behind those.</p>}
+        {soon.map(j => (
+          <JobRow key={j.p.id} j={j}
+            sub={`${j.paintIndex} step${j.paintIndex > 1 ? 's' : ''} before paint · next: ${j.next.label}${j.paintDate ? ` · paint ${dayLabel(j.paintDate)}` : ''}`} />
+        ))}
+      </div>
+      {toast}
+    </div>
+  )
+}
+
+function JobHeaderMini({ j }) {
+  const navigate = useNavigate()
+  return (
+    <button onClick={() => navigate(`/field/job/${j.p.id}`)} className="w-full text-left flex items-center gap-2">
+      <span className="flex-1 min-w-0">
+        <span className="block text-base font-semibold text-gray-900 truncate">{j.p.client || 'Unnamed job'}</span>
+        {j.p.address && <span className="block text-sm text-gray-500 truncate">{j.p.address}</span>}
+      </span>
+      <ChevronRight size={20} className="text-gray-300 shrink-0" />
+    </button>
+  )
+}
+
+// ── One job ─────────────────────────────────────────────────────────────────
+function JobScreen() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const proposal = useStore(s => s.proposals.find(p => String(p.id) === String(id)))
+  const toggleJobStage = useStore(s => s.toggleJobStage)
+  const setJobStageDate = useStore(s => s.setJobStageDate)
+  const updateJobData = useStore(s => s.updateJobData)
+  const permitAccess = usePermitAccess()
+  const [toast, showToast] = useUndo()
+  const [showAll, setShowAll] = useState(false)
+
+  if (!proposal) {
+    return (
+      <div className="space-y-4">
+        <BackButton />
+        <p className="text-base text-gray-600">That job isn't here anymore.</p>
+      </div>
+    )
+  }
+
+  const j = describeJob(proposal, permitAccess)
+  const closed = isJobClosed(proposal)
+
+  const toggle = (stage) => {
+    const wasDone = j.done.has(stage.key)
+    toggleJobStage(proposal.id, stage.key)
+    showToast(wasDone ? `Unchecked: ${stage.label}` : `Done: ${stage.label}`, () => toggleJobStage(proposal.id, stage.key))
+  }
+
+  return (
+    <div className="space-y-4">
+      <BackButton />
+
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 leading-tight">{proposal.client || 'Unnamed job'}</h1>
+        {proposal.address && <p className="text-base text-gray-600 mt-0.5">{proposal.address}</p>}
+      </div>
+
+      {/* Call / Text / Directions */}
+      <div className="grid grid-cols-3 gap-2">
+        <QuickAction href={proposal.phone ? telUrl(proposal.phone) : null} icon={Phone} label="Call" />
+        <QuickAction href={proposal.phone ? smsUrl(proposal.phone) : null} icon={MessageSquare} label="Text" />
+        <QuickAction href={proposal.address ? mapsUrl(proposal.address) : null} icon={Navigation} label="Directions" external />
+      </div>
+
+      {j.failed > 0 && (
+        <Card className="p-4 border-red-300 bg-red-50 flex items-start gap-3">
+          <AlertTriangle size={22} className="text-red-600 shrink-0 mt-0.5" />
+          <p className="text-base text-red-800 font-medium">A county inspection failed on this job. Check with the office before moving on.</p>
+        </Card>
+      )}
+
+      {/* The one thing to do next */}
+      {j.needsType ? (
+        <Card className="p-4 space-y-3">
+          <p className="text-base font-semibold text-gray-900">What kind of job is this?</p>
+          <p className="text-sm text-gray-500">Pick one and its steps will show up.</p>
+          <select defaultValue="" onChange={e => e.target.value && updateJobData(proposal.id, { projectTypeOverride: e.target.value })}
+            className="w-full h-12 px-3 rounded-xl border border-gray-300 bg-white text-base text-gray-900">
+            <option value="" disabled>Choose job type…</option>
+            {JOB_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </Card>
+      ) : closed || !j.next ? (
+        <Card className="p-5 flex items-center gap-3 border-green-300 bg-green-50">
+          <CheckCircle2 size={28} className="text-green-600 shrink-0" />
+          <p className="text-base font-semibold text-green-800">{closed ? 'This job is closed.' : 'Every field step is done. The office will close it out.'}</p>
+        </Card>
+      ) : (
+        <Card className="p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Next step</p>
+            <p className="text-xs font-semibold text-gray-500">{j.doneCount} of {j.total} done</p>
+          </div>
+          <p className="text-xl font-bold text-gray-900 leading-snug">{j.next.label}</p>
+          <Progress done={j.doneCount} total={j.total} />
+          <button onClick={() => toggle(j.next)}
+            className="w-full h-16 rounded-xl bg-green-600 active:bg-green-700 text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm">
+            <Check size={24} /> Mark done
+          </button>
+          <label className="flex items-center gap-3 h-12 px-3 rounded-xl border border-gray-200">
+            <CalendarDays size={18} className="text-gray-500 shrink-0" />
+            <span className="text-sm text-gray-600 shrink-0">Scheduled</span>
+            <input type="date" value={j.p.jobData?.stageDates?.[j.next.key] || ''}
+              onChange={e => setJobStageDate(proposal.id, j.next.key, e.target.value || null)}
+              className="flex-1 min-w-0 bg-transparent text-base text-gray-900 text-right outline-none" />
+          </label>
+        </Card>
+      )}
+
+      <QuickNote proposalId={proposal.id} onSaved={() => showToast('Note saved')} />
+
+      {/* Full checklist, tucked away */}
+      {j.total > 0 && (
+        <Card className="overflow-hidden">
+          <button onClick={() => setShowAll(v => !v)} className="w-full px-4 h-14 flex items-center gap-3 text-left">
+            <ListChecks size={20} className="text-gray-500" />
+            <span className="flex-1 text-base font-semibold text-gray-900">All steps</span>
+            <span className="text-sm text-gray-500">{showAll ? 'Hide' : 'Show'}</span>
+          </button>
+          {showAll && (
+            <ul className="border-t border-gray-100 divide-y divide-gray-100">
+              {j.stages.map(s => {
+                const isDone = j.done.has(s.key)
+                const date = j.p.jobData?.stageDates?.[s.key]
+                const officeOnly = s.key === 'closed'
+                return (
+                  <li key={s.key}>
+                    <button onClick={() => !officeOnly && toggle(s)} disabled={officeOnly} className="w-full px-4 py-3 min-h-14 flex items-center gap-3 text-left active:bg-gray-50">
+                      {isDone ? <CheckCircle2 size={24} className="text-green-600 shrink-0" /> : <Circle size={24} className="text-gray-300 shrink-0" />}
+                      <span className={`flex-1 text-base ${isDone ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{s.label}</span>
+                      {officeOnly && !isDone && <span className="text-xs font-semibold text-gray-400 shrink-0">Office</span>}
+                      {date && !isDone && <span className="text-xs font-semibold text-gray-500 shrink-0">{dayLabel(date)}</span>}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
+      )}
+
+      <RecentNotes proposal={proposal} />
+
+      <button onClick={() => { setViewPref('full'); navigate('/projects?tab=jobs') }}
+        className="w-full h-12 rounded-xl text-sm font-semibold text-gray-600 flex items-center justify-center gap-2">
+        <Monitor size={16} /> Open budget, change orders & more in the full app
+      </button>
+      {toast}
+    </div>
+  )
+}
+
+function BackButton() {
+  const navigate = useNavigate()
+  return (
+    <button onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/field/jobs'))}
+      className="-ml-2 h-10 pr-3 flex items-center gap-1 text-base font-semibold text-[var(--brand-700)]">
+      <ChevronLeft size={22} /> Back
+    </button>
+  )
+}
+
+function QuickAction({ href, icon, label, external }) {
+  const Icon = icon
+  const cls = 'h-16 rounded-2xl border flex flex-col items-center justify-center gap-1 text-sm font-semibold'
+  if (!href) {
+    return <span className={`${cls} border-gray-100 text-gray-300`} aria-disabled="true"><Icon size={20} />{label}</span>
+  }
+  return (
+    <a href={href} {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
+      className={`${cls} border-gray-200 bg-white text-[var(--brand-700)] active:bg-gray-50 shadow-sm`}>
+      <Icon size={20} />{label}
+    </a>
+  )
+}
+
+// One box, one button. Saves as today's daily log entry.
+function QuickNote({ proposalId, onSaved }) {
+  const addDailyLog = useStore(s => s.addDailyLog)
+  const [notes, setNotes] = useState('')
+  const [crew, setCrew] = useState('')
+  const save = () => {
+    if (!notes.trim()) return
+    addDailyLog(proposalId, { date: todayStr(), crew: crew.trim(), weather: '', notes: notes.trim(), source: 'field' })
+    setNotes(''); setCrew('')
+    onSaved?.()
+  }
+  return (
+    <Card className="p-4 space-y-3">
+      <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><StickyNote size={18} className="text-gray-500" /> Today's note</p>
+      <textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="What happened on site today?"
+        className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base text-gray-900 bg-white resize-none outline-none focus:border-[var(--brand-500)]" />
+      <div className="flex gap-2">
+        <label className="flex-1 min-w-0 flex items-center gap-2 h-12 px-3 rounded-xl border border-gray-300 bg-white">
+          <HardHat size={18} className="text-gray-400 shrink-0" />
+          <input value={crew} onChange={e => setCrew(e.target.value)} placeholder="Crew (optional)"
+            className="flex-1 min-w-0 bg-transparent text-base text-gray-900 outline-none" />
+        </label>
+        <button onClick={save} disabled={!notes.trim()}
+          className="h-12 px-6 shrink-0 rounded-xl text-base font-bold text-white bg-[var(--brand-600)] disabled:opacity-40">Save</button>
+      </div>
+    </Card>
+  )
+}
+
+function RecentNotes({ proposal }) {
+  const logs = (proposal.jobData?.dailyLogs || []).slice(0, 3)
+  const office = proposal.jobData?.notes
+  if (!logs.length && !office) return null
+  return (
+    <div className="space-y-2.5">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Notes</h2>
+      {office && (
+        <Card className="p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">From the office</p>
+          <p className="text-base text-gray-800 whitespace-pre-wrap">{office}</p>
+        </Card>
+      )}
+      {logs.map(l => (
+        <Card key={l.id} className="p-4">
+          <p className="text-xs font-semibold text-gray-500 mb-1 flex items-center gap-2">
+            <Clock size={12} /> {dayLabel(l.date)}{l.crew ? ` · ${l.crew}` : ''}
+          </p>
+          <p className="text-base text-gray-800 whitespace-pre-wrap">{l.notes}</p>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+// ── Shell ───────────────────────────────────────────────────────────────────
+const TABS = [
+  { to: '/field', label: 'Today', icon: Sun, end: true },
+  { to: '/field/jobs', label: 'Jobs', icon: HardHat },
+  { to: '/field/paint', label: 'Paint', icon: PaintRoller },
+]
+
+export default function FieldApp() {
+  const branding = useStore(s => s.branding)
+  const theme = useStore(s => s.theme)
+  const navigate = useNavigate()
+  const [menu, setMenu] = useState(false)
+
+  useEffect(() => {
+    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, {
+      sidebar: branding?.sidebarColor || null,
+      accent: branding?.accentColor || null,
+    })
+  }, [branding?.primaryColor, branding?.sidebarColor, branding?.accentColor])
+  useEffect(() => { applyTheme(theme === 'dark') }, [theme])
+
+  const toFullApp = () => { setViewPref('full'); navigate('/') }
+  const companyName = branding?.companyName || 'QUOTEX'
+
+  return (
+    <div className="min-h-[100dvh] qx-ground bg-gray-50 overflow-x-hidden">
+      <header className="sticky top-0 z-30 h-14 px-4 flex items-center gap-3 text-white pt-[env(safe-area-inset-top)] box-content"
+        style={{ backgroundColor: 'var(--sidebar)' }}>
+        {branding?.logo
+          ? <img src={branding.logo} alt={companyName} className="h-8 object-contain" />
+          : <span className="text-base font-black tracking-widest">{companyName}</span>}
+        <span className="text-xs font-semibold uppercase tracking-wide bg-white/15 rounded-full px-2 py-0.5">Field</span>
+        <div className="ml-auto relative">
+          <button onClick={() => setMenu(m => !m)} className="h-10 w-10 rounded-lg flex items-center justify-center text-white/80 active:bg-white/10" aria-label="Options">
+            <Settings2 size={20} />
+          </button>
+          {menu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
+              <div className="absolute right-0 top-12 z-50 w-60 bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden text-gray-900">
+                <button onClick={toFullApp} className="w-full px-4 h-14 flex items-center gap-3 text-base text-left active:bg-gray-50">
+                  <Monitor size={18} className="text-gray-500" /> Switch to full app
+                </button>
+                <button onClick={DEMO ? resetDemo : logout} className="w-full px-4 h-14 flex items-center gap-3 text-base text-left border-t border-gray-100 active:bg-gray-50">
+                  <LogOut size={18} className="text-gray-500" /> {DEMO ? 'Reset demo' : 'Log out'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </header>
+
+      <main className="max-w-xl mx-auto px-4 pt-4 pb-28">
+        <Routes>
+          <Route path="/" element={<TodayScreen />} />
+          <Route path="/field" element={<TodayScreen />} />
+          <Route path="/field/jobs" element={<JobsScreen />} />
+          <Route path="/field/paint" element={<PaintScreen />} />
+          <Route path="/field/job/:id" element={<JobScreen />} />
+          <Route path="*" element={<Navigate to="/field" replace />} />
+        </Routes>
+      </main>
+
+      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]" aria-label="Field navigation">
+        <div className="max-w-xl mx-auto grid grid-cols-3">
+          {TABS.map(t => (
+            <NavLink key={t.to} to={t.to} end={t.end}
+              className={({ isActive }) => `h-16 flex flex-col items-center justify-center gap-0.5 text-xs font-semibold ${isActive ? 'text-[var(--brand-700)]' : 'text-gray-500'}`}>
+              <t.icon size={24} />{t.label}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+    </div>
+  )
+}
