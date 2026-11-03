@@ -697,7 +697,13 @@ function bestInGroup(all) {
 // Appointment date for a proposal: when the estimate/appointment happened.
 const apptDate = (p) => p?.createdAt || p?.sentAt || p?.closedAt || null
 
-function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onOpen, onRevise, onGenerateContract }) {
+// The sales rep who created a proposal, by name, for office/admin views.
+const repName = (members, id) => {
+  const m = (members || []).find(x => x.id === id)
+  return m ? (m.displayName || (m.email || '').split('@')[0]) : ''
+}
+
+function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onOpen, onRevise, onGenerateContract, showRep }) {
   const { deleteProposal, detachProposal, mergeProposalGroups, members, setProposalPm } = useStore()
   const branding = useStore(s => s.branding)
   const setProposalViewToken = useStore(s => s.setProposalViewToken)
@@ -751,6 +757,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
       if (sortKey === 'client') { av = (a.primary.client || '').toLowerCase(); bv = (b.primary.client || '').toLowerCase() }
       else if (sortKey === 'total') { av = Number(a.primary.total) || 0; bv = Number(b.primary.total) || 0 }
       else if (sortKey === 'status') { av = STATUS_RANK[a.primary.status] || 0; bv = STATUS_RANK[b.primary.status] || 0 }
+      else if (sortKey === 'rep') { av = repName(members, a.primary.ownerId).toLowerCase(); bv = repName(members, b.primary.ownerId).toLowerCase() }
       else { av = apptDate(a.primary) ? new Date(apptDate(a.primary)).getTime() : 0; bv = apptDate(b.primary) ? new Date(apptDate(b.primary)).getTime() : 0 }
       const cmp = av < bv ? -1 : av > bv ? 1 : 0
       return sortDir === 'asc' ? cmp : -cmp
@@ -792,6 +799,11 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
           <td className="px-4 py-3">
             <StatusSelect value={p.status} onChange={e => onStatusChange(p, e.target.value)} />
           </td>
+          {showRep && (
+            <td className="px-4 py-3 text-xs text-gray-700 whitespace-nowrap">
+              {repName(members, p.ownerId) || <span className="italic text-gray-300">—</span>}
+            </td>
+          )}
           <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
             {p.sentAt
               ? new Date(p.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -836,7 +848,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
         </tr>
         {expandedLog === p.id && (
           <tr className="border-t border-gray-100">
-            <td colSpan={5} className="p-0">
+            <td colSpan={showRep ? 6 : 5} className="p-0">
               <ActivityLog proposal={p} groupProposals={groupProposals} />
             </td>
           </tr>
@@ -870,6 +882,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                 { key: 'client', label: 'Client', align: 'text-left' },
                 { key: 'total', label: 'Total', align: 'text-right', w: 'w-28' },
                 { key: 'status', label: 'Status', align: 'text-left', w: 'w-36' },
+                ...(showRep ? [{ key: 'rep', label: 'Sales rep', align: 'text-left', w: 'w-28' }] : []),
                 { key: 'date', label: 'Date', align: 'text-left', w: 'w-28' },
               ].map(col => (
                 <th key={col.key}
@@ -912,6 +925,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                       <td className="px-4 py-2.5">
                         <StatusSelect value={alt.status} onChange={e => onStatusChange(alt, e.target.value)} />
                       </td>
+                      {showRep && <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{repName(members, alt.ownerId)}</td>}
                       <td className="px-4 py-2.5 text-xs text-gray-400">
                         {alt.createdAt ? new Date(alt.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                       </td>
@@ -940,7 +954,8 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
 }
 
 // ── Pipeline / Kanban View ─────────────────────────────────────────────────
-function PipelineView({ proposals, onStatusChange }) {
+function PipelineView({ proposals, onStatusChange, showRep }) {
+  const members = useStore(s => s.members)
   return (
     <div className="flex gap-3 overflow-x-auto pb-4">
       {PROPOSAL_STATUSES.map(status => {
@@ -962,6 +977,7 @@ function PipelineView({ proposals, onStatusChange }) {
                 <div key={p.id} className="bg-white rounded-lg border border-gray-100 shadow-sm p-3">
                   <p className="text-sm font-semibold text-gray-800 truncate">{p.client || 'Unnamed'}</p>
                   <p className="text-xs text-[var(--brand-600)] font-medium mt-0.5">${fmt(p.total || 0)}</p>
+                  {showRep && repName(members, p.ownerId) && <p className="text-xs text-gray-500 mt-0.5">Rep: {repName(members, p.ownerId)}</p>}
                   {p.email && <p className="text-xs text-gray-400 truncate mt-0.5">{p.email}</p>}
                   {/* Active reminder indicator */}
                   {(p.reminders || []).some(r => !r.dismissed && isOverdue(nextReminderDate(r))) && (
@@ -1460,12 +1476,14 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
           onOpen={handleOpen}
           onRevise={handleRevise}
           onGenerateContract={handleGenerateContract}
+          showRep={canChoose && !mineOnly}
         />
       )}
       {tab === 'pipeline' && (
         <PipelineView
           proposals={filtered}
           onStatusChange={handleStatusChange}
+          showRep={canChoose && !mineOnly}
         />
       )}
       {tab === 'activity' && (
