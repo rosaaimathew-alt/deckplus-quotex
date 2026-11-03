@@ -319,3 +319,61 @@ html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
   .qx-ink .text-gray-300, .qx-ink .text-gray-400, .qx-ink .text-gray-500,
   .qx-ink .text-gray-600, .qx-ink .text-gray-700 { color: #000 !important; }
 }
+
+/* ── Signing page on a phone (src/pages/SignPage.jsx) ─────────────────────
+   Layout only — same wording, same fields. The page reflows to the screen
+   instead of shrinking a letter-size sheet: narrow margins, left-aligned text
+   (justified text on a narrow column leaves big gaps), signature lines and
+   two-column blocks stack, tables fit, and tap targets get bigger. Scoped to
+   the signing view (.dp-signing) and screen only, so the PDF and print copy
+   are unchanged. */
+@media screen and (max-width: 640px) {
+  .dp-signing .dp-doc { font-size: 12pt; line-height: 1.45; }
+  .dp-signing .dp-page { padding: 22px 16px 26px; min-height: 0; }
+  .dp-signing .dp-page + .dp-page { border-top: 6px solid #eae4d8; }
+  .dp-signing .dp-page p, .dp-signing .dp-bullets li, .dp-signing .dp-initials td { text-align: left; }
+  .dp-signing .dp-indent { margin-left: 1em; }
+  .dp-signing .dp-address { margin-left: 0.6em; }
+  .dp-signing .dp-payments { margin-left: 0.8em; }
+  .dp-signing .dp-bullets { margin-left: 0.2em; }
+  .dp-signing .dp-logo { height: 48px; }
+  .dp-signing img { max-width: 100%; }
+  .dp-signing .dp-h1 { font-size: 13.5pt; }
+
+  /* signature / date lines wrap onto their own rows instead of running off-screen */
+  .dp-signing .dp-sigline, .dp-signing .dp-sigcol-line, .dp-signing .dp-sigcol-date { white-space: normal; }
+  .dp-signing .dp-sig { width: min(260px, 100%); height: 44px; margin: 0.35em 0; }
+  .dp-signing .dp-sigdate { width: 120px; height: 36px; margin: 0.35em 0; }
+  .dp-signing .dp-sigcol-line .dp-sig { width: min(260px, 100%); }
+  .dp-signing .dp-sig img { height: 38px; }
+  .dp-signing .dp-sigcols { grid-template-columns: 1fr; gap: 1.6em; margin-top: 1.8em; }
+  .dp-signing .dp-sigcol-h { margin-bottom: 0.6em; }
+
+  /* initials: a bigger box to tap */
+  .dp-signing .dp-init { width: 76px; height: 38px; }
+  .dp-signing .dp-init img { height: 32px; }
+  .dp-signing .dp-initials td { padding: 0.35em 0.4em; }
+  .dp-signing .dp-initials td.dp-initcell { width: 86px; }
+  .dp-signing .dp-sign-btn { font-size: 12px; border-width: 2px; }
+  .dp-signing .dp-init .dp-sign-btn { font-size: 11px; }
+
+  /* forms and tables fit the screen */
+  .dp-signing .dp-form { font-size: 11pt; }
+  .dp-signing .dp-formhead { flex-wrap: wrap; gap: 0.4em; }
+  .dp-signing .dp-formtitle { font-size: 17pt; }
+  .dp-signing .dp-headerfields, .dp-signing .dp-proc-top { grid-template-columns: 1fr; }
+  .dp-signing .dp-proc-block { grid-template-columns: 1fr !important; }
+  .dp-signing .dp-grid th, .dp-signing .dp-grid td { font-size: 10.5pt; padding: 0.25em 0.35em; overflow-wrap: anywhere; }
+  .dp-signing .dp-pricing .dp-price { width: 38%; }
+  .dp-signing .dp-gcell { overflow-wrap: anywhere; }
+  .dp-signing .dp-blank { min-width: 6ch; max-width: 100%; }
+  .dp-signing .dp-release-h { font-size: 16pt; }
+
+  /* government forms are fixed page images: keep them whole, readable by pinch-zoom */
+  .dp-signing .dp-imgform { padding: 10px 6px; }
+
+  /* the field the "Next" button jumped to */
+  .dp-signing .dp-sign-btn.qx-next { box-shadow: 0 0 0 3px #f59e0b; }
+}
+.dp-signing .dp-sign-btn.qx-next { animation: qx-next-pulse 1.2s ease-in-out 2; }
+@keyframes qx-next-pulse { 50% { background: #fde68a; } }

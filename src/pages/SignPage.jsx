@@ -63,6 +63,19 @@ export default function SignPage() {
     setShowCapture(true)
   }, [])
 
+  // Jump to the next place this signer still has to sign or initial: the first
+  // one below what's on screen, else the first one in the packet.
+  const goNextField = useCallback(() => {
+    const btns = Array.from(document.querySelectorAll('.dp-signing .dp-sign-btn'))
+    if (!btns.length) return
+    const below = btns.find(b => b.getBoundingClientRect().top > 140)
+    const el = below || btns[0]
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    btns.forEach(b => b.classList.remove('qx-next'))
+    el.classList.add('qx-next')
+    setTimeout(() => el.classList.remove('qx-next'), 2600)
+  }, [])
+
   const confirmCapture = useCallback(() => {
     if (!printedName.trim()) { alert('Enter your full name first'); return }
     if (sigRef.current?.isEmpty()) { alert('Please draw or type your signature'); return }
@@ -72,8 +85,8 @@ export default function SignPage() {
     if (pendingField) {
       setAppliedFields(prev => new Set([...prev, pendingField]))
       setPendingField(null)
-    }
-  }, [printedName, pendingField])
+    } else setTimeout(goNextField, 250)   // signature set from the bar: take them to the first field
+  }, [printedName, pendingField, goNextField])
 
   const applyField = useCallback((fieldId) => {
     if (!masterSig) { openCapture(fieldId); return }
@@ -196,12 +209,12 @@ export default function SignPage() {
     const coLines    = d.lines || []
 
     return (
-      <div className="qx-ink min-h-screen bg-gray-100 py-8 px-4">
+      <div className="qx-ink min-h-screen bg-gray-100 py-4 sm:py-8 px-2 sm:px-4">
         <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
 
           {/* CO Header */}
-          <div className="bg-gray-900 text-white px-8 py-6">
-            <div className="flex items-start justify-between">
+          <div className="bg-gray-900 text-white px-4 sm:px-8 py-5 sm:py-6">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">{companyName}</p>
                 <h1 className="text-2xl font-bold">Change Order</h1>
@@ -214,10 +227,10 @@ export default function SignPage() {
             </div>
           </div>
 
-          <div className="px-8 py-6 space-y-6">
+          <div className="px-4 sm:px-8 py-5 sm:py-6 space-y-6">
 
             {/* Client info */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm break-words">
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Client</p>
                 <p className="font-medium text-gray-900">{d.client}</p>
@@ -233,7 +246,7 @@ export default function SignPage() {
             </div>
 
             {/* Addendum opening paragraph */}
-            <p className="text-sm text-gray-800 text-justify">{changeOrderIntro(d.originalContractNum || contractNum)}</p>
+            <p className="text-sm text-gray-800 text-left sm:text-justify">{changeOrderIntro(d.originalContractNum || contractNum)}</p>
 
             {/* Description */}
             <div>
@@ -246,12 +259,12 @@ export default function SignPage() {
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Line Items</p>
                 <div className="border border-gray-200 rounded-xl overflow-hidden text-sm">
-                  <div className="grid grid-cols-[1fr_60px_90px_90px] bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <div className="grid grid-cols-[1fr_36px_72px_80px] sm:grid-cols-[1fr_60px_90px_90px] gap-x-1 bg-gray-50 px-3 sm:px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     <span>Description</span><span>Qty</span><span>Unit $</span><span className="text-right">Total</span>
                   </div>
                   {coLines.map((l, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_60px_90px_90px] px-4 py-2 border-t border-gray-100">
-                      <span className="text-gray-800">{l.desc}</span>
+                    <div key={i} className="grid grid-cols-[1fr_36px_72px_80px] sm:grid-cols-[1fr_60px_90px_90px] gap-x-1 px-3 sm:px-4 py-2 border-t border-gray-100 text-xs sm:text-sm">
+                      <span className="text-gray-800 break-words min-w-0">{l.desc}</span>
                       <span className="text-gray-600">{l.qty}</span>
                       <span className="text-gray-600">${fmt(l.unitPrice)}</span>
                       <span className="text-right font-medium">${fmt((Number(l.qty)||0)*(Number(l.unitPrice)||0))}</span>
@@ -263,7 +276,7 @@ export default function SignPage() {
 
             {/* Financial summary */}
             <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-4 space-y-2 text-sm">
-              <div className="flex justify-between text-gray-600">
+              <div className="flex justify-between gap-3 text-gray-600">
                 <span>Original Contract ({d.originalContractNum})</span>
                 <span>${fmt(d.originalTotal)}</span>
               </div>
@@ -386,14 +399,14 @@ export default function SignPage() {
   return (
     <div className="qx-ink min-h-screen bg-gray-100 pb-32">
       {/* Sticky header with progress */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-20 shadow-sm">
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-2 sm:py-3 sticky top-0 z-20 shadow-sm">
         <div className="max-w-4xl mx-auto">
-          <div className="flex justify-between items-center gap-3 mb-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <img src={logo || '/contract/deckplus-logo.png'} alt="logo" className="h-8 object-contain shrink-0" />
+          <div className="flex justify-between items-center gap-3 mb-1.5 sm:mb-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <img src={logo || '/contract/deckplus-logo.png'} alt="logo" className="h-6 sm:h-8 object-contain shrink-0" />
               <span className="text-xs text-gray-400 truncate">Contract #{contractNum}</span>
             </div>
-            <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider shrink-0">{role && `Signing as ${ROLE_LABELS[role] || role}`}</span>
+            <span className="text-[11px] sm:text-xs font-semibold text-blue-600 uppercase tracking-wider shrink-0">{role && `Signing as ${ROLE_LABELS[role] || role}`}</span>
           </div>
           {masterSig && requiredFields.length > 0 && (
             <div className="flex items-center gap-2">
@@ -407,7 +420,8 @@ export default function SignPage() {
           )}
           {!masterSig && (
             <p className="text-xs text-amber-700 font-medium">
-              Read the contract, then tap any signature or initials field to begin — or{' '}
+              <span className="hidden sm:inline">Read the contract, then tap any signature or initials field to begin — or{' '}</span>
+              <span className="sm:hidden">Read the contract, then{' '}</span>
               <button onClick={() => openCapture()} className="underline text-blue-600">set your signature now</button>
             </p>
           )}
@@ -425,15 +439,15 @@ export default function SignPage() {
       </div>
 
       {/* Sticky bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg z-30">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-3 sm:px-4 py-2.5 sm:py-3 shadow-lg z-30" style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}>
         <div className="max-w-4xl mx-auto">
           {!masterSig ? (
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  placeholder="Enter your full legal name" value={printedName} onChange={e => setPrintedName(e.target.value)} />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex-1 min-w-0">
+                <input className="w-full border border-gray-300 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  placeholder="Your full legal name" value={printedName} onChange={e => setPrintedName(e.target.value)} />
               </div>
-              <button onClick={() => openCapture()} className="shrink-0 bg-gray-900 text-white font-bold px-5 py-2 rounded-xl text-sm hover:bg-gray-700 transition-colors">Create Signature</button>
+              <button onClick={() => openCapture()} className="shrink-0 bg-gray-900 text-white font-bold px-4 sm:px-5 py-2.5 sm:py-2 rounded-xl text-sm hover:bg-gray-700 transition-colors">Create Signature</button>
             </div>
           ) : (
             <div>
@@ -444,7 +458,7 @@ export default function SignPage() {
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   {!isComplete
-                    ? <p className="text-xs text-amber-700 font-medium">{requiredFields.length - signedCount} field{requiredFields.length - signedCount !== 1 ? 's' : ''} remaining — scroll up and tap each blue field to sign or initial</p>
+                    ? <p className="text-xs text-amber-700 font-medium">{requiredFields.length - signedCount} field{requiredFields.length - signedCount !== 1 ? 's' : ''} left<span className="hidden sm:inline"> — tap Next field, or tap each blue field to sign or initial</span></p>
                     : <p className="text-xs text-emerald-600 font-semibold">All fields signed — ready to submit</p>}
                   <div className="flex items-center gap-2 mt-1">
                     <img src={masterSig} alt="sig" className="h-6 object-contain" />
@@ -452,10 +466,17 @@ export default function SignPage() {
                     <button onClick={() => openCapture()} className="text-xs text-blue-500 underline ml-1">change</button>
                   </div>
                 </div>
-                <button onClick={() => setShowFinalize(true)} disabled={!isComplete || submitting}
-                  className="shrink-0 bg-gray-900 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-gray-700 disabled:opacity-40 transition-colors whitespace-nowrap">
-                  Finish &amp; Sign
-                </button>
+                {isComplete ? (
+                  <button onClick={() => setShowFinalize(true)} disabled={submitting}
+                    className="shrink-0 bg-gray-900 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-gray-700 disabled:opacity-40 transition-colors whitespace-nowrap">
+                    Finish &amp; Sign
+                  </button>
+                ) : (
+                  <button onClick={goNextField}
+                    className="shrink-0 bg-blue-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-blue-700 transition-colors whitespace-nowrap">
+                    Next field ↓
+                  </button>
+                )}
               </div>
             </div>
           )}

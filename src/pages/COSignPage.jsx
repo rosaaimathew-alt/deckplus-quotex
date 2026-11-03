@@ -152,9 +152,9 @@ export default function COSignPage() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto my-6 px-3">
+      <div className="max-w-3xl mx-auto my-3 sm:my-6 px-2 sm:px-3">
         <div className="bg-white shadow-lg rounded-sm contract-doc" style={docStyle}>
-          <div className="px-8 py-8">
+          <div className="px-4 py-5 sm:px-8 sm:py-8">
 
             {/* Header */}
             <div className="flex justify-between items-start mb-1 gap-4">
@@ -173,13 +173,13 @@ export default function COSignPage() {
             <div className="border-b-2 border-gray-900 mb-4" />
 
             {/* Client info */}
-            <div className="grid grid-cols-2 gap-x-8 text-[10pt] mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-[10pt] mb-4">
               <div><strong>Client:</strong> {client}</div>
               <div><strong>Address:</strong> {address}</div>
             </div>
 
             {/* Addendum opening paragraph */}
-            <p className="text-[10pt] mb-4 text-justify">{changeOrderIntro(contractNum)}</p>
+            <p className="text-[10pt] mb-4 text-left sm:text-justify">{changeOrderIntro(contractNum)}</p>
 
             {/* Description */}
             {description && (
@@ -190,7 +190,7 @@ export default function COSignPage() {
             )}
 
             {/* Price summary */}
-            <div className="flex gap-8 text-[10pt] mb-4">
+            <div className="flex flex-wrap gap-x-8 gap-y-1 text-[10pt] mb-4">
               <div><span className="text-gray-500">Original Total:</span> <strong>${fmt(originalTotal)}</strong></div>
               <div><span className="text-gray-500">Change Amount:</span> <strong className={delta >= 0 ? 'text-green-700' : 'text-red-600'}>{delta >= 0 ? '+' : '−'}${fmt(Math.abs(delta))}</strong></div>
               <div><span className="text-gray-500">New Total:</span> <strong>${fmt(newTotal)}</strong></div>
@@ -252,12 +252,12 @@ export default function COSignPage() {
             )}
 
             {/* Agreement line */}
-            <p className="text-[10pt] mb-3 text-justify">
+            <p className="text-[10pt] mb-3 text-left sm:text-justify">
               By signing below, both parties agree to the scope of work and payment schedule modifications described in this Change Order. All other terms of the original contract remain in full effect.
             </p>
 
             {/* Special-order materials & cancellation clause */}
-            <p className="text-[10pt] mb-4 text-justify">
+            <p className="text-[10pt] mb-4 text-left sm:text-justify">
               <strong>Special-Order Materials &amp; Cancellation.</strong> If items in this Change Order require special-order, custom, or made-to-order materials that are non-returnable and non-refundable once purchased, PURCHASER acknowledges and agrees that if the items are later rescinded or canceled, or PURCHASER elects not to proceed with this Change Order after it has been signed, the PURCHASER remains responsible for the full cost of any special-order or non-returnable materials already purchased, along with any labor performed, up to the value of this Change Order. Any such amount becomes due upon notice of cancellation.
             </p>
 
