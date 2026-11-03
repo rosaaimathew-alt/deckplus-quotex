@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
-import { MenuChip, QuickPicks, SwitchChip, MineOrgToggle } from '../components/FilterBar'
-import { useScopedProposals } from '../lib/proposalScope'
+import { MenuChip, QuickPicks, SwitchChip, RepToggle } from '../components/FilterBar'
+import { useScopedProposals, latestIterations } from '../lib/proposalScope'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
@@ -1223,7 +1223,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
 
   // Who sees what is decided by the database (a rep's store only ever holds
   // their own deals). The office additionally gets a Mine / Everyone toggle.
-  const { proposals, canChoose, mineOnly, setMineOnly } = useScopedProposals()
+  const { proposals, canChoose, reps, repId, setRep } = useScopedProposals()
 
   const [ownTab, setTab] = useState('list')
   const tab = view || ownTab
@@ -1312,7 +1312,8 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
     navigate('/quote')
   }
 
-  const filtered = proposals.filter(p => matchesStatus(p, filterStatus))
+  // Pipeline cards: one per client — its latest version — so revisions aren't counted twice
+  const pipelineCards = latestIterations(proposals).filter(p => matchesStatus(p, filterStatus))
   // Counts per filter, by client (one row per client, as the list shows)
   const statusCount = (f) => buildGroups(proposals).filter(({ root, revisions }) =>
     [root, ...revisions].some(p => matchesStatus(p, f))).length
@@ -1390,7 +1391,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
               <Bell size={13} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
             </span>
           )}
-          {canChoose && <MineOrgToggle mineOnly={mineOnly} setMineOnly={setMineOnly} />}
+          {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           {tab === 'list' && (
             <SwitchChip label="Numbers" checked={!statsHidden} onChange={toggleStats} title="Show totals for a period" />
           )}
@@ -1476,14 +1477,14 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
           onOpen={handleOpen}
           onRevise={handleRevise}
           onGenerateContract={handleGenerateContract}
-          showRep={canChoose && !mineOnly}
+          showRep={canChoose && !repId}
         />
       )}
       {tab === 'pipeline' && (
         <PipelineView
-          proposals={filtered}
+          proposals={pipelineCards}
           onStatusChange={handleStatusChange}
-          showRep={canChoose && !mineOnly}
+          showRep={canChoose && !repId}
         />
       )}
       {tab === 'activity' && (

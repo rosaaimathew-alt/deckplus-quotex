@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, FileCheck } from 'lucide-react'
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
-import { useScopedProposals } from '../lib/proposalScope'
+import { useScopedProposals, latestIterations } from '../lib/proposalScope'
 import { wonRevenueOf } from '../contractTotal'
 import { TodoCard } from '../components/TodoPanel'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
 import NeedsAttention from '../components/NeedsAttention'
-import { MenuChip, MineOrgToggle } from '../components/FilterBar'
+import { MenuChip, RepToggle } from '../components/FilterBar'
 import { attentionItems, nextReminderDate, isJobClosed } from '../lib/attention'
 import { useNav } from '../nav'
 
@@ -73,8 +73,8 @@ const LinkBtn = ({ onClick, children }) => (
 
 export default function Dashboard() {
   const navigate   = useNavigate()
-  // Office / admin: your own deals by default, or the whole organization's.
-  const { proposals, canChoose, mineOnly, setMineOnly } = useScopedProposals()
+  // Office / admin: your own deals by default, one rep's, or the whole organization's.
+  const { proposals, canChoose, reps, repId, mineOnly, repName, setRep } = useScopedProposals()
   const jobCosts   = useStore(s => s.jobCosts) || {}
   const { can, role } = useNav()
   const attention  = attentionItems({ proposals, jobCosts, can, role })
@@ -96,7 +96,8 @@ export default function Dashboard() {
     .filter(({ root, revisions }) => [root, ...revisions].some(p => isWon(p) && inRange(wonDate(p))))
   // Revenue counts realized Won contracts only, matching the Insights cards
   const won        = proposals.filter(p => p.status === 'Won' && inRange(p.closedAt || p.sentAt || p.createdAt))
-  const active     = proposals.filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status))
+  // Open pipeline: each client's latest version only, not every revision
+  const active     = latestIterations(proposals).filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status))
   const wonRevenue = won.reduce((s, p) => s + wonRevenueOf(p), 0)
   const pipeline   = active.reduce((s, p) => s + (p.total || 0), 0)
   const winRate    = outcomes.length > 0 ? Math.round(wonClients.length / outcomes.length * 100) : null
@@ -149,9 +150,9 @@ export default function Dashboard() {
       {/* Numbers — one quiet strip with a single period choice */}
       <section className="bg-white rounded-xl border border-gray-200 overflow-hidden" aria-label="Your numbers">
         <div className="px-5 pt-3.5 flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-gray-900">{canChoose && !mineOnly ? 'Organization numbers' : 'Your numbers'}</p>
+          <p className="text-sm font-semibold text-gray-900">{!canChoose || mineOnly ? 'Your numbers' : repId ? `${repName}'s numbers` : 'Organization numbers'}</p>
           <div className="flex items-center gap-3">
-            {canChoose && <MineOrgToggle mineOnly={mineOnly} setMineOnly={setMineOnly} />}
+            {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
             {insights && <span className="hidden sm:block"><LinkBtn onClick={() => navigate('/insights')}>All insights</LinkBtn></span>}
             <MenuChip value={periodKey} onChange={setPeriodKey} align="right" options={PERIODS.map(({ value, label }) => ({ value, label }))} />
           </div>

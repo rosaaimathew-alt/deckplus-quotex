@@ -3,6 +3,7 @@
 // as a short to-do; the sidebar and tabs show the same counts as badges, so the
 // numbers always agree wherever you see them.
 import { getStages } from '../pages/Jobs'
+import { latestIterations } from './proposalScope'
 
 const DAY = 86400000
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }
@@ -47,7 +48,9 @@ export function attentionItems({ proposals = [], jobCosts = {}, can = () => true
     })
 
     // Quotes sent a week+ ago with no answer
-    const waiting = live
+    // One per client (its latest version), not one per revision
+    const latest = latestIterations(live)
+    const waiting = latest
       .filter(p => ['Sent', 'Followed Up'].includes(p.status) && (daysSince(p.sentAt) ?? 0) >= 7)
       .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt))
     if (waiting.length) items.push({
@@ -58,7 +61,7 @@ export function attentionItems({ proposals = [], jobCosts = {}, can = () => true
     })
 
     // Drafts that were never sent
-    const drafts = live.filter(p => p.status === 'Draft' && (daysSince(p.createdAt) ?? 0) >= 2)
+    const drafts = latest.filter(p => p.status === 'Draft' && (daysSince(p.createdAt) ?? 0) >= 2)
     if (drafts.length) items.push({
       key: 'drafts', tone: 'info', title: `${drafts.length} draft${drafts.length !== 1 ? 's' : ''} not sent yet`,
       detail: 'Built but never sent to the customer', count: drafts.length,
