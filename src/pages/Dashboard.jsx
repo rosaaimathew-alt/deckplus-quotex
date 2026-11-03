@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, FileCheck } from 'lucide-react'
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
-import { useScopedProposals, latestIterations } from '../lib/proposalScope'
+import { useScopedProposals } from '../lib/proposalScope'
+import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { wonRevenueOf } from '../contractTotal'
 import { TodoCard } from '../components/TodoPanel'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
@@ -20,14 +21,6 @@ const fmt   = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 
 const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US')
 const short = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
-function buildGroups(proposals) {
-  const ids = new Set(proposals.map(p => p.id))
-  const roots = proposals.filter(p => !p.parentId || !ids.has(p.parentId))
-  return roots.map(root => ({
-    root,
-    revisions: proposals.filter(p => p.parentId === root.id).sort((a, b) => (a.version || 2) - (b.version || 2)),
-  }))
-}
 
 const STATUS_DOT = {
   Won: 'bg-emerald-500', Lost: 'bg-red-400', Draft: 'bg-gray-300', Sent: 'bg-sky-500',
@@ -86,14 +79,14 @@ export default function Dashboard() {
 
   // ── Numbers (same rules as before / as Insights) ─────────────────────────
   const inRange = (dateStr) => { const d = new Date(dateStr); return !Number.isNaN(d.getTime()) && d >= pStart && d <= pEnd }
-  const periodProps = proposals.filter(p => p.createdAt && inRange(p.createdAt))
-  // Win rate: opportunities estimated in the period (archived and drafts are neutral)
-  const outcomes   = buildGroups(periodProps.filter(p => p.status !== 'Archived' && p.status !== 'Draft'))
+  // Win rate: clients estimated in the period (archived and drafts are neutral).
+  // Group every version first, so a revision is never counted as a new client.
+  const groups     = clientGroups(proposals)
+  const outcomes   = groups.filter(({ all }) => all.some(p => p.status !== 'Archived' && p.status !== 'Draft' && p.createdAt && inRange(p.createdAt)))
   // A deal counts as won once the client commits — tagged Won or contract signed
   const isWon      = (p) => p.status === 'Won' || p.contractDraft?.signed === true
   const wonDate    = (p) => p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt
-  const wonClients = buildGroups(proposals.filter(p => p.status !== 'Archived'))
-    .filter(({ root, revisions }) => [root, ...revisions].some(p => isWon(p) && inRange(wonDate(p))))
+  const wonClients = groups.filter(({ all }) => all.some(p => p.status !== 'Archived' && isWon(p) && inRange(wonDate(p))))
   // Revenue counts realized Won contracts only, matching the Insights cards
   const won        = proposals.filter(p => p.status === 'Won' && inRange(p.closedAt || p.sentAt || p.createdAt))
   // Open pipeline: each client's latest version only, not every revision

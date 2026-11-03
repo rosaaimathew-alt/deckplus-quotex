@@ -2,6 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { MenuChip } from '../components/FilterBar'
+import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
 
 // ── Sales Heat Map ────────────────────────────────────────────────────────────
@@ -969,10 +970,8 @@ export default function Analytics() {
     // Win rate = deals won ÷ APPOINTMENTS completed (not proposals sent). An
     // appointment = one estimate/opportunity (a root proposal, revisions excluded);
     // it's "won" if any version of it closed. e.g. 3 won / 12 appointments = 25%.
-    const ids     = new Set(proposals.map(p => p.id))
-    const rootGroups = proposals
-      .filter(p => !p.parentId || !ids.has(p.parentId))
-      .map(root => [root, ...proposals.filter(p => p.parentId === root.id)])
+    // One group per client, every version included (src/lib/proposalGroups.js)
+    const rootGroups = clientGroups(proposals).map(g => g.all)
       .filter(group => group.some(p => p.status !== 'Archived'))   // drop fully-archived opportunities
 
     // Appointments completed in the period = estimates DONE in the period (root date).
@@ -1025,7 +1024,8 @@ export default function Analytics() {
     won.forEach(p => { const r = p.winLossReason?.category; if (r) winReasons[r] = (winReasons[r] || 0) + 1 })
     lost.forEach(p => { const r = p.winLossReason?.category; if (r) lossReasons[r] = (lossReasons[r] || 0) + 1 })
 
-    const pipelineValue = proposals
+    // Open pipeline: each client's latest version only
+    const pipelineValue = latestIterations(proposals)
       .filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status) && matchesPeriod(p.createdAt || p.sentAt || p.closedAt))
       .reduce((s, p) => s + Number(p.total || 0), 0)
 

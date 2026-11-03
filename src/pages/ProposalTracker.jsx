@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
 import { MenuChip, QuickPicks, SwitchChip, RepToggle } from '../components/FilterBar'
-import { useScopedProposals, latestIterations } from '../lib/proposalScope'
+import { useScopedProposals } from '../lib/proposalScope'
+import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
@@ -19,16 +20,8 @@ import { getPeriodRange, shiftPeriod, isCurrentPeriod } from '../periodUtils'
 import { wonRevenueOf } from '../contractTotal'
 
 // Group proposals into root → revisions trees
-function buildGroups(proposals) {
-  const ids = new Set(proposals.map(p => p.id))
-  const roots = proposals.filter(p => !p.parentId || !ids.has(p.parentId))
-  return roots.map(root => ({
-    root,
-    revisions: proposals
-      .filter(p => p.parentId === root.id)
-      .sort((a, b) => (a.version || 2) - (b.version || 2)),
-  }))
-}
+// One row per client: every version of the deal, however it was revised (src/lib/proposalGroups.js)
+const buildGroups = (proposals) => clientGroups(proposals).map(({ root, revisions }) => ({ root, revisions }))
 
 // Label a proposal by its role in the group: the root is "Proposal", revisions
 // are "Alt <version>". Used by the activity feeds so each open says which version.
@@ -1031,7 +1024,8 @@ function AnalyticsView({ proposals: allProposals }) {
 
   const won    = proposals.filter(p => p.status === 'Won')
   const lost   = proposals.filter(p => p.status === 'Lost')
-  const active = allProposals.filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status))
+  // Open pipeline: each client's latest version only
+  const active = latestIterations(allProposals).filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status))
 
   // Win rate always all-time so client grouping is never broken by period filter
   const outcomes      = clientOutcomes(allProposals)
@@ -1430,7 +1424,8 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
         // Same won-revenue basis as everywhere else: sold contract value (à la
         // carte = items chosen) plus signed change orders — not the full menu.
         const wonRevenue  = wonInPeriod.reduce((s, p) => s + wonRevenueOf(p), 0)
-        const pipeline    = proposals.filter(p => ['Sent','Followed Up','Negotiating'].includes(p.status)).reduce((s, p) => s + (p.total || 0), 0)
+        // Open pipeline: each client's latest version only, not every revision
+        const pipeline    = latestIterations(proposals).filter(p => ['Sent','Followed Up','Negotiating'].includes(p.status)).reduce((s, p) => s + (p.total || 0), 0)
         const stats = [
           { label: 'Won Revenue', value: `$${fmt(wonRevenue)}`, icon: DollarSign, color: 'text-green-500' },
           { label: 'Open Pipeline', value: `$${fmt(pipeline)}`, icon: TrendingUp, color: 'text-green-600' },
