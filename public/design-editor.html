@@ -997,6 +997,7 @@
         + num('w', 'Width', e.w, 1, 6) + num('d', 'Depth', e.d, 1, 4)
         + pick('tie', 'Roof connection', [['wall', 'Wall tie'], ['roof', 'Roof tie'], ['free', 'Freestanding']], e.tie)
         + pick('roof', 'Roof style', [['shed', 'Shed', free], ['gable', 'Gable'], ['semivault', 'Semi-vault'], ['hip', 'Hip', free]], e.roof)
+        + pick('pitch', 'Roof pitch', [['', `Standard (${e.roof === 'shed' ? (e.tie === 'roof' ? 'fits the tie-in' : '3/12') : '6/12'})`], ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map(v => [v, `${v}/12`])], Number(e.pitch) > 0 ? Number(e.pitch) : '')
         + (free ? '' : pick('enclose', 'Enclosed walls', [['front2', 'Front + 2 sides'], ['front1', 'Front + 1 side (corner)'], ['front0', 'Front only (inset)']], e.enclose))
         + (!free && e.enclose === 'front1' ? pick('cornerSide', 'House wall on', [['left', 'Left'], ['right', 'Right']], e.cornerSide) : '')
         + pick('floor', 'Sits on', [['deck', 'New PT deck'], ['patio', 'Patio / slab']], e.floor)
@@ -1111,7 +1112,7 @@
     S.els.filter(e => e.type === 'stairs' && e.of == null).forEach(e => { const i = stairInfo(e); stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
     const sections = [];
     S.els.forEach(e => {
-      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, doorWall: e.doorWall || 'front', doorPos: e.doorPos ?? null, stairW: e.stairW || 4, landing: e.landing || 'none', steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
+      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, pitch: Number(e.pitch) > 0 ? Number(e.pitch) : null, doorWall: e.doorWall || 'front', doorPos: e.doorPos ?? null, stairW: e.stairW || 4, landing: e.landing || 'none', steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
       if (e.type === 'patio') sections.push({ id: e.id, kind: 'patio', x: e.x, z: e.z, w: e.w, d: e.d, mat: e.mat, wallH: Number(e.wallH) || 0, wallLen: Number(e.wallLen) || 0, steps: e.steps !== false });
     });
     const porchOnDeck = S.els.find(e => e.type === 'porch' && e.floor === 'deck');

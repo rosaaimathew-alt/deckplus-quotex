@@ -544,7 +544,9 @@
   function porchGeom(s) {
     const onDeck = s.floor === 'deck', fy = onDeck ? S.H : 0.33, P = s.wallH || 8, beamH = s.type === 'open' ? 1.2 : 0.95;
     const col = s.type === 'open' ? 0.62 : s.type === 'sunroom' ? 0.5 : EZE.col / 12;
-    const shed = s.roof === 'shed', free = s.tie === 'free', shedPitch = 3 / 12, gp = 6 / 12;
+    // Roof pitch: the porch's own setting (rise per 12″), else standard 3/12 shed, 6/12 gable/semi-vault/hip.
+    const pp = Number(s.pitch) > 0 ? Math.min(14, Math.max(1, Number(s.pitch))) / 12 : null;
+    const shed = s.roof === 'shed', free = s.tie === 'free', shedPitch = pp ?? 3 / 12, gp = pp ?? 6 / 12;
     const zF = s.d - col / 2, beamTop = fy + P + beamH;
     const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;   // underside of the rafters
     const frontTop = beamTop - beamH;                                        // underside of the front header
@@ -797,6 +799,7 @@
     return out;
   }
   function pitchOf(x) {
+    if (Number(x.pitch) > 0) return `${+Number(x.pitch).toFixed(1)}/12`;
     if (x.roof === 'shed') return x.tie === 'roof' ? '3/12–5/12 (to tie in)' : '3/12';
     return '6/12';
   }
@@ -1986,7 +1989,7 @@
     const rz = 0.55, t = M.trim(), dp = pl.dp, roofTie = s.tie === 'roof';
     // Roof-tie shed: the rafters run up past the house eave and into the house roof,
     // so the pitch steepens (3/12 to 5/12) until the high end clears the eave.
-    const shedPitch = shed && roofTie ? Math.min(5 / 12, Math.max(3 / 12, (E + 0.45 - beamTop) / zF)) : pl.g.shedPitch;
+    const shedPitch = shed && roofTie && !(Number(s.pitch) > 0) ? Math.min(5 / 12, Math.max(3 / 12, (E + 0.45 - beamTop) / zF)) : pl.g.shedPitch;
     const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;
     const hp = HS() ? HS().roofPitch / 12 : 0.5;
     const houseRoofTop = (depth) => E + depth * hp + rz * Math.hypot(1, hp);
@@ -2329,7 +2332,7 @@
       const g = porchGeom(s);
       // Roof-tie shed: the house eave sits where the porch rafters (3/12 min) reach the wall,
       // so the porch roof ties into the house roof right at the eave.
-      if (s.tie === 'roof' && g.shed) { E = Math.max(E, g.beamTop + g.zF * 3 / 12 - 0.45); return; }
+      if (s.tie === 'roof' && g.shed) { E = Math.max(E, g.beamTop + g.zF * g.shedPitch - 0.45); return; }
       if (s.tie !== 'wall') return;
       const top = g.shed ? g.roofAt(0) + rz * 1.03 : g.beamTop + (s.w / 2) * g.gp + rz * 1.12;
       E = Math.max(E, top + 1.3);
