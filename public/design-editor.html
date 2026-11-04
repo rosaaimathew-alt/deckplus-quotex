@@ -405,7 +405,7 @@
     const named = COLORS.find(([n]) => coll.includes(n.toLowerCase()));
     if (named) S.color = named[0]; else if (/\bpt\b|pressure/.test(coll)) S.color = 'PT';
     // Decking line from the quote (Trex / TimberTech collection names), first color of that line.
-    const LINE_OF = [['enhance', 'enhance'], ['transcend', 'transcend'], ['lineage', 'lineage'], ['signature', 'signature'], ['prime', 'prime'], ['terrain', 'terrain'], ['reserve', 'reserve'], ['landmark', 'landmark']];
+    const LINE_OF = [['enhance', 'enhance'], ['lineage', 'lineage'], ['transcend', 'transcend'], ['signature', 'signature'], ['prime', 'prime'], ['terrain', 'terrain'], ['reserve', 'reserve'], ['harvest', 'harvest'], ['landmark', 'landmark'], ['vintage', 'vintage'], ['pvc', 'vintage']];
     const ln = LINE_OF.find(([k]) => coll.includes(k));
     if (ln) { S.build.decking = ln[1]; S.build.color = null; } else if (/\bpt\b|pressure/.test(coll)) { S.build.decking = 'pt'; S.build.color = 'pt-pt'; }
     // Skirting from the deck quote: "Trex skirt", "PT skirt (stained)", "Lattice (stained)", "None".

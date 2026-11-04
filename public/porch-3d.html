@@ -307,16 +307,21 @@
   };
 
   // Decking collections the office sells, with each line's colors.
+  // Decking lines and colors as the manufacturers sell them now (checked Nov 2026), one entry
+  // per collection the estimator quotes. Hex values are approximate, for the 3D only.
   const LINES = {
     pt:        { label: 'PT', brand: 'Wood', colors: [['PT', '#b09363']] },
-    enhance:   { label: 'Trex Enhance', brand: 'Trex', colors: [['Foggy Wharf', '#a3a4a2'], ['Rocky Harbor', '#8d8178'], ['Toasted Sand', '#a07c58'], ['Honey Grove', '#9a7a5e'], ['Golden Hour', '#b58358'], ['Cinnamon Cove', '#8c5a44'], ['Clam Shell', '#8f908b'], ['Saddle', '#8a5f42'], ['Tide Pool', '#9a918a'], ['Pebble Beach', '#8b8584']] },
-    transcend: { label: 'Trex Transcend Tropicals', brand: 'Trex', colors: [['Heron Gray', '#8e8f87'], ['Havana Gold', '#93703f'], ['Tiki Torch', '#a35f34'], ['Spiced Rum', '#6c4632'], ['Lava Rock', '#5a2a24']] },
-    lineage:   { label: 'Trex Transcend Lineage', brand: 'Trex', colors: [['Salt Flat', '#bcb0a2'], ['Carmel', '#c19a74'], ['Rainier', '#a9aaa6'], ['Biscayne', '#a08a72'], ['Island Mist', '#8f9087'], ['Jasper', '#a7795a'], ['Hatteras', '#8b4e3f']] },
+    // Enhance Naturals, then Enhance Basics
+    enhance:   { label: 'Trex Enhance', brand: 'Trex', colors: [['Toasted Sand', '#a07c58'], ['Coastal Bluff', '#9c968c'], ['Foggy Wharf', '#a3a4a2'], ['Rocky Harbor', '#8d8178'], ['Honey Grove', '#9a7a5e'], ['Golden Hour', '#b58358'], ['Cinnamon Cove', '#8c5a44'], ['Beach Dune', '#b29a7c'], ['Clam Shell', '#8f908b'], ['Saddle', '#8a5f42']] },
+    transcend: { label: 'Trex Transcend', brand: 'Trex', colors: [['Havana Gold', '#93703f'], ['Island Mist', '#8f9087'], ['Lava Rock', '#5a2a24'], ['Spiced Rum', '#6c4632'], ['Tiki Torch', '#a35f34']] },
+    lineage:   { label: 'Trex Transcend Lineage', brand: 'Trex', colors: [['Biscayne', '#a08a72'], ['Carmel', '#c19a74'], ['Hatteras', '#8b4e3f'], ['Island Mist', '#8f9087'], ['Jasper', '#a7795a'], ['Rainier', '#a9aaa6'], ['Salt Flat', '#bcb0a2']] },
     signature: { label: 'Trex Signature', brand: 'Trex', colors: [['Ocracoke', '#b06f45'], ['Whidbey', '#8f8a82']] },
+    prime:     { label: 'TimberTech Prime/+', brand: 'TimberTech', colors: [['Coconut Husk', '#8a6a4c'], ['Dark Cocoa', '#5a3f30'], ['Maritime Gray', '#7d7b76'], ['Sea Salt Gray', '#a9a59c'], ['Dark Teak', '#6e4a33']] },
     terrain:   { label: 'TimberTech Terrain/+', brand: 'TimberTech', colors: [['Brown Oak', '#7b4f36'], ['Rustic Elm', '#5a3528'], ['Sandy Birch', '#a98d75'], ['Silver Maple', '#6a6159'], ['Stone Ash', '#8f8d88'], ['Natural White Oak', '#c9a676'], ['Weathered Oak', '#9d9585'], ['Dark Oak', '#7e5f45']] },
-    prime:     { label: 'TimberTech Prime/+', brand: 'TimberTech', colors: [['Coastline', '#7d7068'], ['Weathered Teak', '#a9805a'], ['English Walnut', '#6b4c3a'], ['Dark Hickory', '#4f3c33'], ['Mahogany', '#7c4b31'], ['Slate Gray', '#857a70'], ['Brownstone', '#a8876a'], ['Kona', '#4e2b22']] },
-    reserve:   { label: 'TimberTech Reserve', brand: 'TimberTech', colors: [['Reclaimed Chestnut', '#cfc2ad'], ['Driftwood', '#6f6a64'], ['Dark Roast', '#6b4d36'], ['Antique Leather', '#8b6440']] },
-    landmark:  { label: 'TimberTech Landmark PVC', brand: 'TimberTech', colors: [['French White Oak', '#b9ad9c'], ['Castle Gate', '#56565a'], ['American Walnut', '#5c4434'], ['Boardwalk', '#c9c8c3']] },
+    reserve:   { label: 'TimberTech Reserve', brand: 'TimberTech', colors: [['Antique Leather', '#8b6440'], ['Dark Roast', '#6b4d36'], ['Driftwood', '#6f6a64'], ['Reclaimed Chestnut', '#cfc2ad']] },
+    harvest:   { label: 'TimberTech Harvest PVC', brand: 'TimberTech', colors: [['Brownstone', '#a8876a'], ['Kona', '#4e2b22'], ['Slate Gray', '#857a70']] },
+    landmark:  { label: 'TimberTech Landmark PVC', brand: 'TimberTech', colors: [['American Walnut', '#5c4434'], ['Boardwalk', '#c9c8c3'], ['Castle Gate', '#56565a'], ['French White Oak', '#b9ad9c']] },
+    vintage:   { label: 'TimberTech Vintage PVC', brand: 'TimberTech', colors: [['Coastline', '#9b968d'], ['Cypress', '#a07850'], ['Dark Hickory', '#4f3c33'], ['English Walnut', '#6b4c3a'], ['Mahogany', '#7c4b31'], ['Weathered Teak', '#a9805a']] },
   };
   const COLORS = Object.entries(LINES).flatMap(([lk, l]) => l.colors.map(([name, hex]) => ({ key: `${lk}-${name.toLowerCase().replace(/[^a-z]+/g, '-')}`, line: lk, name, hex })));
   const PT_HEX = '#b09363';
@@ -356,8 +361,8 @@
   //   &mode=2d                             open on the floor plan
   // Field names match PORCH_BUILD_INPUT_DEFAULTS, the deck builder's saved state and
   // the hardscape patio inputs (see src/lib/designLink.js).
-  const FLOOR_LINE = { trex_enhance: 'enhance', trex_transcend: 'transcend', trex_lineage: 'lineage', trex_signature: 'signature', timbertech_prime: 'prime', timbertech_terrain: 'terrain', timbertech_reserve: 'reserve', timbertech_landmark: 'landmark' };
-  const COLL_LINE = { 'trex enhance': 'enhance', 'trex transcend': 'transcend', 'trex lineage': 'lineage', 'trex signature': 'signature', 'timbertech prime': 'prime', 'timbertech terrain': 'terrain', 'timbertech reserve': 'reserve', 'timbertech landmark': 'landmark', 'pt': 'pt' };
+  const FLOOR_LINE = { trex_enhance: 'enhance', trex_transcend: 'transcend', trex_lineage: 'lineage', trex_signature: 'signature', timbertech_prime: 'prime', timbertech_terrain: 'terrain', timbertech_reserve: 'reserve', timbertech_landmark: 'landmark', timbertech_harvest: 'harvest', timbertech_vintage: 'vintage', timbertech_pvc: 'vintage' };
+  const COLL_LINE = { 'trex enhance': 'enhance', 'trex transcend': 'transcend', 'trex lineage': 'lineage', 'trex signature': 'signature', 'timbertech prime': 'prime', 'timbertech terrain': 'terrain', 'timbertech reserve': 'reserve', 'timbertech landmark': 'landmark', 'timbertech harvest': 'harvest', 'timbertech vintage': 'vintage', 'timbertech pvc': 'vintage', 'pt': 'pt' };
   const num = (v, d) => (Number(v) > 0 ? Number(v) : d);
   function porchFrom(pb) {
     const type = ['open', 'screen', 'ezebreeze', 'sunroom'].includes(pb.type) ? pb.type : 'screen';
@@ -2648,6 +2653,8 @@
       S.sel = null; S.free = m.free || null; S.houseSpec = m.house || null;
       if (Number(m.H) > 0) S.H = Number(m.H);
       Object.assign(S, m.build || {});
+      if (!LINES[S.decking]) S.decking = 'enhance';
+      if (!COLORS.some(c => c.key === S.color && c.line === S.decking)) S.color = COLORS.find(c => c.line === S.decking).key;
       const vi = document.getElementById('view-inside'); if (vi) vi.hidden = !S.sections.some(x => x.kind === 'porch');
       if (m.meta) S.meta = { ...S.meta, ...m.meta };
       resize(); build(); dirty = false;
