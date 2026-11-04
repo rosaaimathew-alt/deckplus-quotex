@@ -20,6 +20,7 @@ import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
 import { requireAuth, staffRole } from './_auth.js'
+import { sendPermitAlert } from './_permit-alert.js'
 import { searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, RECORD_RE } from './_accela.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
@@ -147,13 +148,16 @@ async function inBatches(items, size, fn) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+  // County connection alert emails ride along on this function
+  const raw = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
+  if (raw.alert) return sendPermitAlert(req, res, raw.alert)
   const staff = await requireAuth(req, res)
   if (!staff) return
   const token = (req.headers.authorization || '').replace(/^Bearer /, '') || req.headers['x-qx-token']
   const role = await staffRole(token, staff)
   if (role !== 'office' && role !== 'admin') return res.status(403).json({ error: 'Only the office can run the permit check.' })
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
+  const body = raw
   const jobs = (Array.isArray(body.jobs) ? body.jobs : []).slice(0, MAX_JOBS).map(j => ({
     id: String(j?.id ?? ''),
     address: String(j?.address || '').slice(0, 200),

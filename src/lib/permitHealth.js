@@ -60,10 +60,10 @@ export function connectionAlerts(permitPulse, { hasJobs = true, now = Date.now()
 // Tell office / admin by email (the server finds their addresses). Best effort.
 export async function sendConnectionAlert(change) {
   try {
-    await fetch('/api/permit-alert', {
+    await fetch('/api/permit-pulse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(change),
+      body: JSON.stringify({ alert: change }),
     })
   } catch { /* the banner still shows; the daily self-test also raises an alert */ }
 }
