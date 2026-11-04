@@ -52,12 +52,13 @@ const SCHEMA = {
       type: 'array',
       description: 'The wall facing the camera split into sections, left to right as seen in the photo, wherever its plane changes (bump-outs, bay or sunroom projections, a garage set forward or back). One section if the wall is flat. Widths add up to the whole wall. outFt is how far that section sticks out toward the camera from the main back wall (the large, furthest-back plane); 0 for the main wall.',
       items: {
-        type: 'object', additionalProperties: false, required: ['widthFt', 'outFt', 'stories', 'roof'],
+        type: 'object', additionalProperties: false, required: ['widthFt', 'outFt', 'stories', 'roof', 'shape'],
         properties: {
           widthFt: { type: 'number' },
           outFt: { type: 'number', description: '0 for the main wall; how far a bump-out projects toward the camera' },
           stories: { type: 'integer', description: 'Height of this section in stories (a one-story bump-out on a two-story house is 1)' },
           roof: { type: 'string', enum: ['main', 'shed', 'gable', 'hip'], description: 'main = no separate roof (the main wall, or the main roof simply covers it); otherwise the bump-out roof' },
+          shape: { type: 'string', enum: ['box', 'bay'], description: 'box = square corners; bay = angled (usually 45°) sides like a bay window. box for the main wall' },
         },
       },
     },
@@ -150,6 +151,7 @@ function segs(h) {
   let list = (Array.isArray(h.segments) ? h.segments : []).slice(0, 8).map(g => ({
     widthFt: clamp(g.widthFt, 2, 120, 10), outFt: clamp(g.outFt, 0, 20, 0), stories: clamp(g.stories, 1, 3, 1) | 0,
     roof: ['main', 'shed', 'gable', 'hip'].includes(g.roof) ? g.roof : 'main',
+    shape: g.shape === 'bay' ? 'bay' : 'box',
   }))
   if (!list.length) return [{ widthFt: W, outFt: 0, stories: clamp(h.stories, 1, 3, 1) | 0, roof: 'main' }]
   const sum = list.reduce((a, g) => a + g.widthFt, 0)

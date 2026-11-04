@@ -447,6 +447,26 @@
     return [];
   }
   const isHouseSide = (s, side) => houseSides(s).includes(side);
+  // How far the matched house's bump-outs project at x (a bay's 45° sides taper to 0 at its ends).
+  function bumpDepthAt(x) {
+    const h = HS(); if (!h || !Array.isArray(h.segments)) return 0;
+    let x0 = -(h.wallWidthFt || 44) / 2, d = 0;
+    h.segments.forEach(g => {
+      const w = Number(g.widthFt) || 0, out = Number(g.outFt) || 0, x1 = x0 + w;
+      if (out > 0.5 && x >= x0 - 0.01 && x <= x1 + 0.01) {
+        if (g.shape === 'bay') { const o = Math.max(0.5, Math.min(out, w / 2 - 1)); d = Math.max(d, x < x0 + o ? (x - x0) / o * out : x > x1 - o ? (x1 - x) / o * out : out); }
+        else d = Math.max(d, out);
+      }
+      x0 = x1;
+    });
+    return d;
+  }
+  // A porch built against a bump-out or the corner of a bay: that side's wall starts out there.
+  function sideStart(s, side) {
+    if (s.kind !== 'porch' || s.tie === 'free' || isHouseSide(s, side)) return 0;
+    const d = bumpDepthAt(side === 'left' ? s.x - s.w / 2 - 0.05 : s.x + s.w / 2 + 0.05);
+    return d > 0.5 && d < s.d - 2 ? d : 0;
+  }
   // Valley line between a corner porch's gable roof and the house wing (local porch x).
   function valleyX(s, side, E) {
     if (!isHouseSide(s, side) || !(s.roof === 'gable' || s.roof === 'semivault')) return null;
@@ -536,7 +556,7 @@
   function porchDoors0(s) {
     const g = porchGeom(s), cvF = covered(s, 'front'), cvL = covered(s, 'left'), cvR = covered(s, 'right'), mid = ([a, b]) => (a + b) / 2;
     const dpos = s.doorPos != null && s.doorPos !== '' && Number.isFinite(+s.doorPos) ? +s.doorPos : null;
-    const clampD = (wall, v) => wall === 'front' ? Math.min(s.w / 2 - Math.max(2, sw(s) / 2 + 0.6), Math.max(-s.w / 2 + Math.max(2, sw(s) / 2 + 0.6), v)) : Math.min(s.d - 2.2, Math.max(2.2, v));
+    const clampD = (wall, v) => wall === 'front' ? Math.min(s.w / 2 - Math.max(2, sw(s) / 2 + 0.6), Math.max(-s.w / 2 + Math.max(2, sw(s) / 2 + 0.6), v)) : Math.min(s.d - 2.2, Math.max(sideStart(s, wall) + 2.2, v));
     if (s.type === 'open') return { front: [], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: dpos != null ? clampD('front', dpos) : 0 } : null };
     const dw = ['front', 'left', 'right'].includes(s.doorWall) ? s.doorWall : null;
     if (dw && (dw !== 'front' || dpos != null) && (dw === 'front' || !isHouseSide(s, dw))) {
@@ -593,7 +613,7 @@
       const cb = g.free ? SUN.corner : 0;
       const walls = {
         front: sunWall(-hw, hw, SUN.corner, SUN.corner, null),
-        left: sunWall(0, D, cb, SUN.corner, dp.left[0]), right: sunWall(0, D, cb, SUN.corner, dp.right[0]),
+        left: sunWall(sideStart(s, 'left'), D, sideStart(s, 'left') ? SUN.corner : cb, SUN.corner, dp.left[0]), right: sunWall(sideStart(s, 'right'), D, sideStart(s, 'right') ? SUN.corner : cb, SUN.corner, dp.right[0]),
       };
       if (g.free) walls.back = sunWall(-hw, hw, SUN.corner, SUN.corner, null);
       if (dp.front.length) walls.front = sunWall(-hw, hw, SUN.corner, SUN.corner, dp.front[0]);
@@ -604,7 +624,7 @@
       return { g, dp, walls, windows: all.filter(h => !h.door).length, doors, kneeSF: Math.round(kneeLF * SUN.knee / 12), kneeLF: Math.round(kneeLF * 10) / 10 };
     }
     if (s.type === 'open') return { g, dp, windows: 0, doors: 0, transoms: 0 };
-    const walls = { front: ezeWall(-hw, hw, dp.front), left: ezeWall(0, D, dp.left), right: ezeWall(0, D, dp.right) };
+    const walls = { front: ezeWall(-hw, hw, dp.front), left: ezeWall(sideStart(s, 'left'), D, dp.left), right: ezeWall(sideStart(s, 'right'), D, dp.right) };
     if (g.free) walls.back = ezeWall(-hw, hw, []);
     houseSides(s).forEach(k => { walls[k] = { cols: [], open: [] }; });
     let windows = 0, transoms = 0, doors = 0;
@@ -1997,10 +2017,10 @@
           const c = dp.stairs.c, clear = srx(s) + col / 2 + 0.05, flank = srx(s) + col / 2 + 0.15;
           if (frontXs.some(x => Math.abs(x - c) < clear)) frontXs = [...frontXs.filter(x => Math.abs(x - c) >= clear + 1.2 || x === xL || x === xR), c - flank, c + flank].filter(x => x >= xL && x <= xR).sort((a, b) => a - b);
         }
-        sideZs.left = sideZs.right = spread(backPost ? col / 2 : 0, zF, LVL_SPAN);
+        ['left', 'right'].forEach(k => { const z0 = sideStart(s, k); sideZs[k] = spread(z0 > 0 ? z0 : backPost ? col / 2 : 0, zF, LVL_SPAN); });
         frontXs.forEach(x => openCol(x, zF, frontTop));
         if (free) frontXs.forEach(x => openCol(x, col / 2, frontTop));
-        [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(s, k)).forEach(([, x]) => sideZs.left.slice(0, -1).forEach(z => { if (z > 0.05) openCol(x, z, sideTop(z)); }));
+        [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(s, k)).forEach(([k, x]) => sideZs[k].slice(0, -1).forEach(z => { if (z > 0.05) openCol(x, z, sideTop(z)); }));
       } else if (s.type !== 'sunroom') {
         pl.walls.front.cols.forEach(x => lamCol(x, zF, frontTop));   // house sides have no columns (empty layout)
         if (free) pl.walls.back.cols.forEach(x => lamCol(x, col / 2, frontTop));
@@ -2011,7 +2031,7 @@
       // Shed roofs: rafters run from the house ledger down onto the front header.
       B(W, beamH, col, t, 0, beamTop - beamH / 2, zF);
       // Side headers; a house side gets a ledger on the house wall instead.
-      [['left', xL], ['right', xR]].forEach(([k, x]) => isHouseSide(s, k) ? B(0.25, beamH, zF, t, x + (k === 'left' ? -col / 2 + 0.13 : col / 2 - 0.13), beamTop - beamH / 2, zF / 2) : B(col, beamH, zF, t, x, beamTop - beamH / 2, zF / 2));
+      [['left', xL], ['right', xR]].forEach(([k, x]) => isHouseSide(s, k) ? B(0.25, beamH, zF, t, x + (k === 'left' ? -col / 2 + 0.13 : col / 2 - 0.13), beamTop - beamH / 2, zF / 2) : B(col, beamH, zF - sideStart(s, k), t, x, beamTop - beamH / 2, (zF + sideStart(s, k)) / 2));
       if (free) B(W, beamH, col, t, 0, beamTop - beamH / 2, col / 2);
       else if (!shed) B(W, beamH, 0.25, t, 0, beamTop - beamH / 2, 0.13);
       else {
@@ -2254,9 +2274,9 @@
         }
         if (free) for (let i = 0; i < frontXs.length - 1; i++) railRun(frontXs[i] + col / 2, col / 2, frontXs[i + 1] - col / 2, col / 2, fy, fy, { postA: false, postB: false });
         [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(s, k)).forEach(([k, x]) => {
-          const zs = [backPost ? col / 2 : 0, ...sideZs[k].filter(z => z > 0.05)];
+          const z0 = sideStart(s, k), zs = [z0 > 0 ? z0 : backPost ? col / 2 : 0, ...sideZs[k].filter(z => z > Math.max(0.05, z0 + 0.05))];
           for (let i = 0; i < zs.length - 1; i++) {
-            const a0 = zs[i] + (i || backPost ? col / 2 : 0.25), b0 = zs[i + 1] - col / 2;
+            const a0 = zs[i] + (i || backPost || z0 > 0 ? col / 2 : 0.25), b0 = zs[i + 1] - col / 2;
             subtract(a0, b0, covered(s, k)).forEach(([a, b]) => railRun(x, a, x, b, fy, fy, { postA: !backPost && i === 0 && a === a0, postB: false }));
           }
         });
@@ -2275,7 +2295,9 @@
     // its ends, so moving a porch or deck slides it along the back wall.
     const reach = Math.max(...xs.map(Math.abs)), hx = 0;
     const hs = HS(), STORY = 9.5, stories = hs ? hs.stories : 1, pitch = hs ? hs.roofPitch / 12 : 0.5;
-    const HW = Math.max(hs ? Math.round(hs.wallWidthFt * 2) / 2 : 44, Math.ceil((reach + 6) / 2) * 4), HD = hs && Number(hs.depthFt) > 0 ? Math.min(60, Math.max(16, Number(hs.depthFt))) : 28, rz = 0.55, k = Math.hypot(1, pitch);
+    // A house matched from a photo keeps its measured width (a porch can sit flush on its corner);
+    // the stock house grows past whatever is built against it.
+    const HW = hs ? Math.round(hs.wallWidthFt * 2) / 2 : Math.max(44, Math.ceil((reach + 6) / 2) * 4), HD = hs && Number(hs.depthFt) > 0 ? Math.min(60, Math.max(16, Number(hs.depthFt))) : 28, rz = 0.55, k = Math.hypot(1, pitch);
     const roofStyle = hs?.roofStyle || 'gable-side';
     // Hip roof over X0..X1 × Z0..Z1 from eave height yb at pitch pp (ridge along the longer side).
     const hipMesh = (X0, X1, Z0, Z1, yb, pp) => {
@@ -2296,7 +2318,7 @@
     const wallWs = hs ? Math.min(HW, hs.wallWidthFt) : HW;
     const segE = (st) => st >= stories ? E : Math.min(E, FF + 9.3 + (st - 1) * STORY);
     const SEGS = [];
-    if (hs && Array.isArray(hs.segments)) { let x = hx - wallWs / 2; hs.segments.forEach(g => { const w = Number(g.widthFt) || 0; if (w > 0) SEGS.push({ x0: x, x1: x + w, out: Math.max(0, Number(g.outFt) || 0), st: Math.max(1, Math.min(stories, g.stories || 1)), roof: g.roof || 'shed' }); x += w; }); }
+    if (hs && Array.isArray(hs.segments)) { let x = hx - wallWs / 2; hs.segments.forEach(g => { const w = Number(g.widthFt) || 0; if (w > 0) SEGS.push({ x0: x, x1: x + w, out: Math.max(0, Number(g.outFt) || 0), st: Math.max(1, Math.min(stories, g.stories || 1)), roof: g.roof || 'shed', bay: g.shape === 'bay' }); x += w; }); }
     const segAt = (x) => SEGS.find(g => g.out > 0.5 && x > g.x0 + 0.2 && x < g.x1 - 0.2);
     let E = FF + 9.3 + (stories - 1) * STORY, matchE = null;
     // A gable, semi-vault or hip porch tied into the house roof sets the house eave, so the
@@ -2355,7 +2377,30 @@
       B(HW + 2.15, 0.16, 1.1, M.ridge(), hx, yr + (rz + 0.1) * k + 0.04, -HD / 2);
       [-1, 1].forEach(sd => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * pitch]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(hx + sd * HW / 2 - (sd > 0 ? 0.2 : 0), E, 0); }));
     }
-    SEGS.filter(g => g.out > 0.5).forEach(g => {
+    SEGS.filter(g => g.out > 0.5 && g.bay).forEach(g => {
+      // Angled bay: 45° side walls, windows on all three faces, a three-sided hip roof.
+      const w = g.x1 - g.x0, out = g.out, top = segE(g.st), o = Math.max(0.5, Math.min(out, w / 2 - 1)); g.o = o;
+      const foot = [[g.x0, 0], [g.x0 + o, out], [g.x1 - o, out], [g.x1, 0]];
+      const prism = (pts, y0, y1, m) => {
+        const sh = new THREE.Shape(); sh.moveTo(pts[0][0], -pts[0][1]); pts.slice(1).forEach(q => sh.lineTo(q[0], -q[1])); sh.closePath();
+        const ms = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: y1 - y0, bevelEnabled: false }), m); ms.rotation.x = -Math.PI / 2; ms.position.y = y0; ms.castShadow = ms.receiveShadow = true; G.add(ms);
+      };
+      prism(foot, 0, fTop, M.concrete());
+      const wb = Math.max(fTop, Math.min(lowTop, top));
+      if (wb > fTop) prism(foot, fTop, wb, specSiding({ siding: hs.lower, sidingColor: hs.lowerColor || '#9c4a36' }));
+      prism(foot, wb, top, M.siding());
+      // roof: eave 0.8′ out from each face, up to a level line on the house wall
+      const e = 0.8, s2 = e * Math.SQRT1_2, yE = top - 0.3, yR = yE + (out + e) * Math.min(pitch, 8 / 12);
+      const E0 = [g.x0 - e * 1.4, yE, 0], E1 = [g.x0 + o - s2 * 0.4, yE, out + e], E2 = [g.x1 - o + s2 * 0.4, yE, out + e], E3 = [g.x1 + e * 1.4, yE, 0];
+      const R1 = [g.x0 + o, yR, 0], R2 = [g.x1 - o, yR, 0], pos = [], uv = [];
+      [[E1, E2, R2], [E1, R2, R1], [E0, E1, R1], [E2, E3, R2]].forEach(t => t.forEach(q => { pos.push(...q); uv.push(q[0], q[2] * 1.2); }));
+      const gb = new THREE.BufferGeometry(); gb.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gb.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gb.computeVertexNormals();
+      const bm = new THREE.Mesh(gb, mat('hipShingle', () => { const m = M.shingle().clone(); m.side = THREE.DoubleSide; return m; })); bm.castShadow = bm.receiveShadow = true; G.add(bm);
+      g.roofTop = yR + 0.3;
+      // fascia boards along the three eaves
+      [[E0, E1], [E1, E2], [E2, E3]].forEach(([a, b2]) => { const L = Math.hypot(b2[0] - a[0], b2[2] - a[2]), f = B(L, 0.4, 0.08, M.trim(), (a[0] + b2[0]) / 2, yE - 0.2, (a[2] + b2[2]) / 2); f.rotation.y = Math.atan2(-(b2[2] - a[2]), b2[0] - a[0]); });
+    });
+    SEGS.filter(g => g.out > 0.5 && !g.bay).forEach(g => {
       const w = g.x1 - g.x0, cx = (g.x0 + g.x1) / 2, out = g.out, top = segE(g.st);
       B(w + 0.2, fTop, out + 0.1, M.concrete(), cx, fTop / 2, out / 2);
       if (lowTop > fTop) B(w + 0.04, Math.min(lowTop, top) - fTop, out + 0.04, specSiding({ siding: hs.lower, sidingColor: hs.lowerColor || '#9c4a36' }), cx, fTop + (Math.min(lowTop, top) - fTop) / 2, out / 2);
@@ -2422,11 +2467,19 @@
       const wallW = Math.min(HW, hs.wallWidthFt);
       hs.windows.forEach(w => {
         const x = hx + (w.center - 0.5) * wallW, y = WIN_Y + (w.story - 1) * STORY + (4.6 - w.heightFt) / 2;
-        if (w.story === 1) HOUSE_WIN.push([x - w.widthFt / 2 - 0.5, x + w.widthFt / 2 + 0.5]);
+        if (w.story === 1 && !(bumpDepthAt(x) > 0.5)) HOUSE_WIN.push([x - w.widthFt / 2 - 0.5, x + w.widthFt / 2 + 0.5]);
         const wallTop = roofStyle === 'gable-front' ? E + Math.max(0, HW / 2 - Math.abs(x - hx) - 1) * pitch : E;
         if (y + w.heightFt / 2 > wallTop - 0.8) return;
         const sg = segAt(x);
-        if (sg && w.story <= sg.st) { if (y + w.heightFt / 2 > segE(sg.st) - 0.8) return; windowAt(group(x, y, sg.out), w.widthFt, w.heightFt); return; }
+        if (sg && w.story <= sg.st) {
+          if (y + w.heightFt / 2 > segE(sg.st) - 0.8) return;
+          if (sg.bay) {
+            const o = sg.o || Math.max(0.5, Math.min(sg.out, (sg.x1 - sg.x0) / 2 - 1));
+            if (x < sg.x0 + o) { const t = (x - sg.x0) / o; windowAt(group(sg.x0 + o * t, y, sg.out * t + 0.02, Math.PI / 4), Math.min(w.widthFt, o * 1.414 - 0.8), w.heightFt); return; }
+            if (x > sg.x1 - o) { const t = (sg.x1 - x) / o; windowAt(group(sg.x1 - o * t, y, sg.out * t + 0.02, -Math.PI / 4), Math.min(w.widthFt, o * 1.414 - 0.8), w.heightFt); return; }
+          }
+          windowAt(group(x, y, sg.out), w.widthFt, w.heightFt); return;
+        }
         if (sg && y - w.heightFt / 2 < (sg.roofTop || 0) + 0.3) return;      // would sit behind the bump-out's roof
         if (w.story === 1 && doors.some(d => Math.abs(x - d.x) < d.w / 2 + w.widthFt / 2 + 0.6)) return;
         windowAt(group(x, y, 0), w.widthFt, w.heightFt);
