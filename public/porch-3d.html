@@ -433,6 +433,12 @@
     return [];
   }
   const isHouseSide = (s, side) => houseSides(s).includes(side);
+  // Valley line between a corner porch's gable roof and the house wing (local porch x).
+  function valleyX(s, side, E) {
+    if (!isHouseSide(s, side) || !(s.roof === 'gable' || s.roof === 'semivault')) return null;
+    const g = porchGeom(s), d = g.beamTop - E + 0.5;
+    return (s.w / 2 + d) * (side === 'left' ? -1 : 1);
+  }
   const WING = 14;                                    // depth of the house wing beside a corner porch
   const offHouse = (s) => s.kind === 'patio' || (s.kind === 'porch' && s.tie === 'free');
   const rect = (s) => ({ x0: s.x - s.w / 2, x1: s.x + s.w / 2, z0: offHouse(s) ? s.z : 0, z1: (offHouse(s) ? s.z : 0) + s.d });
@@ -1888,13 +1894,14 @@
         if (free) zA = -1;                            // freestanding: overhang at the back too
         const zc = (zA + zB) / 2, L = zB - zA;
         [-1, 1].forEach(sd => {
-          const p = B(len, rz, L, t, sd * span / 2, beamTop + (hw - span / 2) * gp + rz / 2 * k, zc); p.rotation.z = -sd * a;
-          const sh = B(len + 0.12, 0.1, L + 0.1, M.shingle(), sd * span / 2, beamTop + (hw - span / 2) * gp + (rz + 0.05) * k, zc + (free ? 0 : 0.05), { swap: true }); sh.rotation.z = -sd * a;
+          const vx = valleyX(s, sd < 0 ? 'left' : 'right', E), sp = vx != null ? Math.abs(vx) : span, ln = sp * k;
+          const p = B(ln, rz, L, t, sd * sp / 2, beamTop + (hw - sp / 2) * gp + rz / 2 * k, zc); p.rotation.z = -sd * a;
+          const sh = B(ln + (vx != null ? 0.02 : 0.12), 0.1, L + 0.1, M.shingle(), sd * sp / 2, beamTop + (hw - sp / 2) * gp + (rz + 0.05) * k, zc + (free ? 0 : 0.05), { swap: true }); sh.rotation.z = -sd * a;
+          if (vx != null) return;                       // valley side: no eave, no gutter
           const gy = beamTop - gp + rz * k - 0.22;
           B(0.4, 0.38, L, M.gutter(), sd * (span + 0.2), gy, zc);
           B(0.22, gy - 0.4, 0.18, M.gutter(), sd * (span + 0.2), (gy + 0.4) / 2, zB - 0.3); B(0.22, 0.2, 0.9, M.gutter(), sd * (span + 0.2), 0.2, zB + 0.1);
         });
-        B(0.9, 0.14, L, M.ridge(), 0, ridgeU + (rz + 0.1) * k + 0.03, zc);
         // Ceiling: a full vault for a gable; a semi-vault slopes up partway, then runs flat.
         const z0c = free ? col / 2 : 0, zLen = zF - z0c, zMid = (zF + z0c) / 2;
         if (semi) {
@@ -2093,8 +2100,12 @@
       const r = rect(a), sd = side === 'left' ? -1 : 1, xa = side === 'left' ? r.x0 - WING : r.x1, xb = xa + WING, xm = (xa + xb) / 2, zEnd = a.d;
       B(WING, E - fTop, zEnd, M.siding(), xm, fTop + (E - fTop) / 2, zEnd / 2);
       B(WING + 0.2, fTop, zEnd + 0.1, M.concrete(), xm, fTop / 2, zEnd / 2);
-      const span = WING / 2 + 1, ang = Math.atan(0.5), k2 = 1 / Math.cos(ang), len = span * k2, L = zEnd + 1;
-      [-1, 1].forEach(q => { const pnl = B(len, rz, L, M.shingle(), xm + q * span / 2, E - 0.5 + (WING / 2 - span / 2) * 0.5 + rz / 2 * k2, L / 2 - 0.01, { swap: true }); pnl.rotation.z = -q * ang; });
+      const span = WING / 2 + 1, ang = Math.atan(0.5), k2 = 1 / Math.cos(ang), L = zEnd + 1;
+      const vx = valleyX(a, side, E), toward = side === 'left' ? 1 : -1;   // q pointing at the porch
+      [-1, 1].forEach(q => {
+        const sp = vx != null && q === toward ? Math.abs(xm - (a.x + vx)) : span;
+        const pnl = B(sp * k2, rz, L, M.shingle(), xm + q * sp / 2, E - 0.5 + (WING / 2 - sp / 2) * 0.5 + rz / 2 * k2, L / 2 - 0.01, { swap: true }); pnl.rotation.z = -q * ang;
+      });
       tri([[-WING / 2, 0], [WING / 2, 0], [0, WING / 4]], 0.2, M.siding(), m => m.position.set(xm, E - 0.5, zEnd - 0.2));
       [-1, 1].forEach(q => beamXY(zEnd + 0.9, xm, E - 0.5 + WING / 4 + 0.6, xm + q * (span + 0.05), E - 1.0, 0.14, 0.5, M.trim()));
       windowAt(group(xm, FF + 5.3, zEnd), 3, 4.6);
