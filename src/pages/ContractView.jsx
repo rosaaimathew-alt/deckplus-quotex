@@ -55,7 +55,7 @@ const PROJECT_TYPES = ['Open Deck', 'Screen Porches', 'Eze-Breeze Porches', 'Ope
 const PAYMENT_MILESTONES = [
   { label: 'Schedule deposit — @ sign contract',            pct: 0.20 },
   { label: 'Start payment — Material drop / Framing Start', pct: 0.30 },
-  { label: 'Roof Completion',                               pct: 0.40 },
+  { label: 'Pre-Paint Payment',                             pct: 0.40 },
   { label: 'Paint Applied',                                 pct: 0.05 },
   { label: 'Substantial completion payment',                pct: 0.05 },
 ]
@@ -81,7 +81,7 @@ const PAYMENT_MILESTONES_50_50 = [
 const PAYMENT_MILESTONES_20_30_40_10 = [
   { label: 'Schedule deposit — @ sign contract',            pct: 0.20 },
   { label: 'Start payment — Material drop / Framing Start', pct: 0.30 },
-  { label: 'Roof Completion',                               pct: 0.40 },
+  { label: 'Pre-Paint Payment',                             pct: 0.40 },
   { label: 'Substantial completion payment',                pct: 0.10 },
 ]
 // $30k–$100k jobs: 10% deposit, $3,000 final payment, and the rest split into
@@ -93,7 +93,7 @@ function formulaMilestones(total, projectTag) {
   const t = Number(total) || 0
   const finalPct = t > 0 ? Math.min(FORMULA_FINAL / t, 1 - FORMULA_DEPOSIT_PCT) : 0
   const midPct = (1 - FORMULA_DEPOSIT_PCT - finalPct) / 2
-  const middle = projectTag === 'Deck' || projectTag === 'Hardscapes' ? 'Progress payment' : 'Roof Completion'
+  const middle = projectTag === 'Deck' || projectTag === 'Hardscapes' ? 'Progress payment' : 'Pre-Paint Payment'
   return Object.assign([
     { label: 'Schedule deposit — @ sign contract',            pct: FORMULA_DEPOSIT_PCT },
     { label: 'Start payment — Material drop / Framing Start', pct: midPct },
@@ -847,6 +847,7 @@ export default function ContractView() {
             className="bg-white shadow-lg print:shadow-none"
             values={values} checks={effectiveChecks} packet={packetKeys}
             scopeLines={scopeLines} projectSummary={projectSummary} total={total} payments={payments}
+            showPaymentPct
             editable onValue={setValue} onCheck={setCheck}
             scopeSlot={
               <div>
