@@ -790,7 +790,7 @@
         if (hasGableEnd(x)) notes.push(`  Gable end: ${gableEndOf(x)}`);
       } else if (x.kind === 'deck') notes.push(`Deck ${x.w}′×${x.d}′, ${dk}`);
       else { const pw = patioWall(x); notes.push(`${x.mat === 'concrete' ? 'Concrete' : 'Paver'} patio ${x.w}′×${x.d}′${pw ? `, raised ${fmtFt(pw.H)} on retaining wall` : ''}`); if (pw?.steps) notes.push(`  ${pw.steps} block steps down`); }
-      if (stairEdge(x)) notes.push(`  Stairs ${risers(S.H) - 1} treads, ${x.stairBox === 'boxed' ? 'boxed' : 'open stringers'}`);
+      if (stairEdge(x)) notes.push(`  Stairs ${(stairGeom(x)?.n || risers(S.H)) - 1} treads, ${x.stairBox === 'boxed' ? 'boxed' : 'open stringers'}`);
     });
     (S.free?.plats || []).forEach(p => { const xs = p.pts.map(q => q[0]), zs = p.pts.map(q => q[1]); notes.push(`${p.kind === 'landing' ? 'Landing' : 'Deck'} ${Math.round(Math.max(...xs) - Math.min(...xs))}′×${Math.round(Math.max(...zs) - Math.min(...zs))}′, ${fmtFt(p.h)} high`); });
     (S.free?.stairs || []).forEach(st => { if (st.top - st.bottom > 0.3) notes.push(`  Stairs ${st.n - 1} treads, ${fmtFt(st.top)} to ${st.foot ? fmtFt(st.bottom) + ' landing' : 'grade'}${st.boxed ? ', boxed' : ''}`); });
@@ -1780,7 +1780,7 @@
     withG(g, () => {
       sg.flights.forEach((f, idx) => {
         const last = idx === sg.flights.length - 1, sub = group(f.ox, 0, f.oz, f.dir ? f.dir * Math.PI / 2 : 0);
-        const end = withG(sub, () => flight(f.top, f.k, rise, last ? 0 : landing.top, railed, idx === 0 ? railStart : -0.1, boxed, false, sw(s)));
+        const end = withG(sub, () => flight(f.top, f.k, rise, last ? sg.bottom : landing.top, railed, idx === 0 ? railStart : -0.1, boxed, false, sw(s)));
         if (last) foot = f.dir ? [f.ox + f.dir * (end + 1.75), f.oz] : [f.ox, f.oz + end + 1.75];
       });
       if (landing) {
@@ -1803,22 +1803,45 @@
     });
     const w = new THREE.Vector3(foot[0], 0, foot[1]).applyAxisAngle(new THREE.Vector3(0, 1, 0), sp.ry).add(new THREE.Vector3(sp.x, 0, sp.z));
     const onPatio = S.sections.some(p => { if (p.kind !== 'patio') return false; const r = rect(p); return w.x > r.x0 && w.x < r.x1 && w.z > r.z0 - 0.5 && w.z < r.z1; });
-    if (!onPatio) { const last = sg.flights[sg.flights.length - 1], pad = group(w.x, 0, w.z, sp.ry + (last.dir ? last.dir * Math.PI / 2 : 0)); withG(pad, () => B(sw(s) + 1.5, 0.2, 3.2, M.concrete(), 0, 0.1, 0)); }
+    if (!onPatio && !(sg.bottom > 0.15)) { const last = sg.flights[sg.flights.length - 1], pad = group(w.x, 0, w.z, sp.ry + (last.dir ? last.dir * Math.PI / 2 : 0)); withG(pad, () => B(sw(s) + 1.5, 0.2, 3.2, M.concrete(), 0, 0.1, 0)); }
   }
 
   // Flights and landing in the stair's own frame: it starts at the edge (0,0) and runs
   // toward +z; "left"/"right" are as you walk down. toWorld() maps to plan coordinates.
   const LANDING = 4;
+  // What the foot of a stair stands on at (x, z): a patio (raised on its wall, or at grade) or one
+  // of the editor's lower decks/landings; else grade (0).
+  function groundAt(x, z, below) {
+    let g = 0;
+    S.sections.forEach(p => {
+      if (p.kind !== 'patio') return; const r = rect(p);
+      if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) { const pw = patioWall(p); g = Math.max(g, (pw ? pw.H : 0) + (p.mat === 'concrete' ? 0.33 : 0.25)); }
+    });
+    (S.free?.plats || []).forEach(p => {
+      if (p.h >= below - 0.3) return;
+      let inside = false; const q = p.pts;
+      for (let i = 0, j = q.length - 1; i < q.length; j = i++) if ((q[i][1] > z) !== (q[j][1] > z) && x < (q[j][0] - q[i][0]) * (z - q[i][1]) / (q[j][1] - q[i][1]) + q[i][0]) inside = !inside;
+      if (inside) g = Math.max(g, p.h);
+    });
+    return g < below - 0.3 ? g : 0;
+  }
   function stairGeom(s) {
     const sp = stairPlacement(s); if (!sp) return null;
-    const n = risers(S.H), rise = S.H / n, kind = s.landing || 'none';
     const c = Math.cos(sp.ry), sn = Math.sin(sp.ry);
     const toWorld = (lx, lz) => [sp.x + lx * c + lz * sn, sp.z - lx * sn + lz * c];
-    if (kind === 'none' || n < 4) return { sp, n, rise, flights: [{ ox: 0, oz: 0, dir: 0, k: n, top: S.H }], landing: null, toWorld };
+    // Steps stop on whatever is under their foot (a raised patio, a lower deck), not at grade.
+    let bottom = 0, n = risers(S.H);
+    for (let it = 0; it < 4; it++) {
+      const f = toWorld(0, (n - 1) * RUN + 0.45), b = groundAt(f[0], f[1], S.H), n2 = risers(S.H - b);
+      if (b === bottom && n2 === n) break;
+      bottom = b; n = n2;
+    }
+    const rise = (S.H - bottom) / n, kind = s.landing || 'none';
+    if (kind === 'none' || n < 4) return { sp, n, rise, bottom, flights: [{ ox: 0, oz: 0, dir: 0, k: n, top: S.H }], landing: null, toWorld };
     const k1 = Math.ceil(n / 2), L0 = (k1 - 1) * RUN, hL = S.H - k1 * rise;
     const f2 = kind === 'straight' ? { ox: 0, oz: L0 + LANDING, dir: 0 }
       : kind === 'left' ? { ox: LANDING / 2, oz: L0 + LANDING / 2, dir: 1 } : { ox: -LANDING / 2, oz: L0 + LANDING / 2, dir: -1 };
-    return { sp, n, rise, toWorld, landing: { z0: L0, top: hL, kind },
+    return { sp, n, rise, bottom, toWorld, landing: { z0: L0, top: hL, kind },
       flights: [{ ox: 0, oz: 0, dir: 0, k: k1, top: S.H }, { ...f2, k: n - k1, top: hL }] };
   }
   // Footprint corners (plan coordinates) of every flight and the landing.
@@ -2671,7 +2694,7 @@
           }
           if (wall) doors.push({ id: x.id, wall, pos });
         }
-        if (x.kind === 'porch') { const sp = stairPlacement(x); if (sp) att.push({ id: x.id, x: sp.x, z: sp.z, rot: sp.ry * 180 / Math.PI, w: sw(x), n: risers(S.H), run: RUN, landing: x.landing || 'none' }); }
+        if (x.kind === 'porch') { const sp = stairPlacement(x); if (sp) att.push({ id: x.id, x: sp.x, z: sp.z, rot: sp.ry * 180 / Math.PI, w: sw(x), n: stairGeom(x)?.n || risers(S.H), run: RUN, landing: x.landing || 'none' }); }
         if (x.kind === 'patio') { const pw = patioWall(x); if (pw?.steps) att.push({ id: x.id, x: x.x, z: rect(x).z1, rot: 0, w: STAIR_W + 1, n: pw.steps + 1, run: pw.run }); }
       });
       window.parent.postMessage({ type: 'qx-attached', list: att, doors, windows: HOUSE_WIN.slice() }, '*');
