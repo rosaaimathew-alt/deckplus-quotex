@@ -257,6 +257,7 @@
       <button type="button" data-view="corner" aria-pressed="true">Corner</button>
       <button type="button" data-view="front" aria-pressed="false">Front</button>
       <button type="button" data-view="top" aria-pressed="false">Plan</button>
+      <button type="button" data-view="inside" aria-pressed="false" id="view-inside">Inside</button>
     </div>
     <div class="render-btn edit-only" id="render-btns">
       <button type="button" class="primary" id="btn-chatgpt">Render in ChatGPT</button>
@@ -433,6 +434,12 @@
     return [];
   }
   const isHouseSide = (s, side) => houseSides(s).includes(side);
+  // Valley line between a corner porch's gable roof and the house wing (local porch x).
+  function valleyX(s, side, E) {
+    if (!isHouseSide(s, side) || !(s.roof === 'gable' || s.roof === 'semivault')) return null;
+    const g = porchGeom(s), d = g.beamTop - E;
+    return (s.w / 2 + d) * (side === 'left' ? -1 : 1);
+  }
   const WING = 14;                                    // depth of the house wing beside a corner porch
   const offHouse = (s) => s.kind === 'patio' || (s.kind === 'porch' && s.tie === 'free');
   const rect = (s) => ({ x0: s.x - s.w / 2, x1: s.x + s.w / 2, z0: offHouse(s) ? s.z : 0, z1: (offHouse(s) ? s.z : 0) + s.d });
@@ -662,6 +669,7 @@
   $('h').addEventListener('input', (e) => { S.H = +e.target.value; update(); });
 
   function updateUI() {
+    const vi = document.getElementById('view-inside'); if (vi) vi.hidden = !S.sections.some(x => x.kind === 'porch');
     $('h-out').textContent = ftIn(S.H);
     $('color-row').hidden = S.decking === 'pt';
     renderList();
@@ -1322,7 +1330,7 @@
     siding: () => S.house === 'brick' ? mat('brick', () => std({ color: '#ffffff', map: T.brick, bumpMap: T.brick, bumpScale: 0.04, roughness: 0.95 }))
       : mat('siding-' + S.house, () => std({ color: HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
     porchSiding: () => mat('psiding-' + S.house, () => std({ color: S.house === 'brick' ? '#c8b994' : HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
-    gableGlass: () => mat('gableGlass', () => noAO(std({ color: '#2a3a44', transparent: true, opacity: 0.32, roughness: 0.05, metalness: 0.2, envMapIntensity: 1.4, side: THREE.DoubleSide, depthWrite: false }))),
+    gableGlass: () => mat('gableGlass', () => noAO(std({ color: '#22323c', transparent: true, opacity: 0.62, roughness: 0.04, metalness: 0.75, envMapIntensity: 1.6, side: THREE.DoubleSide, depthWrite: false }))),   // reads as glass, not an opening
     ezeGlass: () => mat('ezeGlass', () => noAO(std({ color: '#1a2026', transparent: true, opacity: 0.55, roughness: 0.15, metalness: 0.6, side: THREE.DoubleSide, depthWrite: false }))),
     doorPanel2: () => mat('doorPanel2', () => std({ color: '#e9e8e2', roughness: 0.5 })),
     shingle: () => mat('shingle', () => std({ color: '#ffffff', map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95 })),
@@ -1782,7 +1790,7 @@
     // so the pitch steepens (3/12 to 5/12) until the high end clears the eave.
     const shedPitch = shed && roofTie ? Math.min(5 / 12, Math.max(3 / 12, (E + 0.45 - beamTop) / zF)) : pl.g.shedPitch;
     const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;
-    const houseRoofTop = (depth) => E - 0.6 + (depth + 1.2) * 0.5 + rz * 1.118;
+    const houseRoofTop = (depth) => E + depth * 0.5 + rz * 1.118;
     const g = group(cx, 0, free ? s.z : 0);
     withG(g, () => {
       if (onDeck) {
@@ -1888,13 +1896,35 @@
         if (free) zA = -1;                            // freestanding: overhang at the back too
         const zc = (zA + zB) / 2, L = zB - zA;
         [-1, 1].forEach(sd => {
-          const p = B(len, rz, L, t, sd * span / 2, beamTop + (hw - span / 2) * gp + rz / 2 * k, zc); p.rotation.z = -sd * a;
-          const sh = B(len + 0.12, 0.1, L + 0.1, M.shingle(), sd * span / 2, beamTop + (hw - span / 2) * gp + (rz + 0.05) * k, zc + (free ? 0 : 0.05), { swap: true }); sh.rotation.z = -sd * a;
+          const vx = valleyX(s, sd < 0 ? 'left' : 'right', E), sp = vx != null ? Math.abs(vx) : span, ln = sp * k;
+          const p = B(ln, rz, L, t, sd * sp / 2, beamTop + (hw - sp / 2) * gp + rz / 2 * k, zc); p.rotation.z = -sd * a;
+          const sh = B(ln + (vx != null ? 0.02 : 0.12), 0.1, L + 0.1, M.shingle(), sd * sp / 2, beamTop + (hw - sp / 2) * gp + (rz + 0.05) * k, zc + (free ? 0 : 0.05)); sh.rotation.z = -sd * a;
+          if (vx != null) {
+            // Sloped valley: a tapered wedge between the porch gable and the house wing,
+            // wide at the house wall, coming to a point where the two eaves meet, so the
+            // valley line falls from the house roof down to the front eave.
+            const top = (x) => beamTop + (hw - Math.abs(x)) * gp + (rz + 0.16) * k;   // just above the shingles
+            const D2 = 3.5, yF = top(vx), yB = yF + D2 * gp;
+            // The back runs up under the house roof (roof tie) or to the house wall, so it ties in.
+            const zb = Math.min(zA, 0) + 0.02, rise = (zB - zb) / (zB - 0.02);
+            // One flat plane: back edge along the house roof between the two roofs, sloping
+            // down to a point where the two eaves meet.
+            // Edges sit exactly on each roof's surface (the wing roof's top is a touch lower than
+            // the porch's shingles), tucked 1″ under so no seam shows.
+            const under = beamTop + (hw - Math.abs(vx)) * gp, wingTop = (dx) => under + rz * k + dx * gp, porchTop = (dx) => under + (rz + 0.1) * k + dx * gp;
+            const F = [vx, wingTop(0) - 0.03, zB], Lb = [vx - sd * D2, porchTop(D2) - 0.08, zb], Rb = [vx + sd * D2, wingTop(D2) - 0.08, zb];
+            const pos = [...Lb, ...Rb, ...F];
+            const slope = Math.hypot(1, (Lb[1] - yF) / (zB - zb));          // shingle rows at true size along the slope
+            const uv = [Lb, Rb, F].flatMap(q => [q[0], q[2] * slope]);
+            const gv = new THREE.BufferGeometry(); gv.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gv.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gv.computeVertexNormals();
+            const vm = new THREE.Mesh(gv, mat('valley', () => std({ color: '#ffffff', map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95, side: THREE.DoubleSide })));
+            vm.castShadow = vm.receiveShadow = true; G.add(vm);
+            return;                                     // valley side: no eave, no gutter
+          }
           const gy = beamTop - gp + rz * k - 0.22;
           B(0.4, 0.38, L, M.gutter(), sd * (span + 0.2), gy, zc);
           B(0.22, gy - 0.4, 0.18, M.gutter(), sd * (span + 0.2), (gy + 0.4) / 2, zB - 0.3); B(0.22, 0.2, 0.9, M.gutter(), sd * (span + 0.2), 0.2, zB + 0.1);
         });
-        B(0.9, 0.14, L, M.ridge(), 0, ridgeU + (rz + 0.1) * k + 0.03, zc);
         // Ceiling: a full vault for a gable; a semi-vault slopes up partway, then runs flat.
         const z0c = free ? col / 2 : 0, zLen = zF - z0c, zMid = (zF + z0c) / 2;
         if (semi) {
@@ -1902,7 +1932,18 @@
           [-1, 1].forEach(sd => { const c = B((hw - xf) * k, 0.03, zLen, M.tg(), sd * (hw + xf) / 2, beamTop + (hw - (hw + xf) / 2) * gp - 0.02, zMid, { cast: false }); c.rotation.z = -sd * a; });
           B(2 * xf, 0.04, zLen, M.tg(), 0, yf - 0.02, zMid, { cast: false });
         } else {
-          [-1, 1].forEach(sd => { const c = B(hw * k, 0.03, zLen, M.tg(), sd * hw / 2, beamTop + hw / 2 * gp - 0.02, zMid, { cast: false }); c.rotation.z = -sd * a; });
+          [-1, 1].forEach(sd => {
+            // Valley side: the roof stops at the valley, so the ceiling stops there too and a
+            // wall closes that side up to the roof (no view into the vault from outside).
+            const vx = valleyX(s, sd < 0 ? 'left' : 'right', E), cw = vx != null ? Math.min(hw, Math.abs(vx)) : hw;
+            const c = B(cw * k, 0.03, zLen, M.tg(), sd * cw / 2, beamTop + (hw - cw / 2) * gp - 0.02, zMid, { cast: false }); c.rotation.z = -sd * a;
+            if (vx != null) {
+              const top = beamTop + (hw - cw) * gp - 0.02, cs = new THREE.Shape();
+              cs.moveTo(-0.02, beamTop - gp - 0.05); cs.lineTo(zB - 0.22, beamTop - gp - 0.05); cs.lineTo(zB - 0.22, top); cs.lineTo(-0.02, top); cs.closePath();
+              const cm = new THREE.Mesh(new THREE.ShapeGeometry(cs), mat('closer-' + S.house, () => { const m = M.porchSiding().clone(); m.side = THREE.DoubleSide; return m; }));
+              cm.rotation.y = -Math.PI / 2; cm.position.x = sd * (cw - 0.03); cm.receiveShadow = true; G.add(cm);
+            }
+          });
           B(0.46, 0.7, zLen, M.tg(), 0, ridgeU - 0.3, zMid);           // ridge beam inside the vault
         }
         const end = gableEndOf(s);
@@ -2045,7 +2086,10 @@
     // its ends, so moving a porch or deck slides it along the back wall.
     const reach = Math.max(...xs.map(Math.abs)), hx = 0;
     const HW = Math.max(44, Math.ceil((reach + 6) / 2) * 4), HD = 28, rz = 0.55, k = 1.118;
-    let E = FF + 9.3;
+    let E = FF + 9.3, matchE = null;
+    // A gable, semi-vault or hip porch tied into the house roof sets the house eave, so the
+    // gutters, soffits and 1′ overhangs of house, porch and wing all run at one level.
+    att.forEach(s => { if (s.kind === 'porch' && s.tie === 'roof' && s.roof !== 'shed' && matchE == null) matchE = porchGeom(s).beamTop; });
     att.forEach(s => {
       if (s.kind !== 'porch') return;
       const g = porchGeom(s);
@@ -2056,20 +2100,26 @@
       const top = g.shed ? g.roofAt(0) + rz * 1.03 : g.beamTop + (s.w / 2) * g.gp + rz * 1.12;
       E = Math.max(E, top + 1.3);
     });
+    if (matchE != null) {
+      const need = att.filter(s => s.kind === 'porch' && (s.tie === 'wall' || (s.tie === 'roof' && s.roof === 'shed'))).length;
+      E = need ? Math.max(E, matchE) : matchE;          // wall-tie / shed-tie porches need the wall higher
+    }
     const fTop = Math.min(Math.max(FF - 0.6, 0.8), 2.6);
     B(HW + 0.2, fTop, HD + 0.2, M.concrete(), hx, fTop / 2, -HD / 2);
     B(HW, E - fTop, HD, M.siding(), hx, fTop + (E - fTop) / 2, -HD / 2);
     [-1, 1].forEach(sd => { B(0.42, E - fTop, 0.12, M.trim(), hx + sd * (HW / 2 - 0.15), fTop + (E - fTop) / 2, 0.06); B(0.12, E - fTop, 0.42, M.trim(), hx + sd * (HW / 2 + 0.06), fTop + (E - fTop) / 2, -0.15); });
     B(HW, 0.55, 0.1, M.trim(), hx, E - 0.28, 0.05);
-    const run = HD / 2 + 1.2, yr = E - 0.6 + run * 0.5;
-    beamYZ(hx, E - 0.6 + rz / 2 * k, 1.2, yr + rz / 2 * k, -HD / 2, HW + 2, rz, M.trim());
-    beamYZ(hx, E - 0.6 + (rz + 0.05) * k, 1.28, yr + (rz + 0.05) * k, -HD / 2, HW + 2.15, 0.1, M.shingle());
-    beamYZ(hx, yr + rz / 2 * k, -HD / 2, E - 0.6 + rz / 2 * k, -HD - 1.2, HW + 2, rz, M.trim());
-    beamYZ(hx, yr + (rz + 0.05) * k, -HD / 2, E - 0.6 + (rz + 0.05) * k, -HD - 1.28, HW + 2.15, 0.1, M.shingle());
+    const run = HD / 2 + 1.0, yr = E - 0.5 + run * 0.5;            // 1′ overhang, same as the porch
+    beamYZ(hx, E - 0.5 + rz / 2 * k, 1.0, yr + rz / 2 * k, -HD / 2, HW + 2, rz, M.trim());
+    beamYZ(hx, E - 0.5 + (rz + 0.05) * k, 1.08, yr + (rz + 0.05) * k, -HD / 2, HW + 2.15, 0.1, M.shingle());
+    beamYZ(hx, yr + rz / 2 * k, -HD / 2, E - 0.5 + rz / 2 * k, -HD - 1.0, HW + 2, rz, M.trim());
+    beamYZ(hx, yr + (rz + 0.05) * k, -HD / 2, E - 0.5 + (rz + 0.05) * k, -HD - 1.08, HW + 2.15, 0.1, M.shingle());
     B(HW + 2.15, 0.16, 1.1, M.ridge(), hx, yr + (rz + 0.1) * k + 0.04, -HD / 2);
     [-1, 1].forEach(sd => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * 0.5]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(hx + sd * HW / 2 - (sd > 0 ? 0.2 : 0), E, 0); }));
-    const gy = E - 0.6 + rz * k - 0.22;
-    B(HW + 2.15, 0.38, 0.4, M.gutter(), hx, gy, 1.45);
+    const WIN_Y = Math.min(FF + 5.3, E - 3.1);                        // window heads stay under the eave
+    const gy = E - 0.5 + rz * k - 0.22;                               // same formula as the porch gutter
+    B(HW + 2.15, 0.38, 0.4, M.gutter(), hx, gy, 1.25);
+    B(HW + 2, 0.05, 1.0, M.trim(), hx, E - 0.03, 0.5, { cast: false });   // soffit
     [-1, 1].forEach(sd => { const x = hx + sd * (HW / 2 + 0.5); B(0.22, gy - 0.4, 0.18, M.gutter(), x, (gy + 0.4) / 2, 1.3); B(0.22, 0.2, 0.9, M.gutter(), x, 0.2, 1.75); });
 
     // Doors behind each attached section, windows in the gaps.
@@ -2077,9 +2127,9 @@
     doors.forEach(d => { const g = group(d.x, d.y, 0); d.kind === 'deck' ? sliderDoor(g) : entryDoor(g); });
     for (let x = hx - HW / 2 + 4.5; x <= hx + HW / 2 - 4.5; x += 7.5) {
       if (doors.some(d => Math.abs(x - d.x) < d.w / 2 + 3.6)) continue;
-      windowAt(group(x, FF + 5.3, 0), 3, 4.6);
+      windowAt(group(x, WIN_Y, 0), 3, 4.6);
     }
-    [-1, 1].forEach(sd => [-7, -19].forEach(z => windowAt(group(hx + sd * HW / 2, FF + 5.3, z, sd * Math.PI / 2), 3, 4.6)));
+    [-1, 1].forEach(sd => [-7, -19].forEach(z => windowAt(group(hx + sd * HW / 2, WIN_Y, z, sd * Math.PI / 2), 3, 4.6)));
 
     // Landscaping beds in front of the house where nothing is built.
     const spans = att.map(s => [rect(s).x0 - 1, rect(s).x1 + 1]);
@@ -2093,11 +2143,18 @@
       const r = rect(a), sd = side === 'left' ? -1 : 1, xa = side === 'left' ? r.x0 - WING : r.x1, xb = xa + WING, xm = (xa + xb) / 2, zEnd = a.d;
       B(WING, E - fTop, zEnd, M.siding(), xm, fTop + (E - fTop) / 2, zEnd / 2);
       B(WING + 0.2, fTop, zEnd + 0.1, M.concrete(), xm, fTop / 2, zEnd / 2);
-      const span = WING / 2 + 1, ang = Math.atan(0.5), k2 = 1 / Math.cos(ang), len = span * k2, L = zEnd + 1;
-      [-1, 1].forEach(q => { const pnl = B(len, rz, L, M.shingle(), xm + q * span / 2, E - 0.5 + (WING / 2 - span / 2) * 0.5 + rz / 2 * k2, L / 2 - 0.01, { swap: true }); pnl.rotation.z = -q * ang; });
-      tri([[-WING / 2, 0], [WING / 2, 0], [0, WING / 4]], 0.2, M.siding(), m => m.position.set(xm, E - 0.5, zEnd - 0.2));
-      [-1, 1].forEach(q => beamXY(zEnd + 0.9, xm, E - 0.5 + WING / 4 + 0.6, xm + q * (span + 0.05), E - 1.0, 0.14, 0.5, M.trim()));
-      windowAt(group(xm, FF + 5.3, zEnd), 3, 4.6);
+      const span = WING / 2 + 1, ang = Math.atan(0.5), k2 = 1 / Math.cos(ang), L = zEnd + 1;
+      const vx = valleyX(a, side, E), toward = side === 'left' ? 1 : -1;   // q pointing at the porch
+      [-1, 1].forEach(q => {
+        const sp = vx != null && q === toward ? Math.abs(xm - (a.x + vx)) : span;
+        const pnl = B(sp * k2, rz, L, M.shingle(), xm + q * sp / 2, E + (WING / 2 - sp / 2) * 0.5 + rz / 2 * k2, L / 2 - 0.01); pnl.rotation.z = -q * ang;
+      });
+      tri([[-WING / 2, 0], [WING / 2, 0], [0, WING / 4]], 0.2, M.siding(), m => m.position.set(xm, E, zEnd - 0.2));
+      [-1, 1].forEach(q => beamXY(zEnd + 0.9, xm, E + WING / 4 + 0.6, xm + q * (span + 0.05), E - 0.5, 0.14, 0.5, M.trim()));
+      { const out = side === 'left' ? -1 : 1, gx = xm + out * (span + 0.2), wgy = E - 0.5 + rz * k2 - 0.22;   // wing gutter, same height
+        B(0.4, 0.38, L, M.gutter(), gx, wgy, L / 2); B(0.22, wgy - 0.4, 0.18, M.gutter(), gx, (wgy + 0.4) / 2, L - 0.3); B(0.22, 0.2, 0.9, M.gutter(), gx, 0.2, L + 0.1);
+        B(1.0, 0.05, zEnd, M.trim(), xm + out * (WING / 2 + 0.5), E - 0.03, zEnd / 2, { cast: false }); }
+      windowAt(group(xm, WIN_Y, zEnd), 3, 4.6);
     }));
     tree(hx - HW / 2 - 16, -6, 1.1); tree(hx + HW / 2 + 14, -22, 1.25); tree(hx - 6, -HD - 18, 1.3);
     treeline(hx, 0);
@@ -2151,10 +2208,24 @@
     const s = bbox.size / 16 * Math.max(1, 1.25 / Math.max(camera.aspect, 0.4)), fy = S.H, cx = bbox.cx, cz = bbox.cz;
     if (v === 'front') return { pos: new THREE.Vector3(cx, fy + 6, cz + 24 * s + 12), tgt: new THREE.Vector3(cx, fy + 4, cz) };
     if (v === 'top') return { pos: new THREE.Vector3(cx, 44 * s + 22, cz + 0.01), tgt: new THREE.Vector3(cx, 0, cz) };
+    if (v === 'inside') {
+      // Standing inside the porch (the selected one, else the first): eye height 5′-4″,
+      // a third of the way in from the house, looking out the front. Drag to look around.
+      const pc = (sel().kind === 'porch' ? sel() : S.sections.find(x => x.kind === 'porch')), r = rect(pc), fl = raised(pc) ? S.H : 0.33;
+      const ez = r.z0 + pc.d * 0.3, ey = fl + 5.33;
+      return { pos: new THREE.Vector3(pc.x, ey, ez), tgt: new THREE.Vector3(pc.x, ey - 0.15, ez + 0.8) };
+    }
     return { pos: new THREE.Vector3(cx + 13 * s + 9, fy + 8 + 5 * s, cz + 18 * s + 11), tgt: target.clone() };
   }
   goTo = function (v, instant) {
     view = v;
+    // Inside: look around from one spot (no zoom, near clipping close in); outside: orbit.
+    const inside = v === 'inside';
+    controls.minDistance = inside ? 0.5 : 6; controls.maxDistance = inside ? 1.2 : 220; controls.enableZoom = !inside; controls.enablePan = !inside;
+    controls.maxPolarAngle = inside ? Math.PI - 0.3 : Math.PI / 2 - 0.03; controls.minPolarAngle = inside ? 0.3 : 0;
+    camera.near = inside ? 0.1 : 0.5; camera.fov = inside ? 70 : 36; camera.updateProjectionMatrix();
+    outline.visible = !inside && !customer; ['dim-w', 'dim-d'].forEach(id => { $(id).style.visibility = inside ? 'hidden' : ''; });
+    const hint = document.querySelector('.hint'); if (hint) { hint.dataset.out = hint.dataset.out || hint.textContent; hint.textContent = inside ? 'Drag to look around · Corner to step back outside' : hint.dataset.out; }
     document.querySelectorAll('.views button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
     if (dirty) { build(); dirty = false; }
     const { pos, tgt } = viewPos(v);
