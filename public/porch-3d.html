@@ -106,6 +106,25 @@
   .summary span { font-size: 13px; opacity: .8; }
   .hint { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 12px; color: var(--tag-fg); background: var(--tag-bg); padding: 6px 10px; border-radius: 6px; }
   .dim { position: absolute; left: 0; top: 0; font: 500 13px/1 var(--font-mono); background: #1b2520; color: #fff; padding: 5px 7px; border-radius: 4px; pointer-events: none; white-space: nowrap; transform: translate(-50%, -50%); }
+  .render-btn { position: absolute; top: calc(64px + env(safe-area-inset-top, 0px)); right: max(14px, env(safe-area-inset-right, 0px)); display: flex; gap: 6px; }
+  .render-btn button { font: 600 13px/1 var(--font-body); border: 0; border-radius: 8px; padding: 10px 12px; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+  .render-btn .primary { background: var(--accent); color: var(--accent-fg); }
+  .render-btn .ghost { background: var(--tag-bg); color: var(--tag-fg); }
+  .render-btn button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .modal { position: fixed; inset: 0; background: rgba(10,14,12,.72); display: grid; place-items: center; z-index: 50;
+    padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .modal[hidden] { display: none; }
+  .modal-card { background: var(--panel); color: var(--fg); border-radius: 12px; width: min(960px, 100%); max-height: 100%; overflow: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .modal-card img { width: 100%; border-radius: 8px; display: block; background: var(--line); }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .modal-card p { margin: 0; color: var(--muted); line-height: 1.45; font-size: 14px; }
+  .modal-card textarea { width: 100%; min-height: 110px; font: 13px/1.4 var(--font-mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; box-sizing: border-box; }
+  .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .modal-actions button, .modal-actions a { font: 600 14px/1 var(--font-body); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; text-decoration: none; }
+  .modal-actions .primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.9s linear infinite; margin: 30px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
   .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; padding: 20px; text-align: center; }
 
   @media (max-width: 820px) {
@@ -178,11 +197,22 @@
       <button type="button" data-view="front" aria-pressed="false">Front</button>
       <button type="button" data-view="top" aria-pressed="false">Plan</button>
     </div>
+    <div class="render-btn">
+      <button type="button" class="primary" id="btn-render">Photo render</button>
+      <button type="button" class="ghost" id="btn-chatgpt">Copy for ChatGPT</button>
+    </div>
     <div class="summary"><b id="sum-title"></b><span id="sum-sub"></span></div>
     <div class="hint">Drag to orbit · right-drag to pan · tap a section to edit</div>
     <div class="dim" id="dim-w" hidden></div>
     <div class="dim" id="dim-d" hidden></div>
   </main>
+</div>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="modal-title">Photo render</h2><button type="button" class="link-danger" id="modal-close">Close</button></div>
+    <div id="modal-body"></div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -981,7 +1011,7 @@
   }
 
   // Raised floor: boards, fascia, framing, posts, footings.
-  function deckFloor(x0, x1, z0, z1, fy, { ledger = true } = {}) {
+  function deckFloor(x0, x1, z0, z1, fy, { ledger = true, frontZ = z1 - 0.8, postXs = null } = {}) {
     const bw = 5.5 / 12, gap = 0.25 / 12, t = 1 / 12, y = fy - t / 2, W = x1 - x0;
     B(W, t, bw, M.deck(0), (x0 + x1) / 2, y, z1 - bw / 2);
     [x0, x1].forEach((x, i) => B(bw, t, z1 - z0 - bw - gap, M.deck(1), x + (i ? -bw / 2 : bw / 2), y, (z0 + z1 - bw - gap) / 2, { swap: true }));
@@ -992,11 +1022,11 @@
     const jh = 9.25 / 12, jy = fy - t - jh / 2;
     for (let x = x0 + 0.1; x <= x1 - 0.05; x += 16 / 12) B(0.125, jh, z1 - z0 - 0.2, M.pt(), x, jy, (z0 + z1) / 2, { swap: true });
     if (ledger) B(W, jh, 0.15, M.pt(), (x0 + x1) / 2, jy, z0 + 0.08);
-    const rows = (z1 - z0) > 10 ? [z0 + (z1 - z0) / 2, z1 - 0.8] : [z1 - 0.8];
+    const rows = (z1 - z0) > 10 ? [z0 + (z1 - z0) / 2, frontZ] : [frontZ];
     const by = fy - t - jh - 0.4;
     rows.forEach(z => {
       B(W - 0.4, 0.8, 0.3, M.pt(), (x0 + x1) / 2, by, z);
-      spread(x0 + 0.5, x1 - 0.5, 8).forEach(x => {
+      (z === frontZ && postXs ? postXs : spread(x0 + 0.5, x1 - 0.5, 8)).forEach(x => {
         const ph = by - 0.4 - 0.25; if (ph > 0.1) B(0.46, ph, 0.46, M.pt(), x, 0.25 + ph / 2, z);
         if (ph > 4.5) [-1, 1].forEach(sd => { if (x + sd * 2 > x0 && x + sd * 2 < x1) beamXY(z, x, by - 0.4 - 2, x + sd * 2, by - 0.4, 0.29, 0.29, M.pt()); });
         const f = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.35, 20), M.footing()); f.position.set(x, 0.08, z); f.receiveShadow = true; G.add(f);
@@ -1093,7 +1123,10 @@
     const g = group(cx, 0, 0);
     withG(g, () => {
       if (onDeck) {
-        deckFloor(-hw, hw, 0, D, fy);
+        const colXs = s.type === 'open' || s.type === 'sunroom' ? null : pl.walls.front.cols;
+        let px = colXs || spread(-hw + 0.5, hw - 0.5, 8);
+        if (s.type === 'open' || s.type === 'sunroom') px = [...new Set([...spread(-hw + col / 2, hw - col / 2, 8)])];
+        deckFloor(-hw, hw, 0, D, fy, { frontZ: zF, postXs: px });
         skirting(-hw, hw, 0, D, fy, { front: covered(s, 'front').map(([a, b]) => [a - cx, b - cx]), left: covered(s, 'left'), right: covered(s, 'right') });
       } else B(W + 1, 0.33, D + 1, M.concrete(), 0, 0.165, (D + 1) / 2);
 
@@ -1472,6 +1505,82 @@
     placeDim($('dim-w'), dimAnchors.w); placeDim($('dim-d'), dimAnchors.d);
     requestAnimationFrame(frame);
   }
+
+  // ── Photo render ─────────────────────────────────────────────────────────
+  function describe() {
+    const parts = S.sections.map(s => {
+      if (s.kind === 'porch') return `${s.w}×${s.d} ft ${PORCH_TYPES[s.type].toLowerCase()} with a ${s.tie === 'wall' ? 'shed roof tied to the house wall' : 'gable roof tied into the house roof'}`;
+      if (s.kind === 'deck') return `${s.w}×${s.d} ft raised deck with stairs`;
+      return `${s.w}×${s.d} ft ${s.mat === 'concrete' ? 'concrete' : 'paver'} patio`;
+    });
+    const deck = S.decking === 'pt' ? 'pressure-treated wood decking' : `${DECKING[S.decking].label} composite decking in ${COLORS.find(c => c.key === S.color).name}`;
+    const rail = S.rail === 'aluminum' ? 'black aluminum railing' : 'white railing with a composite cap and black round balusters';
+    return `${parts.join(', ')}; ${deck}; ${rail}; ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()} trim and columns; house in ${HOUSES.find(h => h.key === S.house).name.toLowerCase()}; floor ${ftIn(S.H)} above grade`;
+  }
+  const promptText = () => `Turn this 3D model screenshot into a photorealistic exterior photograph of the same scene, as if taken with a professional camera on a sunny afternoon. Keep exactly the same camera angle, framing, house and every built element (posts, headers, roof shape, windows, doors, screens, railings, stairs, deck boards, patio) in the same positions, sizes and proportions. Do not add, remove or move any structural element. Keep the same colors and materials. Make it look real: true wood-grain composite decking, crisp painted trim, real siding or brick, architectural shingles, a natural lawn, realistic shrubs and trees, soft natural sunlight with accurate shadows. No people, no text. Project: ${describe()}.`;
+  function snapshot(maxW = 1600) {
+    const outline0 = outline.visible; outline.visible = false;
+    const dims = [$('dim-w'), $('dim-d')]; dims.forEach(d => d.style.visibility = 'hidden');
+    if (composer) composer.render(); else renderer.render(scene, camera);
+    const src = renderer.domElement, k = Math.min(1, maxW / src.width);
+    const [c, x] = cnv(Math.round(src.width * k), Math.round(src.height * k));
+    x.drawImage(src, 0, 0, c.width, c.height);
+    outline.visible = outline0; dims.forEach(d => d.style.visibility = '');
+    return c.toDataURL('image/jpeg', 0.88);
+  }
+  function sessionToken() {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (/^sb-.*-auth-token$/.test(k)) { const v = JSON.parse(localStorage.getItem(k)); return v?.access_token || v?.currentSession?.access_token || null; }
+      }
+    } catch (e) { /* storage blocked */ }
+    return null;
+  }
+  const modal = $('modal'), mBody = $('modal-body');
+  let lastFocus = null;
+  function openModal(title, html) { lastFocus = document.activeElement; $('modal-title').textContent = title; mBody.innerHTML = html; modal.hidden = false; $('modal-close').focus(); }
+  function closeModal() { modal.hidden = true; mBody.innerHTML = ''; lastFocus?.focus?.(); }
+  $('modal-close').addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+  const fileName = () => `deckplus-render-${new Date().toISOString().slice(0, 10)}`;
+
+  function manualHTML(view, note) {
+    return `${note ? `<p>${note}</p>` : ''}
+      <p><b>Use ChatGPT or the Gemini app:</b> 1) save this view image, 2) copy the prompt, 3) in ChatGPT attach the image, paste the prompt and send.</p>
+      <img src="${view}" alt="Current 3D view">
+      <textarea id="m-prompt" readonly aria-label="Render prompt">${promptText().replace(/</g, '&lt;')}</textarea>
+      <div class="modal-actions"><button type="button" class="primary" id="m-copy">Copy prompt</button><a id="m-save" href="${view}" download="${fileName()}-view.jpg">Save view image</a></div>
+      <p id="m-msg" aria-live="polite"></p>`;
+  }
+  function wireManual() {
+    $('m-copy').addEventListener('click', () => {
+      const t = $('m-prompt'), done = () => { $('m-msg').textContent = 'Prompt copied. Paste it in ChatGPT with the image.'; };
+      navigator.clipboard?.writeText(t.value).then(done, () => { t.select(); $('m-msg').textContent = 'Press Ctrl+C (Cmd+C on Mac) to copy the selected prompt.'; }) ?? (t.select());
+    });
+    $('m-save').addEventListener('click', () => { setTimeout(() => { $('m-msg').textContent = 'If nothing downloaded, right-click (or long-press) the image above and save it.'; }, 600); });
+  }
+  $('btn-chatgpt').addEventListener('click', () => { openModal('Render with ChatGPT', manualHTML(snapshot())); wireManual(); });
+  $('btn-render').addEventListener('click', async () => {
+    const view = snapshot(1400), token = sessionToken();
+    if (!token) { openModal('Photo render', manualHTML(view, 'Automatic rendering works when this builder is opened from QuoteX while signed in. You can still render this view by hand:')); wireManual(); return; }
+    openModal('Photo render', `<p>Rendering a photo of this view. This takes about 10–30 seconds.</p><div class="spinner" role="status" aria-label="Rendering"></div><img src="${view}" alt="Current 3D view" style="opacity:.5">`);
+    try {
+      const r = await fetch('/api/render', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ image: view.split(',')[1], mimeType: 'image/jpeg', description: describe() }) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.image) throw new Error(data.error || `The render service answered ${r.status}.`);
+      if (modal.hidden) return;
+      const url = `data:${data.mimeType};base64,${data.image}`;
+      mBody.innerHTML = `<img src="${url}" alt="Photo render of the build"><p>AI concept image: final materials and details follow the signed contract.</p>
+        <div class="modal-actions"><a class="primary" href="${url}" download="${fileName()}.png">Save image</a><button type="button" id="m-again">Render again</button></div>`;
+      $('m-again').addEventListener('click', () => { closeModal(); $('btn-render').click(); });
+    } catch (err) {
+      if (modal.hidden) return;
+      mBody.innerHTML = manualHTML(view, `Automatic render didn't work: ${String(err.message).replace(/</g, '&lt;')} You can render this view by hand instead:`); wireManual();
+    }
+  });
 
   update = () => { updateUI(); dirty = true; };
   updateUI(); resize(); build(); dirty = false; goTo('corner', true);
