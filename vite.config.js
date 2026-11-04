@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
@@ -82,8 +82,22 @@ function localStorePlugin() {
   }
 }
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), localStorePlugin()],
+// /qx-config.js — the Supabase URL and public (anon) key for the plain pages in
+// public/ (the design editor), which Vite doesn't build. The same values are in
+// the app's own bundle; nothing secret.
+function qxConfigPlugin(env) {
+  const source = () => `window.QX_CONFIG = ${JSON.stringify({ supabaseUrl: env.VITE_SUPABASE_URL || '', supabaseKey: env.VITE_SUPABASE_ANON_KEY || '' })};\n`
+  const serve = (server) => { server.middlewares.use('/qx-config.js', (req, res) => { res.setHeader('Content-Type', 'application/javascript'); res.end(source()) }) }
+  return {
+    name: 'qx-config',
+    configureServer: serve,
+    configurePreviewServer: serve,
+    generateBundle() { this.emitFile({ type: 'asset', fileName: 'qx-config.js', source: source() }) },
+  }
+}
+
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), tailwindcss(), localStorePlugin(), qxConfigPlugin(loadEnv(mode, process.cwd(), 'VITE_'))],
   server: {
     host: true,
     proxy: {
@@ -98,4 +112,4 @@ export default defineConfig({
       '/api/booking':       'http://localhost:3001',
     },
   },
-})
+}))
