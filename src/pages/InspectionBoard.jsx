@@ -10,7 +10,7 @@ import {
   usePermitAccess, permitTracked, BOARD_COLUMNS, boardCells, countyFinaled, inspectionLabel, INSPECTION_TYPES,
   jobCounty, jobJurisdiction, countyConnected, CONNECTED_COUNTIES,
 } from '../lib/permitTracking'
-import { Search, X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck, Printer, Plus, Trash2 } from 'lucide-react'
+import { Search, X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck, Printer, Plus, Trash2, Pencil } from 'lucide-react'
 import { buildWeeklyReportHtml } from '../lib/inspectionReport'
 import { connectionAlerts } from '../lib/permitHealth'
 
@@ -95,7 +95,7 @@ function AddJobModal({ pms, onClose, onAdded }) {
         {county && (
           <div className="text-xs rounded-lg px-3 py-2 bg-gray-50 border border-gray-100 space-y-2">
             <p className="text-gray-600">
-              <b>{county} County.</b> {CONNECTED_COUNTIES.includes(county) && !f.jurisdiction
+              <b>{county} County{f.jurisdiction ? ` · ${f.jurisdiction}` : ''}.</b> {CONNECTED_COUNTIES.includes(f.jurisdiction || county)
                 ? 'Its permit site is connected: inspections update on their own.'
                 : "Its permit site isn't connected yet: record inspection results on the board by hand."}
             </p>
@@ -103,7 +103,7 @@ function AddJobModal({ pms, onClose, onAdded }) {
               Inspected by a city instead of the county?
               <select className="text-xs border border-gray-200 rounded-md px-1.5 py-1 bg-white" value={f.jurisdiction} onChange={set('jurisdiction')}>
                 <option value="">No, the county</option>
-                {['Gastonia', 'Rock Hill', 'Tega Cay', 'Mooresville', 'Fort Mill', 'Lancaster (city)'].map(c => <option key={c}>{c}</option>)}
+                {CITY_CHOICES.map(c => <option key={c}>{c}</option>)}
               </select>
             </label>
           </div>
@@ -129,6 +129,57 @@ function AddJobModal({ pms, onClose, onAdded }) {
           <button onClick={save} className="flex-1 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:opacity-90">Add to the board</button>
           <button onClick={onClose} className="flex-1 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Cancel</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Correct an imported / added job: a misspelled address, the permit #, the
+// county or inspecting city, the PM or job type. The job is checked again
+// right away (where its permit site is connected).
+const COUNTY_CHOICES = ['Mecklenburg', 'Cabarrus', 'Union', 'York', 'Lancaster', 'Gaston', 'Iredell', 'Lincoln', 'Catawba', 'Chester']
+const CITY_CHOICES = ['Rock Hill', 'Tega Cay', 'Waxhaw', 'Fort Mill', 'Mooresville']
+function EditJobForm({ proposal, onClose }) {
+  const saveProposal = useStore(s => s.saveProposal)
+  const updateJobData = useStore(s => s.updateJobData)
+  const im = proposal.imported || {}
+  const [f, setF] = useState({ client: proposal.client || '', address: proposal.address || '', permit: im.permit || '', county: im.county || '', jurisdiction: im.jurisdiction || '', pm: im.pm || '', jobType: im.jobType || '' })
+  const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
+  const save = async () => {
+    const moved = f.address !== proposal.address || f.permit !== (im.permit || '') || f.county !== im.county || f.jurisdiction !== (im.jurisdiction || '')
+    saveProposal({
+      ...proposal, client: f.client.trim(), address: f.address.trim(),
+      imported: { ...im, permit: f.permit.trim().toUpperCase(), county: f.county, jurisdiction: f.jurisdiction, pm: f.pm.trim(), jobType: f.jobType.trim() },
+      ...(moved ? { countyPermit: null } : {}),
+    })
+    if (moved) updateJobData(proposal.id, { countyPick: null })
+    onClose()
+    if (moved && !DEMO) runPermitPulse({ ids: [proposal.id] }).catch(() => {})
+  }
+  const input = 'w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white'
+  const label = 'block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5'
+  return (
+    <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-3 space-y-2">
+      <p className="text-sm font-semibold text-gray-800">Edit job</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="col-span-2"><label className={label}>Client</label><input className={input} value={f.client} onChange={set('client')} /></div>
+        <div className="col-span-2"><label className={label}>Address (house #, street, city, state ZIP)</label><input className={input} value={f.address} onChange={set('address')} /></div>
+        <div><label className={label}>County</label>
+          <select className={input} value={f.county} onChange={set('county')}>
+            {[...new Set([f.county, ...COUNTY_CHOICES])].filter(Boolean).map(c => <option key={c}>{c}</option>)}
+          </select></div>
+        <div><label className={label}>Inspected by a city?</label>
+          <select className={input} value={f.jurisdiction} onChange={set('jurisdiction')}>
+            <option value="">No, the county</option>
+            {[...new Set([f.jurisdiction, ...CITY_CHOICES])].filter(Boolean).map(c => <option key={c}>{c}</option>)}
+          </select></div>
+        <div><label className={label}>Permit #</label><input className={`${input} font-mono`} value={f.permit} onChange={set('permit')} /></div>
+        <div><label className={label}>PM</label><input className={input} value={f.pm} onChange={set('pm')} /></div>
+        <div className="col-span-2 sm:col-span-4"><label className={label}>Job type</label><input className={input} value={f.jobType} onChange={set('jobType')} /></div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700">Save and re-check</button>
+        <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-500">Cancel</button>
       </div>
     </div>
   )
@@ -276,6 +327,7 @@ export default function InspectionBoard() {
   const company = useStore(s => s.branding?.companyName)
   const deleteProposal = useStore(s => s.deleteProposal)
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState(null)
   const onAdded = (id) => {
     setAdding(false); setOpen(id); setQuery('')
     if (!DEMO) runPermitPulse({ ids: [id] }).catch(e => setMsg(e.message))
@@ -446,12 +498,19 @@ export default function InspectionBoard() {
                 <div className="px-4 pb-4 pt-1 space-y-2">
                   <PermitsTab proposal={j.p} stages={getStages(j.p) || []} readOnly={access !== 'edit'} />
                   {access === 'edit' && <OfficeResultForm proposal={j.p} connected={j.connected} />}
-                  {access === 'edit' && j.p.status === 'Imported' && (
-                    <button onClick={() => { if (window.confirm(`Remove ${j.p.client} from the inspections board?`)) { deleteProposal(j.p.id); setOpen(null) } }}
-                      className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-600">
-                      <Trash2 size={11} /> Remove this job from the board
-                    </button>
-                  )}
+                  {access === 'edit' && j.p.status === 'Imported' && (editing === j.p.id
+                    ? <EditJobForm proposal={j.p} onClose={() => setEditing(null)} />
+                    : (
+                      <div className="flex items-center gap-4">
+                        <button onClick={() => setEditing(j.p.id)} className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800">
+                          <Pencil size={11} /> Edit job (address, permit #, county, PM)
+                        </button>
+                        <button onClick={() => { if (window.confirm(`Remove ${j.p.client} from the inspections board?`)) { deleteProposal(j.p.id); setOpen(null) } }}
+                          className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-600">
+                          <Trash2 size={11} /> Remove this job from the board
+                        </button>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>
