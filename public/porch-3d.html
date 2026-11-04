@@ -1977,7 +1977,7 @@
         let px = colXs || spread(-hw + 0.5, hw - 0.5, 8);
         if (s.type === 'open' || s.type === 'sunroom') px = [...new Set([...spread(-hw + col / 2, hw - col / 2, 8)])];
         deckFloor(-hw, hw, 0, D, fy, { frontZ: zF, postXs: px, ledger: !free, backZ: free ? col / 2 : null });
-        skirting(-hw, hw, 0, D, fy, { front: covered(s, 'front').map(([a, b]) => [a - cx, b - cx]), left: covered(s, 'left'), right: covered(s, 'right') });
+        // Porches are not skirted (the porch builder has no skirting option); decks and landings are.
       } else B(W + 1, 0.33, D + 1, M.concrete(), 0, 0.165, (D + 1) / 2);
 
       // ── Columns ─────────────────────────────────────────────────────────
