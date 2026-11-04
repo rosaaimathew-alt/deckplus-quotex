@@ -377,3 +377,15 @@ html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
 }
 .dp-signing .dp-sign-btn.qx-next { animation: qx-next-pulse 1.2s ease-in-out 2; }
 @keyframes qx-next-pulse { 50% { background: #fde68a; } }
+
+/* Dropdown with its arrow tucked in from the edge (the browser's own arrow
+   sits flush against the right border). */
+.qx-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 1rem;
+  padding-right: 2rem !important;
+}
