@@ -15,12 +15,15 @@ import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-
 import {
   Sun, CalendarDays, HardHat, PaintRoller, Phone, MessageSquare, Navigation,
   ChevronLeft, ChevronRight, Check, CheckCircle2, Circle, AlertTriangle, Clock,
-  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2,
+  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2, ShieldCheck,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR } from '../brand'
 import { isJob, isJobClosed } from '../lib/attention'
-import { permitAlerts, permitTracked, usePermitAccess } from '../lib/permitTracking'
+import {
+  permitAlerts, permitTracked, usePermitAccess, boardCells, BOARD_COLUMNS,
+  inspectionLabel, jobCounty, countyConnected,
+} from '../lib/permitTracking'
 import { getStages, JOB_TYPE_OPTIONS } from '../pages/Jobs'
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
@@ -53,7 +56,19 @@ function describeJob(p, permitAccess) {
   const open = stages.filter(s => !done.has(s.key) && s.key !== 'closed')
   const next = open[0] || null
   const dates = jd.stageDates || {}
-  const failed = permitAccess && permitTracked(p) ? permitAlerts(p, stages).failed : 0
+  // Inspections — same rules as the desktop Inspections board: every county,
+  // county results plus results the office records by hand.
+  const tracked = !!permitAccess && permitTracked(p)
+  const cells = tracked ? boardCells(p) : {}
+  const failed = tracked
+    ? Math.max(permitAlerts(p, stages).failed, Object.values(cells).filter(c => c.state === 'fail').length)
+    : 0
+  const officeNext = jd.nextInspection?.code
+    ? { label: inspectionLabel(jd.nextInspection.code), date: jd.nextInspection.date || null } : null
+  const countyNext = Object.entries(cells)
+    .filter(([, c]) => c.state === 'sched')
+    .map(([k, c]) => ({ label: BOARD_COLUMNS.find(b => b.key === k)?.title || k, date: c.date || null }))
+    .sort((a, b) => (a.date || '9').localeCompare(b.date || '9'))[0]
   return {
     p, stages, done, open, next,
     nextDate: next ? dates[next.key] || (next.key === 'start' ? jd.startDate : null) : null,
@@ -61,6 +76,10 @@ function describeJob(p, permitAccess) {
     total: stages.length,
     needsType: stages.length === 0,
     failed,
+    tracked, cells,
+    nextInsp: tracked ? (officeNext || countyNext || null) : null,
+    county: tracked ? jobCounty(p) : '',
+    connected: tracked && countyConnected(p),
     paintIndex: open.findIndex(s => s.key === 'paint'), // 0 = paint is next
     paintDate: dates.paint || null,
   }
@@ -171,7 +190,13 @@ function TodayScreen() {
       if (j.failed) now.push({ j, tone: 'red', why: `Failed inspection — ${j.failed} to redo`, rank: 0 })
       else if (j.next && j.nextDate && j.nextDate < today) now.push({ j, tone: 'amber', why: `Late: ${j.next.label} (was ${dayLabel(j.nextDate)})`, rank: 1 })
       else if (j.next && j.nextDate === today) now.push({ j, tone: 'blue', why: `Today: ${j.next.label}`, rank: 2 })
-      else if (j.needsType) now.push({ j, tone: 'amber', why: 'Pick the job type', rank: 3 })
+      else if (j.nextInsp?.date === today) now.push({ j, tone: 'blue', why: `Inspection today: ${j.nextInsp.label}`, rank: 2 })
+      // Jobs added only for inspection tracking have no job type — don't nag
+      else if (j.needsType && !j.p.imported) now.push({ j, tone: 'amber', why: 'Pick the job type', rank: 3 })
+
+      if (j.nextInsp?.date && j.nextInsp.date > today && j.nextInsp.date < weekEnd) {
+        week.push({ j, date: j.nextInsp.date, label: `Inspection: ${j.nextInsp.label}`, id: `${j.p.id}-insp` })
+      }
 
       // Anything dated this week that isn't done yet (all steps, not just next)
       const dates = j.p.jobData?.stageDates || {}
@@ -253,12 +278,19 @@ function WeekRow({ w }) {
 function JobsScreen() {
   const { jobs, scope, setScope, hasMine } = useFieldJobs()
   const [q, setQ] = useState('')
+  const [show, setShow] = useState('all')       // all | failed | insp
+  const [county, setCounty] = useState('')
+  const counties = useMemo(() => [...new Set(jobs.map(j => j.county).filter(Boolean))].sort(), [jobs])
+  const anyInspections = jobs.some(j => j.tracked)
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return jobs
-      .filter(j => !needle || `${j.p.client || ''} ${j.p.address || ''}`.toLowerCase().includes(needle))
+      .filter(j => !needle || `${j.p.client || ''} ${j.p.address || ''} ${j.p.imported?.permit || ''}`.toLowerCase().includes(needle))
+      .filter(j => !county || j.county === county)
+      .filter(j => show === 'all' || (show === 'failed' ? j.failed > 0 : !!j.nextInsp))
       .sort((a, b) => (a.p.client || '').localeCompare(b.p.client || ''))
-  }, [jobs, q])
+  }, [jobs, q, county, show])
+  const counts = { failed: jobs.filter(j => j.failed > 0).length, insp: jobs.filter(j => j.nextInsp).length }
 
   return (
     <div className="space-y-4">
@@ -269,11 +301,33 @@ function JobsScreen() {
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Name or street"
           className="flex-1 bg-transparent text-base text-gray-900 outline-none" />
       </label>
+      {anyInspections && (
+        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1">
+          {[['all', 'All jobs'], ['failed', `Failed inspection (${counts.failed})`], ['insp', `Inspection coming (${counts.insp})`]].map(([k, label]) => (
+            <button key={k} onClick={() => setShow(k)}
+              className={`h-10 px-4 rounded-full text-sm font-semibold whitespace-nowrap border ${show === k
+                ? (k === 'failed' ? 'bg-red-600 border-red-600 text-white' : 'bg-[var(--brand-600)] border-[var(--brand-600)] text-white')
+                : 'bg-white border-gray-200 text-gray-700'}`}>{label}</button>
+          ))}
+        </div>
+      )}
+      {counties.length > 1 && (
+        <select value={county} onChange={e => setCounty(e.target.value)} aria-label="County"
+          className="w-full h-12 px-3 rounded-2xl border border-gray-200 bg-white text-base text-gray-900">
+          <option value="">Every county</option>
+          {counties.map(c => <option key={c} value={c}>{c} County</option>)}
+        </select>
+      )}
       <div className="space-y-2.5">
-        {list.length === 0 && <p className="text-sm text-gray-500 px-1">No open jobs{q ? ' match that' : ''}.</p>}
+        {list.length === 0 && <p className="text-sm text-gray-500 px-1">No open jobs{q || county || show !== 'all' ? ' match that' : ''}.</p>}
         {list.map(j => (
           <JobRow key={j.p.id} j={j} tone={j.failed ? 'red' : null}
-            sub={<>{j.p.address ? <span className="block truncate">{j.p.address}</span> : null}<span className="block truncate font-medium text-gray-800">{nextLine(j)}</span></>} />
+            sub={<>
+              {j.p.address ? <span className="block truncate">{j.p.address}</span> : null}
+              <span className="block truncate font-medium text-gray-800">
+                {j.failed ? 'Failed inspection' : j.nextInsp ? `Inspection: ${j.nextInsp.label}${j.nextInsp.date ? ` · ${dayLabel(j.nextInsp.date)}` : ''}` : nextLine(j)}
+              </span>
+            </>} />
         ))}
       </div>
     </div>
@@ -436,6 +490,8 @@ function JobScreen() {
         </Card>
       )}
 
+      {j.tracked && <InspectionsCard j={j} />}
+
       <QuickNote proposalId={proposal.id} onSaved={() => showToast('Note saved')} />
 
       {/* Full checklist, tucked away */}
@@ -476,6 +532,53 @@ function JobScreen() {
       </button>
       {toast}
     </div>
+  )
+}
+
+// Read-only copy of this job's row on the Inspections board.
+const CELL_STYLE = {
+  pass:  { cls: 'bg-green-50 text-green-700 border-green-200', word: 'Passed' },
+  fail:  { cls: 'bg-red-50 text-red-700 border-red-200', word: 'Failed' },
+  sched: { cls: 'bg-blue-50 text-blue-700 border-blue-200', word: 'Scheduled' },
+  void:  { cls: 'bg-gray-50 text-gray-600 border-gray-200', word: '' },
+}
+function InspectionsCard({ j }) {
+  const rows = BOARD_COLUMNS.filter(c => j.cells[c.key])
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <ShieldCheck size={18} className="text-gray-500" />
+        <p className="flex-1 text-base font-semibold text-gray-900">Inspections</p>
+        {j.county && <span className="text-xs font-semibold text-gray-500">{j.county} County</span>}
+      </div>
+      {j.nextInsp && (
+        <p className="text-base text-gray-800 flex items-center gap-2">
+          <CalendarDays size={16} className="text-[var(--brand-700)] shrink-0" />
+          Next: <b>{j.nextInsp.label}</b>{j.nextInsp.date ? ` · ${dayLabel(j.nextInsp.date)}` : ''}
+        </p>
+      )}
+      {rows.length === 0 ? (
+        <p className="text-sm text-gray-500">No inspection results yet.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {rows.map(c => {
+            const cell = j.cells[c.key]
+            const st = CELL_STYLE[cell.state] || CELL_STYLE.void
+            return (
+              <li key={c.key} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${st.cls}`}>
+                <span className="flex-1 text-base font-medium">{c.title}</span>
+                <span className="text-sm font-semibold text-right">
+                  {st.word || cell.result}{cell.date ? ` · ${dayLabel(cell.date)}` : ''}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {!j.connected && (
+        <p className="text-xs text-gray-500">This county's results are entered by the office.</p>
+      )}
+    </Card>
   )
 }
 
