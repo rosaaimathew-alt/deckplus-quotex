@@ -29,6 +29,7 @@ import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
 import { setViewPref } from './fieldMode'
 import InstallCard from './InstallCard'
+import JobMoney from './JobMoney'
 
 // ── Date helpers (local calendar days, not UTC) ─────────────────────────────
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -525,6 +526,8 @@ function JobScreen() {
       )}
 
       <RecentNotes proposal={proposal} />
+
+      <JobMoney proposal={proposal} />
 
       <button onClick={() => { setViewPref('full'); navigate('/projects?tab=jobs') }}
         className="w-full h-12 rounded-xl text-sm font-semibold text-gray-600 flex items-center justify-center gap-2">
