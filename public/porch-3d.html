@@ -317,7 +317,7 @@
     const zF = s.d - col / 2, beamTop = fy + P + beamH;
     const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;   // underside of the rafters
     const frontTop = beamTop - beamH;                                        // underside of the front header
-    const sideTop = (z) => shed ? roofAt(z) : beamTop - beamH;               // shed: side walls run up to the rafters
+    const sideTop = () => beamTop - beamH;                                   // under the level side headers
     return { onDeck, fy, P, beamH, col, shed, shedPitch, gp, zF, beamTop, roofAt, frontTop, sideTop };
   }
   // Doors (local coords) and where the stairs land.
@@ -1111,7 +1111,9 @@
       // ── Header across the front; gable roofs also carry level side plates.
       // Shed roofs: rafters run from the house ledger down onto the front header.
       B(W, beamH, col, t, 0, beamTop - beamH / 2, zF);
-      if (!shed) { [xL, xR].forEach(x => B(col, beamH, zF, t, x, beamTop - beamH / 2, zF / 2)); B(W, beamH, 0.25, t, 0, beamTop - beamH / 2, 0.13); }
+      [xL, xR].forEach(x => B(col, beamH, zF, t, x, beamTop - beamH / 2, zF / 2));
+      if (!shed) B(W, beamH, 0.25, t, 0, beamTop - beamH / 2, 0.13);
+      else [xL, xR].forEach(x => tri([[0, 0], [zF + col / 2, 0], [0, roofAt(0) - beamTop]], col, t, m => { m.rotation.y = -Math.PI / 2; m.position.set(x + col / 2, beamTop, 0); }));
 
       // ── Roof ───────────────────────────────────────────────────────────
       let ridgeU = 0, span = 0, zB = D + 1;
