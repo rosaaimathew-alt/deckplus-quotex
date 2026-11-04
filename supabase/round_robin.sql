@@ -79,7 +79,9 @@ alter table rr_settings add column if not exists office_bcc text[] not null defa
 -- Lead reports (api/_lead-report.js): who gets them, and the last one sent.
 alter table rr_settings add column if not exists report_to text[] not null default '{}';
 alter table rr_settings add column if not exists report_sent_for text;        -- last monthly report, e.g. 2026-10
-alter table rr_settings add column if not exists report_week_sent_for text;   -- last weekly report (its Monday), e.g. 2026-11-02
+alter table rr_settings add column if not exists report_week_sent_for text;
+-- Last "calendar not loading" alert (they go out at most hourly).
+alter table rr_settings add column if not exists alert_sent_at timestamptz;   -- last weekly report (its Monday), e.g. 2026-11-02
 alter table rr_settings add column if not exists start_every_minutes int not null default 30 check (start_every_minutes between 5 and 240);
 
 alter table rr_bookings add column if not exists lead_first_name text;
@@ -209,6 +211,8 @@ create table if not exists rr_events (
   created_at timestamptz not null default now()
 );
 create index if not exists rr_events_time on rr_events (created_at);
+-- Which day ("2026-11-06|8" = date | times offered) or time (ISO) was picked.
+alter table rr_events add column if not exists detail text;
 alter table rr_events enable row level security;
 drop policy if exists rr_events_staff on rr_events;
 create policy rr_events_staff on rr_events for select using (auth_role() in ('office','admin'));

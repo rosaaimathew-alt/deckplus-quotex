@@ -2073,7 +2073,7 @@ export default function Jobs() {
             className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors self-start sm:self-auto ${permitsOnly
               ? 'bg-[var(--brand-600)] border-[var(--brand-600)] text-white'
               : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-            <ShieldCheck size={13} /> Mecklenburg permits <span className="opacity-70">{wonJobs.filter(permitTracked).length}</span>
+            <ShieldCheck size={13} /> Permit-tracked <span className="opacity-70">{wonJobs.filter(permitTracked).length}</span>
           </button>
         )}
       </div>

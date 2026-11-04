@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Schedule Your Free Estimate | Deck Plus</title>
@@ -305,11 +308,14 @@
       let visitor
       try { visitor = localStorage.getItem('rr-vid'); if (!visitor) { visitor = id(); localStorage.setItem('rr-vid', visitor) } } catch { visitor = id() }
       const session = id(), sent = new Set()
-      return (event) => {
-        if (params.has('demo') || sent.has(event)) return
-        sent.add(event)
+      // detail: which day (and how many times it showed) or which time was picked;
+      // each distinct pick is recorded once per visit.
+      return (event, detail) => {
+        const key = event + (detail || '')
+        if (params.has('demo') || sent.has(key)) return
+        sent.add(key)
         fetch(API + '?step=1', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ v: visitor, s: session, e: event, page: document.referrer.slice(0, 200) }) }).catch(() => {})
+          body: JSON.stringify({ v: visitor, s: session, e: event, d: detail, page: document.referrer.slice(0, 200) }) }).catch(() => {})
       }
     })()
     const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -495,7 +501,7 @@
           b.setAttribute('aria-pressed', String(k === state.day))
           b.setAttribute('aria-label', fmtDay(keyToDate(k)) + ', times available')
           b.onclick = () => {
-            state.day = k; state.start = null; render(); track('day')
+            state.day = k; state.start = null; render(); track('day', `${k}|${state.byDay.get(k).length}`)
             if (window.innerWidth < 1000 && !COMPACT) $('times').scrollIntoView({ behavior: 'smooth', block: 'start' })
           }
         } else {
@@ -525,7 +531,7 @@
           }
           const b = document.createElement('button')
           b.type = 'button'; b.className = 'slot'; b.textContent = fmtTime(d)
-          b.onclick = () => { state.start = d; render(); track('time'); $('continue').focus({ preventScroll: true }) }
+          b.onclick = () => { state.start = d; render(); track('time', d.toISOString()); $('continue').focus({ preventScroll: true }) }
           return b
         }))
       }

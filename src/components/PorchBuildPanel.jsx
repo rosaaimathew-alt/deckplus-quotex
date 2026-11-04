@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { X, Lock, Plus, Trash2 } from 'lucide-react'
+import { X, Lock, Plus, Trash2, Box } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
@@ -189,6 +189,16 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           <p className="text-xs text-gray-500 mt-0.5">Open, ScreenEze or Eze-Breeze porch. Enter what you measured; price, cost and scope calculate from the office's rates.</p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href={`/porch-3d.html?pb=${encodeURIComponent(JSON.stringify({
+              type: inp.type, width: inp.width, depth: inp.depth, tie: inp.tie, roof: result.roof, floor: inp.floor,
+              deckHeightFt: inp.deckHeightFt, wallHeightIn: inp.wallHeightIn, glassEnds: inp.glassEnds,
+              flooring: inp.flooring, railing: { product: inp.railing?.product || '' }, sides: inp.sides,
+            }))}`}
+            target="_blank" rel="noopener"
+            className="flex items-center gap-1 text-xs font-semibold text-[var(--brand-700)] border border-[var(--brand-200)] rounded-full px-2.5 py-1 hover:bg-[var(--brand-50)]"
+            title="Open this porch in the 3D builder"
+          ><Box size={13} /> View in 3D</a>
           {locked && <span className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><Lock size={11} /> Rates locked</span>}
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>

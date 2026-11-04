@@ -29,10 +29,44 @@ export function usePermitAccess() {
   return null
 }
 
+// Counties whose permit site the inspection check reads. Jobs in any other
+// county are still on the board; the office records their results by hand.
+export const CONNECTED_COUNTIES = ['Mecklenburg', 'Cabarrus', 'Union', 'York', 'Lancaster', 'Rock Hill']
+
+// The job's county (and, where a city runs its own inspections, that city).
+export const jobCounty = (p) => p.imported?.county || locateAddress(p.address).county || ''
+export const jobJurisdiction = (p) => p.imported?.jurisdiction || ''
+// A city that inspects its own jobs (Rock Hill, Tega Cay, Waxhaw) is connected
+// on its own, not through its county.
+export const countyConnected = (p) => CONNECTED_COUNTIES.includes(jobJurisdiction(p) || jobCounty(p))
+
+// Every ongoing job in a county we work in is on the inspections board.
 export function permitTracked(proposal) {
   if ((proposal.jobData?.completedStages || []).includes('closed')) return false
-  if (proposal.imported?.county) return proposal.imported.county === 'Mecklenburg'
-  return locateAddress(proposal.address).county === 'Mecklenburg'
+  return !!jobCounty(proposal)
+}
+
+// Electrical / mechanical / plumbing permit, by its number:
+// "RES-ELC-26-…" (Mecklenburg) or "EL2026-…" (Cabarrus).
+export function tradeKind(record) {
+  const r = String(record || '').toUpperCase()
+  if (/-ELC-|^EL\d/.test(r)) return 'ELC'
+  if (/-MEC-|^(ME|MC)\d/.test(r)) return 'MEC'
+  if (/-PLM-|^PL\d/.test(r)) return 'PLM'
+  return ''
+}
+
+// The county's permits plus the results the office recorded by hand (for
+// counties not connected yet, or anything the county site is slow to post),
+// as one more "permit" so every view treats them alike.
+export function allPermits(proposal) {
+  const permits = proposal.countyPermit?.permits || []
+  const office = proposal.jobData?.officeInspections || []
+  if (!office.length) return permits
+  return [...permits, {
+    record: 'Office entry', role: 'office', manual: true, upcoming: [],
+    completed: office.map(o => ({ ...o, name: o.name || inspectionTitle(o.code), notes: o.note ? [{ by: o.inspector || 'Office', at: o.date, text: o.note }] : [] })),
+  }]
 }
 
 export const PERMIT_KEYS = ['zoning', 'building']
@@ -104,15 +138,20 @@ export const inspectionLabel = (code) => INSPECTION_TYPES.find(t => t.code === c
 export function countyStageKey(ins, permit, stageKeys) {
   const has = (k) => stageKeys.includes(k)
   const pick = (...ks) => ks.find(has) || null
-  if (permit.role === 'trade') {
+  if (permit.manual) {
+    // Office entries carry the board's own codes
+    if (ins.code === 'ER') return pick('rough_elec_insp')
+    if (['EF', 'MI', 'MF'].includes(ins.code)) return null
+  } else if (permit.role === 'trade') {
     // Only the electrical permit's rough inspection has a stage of its own
-    if (/-ELC-/.test(permit.record || '') && (ins.code === 'RF' || ins.code === 'ER')) return pick('rough_elec_insp')
+    if ((permit.kind || tradeKind(permit.record)) === 'ELC' && (ins.code === 'RF' || ins.code === 'ER')) return pick('rough_elec_insp')
     return null
   }
   switch (ins.code) {
     case 'FT': return pick('footing_insp')
     case 'FF': return pick('floor_framing_insp', 'rough_building_insp')
-    case 'FR': return pick('rough_building_insp', 'floor_framing_insp')
+    case 'FR':
+    case 'RF': return pick('rough_building_insp', 'floor_framing_insp')
     case 'ER': return pick('rough_elec_insp')
     case 'FE': return pick('rough_building_insp')
     case 'FI': return pick('final_insp')
@@ -126,7 +165,7 @@ const FAILED = /fail|partial|inaccessible|not ready|disapprov/i
 // County inspections grouped by job stage, plus the ones no stage covers.
 export function countyByStage(proposal, stageKeys) {
   const byStage = {}, other = [], upcoming = []
-  for (const p of proposal.countyPermit?.permits || []) {
+  for (const p of allPermits(proposal)) {
     for (const ins of p.completed || []) {
       const key = countyStageKey(ins, p, stageKeys)
       const item = { ...ins, record: p.record, role: p.role }
@@ -179,13 +218,15 @@ export const BOARD_COLUMNS = [
 ]
 
 function boardColumnOf(permit, ins) {
-  const kind = (String(permit.record || '').split('-')[1] || '').toUpperCase()
   const code = ins.code
+  if (permit.manual) return BOARD_COLUMNS.some(c => c.key === code) ? code : null
+  // Evolve permits carry every trade, split by `kind`; others by permit number
+  const kind = permit.kind || tradeKind(permit.record)
   if (kind === 'ELC') return code === 'RF' ? 'ER' : code === 'FI' ? 'EF' : code === 'SL' ? 'SL' : null
   if (kind === 'MEC' || kind === 'PLM') return code === 'RF' ? 'MI' : code === 'FI' ? 'MF' : null
   if (code === 'FT' || /footing/i.test(ins.name || '')) return 'FT'
   if (code === 'SL' || code === 'MS') return 'SL'
-  if (code === 'FR' || code === 'FF') return 'FR'
+  if (code === 'FR' || code === 'FF' || code === 'RF') return 'FR'   // a building permit's "rough" is its framing
   if (code === 'FI') return 'FI'
   return null
 }
@@ -193,7 +234,7 @@ function boardColumnOf(permit, ins) {
 // { FT: { state: 'pass'|'fail'|'sched'|'void', result, date, list }, … }
 export function boardCells(proposal) {
   const cols = {}
-  for (const p of proposal.countyPermit?.permits || []) {
+  for (const p of allPermits(proposal)) {
     for (const ins of p.completed || []) {
       const k = boardColumnOf(p, ins); if (!k) continue
       ;(cols[k] ||= { list: [], upcoming: [] }).list.push({ ...ins, record: p.record })
@@ -214,6 +255,8 @@ export function boardCells(proposal) {
   }
   return cols
 }
+
+const inspectionTitle = (code) => BOARD_COLUMNS.find(c => c.key === code)?.title || code
 
 export const countyFinaled = (proposal) =>
   (proposal.countyPermit?.permits || []).some(p => p.role === 'building' && /closed|final/i.test(p.recordStatus || p.status || ''))

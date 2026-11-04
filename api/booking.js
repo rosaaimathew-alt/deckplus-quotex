@@ -98,10 +98,12 @@ const TRACK_EVENTS = new Set(['view', 'day', 'time', 'form', 'booked'])
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const BOT_RE = /bot|crawl|spider|slurp|preview|headless|lighthouse|pingdom|monitor/i
 async function trackEvent(req, res) {
-  const { v, s, e, page } = req.body || {}
+  const { v, s, e, d, page } = req.body || {}
   if (!TRACK_EVENTS.has(e) || !UUID_RE.test(v) || !UUID_RE.test(s)) return res.status(400).json({ error: 'bad event' })
   if (BOT_RE.test(req.headers?.['user-agent'] || '')) return res.status(204).end()
-  const { error } = await db().from('rr_events').insert({ visitor_id: v, session_id: s, event: e, page: clean(page, 200) || null })
+  // Which day ("2026-11-06|8" = date | times offered) or time (ISO) was picked.
+  const detail = typeof d === 'string' && /^[0-9TZ:.|-]{1,40}$/.test(d) ? d : null
+  const { error } = await db().from('rr_events').insert({ visitor_id: v, session_id: s, event: e, detail, page: clean(page, 200) || null })
   if (error) console.error('Tracking insert failed:', error.message)
   return res.status(204).end()
 }
@@ -276,6 +278,53 @@ async function book(req, res) {
   })
 }
 
+// ── Alerts: tell the office when the calendar breaks ────────────────────────
+// A failed booking emails the customer's details right away (it's a lead to
+// call back). A calendar that won't load alerts at most once an hour. Sent to
+// rr_settings.report_to; if the database itself is down, to ALERT_FALLBACK.
+const ALERT_FALLBACK = ['matt@deck.plus', 'marcelo@deck.plus']
+let lastLoadAlert = 0
+async function alertOffice({ subject, html, throttle }) {
+  try {
+    if (throttle && Date.now() - lastLoadAlert < 3_600_000) return
+    let to = ALERT_FALLBACK
+    try {
+      const sb = db()
+      if (throttle) {
+        const since = new Date(Date.now() - 3_600_000).toISOString()
+        const { data, error } = await sb.from('rr_settings').update({ alert_sent_at: new Date().toISOString() })
+          .eq('id', true).or(`alert_sent_at.is.null,alert_sent_at.lt.${since}`).select('report_to')
+        if (error) throw error
+        if (!data?.length) { lastLoadAlert = Date.now(); return }   // another instance already alerted this hour
+        if (data[0].report_to?.length) to = data[0].report_to
+      } else {
+        const { data } = await sb.from('rr_settings').select('report_to').eq('id', true).single()
+        if (data?.report_to?.length) to = data.report_to
+      }
+    } catch { /* database down: use the fallback list */ }
+    if (throttle) lastLoadAlert = Date.now()
+    const msg = { to, subject, html }
+    let ok = false
+    try { ok = await sendAsRep({ name: 'Booking Calendar', email: to[0] }, msg) } catch (err) { console.error('Alert via Gmail failed:', err.message) }
+    if (!ok) await sendMail({ ...msg, fromName: 'Deck Plus Booking Calendar' })
+  } catch (err) {
+    console.error('Alert failed:', err.message)
+  }
+}
+
+function failedBookingAlert(body, err) {
+  const b = body || {}
+  const row = (k, v) => v ? `<tr><td style="padding:3px 14px 3px 0;color:#6b7280">${k}</td><td><b>${esc(clean(v, 300))}</b></td></tr>` : ''
+  const when = Date.parse(b.start) ? new Date(b.start).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
+  return {
+    subject: `Booking failed: ${clean(b.firstName, 60)} ${clean(b.lastName, 60)} needs a call back`.trim(),
+    html: `<div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937">
+<p>Someone tried to book on the website calendar and it failed, so <b>no appointment was created</b>. Please call them back:</p>
+<table style="border-collapse:collapse">${row('Name', `${b.firstName || ''} ${b.lastName || ''}`.trim())}${row('Phone', b.phone)}${row('Email', b.email)}${row('Address', [b.street, b.city, b.state, b.zip].filter(Boolean).join(', '))}${row('Wanted', when)}${row('Notes', b.notes)}</table>
+<p style="color:#6b7280;font-size:12px">Error: ${esc(String(err?.message || err).slice(0, 300))}</p></div>`,
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -286,11 +335,23 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && (req.query?.step || req.query?.track)) return await trackEvent(req, res)
     if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
     if (req.method === 'GET' && req.query?.report)             return await sendDueReport(res)
+    if (req.method === 'GET' && req.query?.check === 'alert') {
+      // Sends a sample "booking failed" alert through the real path; at most once an hour.
+      await alertOffice({ throttle: true, ...failedBookingAlert({ firstName: 'TEST', lastName: 'Customer', phone: '(704) 555-0100',
+        email: 'test@example.com', street: '123 Sample St', city: 'Charlotte', state: 'NC', zip: '28202',
+        start: new Date(Date.now() + 86_400_000).toISOString(), notes: 'This is a test alert. No action needed.' }, new Error('test alert')) })
+      return res.status(200).json({ ok: true, note: 'test alert sent (at most once an hour)' })
+    }
     if (req.method === 'GET')  return await getSlots(res)
     if (req.method === 'POST') return await book(req, res)
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (err) {
     console.error('Booking error:', err)
+    if (req.method === 'POST' && !req.query?.step && !req.query?.track) await alertOffice(failedBookingAlert(req.body, err))
+    else if (req.method === 'GET' && !req.query?.check && !req.query?.report) {
+      await alertOffice({ throttle: true, subject: 'The website booking calendar is not loading',
+        html: `<p style="font-family:Arial,Helvetica,sans-serif">Visitors can't see any times on the website calendar right now, so nobody can book.</p><p style="font-family:Arial,Helvetica,sans-serif;color:#6b7280;font-size:12px">Error: ${esc(String(err?.message || err).slice(0, 300))}. You'll get at most one of these an hour.</p>` })
+    }
     return res.status(500).json({ error: 'Something went wrong — please try again.' })
   }
 }

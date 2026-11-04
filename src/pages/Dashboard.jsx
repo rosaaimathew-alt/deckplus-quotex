@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, FileCheck } from 'lucide-react'
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
-import { useScopedProposals, latestIterations } from '../lib/proposalScope'
+import { useScopedProposals } from '../lib/proposalScope'
+import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { wonRevenueOf } from '../contractTotal'
 import { TodoCard } from '../components/TodoPanel'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
@@ -20,14 +21,6 @@ const fmt   = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 
 const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US')
 const short = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
-function buildGroups(proposals) {
-  const ids = new Set(proposals.map(p => p.id))
-  const roots = proposals.filter(p => !p.parentId || !ids.has(p.parentId))
-  return roots.map(root => ({
-    root,
-    revisions: proposals.filter(p => p.parentId === root.id).sort((a, b) => (a.version || 2) - (b.version || 2)),
-  }))
-}
 
 const STATUS_DOT = {
   Won: 'bg-emerald-500', Lost: 'bg-red-400', Draft: 'bg-gray-300', Sent: 'bg-sky-500',
@@ -77,23 +70,25 @@ export default function Dashboard() {
   const { proposals, canChoose, reps, repId, mineOnly, repName, setRep } = useScopedProposals()
   const jobCosts   = useStore(s => s.jobCosts) || {}
   const { can, role } = useNav()
-  const attention  = attentionItems({ proposals, jobCosts, can, role })
+  const permitPulse = useStore(s => s.permitPulse)
+  const attention  = attentionItems({ proposals, jobCosts, can, role, permitPulse })
 
   const [periodKey, setPeriodKey] = useState('year')
+  const [showCounted, setShowCounted] = useState(false)
   const pick = PERIODS.find(x => x.value === periodKey) || PERIODS[3]
   const { start: pStart, end: pEnd } = getPeriodRange(pick.p, shiftPeriod(pick.p, new Date(), pick.back))
   const pLabel = pick.label.toLowerCase()
 
   // ── Numbers (same rules as before / as Insights) ─────────────────────────
   const inRange = (dateStr) => { const d = new Date(dateStr); return !Number.isNaN(d.getTime()) && d >= pStart && d <= pEnd }
-  const periodProps = proposals.filter(p => p.createdAt && inRange(p.createdAt))
-  // Win rate: opportunities estimated in the period (archived and drafts are neutral)
-  const outcomes   = buildGroups(periodProps.filter(p => p.status !== 'Archived' && p.status !== 'Draft'))
+  // Win rate: clients estimated in the period (archived and drafts are neutral).
+  // Group every version first, so a revision is never counted as a new client.
+  const groups     = clientGroups(proposals)
+  const outcomes   = groups.filter(({ all }) => all.some(p => p.status !== 'Archived' && p.status !== 'Draft' && p.createdAt && inRange(p.createdAt)))
   // A deal counts as won once the client commits — tagged Won or contract signed
   const isWon      = (p) => p.status === 'Won' || p.contractDraft?.signed === true
   const wonDate    = (p) => p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt
-  const wonClients = buildGroups(proposals.filter(p => p.status !== 'Archived'))
-    .filter(({ root, revisions }) => [root, ...revisions].some(p => isWon(p) && inRange(wonDate(p))))
+  const wonClients = groups.filter(({ all }) => all.some(p => p.status !== 'Archived' && isWon(p) && inRange(wonDate(p))))
   // Revenue counts realized Won contracts only, matching the Insights cards
   const won        = proposals.filter(p => p.status === 'Won' && inRange(p.closedAt || p.sentAt || p.createdAt))
   // Open pipeline: each client's latest version only, not every revision
@@ -165,12 +160,33 @@ export default function Dashboard() {
             sub={`${active.length} open quote${active.length !== 1 ? 's' : ''}`}
             onClick={() => navigate('/sales?tab=pipeline')} />
           <Stat label="Win rate" value={winRate !== null ? `${winRate}%` : '—'}
-            sub={`${wonClients.length} of ${outcomes.length} · ${pLabel}`}
-            onClick={() => navigate(insights ? '/insights?tab=winloss' : '/sales?tab=proposals')} />
+            sub={`${wonClients.length} of ${outcomes.length} clients · ${pLabel} · ${showCounted ? 'hide' : 'see who'}`}
+            onClick={() => setShowCounted(v => !v)} />
           <Stat label="Average job" value={won.length ? money(wonRevenue / won.length) : '—'}
             sub={`per won job · ${pLabel}`}
             onClick={() => navigate(insights ? '/insights?tab=overview' : '/sales?tab=proposals&status=Won')} />
         </div>
+        {/* Who the win rate counts: one row per client (every version of a deal is one client) */}
+        {showCounted && (
+          <div className="border-t border-gray-100 px-5 py-3">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-xs font-semibold text-gray-700">Clients in the win rate · {pLabel}</p>
+              {insights && <LinkBtn onClick={() => navigate('/insights?tab=winloss')}>Win / loss detail</LinkBtn>}
+            </div>
+            <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1 text-sm list-decimal list-inside">
+              {outcomes
+                .map(g => { const shown = [...g.all].reverse().find(p => p.status !== 'Draft' && p.status !== 'Archived') || g.all[g.all.length - 1]; return { g, shown, won: wonClients.includes(g), name: (shown.client || 'No name').trim() } })
+                .sort((a, b) => (b.won - a.won) || a.name.localeCompare(b.name))
+                .map(({ g, shown, won, name }) => (
+                  <li key={g.root.id} className="truncate text-gray-700">
+                    <button type="button" className="hover:underline" onClick={() => showProposal(shown, navigate)}>{name}</button>
+                    <span className={`ml-1.5 text-xs ${won ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>{won ? 'Won' : `${g.all.length} version${g.all.length !== 1 ? 's' : ''}`}</span>
+                  </li>
+                ))}
+            </ol>
+            <p className="text-[11px] text-gray-400 mt-2">Every version of a deal counts as one client. Archive or delete a test or duplicate proposal to take it out.</p>
+          </div>
+        )}
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
