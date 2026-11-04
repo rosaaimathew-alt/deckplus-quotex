@@ -22,6 +22,12 @@ export function designParts(lines = []) {
       continue
     }
     const st = l.builder?.state
+    // Eze-Breeze porch conversion (an existing open porch enclosed): front + sides from the quote.
+    if (l.builder?.tool === 'porch' && st && n(st.width) > 0 && n(st.depth) > 0) {
+      porches.push({ name: l.name || '', type: 'ezebreeze', width: n(st.width), depth: n(st.depth), tie: 'wall', roof: 'shed', floor: 'patio',
+        wallHeightIn: n(st.wallH) || 96, sides: st.sides || 'Front + 2 sides', conversion: true })
+      continue
+    }
     if (l.builder?.tool === 'deck' && st && n(st.width) > 0 && n(st.depth) > 0) {
       decks.push({
         name: l.name || '', width: n(st.width), depth: n(st.depth), height: n(st.height), collKey: st.collKey || '', rail: st.rail || '',
@@ -76,6 +82,8 @@ export function designUrl(p, mode = '3d') {
 // (proposal_designs), so it reopens where the rep left off.
 export function editorUrl(p) {
   const d = designParts(p?.lines)
-  const payload = { client: p?.client || '', address: p?.address || '', decks: d.decks, porches: d.porches }
+  // Everything on the proposal the drawing needs: porches (with all their options), decks
+  // (with stairs and landings), patios (with retaining walls) and the title-block details.
+  const payload = { client: p?.client || '', address: p?.address || '', phone: p?.phone || '', email: p?.email || '', contractNum: p?.contractDraft?.contractNum || '', decks: d.decks, porches: d.porches, patios: d.patios }
   return `/design-editor.html?design=${encodeURIComponent(JSON.stringify(payload))}${p?.id != null ? `&pid=${encodeURIComponent(p.id)}` : ''}`
 }

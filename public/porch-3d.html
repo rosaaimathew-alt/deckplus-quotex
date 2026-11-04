@@ -430,7 +430,7 @@
     const side = Math.min(s.d, left / 2);
     if (side > 0) { take(side * 2); runs.push({ edge: 'left', a: r.z1 - side, b: r.z1 }, { edge: 'right', a: r.z1 - side, b: r.z1 }); }
     const bk = take(s.w); if (bk > 0) runs.push({ edge: 'back', a: s.x - bk / 2, b: s.x + bk / 2 });
-    const n = H > 0.6 ? Math.ceil(H * 12 / 7) : 0;   // block steps down the front, 7″ max rise
+    const n = H > 0.6 && s.steps !== false ? Math.ceil(H * 12 / 7) : 0;   // block steps down the front, 7″ max rise
     return { H, runs, steps: n, run: 14 / 12, type: s.wallType || 'Retaining wall' };
   }
   // Porch Builder "sides": 'Front + 2 sides' (default), 'Front + 1 side' = built into a corner
@@ -446,6 +446,7 @@
   function valleyX(s, side, E) {
     if (!isHouseSide(s, side) || !(s.roof === 'gable' || s.roof === 'semivault')) return null;
     const g = porchGeom(s), d = g.beamTop - E;
+    if (d < -0.05) return null;            // wing eave above the porch roof: the roof runs into the wing wall
     return (s.w / 2 + d) * (side === 'left' ? -1 : 1);
   }
   const WING = 14;                                    // depth of the house wing beside a corner porch
@@ -523,8 +524,9 @@
     const sideTop = () => beamTop - beamH;                                   // under the level side headers
     return { onDeck, fy, P, beamH, col, shed, free, shedPitch, gp, zF, beamTop, roofAt, frontTop, sideTop };
   }
-  // Doors (local coords) and where the stairs land.
-  function porchDoors(s) {
+  // Doors (local coords) and where the stairs land. The editor can remove the steps (s.steps === false).
+  function porchDoors(s) { const d = porchDoors0(s); if (s.steps === false && d) d.stairs = null; return d; }
+  function porchDoors0(s) {
     const g = porchGeom(s), cvF = covered(s, 'front'), cvL = covered(s, 'left'), cvR = covered(s, 'right'), mid = ([a, b]) => (a + b) / 2;
     if (s.type === 'open') return { front: [], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
     if (s.type === 'sunroom') {
@@ -2524,6 +2526,12 @@
       if (m.meta) S.meta = { ...S.meta, ...m.meta };
       resize(); build(); dirty = false;
       if (!framed || m.frame) { framed = true; goTo('corner', true); }
+      const att = [];
+      S.sections.forEach(x => {
+        if (x.kind === 'porch') { const sp = stairPlacement(x); if (sp) att.push({ id: x.id, x: sp.x, z: sp.z, rot: sp.ry * 180 / Math.PI, w: STAIR_W, n: risers(S.H), run: RUN }); }
+        if (x.kind === 'patio') { const pw = patioWall(x); if (pw?.steps) att.push({ id: x.id, x: x.x, z: rect(x).z1, rot: 0, w: STAIR_W + 1, n: pw.steps + 1, run: pw.run }); }
+      });
+      window.parent.postMessage({ type: 'qx-attached', list: att }, '*');
     });
     // The editor asks for the floor plan on the design sheet (to print or export).
     window.addEventListener('message', (ev) => {
