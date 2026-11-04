@@ -193,7 +193,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             href={`/porch-3d.html?pb=${encodeURIComponent(JSON.stringify({
               type: inp.type, width: inp.width, depth: inp.depth, tie: inp.tie, roof: result.roof, floor: inp.floor,
               deckHeightFt: inp.deckHeightFt, wallHeightIn: inp.wallHeightIn, glassEnds: inp.glassEnds,
-              flooring: inp.flooring, railing: { product: inp.railing?.product || '' },
+              flooring: inp.flooring, railing: { product: inp.railing?.product || '' }, sides: inp.sides,
             }))}`}
             target="_blank" rel="noopener"
             className="flex items-center gap-1 text-xs font-semibold text-[var(--brand-700)] border border-[var(--brand-200)] rounded-full px-2.5 py-1 hover:bg-[var(--brand-50)]"
