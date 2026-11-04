@@ -128,6 +128,13 @@
   .step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .step.done { border-color: var(--accent); background: var(--accent-soft); }
   @media (max-width: 600px) { .steps { grid-template-columns: 1fr; } }
+  .house-pick { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px; border: 1px dashed var(--muted); border-radius: 10px; }
+  .house-pick.has { border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
+  .house-pick img { width: 96px; height: 64px; object-fit: cover; border-radius: 6px; }
+  .house-pick label.btnlike { font: 600 14px/1 var(--font-body); padding: 10px 14px; border-radius: 8px; background: var(--accent); color: var(--accent-fg); cursor: pointer; }
+  .house-pick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .house-pick input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .house-pick span { font-size: 13.5px; color: var(--muted); min-width: 0; flex: 1; }
   .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .modal-actions button, .modal-actions a { font: 600 14px/1 var(--font-body); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; text-decoration: none; }
   .modal-actions .primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
@@ -1544,16 +1551,36 @@
   modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
 
-  // Three taps: copy the view image, open ChatGPT, copy the prompt. Paste each into ChatGPT.
+  // Optional photo of the customer's house (phone photo or a Google Earth screenshot).
+  // It's combined side by side with the 3D view so ChatGPT gets one image to paste.
+  let housePhoto = null;   // HTMLImageElement
+  const housePrompt = () => `This image has two halves. LEFT: a real photo of a customer's house. RIGHT: a 3D design of the new porch/deck we are building. Create ONE photorealistic photograph of the house on the LEFT, from the same camera angle, with the new construction from the RIGHT built onto the back of it. Keep the left photo's house, siding, roof, windows, yard, trees and lighting exactly as they are. Attach the new construction to the house wall in the most logical spot (centered on the back door if one is visible). Match the RIGHT design exactly: same structure type, roof style, posts, headers, screens or windows, railings, stairs, decking color and trim color, and the same proportions relative to the house (a standard door is 3 ft wide by 6 ft 8 in tall). Output only the finished single photo, no split screen, no text. Project: ${describe()}.`;
+  function composite(view) {
+    return new Promise(res => {
+      const v = new Image(); v.onload = () => {
+        const h = 900, hw = Math.round(housePhoto.width * h / housePhoto.height), vw = Math.round(v.width * h / v.height);
+        const [c, x] = cnv(hw + vw + 12, h); x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, h);
+        x.drawImage(housePhoto, 0, 0, hw, h); x.drawImage(v, hw + 12, 0, vw, h);
+        res(c.toDataURL('image/jpeg', 0.9));
+      }; v.src = view;
+    });
+  }
+  // Three taps: copy the image, open ChatGPT, copy the prompt. Paste each into ChatGPT.
   function manualHTML(view) {
-    return `<div class="steps">
+    return `<div class="house-pick${housePhoto ? ' has' : ''}" id="m-house">
+        ${housePhoto ? `<img src="${housePhoto.src}" alt="House photo">` : ''}
+        <input type="file" id="m-house-file" accept="image/*"><label for="m-house-file" class="btnlike">${housePhoto ? 'Change house photo' : 'Add house photo'}</label>
+        <span>${housePhoto ? 'ChatGPT will build the porch onto this house.' : 'Optional: a photo of the back of their house, or a Google Earth screenshot. ChatGPT puts the porch on it.'}</span>
+        ${housePhoto ? '<button type="button" class="link-danger" id="m-house-clear">Remove</button>' : ''}
+      </div>
+      <div class="steps">
         <button type="button" class="step" id="m-img"><span class="num">1</span>Copy image<small>Then paste it into ChatGPT (Ctrl+V / ⌘V)</small></button>
         <a class="step" id="m-open" href="https://chatgpt.com/" target="_blank" rel="noopener"><span class="num">2</span>Open ChatGPT<small>Opens in a new tab</small></a>
         <button type="button" class="step" id="m-copy"><span class="num">3</span>Copy prompt<small>Paste it after the image and send</small></button>
       </div>
       <p id="m-msg" aria-live="polite">Tip: keep this window open and switch back for step 3.</p>
       <img id="m-view" src="${view}" alt="Current 3D view">
-      <textarea id="m-prompt" readonly aria-label="Render prompt">${promptText().replace(/</g, '&lt;')}</textarea>`;
+      <textarea id="m-prompt" readonly aria-label="Render prompt">${(housePhoto ? housePrompt() : promptText()).replace(/</g, '&lt;')}</textarea>`;
   }
   function wireManual(view) {
     const msg = (t) => { $('m-msg').textContent = t; };
@@ -1577,7 +1604,17 @@
       else { t.select(); msg('Press Ctrl+C (⌘C on Mac) to copy the selected prompt.'); }
     });
   }
-  $('btn-chatgpt').addEventListener('click', () => { const v = snapshot(); openModal('Render in ChatGPT', manualHTML(v)); wireManual(v); });
+  async function showRender(raw) {
+    const v = housePhoto ? await composite(raw) : raw;
+    if (modal.hidden) openModal('Render in ChatGPT', manualHTML(v)); else mBody.innerHTML = manualHTML(v);
+    wireManual(v);
+    $('m-house-file').addEventListener('change', (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => { housePhoto = im; showRender(raw); }; im.src = r.result; }; r.readAsDataURL(f);
+    });
+    $('m-house-clear')?.addEventListener('click', () => { housePhoto = null; showRender(raw); });
+  }
+  $('btn-chatgpt').addEventListener('click', () => showRender(snapshot()));
 
   update = () => { updateUI(); dirty = true; };
   updateUI(); resize(); build(); dirty = false; goTo('corner', true);
