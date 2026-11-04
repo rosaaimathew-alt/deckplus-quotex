@@ -9,6 +9,7 @@ import PermitsTab from '../components/PermitsTab'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
+import { useJobMoney } from '../nav'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1457,6 +1458,7 @@ function PaymentReminderModal({ proposal, onClose }) {
 // ── Close-Out Modal ──────────────────────────────────────────────────────────
 function CloseOutModal({ proposal, onClose }) {
   const { toggleJobStage, updateJobData, saveJobCosts } = useStore()
+  const money = useJobMoney()   // off: no profit entry at close-out
   const draft = proposal.contractDraft || {}
   const contractNum = draft.contractNum || contractNumberFor(proposal.id)
   const projectTypes = (draft.projectTypes || []).join(', ') || ''
@@ -1534,6 +1536,7 @@ function CloseOutModal({ proposal, onClose }) {
           </div>
 
           {/* Profit achieved — optional, feeds the Profitability tracker */}
+          {money && (
           <div className="border border-gray-200 rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-gray-700">Profit on this job <span className="font-normal text-gray-400">(optional)</span></label>
@@ -1553,6 +1556,7 @@ function CloseOutModal({ proposal, onClose }) {
             </div>
             <p className="text-[11px] text-gray-400 mt-1.5">Enter either one — it logs to your Profitability metrics. Leave blank to skip.</p>
           </div>
+          )}
 
           <label className="flex items-center gap-3 cursor-pointer">
             <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)}
@@ -1719,6 +1723,7 @@ function JobCard({ proposal }) {
   const [showCloseOut, setShowCloseOut] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const permitAccess = usePermitAccess()
+  const money = useJobMoney()   // off: no Budget / Price list / Costs / Receipts (Settings › Team › Access)
 
   const jobData = proposal.jobData || {}
   const completedStages = jobData.completedStages || []
@@ -1745,13 +1750,15 @@ function JobCard({ proposal }) {
   const TABS = [
     { key: 'stages',  label: 'Stages' },
     ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0) ? ` (${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0)})` : ''}` }] : []),
-    { key: 'budget',  label: 'Budget' },
-    { key: 'pricelist', label: 'Price list' },
-    { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
+    ...(money ? [
+      { key: 'budget',  label: 'Budget' },
+      { key: 'pricelist', label: 'Price list' },
+      { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
+    ] : []),
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
     { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
-    { key: 'receipts',label: `Receipts${receiptCount ? ` (${receiptCount})` : ''}` },
+    ...(money ? [{ key: 'receipts',label: `Receipts${receiptCount ? ` (${receiptCount})` : ''}` }] : []),
   ]
 
   // One soft-pill status system for the card badge.
@@ -1952,13 +1959,13 @@ function JobCard({ proposal }) {
               </div>
             )}
             {tab === 'permits' && showPermits && <PermitsTab proposal={proposal} stages={stages} readOnly={permitAccess !== 'edit'} />}
-            {tab === 'budget'  && <BudgetTab proposal={proposal} />}
-            {tab === 'pricelist' && <JobPriceList proposal={proposal} />}
-            {tab === 'costs'   && <JobFinancials proposal={proposal} />}
+            {tab === 'budget'  && money && <BudgetTab proposal={proposal} />}
+            {tab === 'pricelist' && money && <JobPriceList proposal={proposal} />}
+            {tab === 'costs'   && money && <JobFinancials proposal={proposal} />}
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}
-            {tab === 'receipts'&& <ReceiptsTab proposal={proposal} />}
+            {tab === 'receipts'&& money && <ReceiptsTab proposal={proposal} />}
           </div>
         </div>
       )}

@@ -28,6 +28,7 @@ import { setViewPref, usePaintView } from './fieldMode'
 import { PaintQueue, PaintSchedule, PaintTouchUps, PaintJob } from './PaintApp'
 import InstallCard from './InstallCard'
 import JobMoney from './JobMoney'
+import { useJobMoney } from '../nav'
 import {
   todayStr, addDays, dayLabel, mapsUrl, telUrl, smsUrl, describeJob, useFieldJobs, Card, Progress, ScopeToggle, JobRow, nextLine, useUndo, BackButton, QuickAction, QuickNote, RecentNotes,
 } from './shared'
@@ -258,6 +259,7 @@ function JobHeaderMini({ j }) {
 function JobScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const showMoney = useJobMoney()   // payments: off for some people (Settings › Team › Access)
   const proposal = useStore(s => s.proposals.find(p => String(p.id) === String(id)))
   const toggleJobStage = useStore(s => s.toggleJobStage)
   const setJobStageDate = useStore(s => s.setJobStageDate)
@@ -381,7 +383,7 @@ function JobScreen() {
 
       <RecentNotes proposal={proposal} />
 
-      <JobMoney proposal={proposal} />
+      {showMoney && <JobMoney proposal={proposal} />}
 
       <button onClick={() => { setViewPref('full'); navigate('/projects?tab=jobs') }}
         className="w-full h-12 rounded-xl text-sm font-semibold text-gray-600 flex items-center justify-center gap-2">

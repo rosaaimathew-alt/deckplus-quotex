@@ -15,6 +15,7 @@ import {
 import { useStore } from './store'
 import { canAccessRoute } from './plans'
 import { canRoleAccess } from './roles'
+import { isOff, PATH_KEYS, JOB_MONEY } from './permissions'
 
 export const DESTINATIONS = [
   { key: 'home', to: '/', label: 'Home', icon: House, access: ['/'],
@@ -91,13 +92,15 @@ export function makeAccess(plan, role) {
 
 // Destinations (with only their allowed tabs) for the signed-in role and plan.
 // The paint PM has no sidebar at all: they only ever get Field mode (App.jsx).
-export function visibleDestinations(plan, role) {
+// permissions: the person's own switches (permissions.js) — a tab the admin
+// switched off for them is left out like one their department doesn't have.
+export function visibleDestinations(plan, role, permissions = {}) {
   if (role === 'paint') return []
   const can = makeAccess(plan, role)
   const out = []
   for (const d of DESTINATIONS) {
     if (d.tabs) {
-      const tabs = d.tabs.filter(t => can(t.access))
+      const tabs = d.tabs.filter(t => can(t.access) && !isOff(permissions, `${d.key}.${t.key}`))
       if (tabs.length) out.push({ ...d, tabs })
     } else if (can(d.access)) {
       out.push(d)
@@ -106,13 +109,24 @@ export function visibleDestinations(plan, role) {
   return out
 }
 
+const NO_PERMS = {}
+
 export function useNav() {
   const plan = useStore(s => s.branding?.plan || 'enterprise')
   const role = useStore(s => s.role || 'manager')
+  const permissions = useStore(s => s.me?.permissions) || NO_PERMS
   return useMemo(() => {
-    const destinations = visibleDestinations(plan, role)
-    const can = makeAccess(plan, role)
+    const destinations = visibleDestinations(plan, role, permissions)
+    const base = makeAccess(plan, role)
+    const can = (paths) => base(paths) && asList(paths).every(p => !isOff(permissions, PATH_KEYS[p]))
     const tabsOf = (key) => destinations.find(d => d.key === key)?.tabs || []
-    return { plan, role, can, destinations, tabsOf }
-  }, [plan, role])
+    // allowed('projects.inspections'), allowed('job.money'): this person's switch
+    const allowed = (key) => !isOff(permissions, key)
+    return { plan, role, can, destinations, tabsOf, allowed, money: allowed(JOB_MONEY) }
+  }, [plan, role, permissions])
+}
+
+// The money inside a job (Budget, Costs, Receipts, payments, profit, quote margin).
+export function useJobMoney() {
+  return useStore(s => !isOff(s.me?.permissions, JOB_MONEY))
 }

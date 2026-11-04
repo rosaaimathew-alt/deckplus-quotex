@@ -4,6 +4,7 @@ import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdB
 import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
+import { appRoleOf } from './roles'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 // Real data lives in Supabase as one row per record (see src/supabase.js).
@@ -1401,9 +1402,8 @@ if (DEMO && typeof window !== 'undefined') {
 // ── Org bootstrap (rows architecture) ────────────────────────────────────────
 // After sign-in: load every row this user may see (RLS decides), put it in the
 // store in the store's own shape, then arm the adapter so changes flow both
-// ways. Membership role → app role: rep→sales, pm→pm, paint→paint (Field mode
-// only), office/admin→manager.
-const ROLE_MAP = { rep: 'sales', pm: 'pm', paint: 'paint', office: 'manager', admin: 'manager' }
+// ways. Membership role → app role (roles.js appRoleOf): rep→sales, pm→pm,
+// paint→paint (Field mode only), office/admin→manager.
 const SETTINGS_DEFAULTS = () => ({
   projectTypes: ['Open Deck', 'Screen Porches', 'Eze-Breeze Porches', 'Open Porches', 'Porch Conversions', 'Sunrooms', 'Hardscapes'],
   catalogCategories: ['Fencing', 'Gates', 'Demo', 'Materials', 'Labor', 'Framing', 'Concrete', 'Electrical',
@@ -1428,7 +1428,7 @@ export function bootstrapOrg() {
     const { orgId, me, members, settings, collections } = await loadOrg()
     const merged = { ...SETTINGS_DEFAULTS(), ...settings, branding: normalizeBranding(settings.branding) }
     const cols   = { ...collections, catalog: stripDeckItems(collections.catalog || []) }
-    useStore.setState({ ...cols, ...merged, orgId, me, members, role: ROLE_MAP[me.role] || 'manager', orgLoaded: true })
+    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), orgLoaded: true })
     armAdapter(useStore, orgId, settings)
     // A brand-new org gets the built-in email templates once; the adapter
     // writes them as rows because they arrive after arming. (Not for the paint

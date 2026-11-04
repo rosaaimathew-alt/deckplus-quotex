@@ -23,6 +23,7 @@ import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import { toBreakdown } from '../lib/priceList'
 import { priceRangeOf, rangeText, RANGE_PCT } from '../lib/priceRange'
+import { useJobMoney } from '../nav'
 
 const MARGIN_DEFAULT = 30
 
@@ -61,6 +62,7 @@ function porchWall(Lin, doorCount = 0) {
 }
 
 function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
+  const showMoney = useJobMoney()   // cost / margin: off for some people (Settings › Team › Access)
   const rates            = useStore(s => s.porchComponentRates) || PORCH_COMPONENT_DEFAULTS
   const customComponents = useStore(s => s.porchCustomComponents) || []
   const formulaLocked    = useStore(s => s.porchFormulaLocked)
@@ -266,8 +268,8 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 mt-3 border-t border-gray-200 pt-3">
-        <span className="text-xs text-gray-400">Est. cost <span className="text-gray-600 font-medium">{money(cost)}</span></span>
-        <span className="text-xs text-gray-400">Margin <span className={marginPct >= 30 ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>{marginPct.toFixed(0)}%</span></span>
+        {showMoney && <span className="text-xs text-gray-400">Est. cost <span className="text-gray-600 font-medium">{money(cost)}</span></span>}
+        {showMoney && <span className="text-xs text-gray-400">Margin <span className={marginPct >= 30 ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>{marginPct.toFixed(0)}%</span></span>}
         <span className="text-sm text-gray-500">Price <span className="text-lg font-bold text-gray-900">{money(price)}</span></span>
       </div>
 
@@ -290,6 +292,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
 }
 
 export default function BuildQuote() {
+  const showMoney = useJobMoney()   // the margin overlay: off for some people (Settings › Team › Access)
   const catalogRaw = useStore(s => s.catalog)
   // Make the formula/assembly builder reachable from the catalog on every site
   // (not just the demo) by injecting it into the picker when it isn't already there.
@@ -1300,7 +1303,8 @@ export default function BuildQuote() {
           </div>
         )}
 
-        {/* Margin overlay */}
+        {/* Margin overlay (not for someone with job money switched off) */}
+        {showMoney && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-amber-800">Margin Overlay (Contractor Only)</span>
@@ -1327,6 +1331,7 @@ export default function BuildQuote() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Save Template Modal */}
