@@ -76,6 +76,8 @@
   .props select { font: 500 13.5px/1.2 var(--font-body); padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); max-width: 220px; }
   .props { max-height: 46%; overflow-y: auto; }
   .props input { font: 500 14px/1 var(--font-mono); width: 76px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+  .props .hrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }
+  .props input[type=color] { width: 56px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
   .props .ro { font: 500 13px/1.3 var(--font-mono); color: var(--fg); text-transform: none; letter-spacing: 0; }
   kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border-radius: 4px; border: 1px solid currentColor; opacity: .7; margin-left: 3px; }
   .keys { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: 52px; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
@@ -356,11 +358,11 @@
 
   // ═══ History ═════════════════════════════════════════════════════════════
   const hist = [], fut = [];
-  const snap = () => JSON.stringify({ v: 2, els: S.els, color: S.color, build: S.build, nextId });
+  const snap = () => JSON.stringify({ v: 2, els: S.els, color: S.color, build: S.build, nextId, house: S.house || null });
   let lastSaved = snap();
   let onChange = () => {};        // set once the saved design has loaded (see Save to the proposal)
   function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); onChange(); }
-  function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; S.build = { ...BUILD_DEF, ...(o.build || legacyBuild(o.color)) }; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
+  function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; S.house = o.house || null; S.build = { ...BUILD_DEF, ...(o.build || legacyBuild(o.color)) }; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
   function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); refreshButtons(); onChange(); }
   function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); refreshButtons(); onChange(); }
 
@@ -660,6 +662,78 @@
   function refreshButtons() { $('b-undo').disabled = !hist.length; $('b-redo').disabled = !fut.length; ['b-copy', 'b-del', 'b-rotl', 'b-rotr'].forEach(i => { $(i).disabled = !sel; }); }
 
   // ── Properties of the selected element (exact numbers) ───────────────────
+  // ── The customer's house, matched from a photo ───────────────────────────────
+  // The photo goes to our server once (/api/ai-chat?task=house, Claude reads it); what
+  // comes back (stories, roof pitch, siding, colors, wall width, windows) is saved with
+  // the design and the 3D view builds that house. The photo itself is not stored.
+  let houseBusy = false, houseMsg = '';
+  const SIDING = [['vinyl', 'Vinyl siding'], ['wood', 'Wood siding'], ['brick', 'Brick'], ['stone', 'Stone'], ['stucco', 'Stucco']];
+  function houseProps() {
+    const h = S.house, n = (k, label, v, step, min) => `<label>${label}<input type="number" data-hk="${k}" step="${step}" min="${min}" value="${+(+v).toFixed(1)}"></label>`;
+    const col = (k, label) => `<label>${label}<input type="color" data-hk="${k}" value="${h[k]}"></label>`;
+    let out = `<span class="hrow"><b>Customer's house</b><input type="file" id="h-file" accept="image/jpeg,image/png,image/webp" hidden>
+      <button type="button" class="ghost-btn" id="h-photo"${houseBusy ? ' disabled' : ''}>${houseBusy ? 'Reading photo…' : h ? 'Match a new photo' : 'Match house from photo'}</button>
+      ${h ? '<button type="button" class="ghost-btn" id="h-clear">Use stock house</button>' : ''}
+      <span class="ro">${houseMsg || (h ? (h.notes || 'Matched from photo. Adjust below if needed.') : 'Upload a photo of the back of the house (or a Google Earth screenshot).')}</span></span>`;
+    if (h) out += `<label>Stories<select data-hk="stories">${[1, 2, 3].map(v => `<option value="${v}"${h.stories === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>`
+      + `<label>Walkout<select data-hk="walkout"><option value=""${h.walkout ? '' : ' selected'}>No</option><option value="1"${h.walkout ? ' selected' : ''}>Yes</option></select></label>`
+      + `<label>Siding<select data-hk="siding">${SIDING.map(([v, t]) => `<option value="${v}"${h.siding === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`
+      + col('sidingColor', 'Siding color') + col('roofColor', 'Roof color')
+      + n('roofPitch', 'Roof pitch (/12)', h.roofPitch, 0.5, 3) + n('wallWidthFt', 'House width (ft)', h.wallWidthFt, 1, 16);
+    return out;
+  }
+  function photoToJpeg(file) {          // ≤1568 px on the long side keeps the upload small and the cost low
+    return new Promise((ok, bad) => {
+      const url = URL.createObjectURL(file), im = new Image();
+      im.onload = () => {
+        const k = Math.min(1, 1568 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        ok(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); bad(new Error('That file is not a photo this browser can open.')); };
+      im.src = url;
+    });
+  }
+  let authSb = null;
+  async function authToken() {
+    const cfg = window.QX_CONFIG || {};
+    if (!authSb && window.supabase?.createClient && cfg.supabaseUrl) authSb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false } });
+    const { data } = authSb ? await authSb.auth.getSession() : { data: {} };
+    if (!data?.session) throw new Error('Sign in to QuoteX in this browser first.');
+    return data.session.access_token;
+  }
+  async function matchHouse(file) {
+    houseBusy = true; houseMsg = ''; renderProps();
+    try {
+      const image = await photoToJpeg(file), token = await authToken();
+      const r = await fetch('/api/ai-chat?task=house', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ image, mediaType: 'image/jpeg' }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.house) throw new Error(d.house ? '' : (/messages required/i.test(d.error || '') ? 'House matching is not switched on yet.' : d.error || `Could not match the house (${r.status}).`));
+      S.house = d.house;
+      // Porch trim follows the house trim when one of ours is close.
+      if (OPTS?.trims?.length) {
+        const rgb = (x) => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16)), t = rgb(d.house.trimColor);
+        const best = OPTS.trims.map(o => ({ o, d: rgb(o.hex).reduce((a, v, i) => a + (v - t[i]) ** 2, 0) })).sort((a, b) => a.d - b.d)[0];
+        if (best && best.d < 3 * 60 ** 2) S.build.trim = best.o.key;
+      }
+      houseMsg = d.house.notes || 'Matched from photo. Adjust below if needed.';
+      commit(); changed(); send3D(true);
+    } catch (e) { houseMsg = e.message; }
+    houseBusy = false; renderProps();
+  }
+  function bindHouse(p) {
+    $('h-photo')?.addEventListener('click', () => $('h-file').click());
+    $('h-file')?.addEventListener('change', (ev) => { const f = ev.target.files?.[0]; if (f) matchHouse(f); });
+    $('h-clear')?.addEventListener('click', () => { S.house = null; houseMsg = ''; commit(); changed(); });
+    p.querySelectorAll('[data-hk]').forEach(inp => inp.addEventListener('change', () => {
+      const k = inp.dataset.hk, h = S.house; if (!h) return;
+      if (k === 'stories') h.stories = +inp.value; else if (k === 'walkout') h.walkout = !!inp.value;
+      else if (inp.type === 'number') { const v = parseFloat(inp.value); if (!Number.isFinite(v)) return; h[k] = k === 'roofPitch' ? Math.min(14, Math.max(3, v)) : Math.min(120, Math.max(16, v)); }
+      else h[k] = inp.value;
+      commit(); changed();
+    }));
+  }
   function renderProps() {
     const p = $('props'), e = byId(sel);
     const num = (k, label, v, step = 0.5, min = 0) => `<label>${label}<input type="number" data-k="${k}" step="${step}" min="${min}" value="${+(+v).toFixed(2)}"></label>`;
@@ -674,9 +748,10 @@
           + (line && line.colors.length > 1 ? pick('b:color', 'Color', line.colors.map(c => [c.key, c.name]), b.color) : '')
           + pick('b:rail', 'Railing', [['hybrid', 'Hybrid (white, black balusters)'], ['aluminum', 'Aluminum (all black)']], b.rail)
           + pick('b:skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal']], b.skirt)
-          + pick('b:house', 'House', OPTS.houses.map(x => [x.key, x.name]), b.house)
+          + (S.house ? '' : pick('b:house', 'House', OPTS.houses.map(x => [x.key, x.name]), b.house))
           + pick('b:trim', 'Porch trim', OPTS.trims.map(x => [x.key, x.name]), b.trim)
-          : '<span class="ro" style="align-self:center">Loading options…</span>');
+          : '<span class="ro" style="align-self:center">Loading options…</span>')
+        + houseProps();
     } else if (e.type === 'porch') {
       const free = e.tie === 'free', gab = e.roof === 'gable' || e.roof === 'semivault';
       h = `<b>${PORCH_NAMES[e.ptype]}</b>`
@@ -708,8 +783,8 @@
       const i = stairInfo(e);
       h = `<b>Stairs</b>${num('rot', 'Angle°', e.rot, 1, -180)}${num('w', 'Width', e.w, 0.5, 3)}${pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '')}<label>From → to<span class="ro">${fmt(i.top)} → ${i.foot ? 'landing ' + fmt(i.bottom) : 'grade'}</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label>${e.manual ? '<button type="button" id="b-square">Square to edge</button>' : ''}`;
     }
-    p.innerHTML = h; p.hidden = false;
-    p.querySelectorAll('select').forEach(sl => sl.addEventListener('change', () => {
+    p.innerHTML = h; p.hidden = false; bindHouse(p);
+    p.querySelectorAll('select:not([data-hk])').forEach(sl => sl.addEventListener('change', () => {
       const k = sl.dataset.k, v = sl.value;
       if (k.startsWith('b:')) {
         const bk = k.slice(2); S.build[bk] = v;
@@ -725,7 +800,7 @@
       }
       commit(); changed();
     }));
-    p.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
+    p.querySelectorAll('input:not([data-hk]):not([type=file])').forEach(inp => inp.addEventListener('change', () => {
       const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
       if (inp.dataset.k === 'dw' || inp.dataset.k === 'dd') {     // stretch the deck: house side and left side stay put
         const i = inp.dataset.k === 'dw' ? 0 : 1, vs = e.pts.map(q => q[i]), lo = Math.min(...vs), span = Math.max(...vs) - lo;
@@ -796,7 +871,7 @@
     const H = porchOnDeck ? porchOnDeck.h : Math.max(3, ...plats.filter(q => q.houseSpan).map(q => q.h));
     plats.forEach((q, i) => { q.kind = S.els.filter(e => e.type === 'deck' || e.type === 'landing')[i].type; });
     const meta = DESIGN ? { client: DESIGN.client || '', address: DESIGN.address || '', phone: DESIGN.phone || '', email: DESIGN.email || '', contract: DESIGN.contractNum || '' } : null;
-    return { type: 'qx-design-3d', sections, free: { plats, stairs }, H, build: S.build, meta };
+    return { type: 'qx-design-3d', sections, free: { plats, stairs }, H, build: S.build, meta, house: S.house || null };
   }
   function send3D(force) {
     clearTimeout(sendT);
@@ -855,7 +930,7 @@
     const w = Math.max(x1 - x0, (z1 - z0) / asp, 20); vb = { x: (x0 + x1) / 2 - w / 2, z: z0 - ((w * asp) - (z1 - z0)) / 2 * 0.3, w }; drawPlan();
   }
   $('b-fit').addEventListener('click', fitPlan);
-  if (CUSTOMER && SENT && Array.isArray(SENT.els) && SENT.els.length) { S.els = SENT.els; if (SENT.color) S.color = SENT.color; S.build = { ...BUILD_DEF, ...(SENT.build || {}) }; if (!SENT.build && SENT.color) S.pendingLegacy = SENT.color; nextId = SENT.nextId || SENT.els.length + 1; lastSaved = snap(); }
+  if (CUSTOMER && SENT && Array.isArray(SENT.els) && SENT.els.length) { S.els = SENT.els; if (SENT.color) S.color = SENT.color; S.build = { ...BUILD_DEF, ...(SENT.build || {}) }; S.house = SENT.house || null; if (!SENT.build && SENT.color) S.pendingLegacy = SENT.color; nextId = SENT.nextId || SENT.els.length + 1; lastSaved = snap(); }
   init3D(); frame3D(); sel = DESIGN || CUSTOMER ? null : 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
   if (CUSTOMER) { $('tip').textContent = 'Drag to move around · scroll or pinch to zoom · drag the 3D view to look around'; const h = document.querySelector('.bar h1'); if (h) h.textContent = 'Your Deck Plus Design'; }
 

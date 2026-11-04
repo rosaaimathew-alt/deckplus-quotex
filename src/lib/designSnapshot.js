@@ -11,8 +11,9 @@ export async function withSavedDesign(snapshot, proposalId) {
     const { data, error } = await supabase.from('proposal_designs').select('data').eq('proposal_id', String(proposalId)).maybeSingle()
     const d = !error && data?.data
     if (!d || !Array.isArray(d.els) || !d.els.length) return snapshot
-    // Only the drawing itself: shapes, heights, angles, porch/patio options and finishes.
-    return { ...snapshot, design: { els: d.els, color: d.color || null, build: d.build || null, nextId: d.nextId || d.els.length + 1 } }
+    // Only the drawing itself: shapes, heights, angles, porch/patio options, finishes and
+    // the customer's house as matched from a photo (numbers and colors; no photo).
+    return { ...snapshot, design: { els: d.els, color: d.color || null, build: d.build || null, nextId: d.nextId || d.els.length + 1, house: d.house || null } }
   } catch {
     return snapshot      // never block sending a proposal over the drawing
   }

@@ -1390,14 +1390,28 @@
   const mat = (key, make) => mc[key] || (mc[key] = make());
   const std = (o) => new THREE.MeshStandardMaterial(o);
   const noAO = (m) => { m.userData.noAO = true; return m; };   // see-through: skip ambient occlusion
+  // The customer's house, matched from a photo in the design editor (null = the stock house).
+  const HS = () => S.houseSpec || null;
+  const tintOver = (hexCol, base) => {           // multiply tint that lands a dark texture on the photo's color
+    const c = new THREE.Color(hexCol); return new THREE.Color(Math.min(3, c.r / base), Math.min(3, c.g / base), Math.min(3, c.b / base));
+  };
+  function specSiding(h) {
+    const k = `hs-${h.siding}-${h.sidingColor}`;
+    if (h.siding === 'brick') return mat(k, () => std({ color: tintOver(h.sidingColor, 0.42), map: T.brick, bumpMap: T.brick, bumpScale: 0.04, roughness: 0.95 }));
+    if (h.siding === 'stone') return mat(k, () => std({ color: tintOver(h.sidingColor, 0.58), map: T.wallBlock, bumpMap: T.wallBlock, bumpScale: 0.05, roughness: 0.95 }));
+    if (h.siding === 'stucco') return mat(k, () => std({ color: h.sidingColor, map: T.concrete, bumpMap: T.concrete, bumpScale: 0.02, roughness: 0.95 }));
+    return mat(k, () => std({ color: h.sidingColor, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 }));
+  }
   const M = {
-    siding: () => S.house === 'brick' ? mat('brick', () => std({ color: '#ffffff', map: T.brick, bumpMap: T.brick, bumpScale: 0.04, roughness: 0.95 }))
+    siding: () => HS() ? specSiding(HS()) : S.house === 'brick' ? mat('brick', () => std({ color: '#ffffff', map: T.brick, bumpMap: T.brick, bumpScale: 0.04, roughness: 0.95 }))
       : mat('siding-' + S.house, () => std({ color: HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
-    porchSiding: () => mat('psiding-' + S.house, () => std({ color: S.house === 'brick' ? '#c8b994' : HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
+    porchSiding: () => HS() && ['vinyl', 'wood'].includes(HS().siding) ? mat('hps-' + HS().sidingColor, () => std({ color: HS().sidingColor, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 }))
+      : mat('psiding-' + S.house, () => std({ color: S.house === 'brick' ? '#c8b994' : HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
     gableGlass: () => mat('gableGlass', () => noAO(std({ color: '#22323c', transparent: true, opacity: 0.62, roughness: 0.04, metalness: 0.75, envMapIntensity: 1.6, side: THREE.DoubleSide, depthWrite: false }))),   // reads as glass, not an opening
     ezeGlass: () => mat('ezeGlass', () => noAO(std({ color: '#1a2026', transparent: true, opacity: 0.55, roughness: 0.15, metalness: 0.6, side: THREE.DoubleSide, depthWrite: false }))),
     doorPanel2: () => mat('doorPanel2', () => std({ color: '#e9e8e2', roughness: 0.5 })),
-    shingle: () => mat('shingle', () => std({ color: '#ffffff', map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95 })),
+    shingle: () => HS() ? mat('shingle-' + HS().roofColor, () => std({ color: tintOver(HS().roofColor, 0.28), map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95 }))
+      : mat('shingle', () => std({ color: '#ffffff', map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95 })),
     ridge: () => mat('ridge', () => std({ color: '#3e3f43', roughness: 0.95 })),
     concrete: () => mat('concrete', () => std({ color: '#ffffff', map: T.concrete, roughness: 0.95 })),
     pavers: () => mat('pavers', () => std({ color: '#ffffff', map: T.pavers, bumpMap: T.pavers, bumpScale: 0.03, roughness: 0.9 })),
@@ -2150,8 +2164,9 @@
     // The house stays put: centred on 0 and only grows (symmetrically) if a section runs past
     // its ends, so moving a porch or deck slides it along the back wall.
     const reach = Math.max(...xs.map(Math.abs)), hx = 0;
-    const HW = Math.max(44, Math.ceil((reach + 6) / 2) * 4), HD = 28, rz = 0.55, k = 1.118;
-    let E = FF + 9.3, matchE = null;
+    const hs = HS(), STORY = 9.5, stories = hs ? hs.stories : 1, pitch = hs ? hs.roofPitch / 12 : 0.5;
+    const HW = Math.max(hs ? Math.round(hs.wallWidthFt / 2) * 2 : 44, Math.ceil((reach + 6) / 2) * 4), HD = 28, rz = 0.55, k = Math.hypot(1, pitch);
+    let E = FF + 9.3 + (stories - 1) * STORY, matchE = null;
     // A gable, semi-vault or hip porch tied into the house roof sets the house eave, so the
     // gutters, soffits and 1′ overhangs of house, porch and wing all run at one level.
     att.forEach(s => { if (s.kind === 'porch' && s.tie === 'roof' && s.roof !== 'shed' && matchE == null) matchE = porchGeom(s).beamTop; });
@@ -2167,20 +2182,20 @@
     });
     if (matchE != null) {
       const need = att.filter(s => s.kind === 'porch' && (s.tie === 'wall' || (s.tie === 'roof' && s.roof === 'shed'))).length;
-      E = need ? Math.max(E, matchE) : matchE;          // wall-tie / shed-tie porches need the wall higher
+      E = need || stories > 1 ? Math.max(E, matchE) : matchE;          // wall-tie / shed-tie porches (or an upper story) need the wall higher
     }
-    const fTop = Math.min(Math.max(FF - 0.6, 0.8), 2.6);
+    const fTop = hs?.walkout ? 0.8 : Math.min(Math.max(FF - 0.6, 0.8), 2.6);   // a walkout shows its lower level
     B(HW + 0.2, fTop, HD + 0.2, M.concrete(), hx, fTop / 2, -HD / 2);
     B(HW, E - fTop, HD, M.siding(), hx, fTop + (E - fTop) / 2, -HD / 2);
     [-1, 1].forEach(sd => { B(0.42, E - fTop, 0.12, M.trim(), hx + sd * (HW / 2 - 0.15), fTop + (E - fTop) / 2, 0.06); B(0.12, E - fTop, 0.42, M.trim(), hx + sd * (HW / 2 + 0.06), fTop + (E - fTop) / 2, -0.15); });
     B(HW, 0.55, 0.1, M.trim(), hx, E - 0.28, 0.05);
-    const run = HD / 2 + 1.0, yr = E - 0.5 + run * 0.5;            // 1′ overhang, same as the porch
+    const run = HD / 2 + 1.0, yr = E - 0.5 + run * pitch;          // 1′ overhang, same as the porch
     beamYZ(hx, E - 0.5 + rz / 2 * k, 1.0, yr + rz / 2 * k, -HD / 2, HW + 2, rz, M.trim());
     beamYZ(hx, E - 0.5 + (rz + 0.05) * k, 1.08, yr + (rz + 0.05) * k, -HD / 2, HW + 2.15, 0.1, M.shingle());
     beamYZ(hx, yr + rz / 2 * k, -HD / 2, E - 0.5 + rz / 2 * k, -HD - 1.0, HW + 2, rz, M.trim());
     beamYZ(hx, yr + (rz + 0.05) * k, -HD / 2, E - 0.5 + (rz + 0.05) * k, -HD - 1.08, HW + 2.15, 0.1, M.shingle());
     B(HW + 2.15, 0.16, 1.1, M.ridge(), hx, yr + (rz + 0.1) * k + 0.04, -HD / 2);
-    [-1, 1].forEach(sd => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * 0.5]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(hx + sd * HW / 2 - (sd > 0 ? 0.2 : 0), E, 0); }));
+    [-1, 1].forEach(sd => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * pitch]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(hx + sd * HW / 2 - (sd > 0 ? 0.2 : 0), E, 0); }));
     const WIN_Y = Math.min(FF + 5.3, E - 3.1);                        // window heads stay under the eave
     const gy = E - 0.5 + rz * k - 0.22;                               // same formula as the porch gutter
     B(HW + 2.15, 0.38, 0.4, M.gutter(), hx, gy, 1.25);
@@ -2192,11 +2207,24 @@
       ...freeAt.filter(p => !att.some(s => rect(s).x0 < (p.houseSpan[0] + p.houseSpan[1]) / 2 && rect(s).x1 > (p.houseSpan[0] + p.houseSpan[1]) / 2))
         .map(p => ({ x: (p.houseSpan[0] + p.houseSpan[1]) / 2, w: 6, y: p.h, kind: 'deck' }))];
     doors.forEach(d => { const g = group(d.x, d.y, 0); d.kind === 'deck' ? sliderDoor(g) : entryDoor(g); });
-    for (let x = hx - HW / 2 + 4.5; x <= hx + HW / 2 - 4.5; x += 7.5) {
-      if (doors.some(d => Math.abs(x - d.x) < d.w / 2 + 3.6)) continue;
-      windowAt(group(x, WIN_Y, 0), 3, 4.6);
+    if (hs && hs.windows.length) {
+      // Windows where they are in the photo (0 = left end of the wall, 1 = right end).
+      const wallW = Math.min(HW, hs.wallWidthFt);
+      hs.windows.forEach(w => {
+        const x = hx + (w.center - 0.5) * wallW, y = WIN_Y + (w.story - 1) * STORY + (4.6 - w.heightFt) / 2;
+        if (y + w.heightFt / 2 > E - 0.8) return;
+        if (w.story === 1 && doors.some(d => Math.abs(x - d.x) < d.w / 2 + w.widthFt / 2 + 0.6)) return;
+        windowAt(group(x, y, 0), w.widthFt, w.heightFt);
+      });
+    } else {
+      for (let x = hx - HW / 2 + 4.5; x <= hx + HW / 2 - 4.5; x += 7.5) {
+        for (let st = 1; st <= stories; st++) {
+          if (st === 1 && doors.some(d => Math.abs(x - d.x) < d.w / 2 + 3.6)) continue;
+          windowAt(group(x, WIN_Y + (st - 1) * STORY, 0), 3, 4.6);
+        }
+      }
     }
-    [-1, 1].forEach(sd => [-7, -19].forEach(z => windowAt(group(hx + sd * HW / 2, WIN_Y, z, sd * Math.PI / 2), 3, 4.6)));
+    for (let st = 1; st <= stories; st++) [-1, 1].forEach(sd => [-7, -19].forEach(z => windowAt(group(hx + sd * HW / 2, WIN_Y + (st - 1) * STORY, z, sd * Math.PI / 2), 3, 4.6)));
 
     // Landscaping beds in front of the house where nothing is built.
     const spans = [...att.map(s => [rect(s).x0 - 1, rect(s).x1 + 1]), ...freeAt.map(p => [p.houseSpan[0] - 1, p.houseSpan[1] + 1])];
@@ -2519,7 +2547,7 @@
       const m = ev.data;
       if (ev.source !== window.parent || !m || m.type !== 'qx-design-3d') return;
       S.sections = (m.sections || []).map(x => ({ ...DEFAULTS[x.kind], ...x }));
-      S.sel = null; S.free = m.free || null;
+      S.sel = null; S.free = m.free || null; S.houseSpec = m.house || null;
       if (Number(m.H) > 0) S.H = Number(m.H);
       Object.assign(S, m.build || {});
       const vi = document.getElementById('view-inside'); if (vi) vi.hidden = !S.sections.some(x => x.kind === 'porch');
