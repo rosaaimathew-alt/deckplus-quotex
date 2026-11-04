@@ -1,0 +1,69 @@
+# County permit connection self-test. Twice a day, before the app's 8 AM and
+# 1 PM inspection checks, this runs scripts/permit-canary.mjs: it reads a known
+# permit from the county site through the same code the app uses. If that fails
+# twice in a row it opens a GitHub issue titled "ALERT: county permit
+# connection ..." — GitHub emails the owner and pushes to the GitHub mobile
+# app — and closes it again once the county site reads fine.
+name: County permit connection
+
+on:
+  schedule:
+    - cron: '40 11 * * *'   # 7:40 AM EDT / 6:40 AM EST
+    - cron: '40 16 * * *'   # 12:40 PM EDT / 11:40 AM EST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: permit-canary
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PERMIT_CANARY_RECORD: ${{ vars.PERMIT_CANARY_RECORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read a known permit from the county site
+        id: check
+        run: |
+          set +e
+          node scripts/permit-canary.mjs > out.txt 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            echo "First run failed; re-checking in 60s to rule out a blip" >> out.txt
+            sleep 60
+            node scripts/permit-canary.mjs > out2.txt 2>&1
+            code=$?
+            cat out2.txt >> out.txt
+          fi
+          cat out.txt
+          echo "failed=$([ $code -ne 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Raise or update the alert
+        if: steps.check.outputs.failed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="$(printf 'The county permit self-test failed at %s UTC, so inspection results on the board may stop updating.\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(date -u '+%Y-%m-%d %H:%M')" "$(cat out.txt)" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          open=$(gh issue list --state open --search 'in:title "ALERT: county permit connection"' --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "ALERT: county permit connection broken — inspection results not updating" --body "$body"
+          fi
+          exit 1
+      - name: Close the alert once healthy
+        if: steps.check.outputs.failed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --state open --search 'in:title "ALERT: county permit connection"' --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Recovered: the county site reads fine again ($(date -u '+%Y-%m-%d %H:%M') UTC)."
+          done

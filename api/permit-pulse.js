@@ -2,7 +2,7 @@
 /**
  * Mecklenburg County inspection pulse.
  *   POST /api/permit-pulse  { jobs: [{ id, address, client, pick?, knownNotes? }] }
- *     → { results: { [id]: { permits, candidates, needsPick, error, checkedAt } } }
+ *     → { results: { [id]: { permits, candidates, needsPick, error, siteError, checkedAt } } }
  *
  * Office / admin only. For each job it finds the county permit by the job's
  * OWN address (street number + street name, then the exact number, street
@@ -171,7 +171,9 @@ export default async function handler(req, res) {
       results[job.id] = { ...(await checkJob(job)), checkedAt }
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') console.error('[permit-pulse]', job.id, e)
-      results[job.id] = { error: `Couldn't read the county site: ${e.message}`, checkedAt }
+      // siteError: the county site itself failed (down, blocked, or its pages
+      // changed so they can't be read) — what the connection alerts watch for.
+      results[job.id] = { error: `Couldn't read the county site: ${e.message}`, siteError: true, checkedAt }
     }
   })
   res.status(200).json({ results })
