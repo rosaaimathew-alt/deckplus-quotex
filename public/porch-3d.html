@@ -1638,6 +1638,10 @@
   // ── Building pieces ────────────────────────────────────────────────────────
   function windowAt(g, w, h) { withG(g, () => {
     const t = M.trim();
+    if (HS()?.shutters) {
+      const sm = mat('shutter-' + HS().shutterColor, () => std({ color: HS().shutterColor || '#2a2a2a', roughness: 0.6 })), swd = Math.min(1.6, Math.max(1.1, w * 0.45));
+      [-1, 1].forEach(sd => { B(swd, h + 0.3, 0.1, sm, sd * (w / 2 + 0.55 + swd / 2), 0, 0.06); [-1, 1].forEach(r => B(swd - 0.3, 0.08, 0.12, sm, sd * (w / 2 + 0.55 + swd / 2), r * (h / 2 - 0.4), 0.09)); });
+    }
     B(w + 0.75, 0.42, 0.14, t, 0, h / 2 + 0.21, 0.07); B(w + 0.95, 0.08, 0.22, t, 0, h / 2 + 0.46, 0.1);
     [-1, 1].forEach(s => B(0.36, h, 0.14, t, s * (w / 2 + 0.18), 0, 0.07));
     B(w + 0.95, 0.1, 0.34, t, 0, -h / 2 - 0.05, 0.15); B(w + 0.5, 0.26, 0.1, t, 0, -h / 2 - 0.23, 0.05);
@@ -1964,7 +1968,8 @@
     // so the pitch steepens (3/12 to 5/12) until the high end clears the eave.
     const shedPitch = shed && roofTie ? Math.min(5 / 12, Math.max(3 / 12, (E + 0.45 - beamTop) / zF)) : pl.g.shedPitch;
     const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;
-    const houseRoofTop = (depth) => E + depth * 0.5 + rz * 1.118;
+    const hp = HS() ? HS().roofPitch / 12 : 0.5;
+    const houseRoofTop = (depth) => E + depth * hp + rz * Math.hypot(1, hp);
     const g = group(cx, 0, free ? s.z : 0);
     withG(g, () => {
       if (onDeck) {
@@ -2270,7 +2275,8 @@
     // its ends, so moving a porch or deck slides it along the back wall.
     const reach = Math.max(...xs.map(Math.abs)), hx = 0;
     const hs = HS(), STORY = 9.5, stories = hs ? hs.stories : 1, pitch = hs ? hs.roofPitch / 12 : 0.5;
-    const HW = Math.max(hs ? Math.round(hs.wallWidthFt / 2) * 2 : 44, Math.ceil((reach + 6) / 2) * 4), HD = 28, rz = 0.55, k = Math.hypot(1, pitch);
+    const HW = Math.max(hs ? Math.round(hs.wallWidthFt * 2) / 2 : 44, Math.ceil((reach + 6) / 2) * 4), HD = hs && Number(hs.depthFt) > 0 ? Math.min(60, Math.max(16, Number(hs.depthFt))) : 28, rz = 0.55, k = Math.hypot(1, pitch);
+    const roofStyle = hs?.roofStyle || 'gable-side';
     let E = FF + 9.3 + (stories - 1) * STORY, matchE = null;
     // A gable, semi-vault or hip porch tied into the house roof sets the house eave, so the
     // gutters, soffits and 1′ overhangs of house, porch and wing all run at one level.
@@ -2291,20 +2297,76 @@
     }
     const fTop = hs?.walkout ? 0.8 : Math.min(Math.max(FF - 0.6, 0.8), 2.6);   // a walkout shows its lower level
     B(HW + 0.2, fTop, HD + 0.2, M.concrete(), hx, fTop / 2, -HD / 2);
-    B(HW, E - fTop, HD, M.siding(), hx, fTop + (E - fTop) / 2, -HD / 2);
+    const lowTop = hs && hs.lower && hs.lower !== 'none' ? Math.min(E - 1, fTop + Math.max(1, hs.lowerHeightFt || 3)) : fTop;
+    if (lowTop > fTop) {
+      B(HW + 0.04, lowTop - fTop, HD + 0.04, specSiding({ siding: hs.lower, sidingColor: hs.lowerColor || '#9c4a36' }), hx, fTop + (lowTop - fTop) / 2, -HD / 2);
+      B(HW + 0.3, 0.12, HD + 0.3, M.trim(), hx, lowTop + 0.04, -HD / 2);                 // sill cap where the materials meet
+    }
+    B(HW, E - lowTop, HD, M.siding(), hx, lowTop + (E - lowTop) / 2, -HD / 2);
     [-1, 1].forEach(sd => { B(0.42, E - fTop, 0.12, M.trim(), hx + sd * (HW / 2 - 0.15), fTop + (E - fTop) / 2, 0.06); B(0.12, E - fTop, 0.42, M.trim(), hx + sd * (HW / 2 + 0.06), fTop + (E - fTop) / 2, -0.15); });
     B(HW, 0.55, 0.1, M.trim(), hx, E - 0.28, 0.05);
     const run = HD / 2 + 1.0, yr = E - 0.5 + run * pitch;          // 1′ overhang, same as the porch
-    beamYZ(hx, E - 0.5 + rz / 2 * k, 1.0, yr + rz / 2 * k, -HD / 2, HW + 2, rz, M.trim());
-    beamYZ(hx, E - 0.5 + (rz + 0.05) * k, 1.08, yr + (rz + 0.05) * k, -HD / 2, HW + 2.15, 0.1, M.shingle());
-    beamYZ(hx, yr + rz / 2 * k, -HD / 2, E - 0.5 + rz / 2 * k, -HD - 1.0, HW + 2, rz, M.trim());
-    beamYZ(hx, yr + (rz + 0.05) * k, -HD / 2, E - 0.5 + (rz + 0.05) * k, -HD - 1.08, HW + 2.15, 0.1, M.shingle());
-    B(HW + 2.15, 0.16, 1.1, M.ridge(), hx, yr + (rz + 0.1) * k + 0.04, -HD / 2);
-    [-1, 1].forEach(sd => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * pitch]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(hx + sd * HW / 2 - (sd > 0 ? 0.2 : 0), E, 0); }));
+    let ridgeTop = yr;
+    if (roofStyle === 'gable-front') {
+      // Ridge runs from the back wall to the front of the house: a gable faces the yard.
+      const runX = HW / 2 + 1.0, yrx = E - 0.5 + runX * pitch; ridgeTop = yrx;
+      [-1, 1].forEach(sd => {
+        beamXY(-HD / 2, hx, yrx + rz / 2 * k, hx + sd * runX, E - 0.5 + rz / 2 * k, HD + 2, rz, M.trim());
+        beamXY(-HD / 2, hx, yrx + (rz + 0.05) * k, hx + sd * (runX + 0.08), E - 0.5 + (rz + 0.05) * k, HD + 2.15, 0.1, M.shingle());
+      });
+      B(1.1, 0.16, HD + 2.15, M.ridge(), hx, yrx + (rz + 0.1) * k + 0.04, -HD / 2);
+      [0, -HD].forEach(z => tri([[-HW / 2, 0], [HW / 2, 0], [0, HW / 2 * pitch]], 0.2, M.siding(), m => m.position.set(hx, E, z === 0 ? -0.2 : z)));
+      [-1, 1].forEach(sd => beamXY(1.0, hx, yrx + 0.05, hx + sd * (runX + 0.05), E - 0.52, 0.14, 0.55, M.trim()));   // rake boards on the yard gable
+    } else if (roofStyle === 'hip') {
+      // Four slopes down to eaves on every side; the ridge runs along the back wall.
+      const o = 1.0, X0 = hx - HW / 2 - o, X1 = hx + HW / 2 + o, Z0 = -HD - o, Z1 = o, yb = E - 0.5 + (rz + 0.05) * k;
+      const half = (Z1 - Z0) / 2, zm = (Z0 + Z1) / 2, R2 = Math.min(half, (X1 - X0) / 2), yt = yb + R2 * pitch;
+      const rA = [X0 + R2, yt, zm], rB = [X1 - R2, yt, zm];
+      const faces = [
+        [[X0, yb, Z1], [X1, yb, Z1], rB, rA, [1, 0, 0], [0, 0, -1]],     // front (yard side)
+        [[X1, yb, Z0], [X0, yb, Z0], rA, rB, [-1, 0, 0], [0, 0, 1]],     // back
+        [[X0, yb, Z0], [X0, yb, Z1], rA, null, [0, 0, 1], [1, 0, 0]],    // left end
+        [[X1, yb, Z1], [X1, yb, Z0], rB, null, [0, 0, -1], [-1, 0, 0]],  // right end
+      ];
+      const pos = [], uv = [], kk = Math.hypot(1, pitch);
+      const uvOf = (p, a, e, n) => [(p[0] - a[0]) * e[0] + (p[2] - a[2]) * e[2], ((p[0] - a[0]) * n[0] + (p[2] - a[2]) * n[2]) * kk];
+      faces.forEach(([a, b, c, d, e, n]) => {
+        const tris = d ? [[a, b, c], [a, c, d]] : [[a, b, c]];
+        tris.forEach(t => t.forEach(p => { pos.push(...p); uv.push(...uvOf(p, a, e, n)); }));
+      });
+      const gh = new THREE.BufferGeometry(); gh.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gh.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gh.computeVertexNormals();
+      const hm = new THREE.Mesh(gh, mat('hipShingle', () => { const m = M.shingle().clone(); m.side = THREE.DoubleSide; return m; })); hm.castShadow = hm.receiveShadow = true; G.add(hm);
+      B(rB[0] - rA[0] + 0.3, 0.16, 0.9, M.ridge(), (rA[0] + rB[0]) / 2, yt + 0.06, zm);
+      // fascia on all four eaves, soffits on the sides and back
+      B(X1 - X0, 0.5, 0.1, M.trim(), hx, yb - 0.3, Z0); [-1, 1].forEach(sd => B(0.1, 0.5, Z1 - Z0, M.trim(), hx + sd * (HW / 2 + o), yb - 0.3, zm));
+      [-1, 1].forEach(sd => B(o, 0.05, HD + 2 * o, M.trim(), hx + sd * (HW / 2 + o / 2), E - 0.03, -HD / 2, { cast: false }));
+      ridgeTop = yt;
+    } else {
+      beamYZ(hx, E - 0.5 + rz / 2 * k, 1.0, yr + rz / 2 * k, -HD / 2, HW + 2, rz, M.trim());
+      beamYZ(hx, E - 0.5 + (rz + 0.05) * k, 1.08, yr + (rz + 0.05) * k, -HD / 2, HW + 2.15, 0.1, M.shingle());
+      beamYZ(hx, yr + rz / 2 * k, -HD / 2, E - 0.5 + rz / 2 * k, -HD - 1.0, HW + 2, rz, M.trim());
+      beamYZ(hx, yr + (rz + 0.05) * k, -HD / 2, E - 0.5 + (rz + 0.05) * k, -HD - 1.08, HW + 2.15, 0.1, M.shingle());
+      B(HW + 2.15, 0.16, 1.1, M.ridge(), hx, yr + (rz + 0.1) * k + 0.04, -HD / 2);
+      [-1, 1].forEach(sd => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * pitch]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(hx + sd * HW / 2 - (sd > 0 ? 0.2 : 0), E, 0); }));
+    }
+    // Chimney: on an end wall, on the back wall, or up through the roof; capped above the ridge.
+    if (hs && hs.chimney && hs.chimney !== 'none') {
+      const cm = hs.chimneyMaterial === 'siding' ? M.siding() : specSiding({ siding: hs.chimneyMaterial === 'stone' ? 'stone' : 'brick', sidingColor: hs.chimneyColor || '#9c4a36' });
+      const top = ridgeTop + 2.5, cw = 4.5, cd = 2.6;
+      let cx2, cz2, y0 = 0, sx = cw, sz = cd;
+      if (hs.chimney === 'left' || hs.chimney === 'right') { const sd = hs.chimney === 'left' ? -1 : 1; cx2 = hx + sd * (HW / 2 + cd / 2); cz2 = -HD / 2; sx = cd; sz = cw; }
+      else if (hs.chimney === 'back') { cx2 = hx + ((hs.chimneyAt ?? 0.5) - 0.5) * Math.min(HW, hs.wallWidthFt || HW); cz2 = cd / 2; if (att.some(a => { const r = rect(a); return cx2 > r.x0 - 3 && cx2 < r.x1 + 3; })) { cz2 = -HD / 2 + 3; y0 = E; } }
+      else { cx2 = hx + ((hs.chimneyAt ?? 0.5) - 0.5) * Math.min(HW, hs.wallWidthFt || HW); cz2 = -HD / 2 + (roofStyle === 'gable-front' ? 0 : 3); y0 = E; }
+      B(sx, top - y0, sz, cm, cx2, (top + y0) / 2, cz2);
+      B(sx + 0.5, 0.35, sz + 0.5, M.concrete(), cx2, top + 0.17, cz2);
+    }
     const WIN_Y = Math.min(FF + 5.3, E - 3.1);                        // window heads stay under the eave
     const gy = E - 0.5 + rz * k - 0.22;                               // same formula as the porch gutter
-    B(HW + 2.15, 0.38, 0.4, M.gutter(), hx, gy, 1.25);
-    B(HW + 2, 0.05, 1.0, M.trim(), hx, E - 0.03, 0.5, { cast: false });   // soffit
+    if (roofStyle === 'gable-front') [-1, 1].forEach(sd => { B(0.4, 0.38, HD + 2.15, M.gutter(), hx + sd * (HW / 2 + 1.25), gy, -HD / 2); B(1.0, 0.05, HD + 2, M.trim(), hx + sd * (HW / 2 + 0.5), E - 0.03, -HD / 2, { cast: false }); });
+    else {
+      B(HW + 2.15, 0.38, 0.4, M.gutter(), hx, gy, 1.25);
+      B(HW + 2, 0.05, 1.0, M.trim(), hx, E - 0.03, 0.5, { cast: false });   // soffit
+    }
     [-1, 1].forEach(sd => { const x = hx + sd * (HW / 2 + 0.5); B(0.22, gy - 0.4, 0.18, M.gutter(), x, (gy + 0.4) / 2, 1.3); B(0.22, 0.2, 0.9, M.gutter(), x, 0.2, 1.75); });
 
     // Doors behind each attached section, windows in the gaps.
@@ -2324,7 +2386,8 @@
       hs.windows.forEach(w => {
         const x = hx + (w.center - 0.5) * wallW, y = WIN_Y + (w.story - 1) * STORY + (4.6 - w.heightFt) / 2;
         if (w.story === 1) HOUSE_WIN.push([x - w.widthFt / 2 - 0.5, x + w.widthFt / 2 + 0.5]);
-        if (y + w.heightFt / 2 > E - 0.8) return;
+        const wallTop = roofStyle === 'gable-front' ? E + Math.max(0, HW / 2 - Math.abs(x - hx) - 1) * pitch : E;
+        if (y + w.heightFt / 2 > wallTop - 0.8) return;
         if (w.story === 1 && doors.some(d => Math.abs(x - d.x) < d.w / 2 + w.widthFt / 2 + 0.6)) return;
         windowAt(group(x, y, 0), w.widthFt, w.heightFt);
       });
@@ -2673,6 +2736,7 @@
       const m = ev.data;
       if (ev.source !== window.parent || !m || m.type !== 'qx-design-3d') return;
       S.sections = (m.sections || []).map(x => ({ ...DEFAULTS[x.kind], ...x }));
+      if (m.house?.roofStyle === 'gable-front') S.sections.forEach(x => { if (x.kind === 'porch' && x.tie === 'roof') x.tie = 'wall'; });
       S.sel = null; S.free = m.free || null; S.houseSpec = m.house || null;
       if (Number(m.H) > 0) S.H = Number(m.H);
       Object.assign(S, m.build || {});

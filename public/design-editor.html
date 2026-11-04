@@ -750,20 +750,29 @@
   // The photo goes to our server once (/api/ai-chat?task=house, Claude reads it); what
   // comes back (stories, roof pitch, siding, colors, wall width, windows) is saved with
   // the design and the 3D view builds that house. The photo itself is not stored.
-  let houseBusy = false, houseMsg = '';
+  let houseBusy = false, houseMsg = '', houseKnownW = 0;
   const SIDING = [['vinyl', 'Vinyl siding'], ['wood', 'Wood siding'], ['brick', 'Brick'], ['stone', 'Stone'], ['stucco', 'Stucco']];
   function houseProps() {
     const h = S.house, n = (k, label, v, step, min) => `<label>${label}<input type="number" data-hk="${k}" step="${step}" min="${min}" value="${+(+v).toFixed(1)}"></label>`;
-    const col = (k, label) => `<label>${label}<input type="color" data-hk="${k}" value="${h[k]}"></label>`;
+    const col = (k, label) => `<label>${label}<input type="color" data-hk="${k}" value="${h[k] || '#888888'}"></label>`;
+    const sel = (k, label, opts, v) => `<label>${label}<select data-hk="${k}">${opts.map(([val, t]) => `<option value="${val}"${String(v) === String(val) ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`;
     let out = `<span class="hrow"><b>Customer's house</b><input type="file" id="h-file" accept="image/jpeg,image/png,image/webp" hidden>
       <button type="button" class="ghost-btn" id="h-photo"${houseBusy ? ' disabled' : ''}>${houseBusy ? 'Reading photo…' : h ? 'Match a new photo' : 'Match house from photo'}</button>
       ${h ? '<button type="button" class="ghost-btn" id="h-clear">Use stock house</button>' : ''}
-      <span class="ro">${houseMsg || (h ? (h.notes || 'Matched from photo. Adjust below if needed.') : 'Upload a photo of the back of the house (or a Google Earth screenshot).')}</span></span>`;
+      <label class="mw">Measured width (ft)<input type="number" id="h-known" step="0.5" min="0" placeholder="optional" value="${houseKnownW || ''}"></label>
+      <span class="ro">${houseMsg || (h ? (h.notes || 'Matched from photo. Adjust below if needed.') : 'Upload a photo of the back of the house (or a Google Earth screenshot). Enter the measured width first for true scale.')}</span></span>`;
     if (h) out += `<label>Stories<select data-hk="stories">${[1, 2, 3].map(v => `<option value="${v}"${h.stories === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>`
       + `<label>Walkout<select data-hk="walkout"><option value=""${h.walkout ? '' : ' selected'}>No</option><option value="1"${h.walkout ? ' selected' : ''}>Yes</option></select></label>`
       + `<label>Siding<select data-hk="siding">${SIDING.map(([v, t]) => `<option value="${v}"${h.siding === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`
       + col('sidingColor', 'Siding color') + col('roofColor', 'Roof color')
-      + n('roofPitch', 'Roof pitch (/12)', h.roofPitch, 0.5, 3) + n('wallWidthFt', 'House width (ft)', h.wallWidthFt, 1, 16);
+      + n('roofPitch', 'Roof pitch (/12)', h.roofPitch, 0.5, 3) + n('wallWidthFt', 'House width (ft)', h.wallWidthFt, 0.5, 16) + n('depthFt', 'House depth (ft)', h.depthFt || 28, 0.5, 16)
+      + sel('roofStyle', 'Roof', [['gable-side', 'Gable, ridge along the back'], ['gable-front', 'Gable facing the yard'], ['hip', 'Hip']], h.roofStyle || 'gable-side')
+      + sel('lower', 'Lower wall', [['none', 'Same as siding'], ['brick', 'Brick'], ['stone', 'Stone']], h.lower || 'none')
+      + (h.lower && h.lower !== 'none' ? n('lowerHeightFt', 'Lower wall height (ft)', h.lowerHeightFt || 3, 0.5, 1) + col('lowerColor', 'Lower wall color') : '')
+      + sel('chimney', 'Chimney', [['none', 'None'], ['left', 'Left end wall'], ['right', 'Right end wall'], ['back', 'Back wall'], ['roof', 'Through the roof']], h.chimney || 'none')
+      + (h.chimney && h.chimney !== 'none' ? sel('chimneyMaterial', 'Chimney', [['brick', 'Brick'], ['stone', 'Stone'], ['siding', 'Siding']], h.chimneyMaterial || 'brick') + (['back', 'roof'].includes(h.chimney) ? n('chimneyAtFt', 'Chimney from left (ft)', (h.chimneyAt ?? 0.5) * h.wallWidthFt, 0.5, 0) : '') + (h.chimneyMaterial !== 'siding' ? col('chimneyColor', 'Chimney color') : '') : '')
+      + sel('shutters', 'Shutters', [['', 'None'], ['1', 'Yes']], h.shutters ? '1' : '')
+      + (h.shutters ? col('shutterColor', 'Shutter color') : '');
     return out;
   }
   function photoToJpeg(file) {          // ≤1568 px on the long side keeps the upload small and the cost low
@@ -791,7 +800,7 @@
     houseBusy = true; houseMsg = ''; renderProps();
     try {
       const image = await photoToJpeg(file), token = await authToken();
-      const r = await fetch('/api/ai-chat?task=house', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ image, mediaType: 'image/jpeg' }) });
+      const r = await fetch('/api/ai-chat?task=house', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ image, mediaType: 'image/jpeg', widthFt: houseKnownW || undefined }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.house) throw new Error(d.house ? '' : (/messages required/i.test(d.error || '') ? 'House matching is not switched on yet.' : d.error || `Could not match the house (${r.status}).`));
       S.house = d.house;
@@ -808,12 +817,21 @@
   }
   function bindHouse(p) {
     $('h-photo')?.addEventListener('click', () => $('h-file').click());
+    $('h-known')?.addEventListener('change', (ev) => { const v = parseFloat(ev.target.value); houseKnownW = v > 0 ? v : 0; if (houseKnownW && S.house) { S.house.wallWidthFt = houseKnownW; commit(); changed(); } });
     $('h-file')?.addEventListener('change', (ev) => { const f = ev.target.files?.[0]; if (f) matchHouse(f); });
     $('h-clear')?.addEventListener('click', () => { S.house = null; houseMsg = ''; commit(); changed(); });
     p.querySelectorAll('[data-hk]').forEach(inp => inp.addEventListener('change', () => {
       const k = inp.dataset.hk, h = S.house; if (!h) return;
       if (k === 'stories') h.stories = +inp.value; else if (k === 'walkout') h.walkout = !!inp.value;
-      else if (inp.type === 'number') { const v = parseFloat(inp.value); if (!Number.isFinite(v)) return; h[k] = k === 'roofPitch' ? Math.min(14, Math.max(3, v)) : Math.min(120, Math.max(16, v)); }
+      else if (k === 'shutters') h.shutters = !!inp.value;
+      else if (inp.type === 'number') {
+        const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
+        if (k === 'roofPitch') h.roofPitch = Math.min(14, Math.max(3, v));
+        else if (k === 'lowerHeightFt') h.lowerHeightFt = Math.min(12, Math.max(1, v));
+        else if (k === 'chimneyAtFt') h.chimneyAt = Math.min(1, Math.max(0, v / (h.wallWidthFt || 44)));
+        else if (k === 'depthFt') h.depthFt = Math.min(60, Math.max(16, v));
+        else h[k] = Math.min(120, Math.max(16, v));
+      }
       else h[k] = inp.value;
       commit(); changed();
     }));
@@ -924,7 +942,7 @@
       }
       commit(); changed();
     }));
-    p.querySelectorAll('input:not([data-hk]):not([type=file])').forEach(inp => inp.addEventListener('change', () => {
+    p.querySelectorAll('input:not([data-hk]):not([type=file]):not(#h-known)').forEach(inp => inp.addEventListener('change', () => {
       const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
       if (inp.dataset.k === 'dw' || inp.dataset.k === 'dd') {     // stretch the deck: house side and left side stay put
         const i = inp.dataset.k === 'dw' ? 0 : 1, vs = e.pts.map(q => q[i]), lo = Math.min(...vs), span = Math.max(...vs) - lo;
