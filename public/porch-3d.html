@@ -1896,8 +1896,27 @@
         [-1, 1].forEach(sd => {
           const vx = valleyX(s, sd < 0 ? 'left' : 'right', E), sp = vx != null ? Math.abs(vx) : span, ln = sp * k;
           const p = B(ln, rz, L, t, sd * sp / 2, beamTop + (hw - sp / 2) * gp + rz / 2 * k, zc); p.rotation.z = -sd * a;
-          const sh = B(ln + (vx != null ? 0.02 : 0.12), 0.1, L + 0.1, M.shingle(), sd * sp / 2, beamTop + (hw - sp / 2) * gp + (rz + 0.05) * k, zc + (free ? 0 : 0.05), { swap: true }); sh.rotation.z = -sd * a;
-          if (vx != null) return;                       // valley side: no eave, no gutter
+          const sh = B(ln + (vx != null ? 0.02 : 0.12), 0.1, L + 0.1, M.shingle(), sd * sp / 2, beamTop + (hw - sp / 2) * gp + (rz + 0.05) * k, zc + (free ? 0 : 0.05)); sh.rotation.z = -sd * a;
+          if (vx != null) {
+            // Sloped valley: a tapered wedge between the porch gable and the house wing,
+            // wide at the house wall, coming to a point where the two eaves meet, so the
+            // valley line falls from the house roof down to the front eave.
+            const top = (x) => beamTop + (hw - Math.abs(x)) * gp + (rz + 0.16) * k;   // just above the shingles
+            const D2 = 3.5, yF = top(vx), yB = yF + D2 * gp;
+            // The back runs up under the house roof (roof tie) or to the house wall, so it ties in.
+            const zb = Math.min(zA, 0) + 0.02, rise = (zB - zb) / (zB - 0.02);
+            // One flat plane: back edge along the house roof between the two roofs, sloping
+            // down to a point where the two eaves meet.
+            const F = [vx, yF - 0.05, zB], Lb = [vx - sd * D2, yF + D2 * gp * rise - 0.12, zb], Rb = [vx + sd * D2, yF + D2 * gp * rise - 0.12, zb];   // edges tuck under the roofs
+            B(2.2, Math.max(0.2, yF - (beamTop - gp) - 0.3), 0.15, M.porchSiding(), vx, (yF + beamTop - gp - 0.3) / 2, zB - 0.45);
+            const pos = [...Lb, ...Rb, ...F];
+            const slope = Math.hypot(1, (Lb[1] - yF) / (zB - zb));          // shingle rows at true size along the slope
+            const uv = [Lb, Rb, F].flatMap(q => [q[0], q[2] * slope]);
+            const gv = new THREE.BufferGeometry(); gv.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gv.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gv.computeVertexNormals();
+            const vm = new THREE.Mesh(gv, mat('valley', () => std({ color: '#ffffff', map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95, side: THREE.DoubleSide })));
+            vm.castShadow = vm.receiveShadow = true; G.add(vm);
+            return;                                     // valley side: no eave, no gutter
+          }
           const gy = beamTop - gp + rz * k - 0.22;
           B(0.4, 0.38, L, M.gutter(), sd * (span + 0.2), gy, zc);
           B(0.22, gy - 0.4, 0.18, M.gutter(), sd * (span + 0.2), (gy + 0.4) / 2, zB - 0.3); B(0.22, 0.2, 0.9, M.gutter(), sd * (span + 0.2), 0.2, zB + 0.1);
@@ -2104,7 +2123,7 @@
       const vx = valleyX(a, side, E), toward = side === 'left' ? 1 : -1;   // q pointing at the porch
       [-1, 1].forEach(q => {
         const sp = vx != null && q === toward ? Math.abs(xm - (a.x + vx)) : span;
-        const pnl = B(sp * k2, rz, L, M.shingle(), xm + q * sp / 2, E - 0.5 + (WING / 2 - sp / 2) * 0.5 + rz / 2 * k2, L / 2 - 0.01, { swap: true }); pnl.rotation.z = -q * ang;
+        const pnl = B(sp * k2, rz, L, M.shingle(), xm + q * sp / 2, E - 0.5 + (WING / 2 - sp / 2) * 0.5 + rz / 2 * k2, L / 2 - 0.01); pnl.rotation.z = -q * ang;
       });
       tri([[-WING / 2, 0], [WING / 2, 0], [0, WING / 4]], 0.2, M.siding(), m => m.position.set(xm, E - 0.5, zEnd - 0.2));
       [-1, 1].forEach(q => beamXY(zEnd + 0.9, xm, E - 0.5 + WING / 4 + 0.6, xm + q * (span + 0.05), E - 1.0, 0.14, 0.5, M.trim()));
