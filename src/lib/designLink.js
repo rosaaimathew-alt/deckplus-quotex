@@ -37,7 +37,7 @@ export function designParts(lines = []) {
       const bySF = st.sizeMode === 'sf' && n(st.areaSF) > 0, side = bySF ? Math.max(6, Math.round(Math.sqrt(n(st.areaSF)))) : 0
       decks.push({
         name: l.name || '', width: bySF ? side : n(st.width), depth: bySF ? side : n(st.depth), height: n(st.height), collKey: st.collKey || '', rail: st.rail || '',
-        freestanding: !!st.freestanding,
+        freestanding: !!st.freestanding, skirt: typeof st.skirt === 'string' ? st.skirt : '',
         // Extra deck sections (bump-outs) priced on the same line: width × depth, no position.
         sections: (st.sections || []).filter(x => n(x.width) > 0 && n(x.depth) > 0).map(x => ({ width: n(x.width), depth: n(x.depth) })),
         // Stair runs and landings as the deck builder links them (from 'deck' / a landing → to a landing / 'grade'), for the design editor

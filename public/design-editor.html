@@ -408,6 +408,9 @@
     const LINE_OF = [['enhance', 'enhance'], ['transcend', 'transcend'], ['lineage', 'lineage'], ['signature', 'signature'], ['prime', 'prime'], ['terrain', 'terrain'], ['reserve', 'reserve'], ['landmark', 'landmark']];
     const ln = LINE_OF.find(([k]) => coll.includes(k));
     if (ln) { S.build.decking = ln[1]; S.build.color = null; } else if (/\bpt\b|pressure/.test(coll)) { S.build.decking = 'pt'; S.build.color = 'pt-pt'; }
+    // Skirting from the deck quote: "Trex skirt", "PT skirt (stained)", "Lattice (stained)", "None".
+    const sk = String((DESIGN.decks || []).map(q => q.skirt).find(v => v && !/^none$/i.test(v)) || '');
+    if (sk) S.build.skirt = /lattice/i.test(sk) ? 'lattice' : /\bpt\b|pressure|wood/i.test(sk) ? 'pt' : 'horizontal';
   }
 
   // ═══ History ═════════════════════════════════════════════════════════════
@@ -862,7 +865,7 @@
         + (OPTS ? pick('b:decking', 'Decking', OPTS.lines.map(l => [l.key, l.label]), b.decking)
           + (line && line.colors.length > 1 ? pick('b:color', 'Color', line.colors.map(c => [c.key, c.name]), b.color) : '')
           + pick('b:rail', 'Railing', [['hybrid', 'Hybrid (white, black balusters)'], ['aluminum', 'Aluminum (all black)']], b.rail)
-          + pick('b:skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal']], b.skirt)
+          + pick('b:skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']], b.skirt)
           + (S.house ? '' : pick('b:house', 'House', OPTS.houses.map(x => [x.key, x.name]), b.house))
           + pick('b:trim', 'Porch trim', OPTS.trims.map(x => [x.key, x.name]), b.trim)
           : '<span class="ro" style="align-self:center">Loading options…</span>')
@@ -980,7 +983,8 @@
           rails.push([a[0] + ux * p + ox, a[1] + uz * p + oz, a[0] + ux * q + ox, a[1] + uz * q + oz]);
         });
         if (!house) { const n = Math.max(1, Math.ceil(L / 8)); for (let k = 0; k <= n; k++) { let x = a[0] + (b[0] - a[0]) * k / n, z = a[1] + (b[1] - a[1]) * k / n; const d = Math.hypot(cx - x, cz - z) || 1; posts.push([x + (cx - x) / d * .9, z + (cz - z) / d * .9]); } }
-        eds.push({ a, b, house, rails });
+        // Skirting runs along the open part of the edge (not where another piece at this height joins it).
+        eds.push({ a, b, house, rails, skirt: house ? [] : subtract(0, L, sharedCuts(a, b, e)) });
       });
       plats.push({ pts, h, edges: eds, posts, houseSpan });
     });
