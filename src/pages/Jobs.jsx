@@ -1203,7 +1203,7 @@ function WarrantyTab({ proposal }) {
 const PM_STANDARD = [
   { label: 'Schedule deposit — @ sign contract',            pct: 0.20 },
   { label: 'Start payment — Material drop / Framing Start', pct: 0.30 },
-  { label: 'Roof Completion',                               pct: 0.40 },
+  { label: 'Pre-Paint Payment',                             pct: 0.40 },
   { label: 'Paint Applied',                                 pct: 0.05 },
   { label: 'Substantial completion payment',                pct: 0.05 },
 ]
