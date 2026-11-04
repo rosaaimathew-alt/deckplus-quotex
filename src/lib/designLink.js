@@ -5,6 +5,8 @@
 // (public/porch-3d.html) reads them from the `design` query parameter and
 // draws the same build in 3D or as a 2D plan, with no re-entry.
 
+import { priceRangeOf } from './priceRange'
+
 const n = (v) => Number(v) || 0
 
 export function designParts(lines = []) {
@@ -15,7 +17,7 @@ export function designParts(lines = []) {
       porches.push({
         name: l.name || '', type: pb.type, width: n(pb.width), depth: n(pb.depth), tie: pb.tie, roof: pb.roof,
         floor: pb.floor, deckHeightFt: pb.deckHeightFt, wallHeightIn: pb.wallHeightIn, glassEnds: pb.glassEnds,
-        flooring: pb.flooring, railing: { product: pb.railing?.product || '' },
+        flooring: pb.flooring, railing: { product: pb.railing?.product || '' }, sides: pb.sides || '',
       })
       continue
     }
@@ -25,12 +27,15 @@ export function designParts(lines = []) {
       continue
     }
     const patio = l.builder?.tool === 'hardscape' ? st?.inp?.patio : null
+    // Retaining wall from the same hardscape line: drawn as a raised patio on the wall.
+    const w = l.builder?.tool === 'hardscape' ? st?.inp?.wall : null
+    const wall = w?.type && n(w.height) > 0 ? { height: n(w.height), length: n(w.length), label: w.type } : null
     // Irregular patios are priced on total SF (sizeMode 'sf'); draw them as a square of that area.
     if (patio?.sizeMode === 'sf' && n(patio.areaSF) > 0) {
       const side = Math.max(4, Math.round(Math.sqrt(n(patio.areaSF))))
-      patios.push({ name: l.name || '', width: side, depth: side, surface: patio.surface || '', irregular: true })
+      patios.push({ name: l.name || '', width: side, depth: side, surface: patio.surface || '', irregular: true , wall })
     } else if (patio && n(patio.width) > 0 && n(patio.depth) > 0) {
-      patios.push({ name: l.name || '', width: n(patio.width), depth: n(patio.depth), surface: patio.surface || '' })
+      patios.push({ name: l.name || '', width: n(patio.width), depth: n(patio.depth), surface: patio.surface || '' , wall })
     }
   }
   return { porches, decks, patios }
@@ -54,6 +59,9 @@ export function designSummary(p) {
 
 export function designUrl(p, mode = '3d') {
   const d = designParts(p?.lines)
-  const payload = { client: p?.client || '', address: p?.address || '', phone: p?.phone || '', email: p?.email || '', contractNum: p?.contractDraft?.contractNum || '', ...d }
+  // Only the price the proposal itself shows: its range when it uses one, else its total.
+  const total = Number(p?.total) || 0
+  const priceRange = p?.isAlaCarte ? null : priceRangeOf(total, p?.priceRange)
+  const payload = { client: p?.client || '', address: p?.address || '', phone: p?.phone || '', email: p?.email || '', contractNum: p?.contractDraft?.contractNum || '', priceRange, total: priceRange || p?.isAlaCarte ? 0 : total, ...d }
   return `/porch-3d.html?design=${encodeURIComponent(JSON.stringify(payload))}${mode === '2d' ? '&mode=2d' : ''}`
 }

@@ -155,6 +155,18 @@
   .sheet-pick { display: flex; gap: 2px; background: var(--tag-bg); border-radius: 8px; padding: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
   .plan-actions .sheet-pick button { background: transparent; color: var(--tag-fg); box-shadow: none; padding: 7px 10px; }
   .plan-actions .sheet-pick button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+  .plan-tools { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 4; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
+    background: var(--tag-bg); color: var(--tag-fg); border-radius: 10px; padding: 6px 10px; box-shadow: 0 2px 8px rgba(0,0,0,.18); max-width: calc(100% - 200px); font-size: 12.5px; }
+  .plan-tools[hidden] { display: none; }
+  .plan-tools b { font-weight: 700; margin-right: 2px; }
+  .plan-tools .grp { display: flex; gap: 2px; align-items: center; }
+  .plan-tools .grp span { color: var(--muted); margin-right: 4px; }
+  .plan-tools button { font: 600 12px/1 var(--font-body); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+  .plan-tools button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .plan-tools button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .plan-tools .danger { color: var(--danger); }
+  .plan svg { touch-action: none; }
+  @media (max-width: 820px) { .plan-tools { max-width: calc(100% - 24px); top: calc(60px + env(safe-area-inset-top, 0px)); } }
   .plan-msg { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(64px + env(safe-area-inset-bottom, 0px)); background: var(--tag-bg); color: var(--tag-fg); font-size: 13px; padding: 8px 12px; border-radius: 6px; z-index: 3; max-width: calc(100% - 32px); }
   body.customer .edit-only { display: none !important; }
   .cust-note { display: none; border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: 14px; line-height: 1.5; color: var(--fg); background: var(--accent-soft); }
@@ -178,6 +190,7 @@
       <div class="eyebrow">QuoteX prototype · Deck Plus</div>
       <h1>Deck Plus 3D Builder</h1>
       <p class="lede" id="from-est" hidden><b id="from-est-who">Loaded from the proposal.</b> Sizes, porch type, roof connection, roof style, floor and wall heights, gable glass, decking and railing come from the estimate.</p>
+      <p class="lede edit-only"><b>2D:</b> click a section on the plan to select it, drag to move it, drag the square handles to resize, and drag the stairs to slide them. The toolbar adds landings and turns. Arrow keys nudge 1′.</p>
       <p class="lede edit-only">Combine porches, decks and patios into one build. Pick a section to edit it, or tap it in the 3D view. Drag to orbit, scroll or pinch to zoom.</p>
     </div>
 
@@ -220,11 +233,9 @@
       <div class="swatches" id="trim-swatches"></div>
     </fieldset>
 
-    <section class="price edit-only" aria-label="Base price">
-      <div class="label">Base price from the rate tables</div>
-      <div id="price-lines"></div>
-      <div class="price-total"><span>Estimate</span><strong id="price-total">$0</strong></div>
-      <p class="note">Porch, deck, rail, step and patio rates come from the QuoteX price lists. Electrical, doors, ceiling and roof options, fascia, skirting and permits are priced in QuoteX and left out here.</p>
+    <section class="price" aria-label="Proposal price">
+      <div class="price-total"><span id="price-label">Price</span><strong id="price-total">—</strong></div>
+      <p class="note" id="price-note"></p>
     </section>
   </aside>
 
@@ -235,6 +246,7 @@
       <button type="button" data-mode="3d" aria-pressed="true">3D</button>
     </div>
     <div class="plan" id="plan" hidden></div>
+    <div class="plan-tools" id="plan-tools" hidden></div>
     <div class="plan-actions" id="plan-actions" hidden>
       <div class="sheet-pick" role="group" aria-label="Design sheet"><button type="button" data-sheet="auto" aria-pressed="true">Auto</button><button type="button" data-sheet="s11" aria-pressed="false">11×17</button><button type="button" data-sheet="s24" aria-pressed="false">18×24</button></div>
       <button type="button" id="btn-print">Print</button>
@@ -275,25 +287,16 @@
 <script>
 (function () {
   // ── Rates (sell price) from the QuoteX price lists ─────────────────────────
-  const PORCH_BASE = {                       // src/porchBuild.js, $/SF
-    screen_wall_deck: 80, screen_roof_deck: 90, screen_wall_patio: 72, screen_roof_patio: 80,
-    open_wall_deck: 77,   open_roof_deck: 87,   open_wall_patio: 67,   open_roof_patio: 77,
-  };
-  const SCREENEZE_SF = 3, DECK_OVER_8_SF = 5, GABLE_OVER_19 = 1000, STEP_FACTOR = 1.5;
-  const DECKING = {                          // src/lib/deckPricing.js + porch floor upgrades
-    pt:        { label: 'PT',                      deckSF: 33,    porchUp: 0 },
-    enhance:   { label: 'Trex Enhance',            deckSF: 48.4,  porchUp: 7.7 },
-    transcend: { label: 'Trex Transcend Tropicals', deckSF: 61.6, porchUp: 17.6 },
-    lineage:   { label: 'Trex Transcend Lineage',  deckSF: 61.6,  porchUp: 0 },
-    signature: { label: 'Trex Signature',          deckSF: 73.7,  porchUp: 0 },
-    terrain:   { label: 'TimberTech Terrain/+',    deckSF: 55.44, porchUp: 0 },
-    prime:     { label: 'TimberTech Prime/+',      deckSF: 50.82, porchUp: 0 },
-    reserve:   { label: 'TimberTech Reserve',      deckSF: 58.91, porchUp: 0 },
-    landmark:  { label: 'TimberTech Landmark PVC', deckSF: 65.84, porchUp: 0 },
+  // No rates live in this page. The only price shown is the one on the proposal
+  // (its range, or its total), passed in by QuoteX.
+  const DECKING = {
+    pt: { label: 'PT' }, enhance: { label: 'Trex Enhance' }, transcend: { label: 'Trex Transcend Tropicals' },
+    lineage: { label: 'Trex Transcend Lineage' }, signature: { label: 'Trex Signature' }, terrain: { label: 'TimberTech Terrain/+' },
+    prime: { label: 'TimberTech Prime/+' }, reserve: { label: 'TimberTech Reserve' }, landmark: { label: 'TimberTech Landmark PVC' },
   };
   const PATIO = {                            // src/hardscape.js
-    pavers:   { label: 'Paver patio',    item: 'Techo Bloc pavers', sf: 27.5, smallAdd: 6 },
-    concrete: { label: 'Concrete patio', item: 'Concrete 4″',       sf: 17,   smallSF: 30 },
+    pavers:   { label: 'Paver patio' },
+    concrete: { label: 'Concrete patio' },
   };
 
   // Decking collections the office sells, with each line's colors.
@@ -325,7 +328,7 @@
 
   let nextId = 1;
   const DEFAULTS = {
-    porch: { w: 14, d: 14, x: 0, z: 0, type: 'ezebreeze', tie: 'wall', roof: 'shed', floor: 'deck', wallH: 8, sideGable: 'open', gableEnd: null },
+    porch: { w: 14, d: 14, x: 0, z: 0, type: 'ezebreeze', tie: 'wall', roof: 'shed', floor: 'deck', wallH: 8, sideGable: 'open', gableEnd: null, enclose: 'front2', cornerSide: 'right' },
     deck:  { w: 14, d: 12, x: 0, z: 0, stairs: 'front', stairBox: 'open' },
     patio: { w: 16, d: 12, x: 0, z: 14, mat: 'pavers' },
   };
@@ -359,13 +362,15 @@
       type, tie, roof, floor: pb.floor === 'patio' ? 'patio' : 'deck',
       wallH: Math.min(10, Math.max(8, num(pb.wallHeightIn, 96) / 12)),
       gableEnd: (Number(pb.glassEnds) || 0) > 0 ? 'glass' : (type === 'screen' ? 'screen' : 'siding'),
+      enclose: /front only/i.test(pb.sides || '') ? 'front0' : /1 side/i.test(pb.sides || '') ? 'front1' : 'front2',
+      cornerSide: pb.cornerSide === 'left' ? 'left' : 'right',
     });
   }
   let fromEstimate = false, startMode = '3d';
   // ?view=customer → look-only: no editing, no prices (for the customer's proposal link).
   const customer = new URLSearchParams(location.search).get('view') === 'customer';
   if (customer) document.body.classList.add('customer');
-  S.meta = { client: '', address: '' };
+  S.meta = { client: '', address: '', priceRange: null, total: 0 };
   try {
     const qs = new URLSearchParams(location.search);
     startMode = qs.get('mode') === '2d' ? '2d' : '3d';
@@ -384,7 +389,8 @@
       S.H = Math.min(10, Math.max(1, H0));
       (d.patios || []).forEach((x, k) => {
         const base = decks[k] || decks[0] || porches[0], zFront = base ? base.d + Math.max(1, Math.ceil(S.H * 12 / 7.5)) * (11 / 12) + 1 : 4;   // stairs run-out
-        S.sections.push(mk('patio', { x: base ? base.x : 0, z: Math.round(zFront), w: Math.round(num(x.width, 16)), d: Math.round(num(x.depth, 12)), mat: /concrete/i.test(x.surface || '') ? 'concrete' : 'pavers' }));
+        S.sections.push(mk('patio', { x: base ? base.x : 0, z: Math.round(zFront), w: Math.round(num(x.width, 16)), d: Math.round(num(x.depth, 12)), mat: /concrete/i.test(x.surface || '') ? 'concrete' : 'pavers',
+          wallH: Number(x.wall?.height) || 0, wallLen: Number(x.wall?.length) || 0, wallType: x.wall?.label || '' }));
       });
       S.sel = S.sections[0].id;
       const coll = String(d.decks?.[0]?.collKey || '').toLowerCase().replace(/[^a-z ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -392,7 +398,8 @@
       const ck = Object.keys(COLL_LINE).find(k => coll.startsWith(k)), fk = Object.keys(FLOOR_LINE).find(k => fl.startsWith(k));
       S.decking = ck ? COLL_LINE[ck] : fk ? FLOOR_LINE[fk] : 'pt';
       if (/alum/i.test(`${d.decks?.[0]?.rail || ''} ${d.porches?.[0]?.railing?.product || ''}`)) S.rail = 'aluminum';
-      S.meta = { client: String(d.client || ''), address: String(d.address || ''), phone: String(d.phone || ''), email: String(d.email || ''), contract: String(d.contractNum || '') };
+      const range = d.priceRange && Number(d.priceRange.high) > 0 ? { low: Number(d.priceRange.low) || 0, high: Number(d.priceRange.high) } : null;
+      S.meta = { client: String(d.client || ''), address: String(d.address || ''), phone: String(d.phone || ''), email: String(d.email || ''), contract: String(d.contractNum || ''), priceRange: range, total: range ? 0 : Number(d.total) || 0 };
       fromEstimate = true;
     }
   } catch (e) { /* bad link: fall back to the sample build */ }
@@ -402,6 +409,31 @@
   const ftIn = (ft) => { const f = Math.floor(ft + 1e-6); const i = Math.round((ft - f) * 12); return `${f}′-${i}″`; };
   const sel = () => S.sections.find(s => s.id === S.sel) || S.sections[0];
   const raised = (s) => s.kind === 'deck' || (s.kind === 'porch' && s.floor === 'deck');
+  // Raised patio on a retaining wall: the wall (estimate's length × height) runs along the
+  // patio's edges, front first, then the two sides from the front corners, then the back.
+  const WALL_T = 1;                                   // 12″ block wall
+  function patioWall(s) {
+    const H = Number(s.wallH) || 0; if (s.kind !== 'patio' || H <= 0) return null;
+    const r = rect(s), total = Number(s.wallLen) > 0 ? Number(s.wallLen) : 2 * (s.w + s.d);
+    let left = total; const runs = [];
+    const take = (len) => { const t = Math.max(0, Math.min(len, left)); left -= t; return t; };
+    const f = take(s.w); if (f > 0) runs.push({ edge: 'front', a: s.x - f / 2, b: s.x + f / 2 });
+    const side = Math.min(s.d, left / 2);
+    if (side > 0) { take(side * 2); runs.push({ edge: 'left', a: r.z1 - side, b: r.z1 }, { edge: 'right', a: r.z1 - side, b: r.z1 }); }
+    const bk = take(s.w); if (bk > 0) runs.push({ edge: 'back', a: s.x - bk / 2, b: s.x + bk / 2 });
+    const n = H > 0.6 ? Math.ceil(H * 12 / 7) : 0;   // block steps down the front, 7″ max rise
+    return { H, runs, steps: n, run: 14 / 12, type: s.wallType || 'Retaining wall' };
+  }
+  // Porch Builder "sides": 'Front + 2 sides' (default), 'Front + 1 side' = built into a corner
+  // of the house (the other side is house wall), 'Front only' = inset between two house walls.
+  function houseSides(s) {
+    if (s.kind !== 'porch' || s.tie === 'free') return [];
+    if (s.enclose === 'front1') return [s.cornerSide === 'left' ? 'left' : 'right'];
+    if (s.enclose === 'front0') return ['left', 'right'];
+    return [];
+  }
+  const isHouseSide = (s, side) => houseSides(s).includes(side);
+  const WING = 14;                                    // depth of the house wing beside a corner porch
   const offHouse = (s) => s.kind === 'patio' || (s.kind === 'porch' && s.tie === 'free');
   const rect = (s) => ({ x0: s.x - s.w / 2, x1: s.x + s.w / 2, z0: offHouse(s) ? s.z : 0, z1: (offHouse(s) ? s.z : 0) + s.d });
   const ROOF_LABEL = { shed: 'Shed roof', gable: 'Gable roof', semivault: 'Semi-vaulted roof', hip: 'Hip roof' };
@@ -468,11 +500,13 @@
     const g = porchGeom(s), cvF = covered(s, 'front'), cvL = covered(s, 'left'), cvR = covered(s, 'right'), mid = ([a, b]) => (a + b) / 2;
     if (s.type === 'open') return { front: [], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
     if (s.type === 'sunroom') {
-      const side = cvL.length ? 'left' : 'right', cv = side === 'left' ? cvL : cvR;
+      if (houseSides(s).length === 2) return { front: [0], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
+      let side = cvL.length ? 'left' : 'right'; if (isHouseSide(s, side)) side = side === 'left' ? 'right' : 'left';
+      const cv = side === 'left' ? cvL : cvR;
       const z = cv.length ? Math.min(Math.max(mid(cv[0]), 2.2), s.d - 3.6) : 2.2;
       return { front: [], left: side === 'left' ? [z] : [], right: side === 'right' ? [z] : [], stairs: g.onDeck && !cv.length ? { edge: side, c: z } : null };
     }
-    return { front: cvF.length ? [] : [0], left: cvL.map(mid), right: cvR.map(mid), stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
+    return { front: cvF.length ? [] : [0], left: isHouseSide(s, 'left') ? [] : cvL.map(mid), right: isHouseSide(s, 'right') ? [] : cvR.map(mid), stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
   }
   // Columns and openings on one Eze-Breeze / ScreenEze wall from a to b (ft).
   function ezeWall(a, b, doorCenters) {
@@ -514,14 +548,17 @@
         left: sunWall(0, D, cb, SUN.corner, dp.left[0]), right: sunWall(0, D, cb, SUN.corner, dp.right[0]),
       };
       if (g.free) walls.back = sunWall(-hw, hw, SUN.corner, SUN.corner, null);
+      if (dp.front.length) walls.front = sunWall(-hw, hw, SUN.corner, SUN.corner, dp.front[0]);
+      houseSides(s).forEach(k => { walls[k] = []; });
       const all = Object.values(walls).flat();
       const doors = all.filter(h => h.door).length;
-      const kneeLF = s.w * (g.free ? 2 : 1) + 2 * s.d - doors * SUN.door / 12;
+      const kneeLF = s.w * (g.free ? 2 : 1) + (2 - houseSides(s).length) * s.d - doors * SUN.door / 12;
       return { g, dp, walls, windows: all.filter(h => !h.door).length, doors, kneeSF: Math.round(kneeLF * SUN.knee / 12), kneeLF: Math.round(kneeLF * 10) / 10 };
     }
     if (s.type === 'open') return { g, dp, windows: 0, doors: 0, transoms: 0 };
     const walls = { front: ezeWall(-hw, hw, dp.front), left: ezeWall(0, D, dp.left), right: ezeWall(0, D, dp.right) };
     if (g.free) walls.back = ezeWall(-hw, hw, []);
+    houseSides(s).forEach(k => { walls[k] = { cols: [], open: [] }; });
     let windows = 0, transoms = 0, doors = 0;
     [['front', () => g.frontTop], ['left', g.sideTop], ['right', g.sideTop], ...(g.free ? [['back', () => g.frontTop]] : [])].forEach(([k, top]) => walls[k].open.forEach(o => {
       if (o.door) { doors++; return; }
@@ -531,93 +568,15 @@
     return { g, dp, walls, windows, transoms, doors };
   }
 
-  // ── Price ──────────────────────────────────────────────────────────────────
-  const SKIRT_SF = 33;                       // Trex skirt, $/SF
-  function railRate() {
-    if (S.rail === 'aluminum') return LINES[S.decking].brand === 'TimberTech' ? { label: 'TimberTech aluminum rail', lf: 152.46 } : { label: 'Trex Select aluminum rail', lf: 112 };
-    return S.decking === 'pt' ? { label: 'Hybrid rail, wood cap', lf: 19 } : { label: 'Hybrid rail, composite cap', lf: 30.8 };
-  }
-  // Exposed (not shared) edge length of a raised section: front + both sides.
-  function exposedLF(s) {
-    const r = rect(s);
-    return ['front', 'left', 'right'].reduce((t, e) => {
-      const len = e === 'front' ? s.w : s.d;
-      return t + subtract(0, len, covered(s, e).map(([a, b]) => e === 'front' ? [a - r.x0, b - r.x0] : [a, b])).reduce((u, [a, b]) => u + b - a, 0);
-    }, 0);
-  }
-  const skirtH = () => Math.max(0, S.H - 1.05);
-  function skirtLine(s) {
-    if (S.skirt === 'none' || !raised(s) || skirtH() < 0.5) return null;
-    const sf = Math.round(exposedLF(s) * skirtH());
-    return [`Trex horizontal skirt · ${sf} SF × $${SKIRT_SF}`, sf * SKIRT_SF];
-  }
-  function priceSection(s) {
-    const sf = s.w * s.d, dk = DECKING[S.decking], lines = [];
-    const steps = stairEdge(s) ? risers(S.H) : 0;
-    const boxLine = () => (steps && s.stairBox === 'boxed') ? [[`Box steps · ${steps} × $100`, steps * 100]] : [];
-    if (s.kind === 'porch') {
-      // Same rules as computePorchBuild(): Eze-Breeze prices on the screen rows, sunrooms on the
-      // open rows, freestanding on the wall-tie rows plus the freestanding add.
-      const baseType = s.type === 'ezebreeze' ? 'screen' : s.type === 'sunroom' ? 'open' : s.type;
-      const tieBase = s.tie === 'free' ? 'wall' : s.tie;
-      const rate = PORCH_BASE[`${baseType}_${tieBase}_${s.floor}`], pl = porchPlan(s);
-      lines.push([`${TIE_LABEL[s.tie]}, ${ROOF_LABEL[s.roof].toLowerCase()}, ${s.floor === 'deck' ? 'on new PT deck' : 'on patio'} · ${sf} SF × $${rate}`, sf * rate]);
-      if (s.tie === 'free') lines.push([`Freestanding structure add · ${sf} SF × $7`, sf * 7]);
-      if (s.roof === 'gable' || s.roof === 'hip') { lines.push([`PT LVL framing (porch depth) · ${s.d} LF × $50`, s.d * 50]); lines.push(['Engineer letter (LVL)', 1800]); }
-      if (s.roof === 'semivault') lines.push(['Engineer letter (semi-vaulted roof)', 1800]);
-      if (hasGableEnd(s) && s.w > 19) lines.push(['Gable / semi-vaulted wider than 19′ add', GABLE_OVER_19]);
-      if (s.roof === 'hip') { lines.push(['Hip roof', 3000]); lines.push([`Flat ceiling (required with hip roof) · ${sf} SF × $5`, sf * 5]); }
-      if (s.type === 'screen') lines.push([`ScreenEze screens · ${sf} SF × $${SCREENEZE_SF}`, sf * SCREENEZE_SF]);
-      if (s.type === 'screen' || s.type === 'ezebreeze') lines.push(['6×6 laminated COX column package', 2000]);
-      if (s.type === 'ezebreeze') {
-        lines.push([`Eze-Breeze windows · ${pl.windows} × $530`, pl.windows * 530]);
-        if (pl.transoms) lines.push([`Eze-Breeze transoms (wall over 100″) · ${pl.transoms} × $130`, pl.transoms * 130]);
-      }
-      if ((s.type === 'screen' || s.type === 'ezebreeze') && pl.doors) lines.push([`Larsen Tradewinds door + lip · ${pl.doors} × $880`, pl.doors * 880]);
-      if (s.type === 'sunroom') {
-        lines.push([`Sunroom windows 36″×60″ · ${pl.windows} × $950`, pl.windows * 950]);
-        lines.push([`Knee wall · ${pl.kneeSF} SF × $29`, pl.kneeSF * 29]);
-        lines.push(['Sunroom insulation', 800]);
-        if (pl.doors) lines.push([`36″ Fullview glass door · ${pl.doors} × $1,500`, pl.doors * 1500]);
-      }
-      if (hasGableEnd(s) && gableEndOf(s) === 'glass') { const n = s.tie === 'free' ? 2 : 1; lines.push([`Glass in gable end · ${n} × $975`, n * 975]); }
-      if (s.floor === 'deck' && S.decking !== 'pt' && !dk.porchUp) lines.push([`${dk.label} porch floor upgrade · not on the price sheet yet`, 0]);
-      if (s.floor === 'deck' && dk.porchUp) lines.push([`${dk.label} floor upgrade · ${sf} SF × $${dk.porchUp.toFixed(2)}`, sf * dk.porchUp]);
-      if (s.floor === 'deck' && S.H > 8) lines.push([`Deck above 8′ high · ${sf} SF × $${DECK_OVER_8_SF}`, sf * DECK_OVER_8_SF]);
-      if (steps) lines.push([`${dk.label} steps · ${steps} × ${STAIR_W}′ × ${STEP_FACTOR} × $${dk.deckSF}`, steps * STAIR_W * STEP_FACTOR * dk.deckSF]);
-      lines.push(...boxLine());
-      const sk = skirtLine(s); if (sk) lines.push(sk);
-    } else if (s.kind === 'deck') {
-      lines.push([`${dk.label} deck · ${sf} SF × $${dk.deckSF}`, sf * dk.deckSF]);
-      if (steps) lines.push([`${dk.label} steps · ${steps} × ${STAIR_W}′ × ${STEP_FACTOR} × $${dk.deckSF}`, steps * STAIR_W * STEP_FACTOR * dk.deckSF]);
-      lines.push(...boxLine());
-      let lf = exposedLF(s);
-      if (steps) lf -= STAIR_W;
-      if (steps >= 4) lf += 2 * Math.hypot((steps - 1) * RUN, S.H);
-      lf = Math.round(lf);
-      const rr = railRate();
-      if (lf > 0) lines.push([`${rr.label} · ${lf} LF × $${rr.lf}`, lf * rr.lf]);
-      if (S.H > 8) lines.push([`Deck above 8′ high · ${sf} SF × $${DECK_OVER_8_SF}`, sf * DECK_OVER_8_SF]);
-      const sk = skirtLine(s); if (sk) lines.push(sk);
-    } else {
-      const p = PATIO[s.mat];
-      if (s.mat === 'concrete') {
-        const r = sf < 200 ? p.smallSF : p.sf;
-        lines.push([`${p.item}${sf < 200 ? ' (under 200 SF)' : ''} · ${sf} SF × $${r}`, sf * r]);
-      } else {
-        lines.push([`${p.item} · ${sf} SF × $${p.sf}`, sf * p.sf]);
-        if (sf < 200) lines.push([`Patio under 200 SF add · ${sf} SF × $${p.smallAdd}`, sf * p.smallAdd]);
-      }
-    }
-    return lines;
-  }
+  // ── Price: whatever the proposal shows the customer ────────────────────────
+  const usd = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
   function price() {
-    let total = 0;
-    $('price-lines').innerHTML = S.sections.map(s => {
-      const lines = priceSection(s), sub = lines.reduce((a, [, v]) => a + v, 0); total += sub;
-      return `<div class="price-group"><div class="price-head"><span>${title(s)} ${s.w}′ × ${s.d}′</span><span>${money.format(sub)}</span></div>${lines.map(([l, v]) => `<div class="price-line"><span>${l}</span><span>${money.format(v)}</span></div>`).join('')}</div>`;
-    }).join('');
-    $('price-total').textContent = money.format(total);
+    const pr = S.meta.priceRange, tot = Number(S.meta.total) || 0;
+    $('price-total').textContent = pr ? `${usd(pr.low)} – ${usd(pr.high)}` : tot ? usd(tot) : '—';
+    $('price-label').textContent = pr ? 'Proposal price range' : tot ? 'Proposal total' : 'Price';
+    $('price-note').textContent = (pr || tot)
+      ? 'From the proposal. Changing sizes or options here does not change the price; an updated quote does.'
+      : 'Open this from a proposal (Sales → Designs) to show its price. Changes made here do not change any price.';
   }
 
   // ── Section list & editor ──────────────────────────────────────────────────
@@ -630,7 +589,8 @@
 
   const FMT = {
     w: v => `${v}′`, d: v => `${v}′`, z: v => `${v}′`,
-    wallH: v => `${ftIn(v)}${v * 12 > EZE.maxH ? ' · transoms' : ''}`,
+    wallH: v => sel()?.kind === 'patio' ? (v > 0 ? ftIn(v) : 'None (at grade)') : `${ftIn(v)}${v * 12 > EZE.maxH ? ' · transoms' : ''}`,
+    wallLen: v => v > 0 ? `${v}′` : 'All open edges',
     x: v => v === 0 ? 'Centered' : `${Math.abs(v)}′ ${v < 0 ? 'left' : 'right'}`,
   };
   function renderEditor() {
@@ -638,27 +598,33 @@
     const seg = (key, opts, off = [], val = s[key]) => `<div class="seg">${opts.map(([v, l, sm]) => `<input type="radio" name="e-${key}" id="e-${key}-${v}" value="${v}"${val === v ? ' checked' : ''}${off.includes(v) ? ' disabled' : ''}><label for="e-${key}-${v}"${off.includes(v) ? ' style="opacity:.4;cursor:not-allowed"' : ''}>${l}${sm ? `<small>${sm}</small>` : ''}</label>`).join('')}</div>`;
     const range = (key, label, min, max, step) => `<div class="row-label"><label class="label" for="e-${key}">${label}</label><output id="e-${key}-out" for="e-${key}">${FMT[key](s[key])}</output></div><input type="range" id="e-${key}" data-key="${key}" min="${min}" max="${max}" step="${step}" value="${s[key]}">`;
     let body = range('w', s.kind === 'patio' ? 'Width' : 'Width (along house)', 6, 30, 1) + range('d', s.kind === 'patio' ? 'Depth' : 'Depth (out from house)', 6, 24, 1) + range('x', 'Position along house', -30, 30, 0.5);
-    if (s.kind === 'patio') body += range('z', 'Distance from house', 0, 30, 0.5) + `<span class="label">Surface</span>` + seg('mat', [['pavers', 'Pavers', 'Techo Bloc'], ['concrete', 'Concrete', '4″ slab']]);
+    if (s.kind === 'patio') body += range('z', 'Distance from house', 0, 30, 0.5) + `<span class="label">Surface</span>` + seg('mat', [['pavers', 'Pavers', 'Techo Bloc'], ['concrete', 'Concrete', '4″ slab']])
+      + range('wallH', 'Retaining wall height', 0, 6, 0.5) + (Number(s.wallH) > 0 ? range('wallLen', 'Retaining wall length', 0, 2 * (s.w + s.d), 1) : '');
     if (s.kind === 'porch') body += `<span class="label">Porch type</span>` + seg('type', [['sunroom', 'Sunroom', 'Glass'], ['ezebreeze', 'Eze-Breeze', 'Vinyl'], ['screen', 'Screen', 'ScreenEze'], ['open', 'Open', 'Rail']])
       + range('wallH', 'Wall height', 8, 10, 0.5)
+      + `<span class="label">Enclosed walls</span>` + seg('enclose', [['front2', 'Front + 2 sides'], ['front1', 'Front + 1 side', 'In a corner'], ['front0', 'Front only', 'Inset']], s.tie === 'free' ? ['front1', 'front0'] : [], s.enclose || 'front2')
+      + (s.enclose === 'front1' && s.tie !== 'free' ? `<span class="label">House wall on</span>` + seg('cornerSide', [['left', 'Left side'], ['right', 'Right side']], [], s.cornerSide || 'right') : '')
       + `<span class="label">Roof connection</span>` + seg('tie', [['wall', 'Wall tie', 'Ledger on wall'], ['roof', 'Roof tie', 'Into house roof'], ['free', 'Freestanding', 'Detached']])
       + (s.tie === 'free' ? range('z', 'Distance from house', 2, 30, 0.5) : '')
       + `<span class="label">Roof style</span>` + seg('roof', [['shed', 'Shed'], ['gable', 'Gable'], ['semivault', 'Semi Vault'], ['hip', 'Hip']], s.tie === 'free' ? ['shed', 'hip'] : [])
       + (s.roof === 'shed' ? `<span class="label">Above the side headers</span>` + seg('sideGable', [['open', 'Open', s.type === 'screen' ? 'Screen' : s.type === 'open' ? 'Open air' : 'Glass'], ['closed', 'Closed', 'Trim']]) : '')
-      + (hasGableEnd(s) ? `<span class="label">Gable end${s.tie === 'free' ? 's' : ''}</span>` + seg('gableEnd', [['glass', 'Glass', '+$975 each'], ...(s.type === 'screen' ? [['screen', 'Screen']] : []), ['siding', 'Siding']], [], gableEndOf(s)) : '')
+      + (hasGableEnd(s) ? `<span class="label">Gable end${s.tie === 'free' ? 's' : ''}</span>` + seg('gableEnd', [['glass', 'Glass'], ...(s.type === 'screen' ? [['screen', 'Screen']] : []), ['siding', 'Siding']], [], gableEndOf(s)) : '')
       + `<span class="label">Sits on</span>` + seg('floor', [['deck', 'New PT deck', 'At deck height'], ['patio', 'Patio', 'At grade']]);
     if (s.kind === 'deck') body += `<span class="label">Stairs</span>` + seg('stairs', [['front', 'Front'], ['left', 'Left'], ['right', 'Right'], ['none', 'None']]);
-    if (raised(s) && (s.kind === 'deck' ? s.stairs !== 'none' : true)) body += `<span class="label">Stair sides</span>` + seg('stairBox', [['open', 'Open stringers'], ['boxed', 'Boxed', '+$100 / step']], [], s.stairBox || 'open');
+    if (raised(s) && (s.kind === 'deck' ? s.stairs !== 'none' : true)) body += `<span class="label">Stair sides</span>` + seg('stairBox', [['open', 'Open stringers'], ['boxed', 'Boxed']], [], s.stairBox || 'open');
     e.innerHTML = `<div class="editor-head"><h2 id="e-title">${title(s)}</h2>${S.sections.length > 1 ? '<button type="button" class="link-danger" id="e-remove">Remove section</button>' : ''}</div>${body}`;
     e.querySelectorAll('input[type=range]').forEach(r => r.addEventListener('input', () => {
-      s[r.dataset.key] = +r.value; $(`e-${r.dataset.key}-out`).textContent = FMT[r.dataset.key](s[r.dataset.key]); update();
+      s[r.dataset.key] = +r.value; $(`e-${r.dataset.key}-out`).textContent = FMT[r.dataset.key](s[r.dataset.key]);
+      if (s.kind === 'patio' && r.dataset.key === 'wallH' && ((+r.value > 0) !== !!$('e-wallLen'))) renderEditor();
+      update();
     }));
     e.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => {
       const k = r.name.slice(2); s[k] = r.value; $('e-title').textContent = title(s);
       // Porch Builder rule: a freestanding porch takes a gable or semi-vaulted roof.
       if (k === 'tie' && s.tie === 'free') { if (s.roof === 'shed' || s.roof === 'hip') s.roof = 'gable'; if (s.z < 2) s.z = 6; }
       if (k === 'type') s.gableEnd = null;
-      if (['tie', 'type', 'roof', 'stairs', 'floor'].includes(k)) renderEditor();
+      if (k === 'tie' && s.tie === 'free') s.enclose = 'front2';
+      if (['tie', 'type', 'roof', 'stairs', 'floor', 'enclose'].includes(k)) renderEditor();
       update();
     }));
     $('e-remove')?.addEventListener('click', () => {
@@ -680,7 +646,7 @@
     el.innerHTML = list.map(c => `<input type="radio" name="${name}" id="${name}-${c.key}" value="${c.key}" aria-label="${c.name}"${c.key === S[key] ? ' checked' : ''}><label for="${name}-${c.key}" title="${c.name}" style="background:${c.hex}"></label>`).join('');
     el.addEventListener('change', (e) => { S[key] = e.target.value; nameEl.textContent = list.find(c => c.key === S[key]).name; update(); });
   }
-  $('decking').innerHTML = ['Wood', 'Trex', 'TimberTech'].map(b => `<optgroup label="${b}">${Object.entries(LINES).filter(([, l]) => l.brand === b).map(([k, l]) => `<option value="${k}"${k === S.decking ? ' selected' : ''}>${l.label} · $${DECKING[k].deckSF}/SF deck</option>`).join('')}</optgroup>`).join('');
+  $('decking').innerHTML = ['Wood', 'Trex', 'TimberTech'].map(b => `<optgroup label="${b}">${Object.entries(LINES).filter(([, l]) => l.brand === b).map(([k, l]) => `<option value="${k}"${k === S.decking ? ' selected' : ''}>${l.label}</option>`).join('')}</optgroup>`).join('');
   function colorSwatches() {
     const list = COLORS.filter(c => c.line === S.decking);
     if (!list.some(c => c.key === S.color)) S.color = list[0].key;
@@ -729,13 +695,8 @@
   function planExtents() {
     const rs = S.sections.map(rect);
     let x0 = Math.min(...rs.map(r => r.x0)), x1 = Math.max(...rs.map(r => r.x1)), z1 = Math.max(...rs.map(r => r.z1));
-    S.sections.forEach(x => {
-      const sp = stairPlacement(x); if (!sp) return;
-      const run = risers(S.H) * RUN;
-      if (sp.edge === 'front') z1 = Math.max(z1, rect(x).z1 + run);
-      if (sp.edge === 'left') x0 = Math.min(x0, rect(x).x0 - run);
-      if (sp.edge === 'right') x1 = Math.max(x1, rect(x).x1 + run);
-    });
+    S.sections.forEach(x => { const pw = patioWall(x); if (pw?.steps) z1 = Math.max(z1, rect(x).z1 + pw.steps * pw.run + 1); });
+    S.sections.forEach(x => stairFootprint(x).forEach(([px, pz]) => { x0 = Math.min(x0, px - 1); x1 = Math.max(x1, px + 1); z1 = Math.max(z1, pz + 1); }));
     // room for dimensions, labels and a strip of the house
     return { x0: x0 - 4, x1: x1 + 4, z0: -7, z1: z1 + 4 };
   }
@@ -764,24 +725,28 @@
     const notes = [];
     S.sections.forEach(x => {
       if (x.kind === 'porch') {
-        notes.push(`${PORCH_TYPES[x.type]} ${x.w}′×${x.d}′, ${TIE_LABEL[x.tie].toLowerCase()}`);
+        notes.push(`${PORCH_TYPES[x.type]} ${x.w}′×${x.d}′, ${TIE_LABEL[x.tie].toLowerCase()}${x.enclose === 'front1' ? `, in house corner (${x.cornerSide || 'right'})` : x.enclose === 'front0' ? ', inset' : ''}`);
         notes.push(`  ${ROOF_LABEL[x.roof]}, ${pitchOf(x)} pitch, ${fmtFt(x.wallH || 8)} walls`);
         if (hasGableEnd(x)) notes.push(`  Gable end: ${gableEndOf(x)}`);
       } else if (x.kind === 'deck') notes.push(`Deck ${x.w}′×${x.d}′, ${dk}`);
-      else notes.push(`${x.mat === 'concrete' ? 'Concrete' : 'Paver'} patio ${x.w}′×${x.d}′`);
+      else { const pw = patioWall(x); notes.push(`${x.mat === 'concrete' ? 'Concrete' : 'Paver'} patio ${x.w}′×${x.d}′${pw ? `, raised ${fmtFt(pw.H)} on retaining wall` : ''}`); if (pw?.steps) notes.push(`  ${pw.steps} block steps down`); }
       if (stairEdge(x)) notes.push(`  Stairs ${risers(S.H) - 1} treads, ${x.stairBox === 'boxed' ? 'boxed' : 'open stringers'}`);
     });
     notes.push(`Decking: ${dk}. Floor ${fmtFt(S.H)} above grade.`);
     notes.push(`Railing: ${S.rail === 'aluminum' ? 'black aluminum' : 'hybrid, composite cap, black balusters'}; equal sections, 8′ max.`);
     return notes;
   }
-  function planSVG() {
-    const pick = pickSheet(), sheet = pick.sheet, g = sheet.grid, PX = g.step / pick.ftPerDot;  // pt per foot
+  let PLAN = null, planSel = true;                       // last plan's transform; show selection?
+  const isSel = (x) => planSel && !customer && mode === '2d' && x.id === S.sel;
+  function planSVG(interactive = false) {
+    planSel = interactive;
+    const pick = S.sheetLock ? S.sheetLock.pick : pickSheet(), sheet = pick.sheet, g = sheet.grid, PX = g.step / pick.ftPerDot;  // pt per foot
     const e = planExtents(), GW = (g.cols - 1) * pick.ftPerDot, GH = (g.rows - 1) * pick.ftPerDot, q = pick.ftPerDot;
     // Snap: the origin is a whole number of dots, so integer-foot edges sit on dots.
-    const xo = Math.floor((e.x0 - (GW - (e.x1 - e.x0)) / 2) / q) * q;
-    const zo = Math.floor((e.z0 - (GH - (e.z1 - e.z0)) / 2) / q) * q;
+    const xo = S.sheetLock ? S.sheetLock.xo : Math.floor((e.x0 - (GW - (e.x1 - e.x0)) / 2) / q) * q;
+    const zo = S.sheetLock ? S.sheetLock.zo : Math.floor((e.z0 - (GH - (e.z1 - e.z0)) / 2) / q) * q;
     const X = (x) => (g.x0 + (x - xo) * PX).toFixed(2), Z = (z) => (g.y0 + (z - zo) * PX).toFixed(2);
+    if (interactive) PLAN = { pick, xo, zo, PX, g, toFt: (sx, sy) => [xo + (sx - g.x0) / PX, zo + (sy - g.y0) / PX] };
     const gx0 = xo, gx1 = xo + GW, gz0 = zo, gz1 = zo + GH;      // grid bounds in feet
     const out = [];
     const line = (xa, za, xb, zb, cls) => out.push(`<line class="${cls}" x1="${X(xa)}" y1="${Z(za)}" x2="${X(xb)}" y2="${Z(zb)}"/>`);
@@ -838,6 +803,10 @@
     box(hx0, hz0, hx1, 0, 'house'); line(hx0, 0, hx1, 0, 'wall');
     text(hx0 + ft(4), hz0 + ft(8), 'EXISTING HOUSE', 'house-lbl');
     const att = S.sections.filter(x => !offHouse(x));
+    att.forEach(a => houseSides(a).forEach(side => {
+      const r = rect(a), xa = side === 'left' ? Math.max(gx0, r.x0 - WING) : r.x1, xb = side === 'left' ? r.x0 : Math.min(gx1, r.x1 + WING);
+      box(xa, 0, xb, r.z1, 'house'); line(side === 'left' ? xb : xa, 0, side === 'left' ? xb : xa, r.z1, 'wall'); line(xa, r.z1, xb, r.z1, 'wall');
+    }));
     att.forEach(a => {
       if (a.kind === 'deck') {      // sliding door: two panels, arrow
         const w = 6, x0 = a.x - w / 2;
@@ -857,6 +826,15 @@
       const r = rect(x), sp = stairPlacement(x);
       if (x.kind === 'patio') {
         box(r.x0, r.z0, r.x1, r.z1, 'slab');
+        const pw = patioWall(x);
+        if (pw) {
+          pw.runs.forEach(w => (w.edge === 'front' || w.edge === 'back')
+            ? box(w.a, w.edge === 'front' ? r.z1 - WALL_T : r.z0, w.b, w.edge === 'front' ? r.z1 : r.z0 + WALL_T, 'rwall')
+            : box(w.edge === 'left' ? r.x0 : r.x1 - WALL_T, w.a, w.edge === 'left' ? r.x0 + WALL_T : r.x1, w.b, 'rwall'));
+          if (pw.steps) { box(x.x - (STAIR_W + 1) / 2, r.z1, x.x + (STAIR_W + 1) / 2, r.z1 + pw.steps * pw.run, 'stairs'); for (let k = 1; k < pw.steps; k++) line(x.x - (STAIR_W + 1) / 2, r.z1 + k * pw.run, x.x + (STAIR_W + 1) / 2, r.z1 + k * pw.run, 'tread'); }
+          const lenTot = pw.runs.reduce((a, w) => a + w.b - w.a, 0);
+          text(x.x, (r.z0 + r.z1) / 2 + ft(15), `RAISED ${fmtFt(pw.H)} · ${Math.round(lenTot)} LF RETAINING WALL`, 'note');
+        }
         if (x.mat === 'concrete') concrete(r.x0, r.z0, r.x1, r.z1); else { box(r.x0 + 0.5, r.z0 + 0.5, r.x1 - 0.5, r.z1 - 0.5, 'border'); pavers(r.x0, r.z0, r.x1, r.z1); }
         text(x.x, (r.z0 + r.z1) / 2 - ft(2), x.mat === 'concrete' ? 'CONCRETE PATIO' : 'PAVER PATIO', 'room');
         text(x.x, (r.z0 + r.z1) / 2 + ft(7), `${x.w * x.d} SF`, 'note');
@@ -877,7 +855,7 @@
         box(r.x0, r.z0, r.x1, r.z1, gg.onDeck ? 'floor' : 'slab');
         if (gg.onDeck) decking(r.x0, r.z0, r.x1, r.z1, { front: true, left: true, right: true }); else concrete(r.x0, r.z0, r.x1, r.z1);
         if (x.type === 'sunroom') {
-          const th = 0.5, segs = [['front', 'x', x.d - th / 2, -hw, hw], ['left', 'z', -hw + th / 2, 0, x.d], ['right', 'z', hw - th / 2, 0, x.d], ...(gg.free ? [['back', 'x', th / 2, -hw, hw]] : [])];
+          const th = 0.5, segs = [['front', 'x', x.d - th / 2, -hw, hw], ['left', 'z', -hw + th / 2, 0, x.d], ['right', 'z', hw - th / 2, 0, x.d], ...(gg.free ? [['back', 'x', th / 2, -hw, hw]] : [])].filter(([k]) => !isHouseSide(x, k));
           segs.forEach(([k, ax, f, a, b]) => {
             subtract(a, b, pl.walls[k].map(h => [h.a, h.b])).forEach(([p2, q2]) => ax === 'x' ? box(cx + p2, zo2 + f - th / 2, cx + q2, zo2 + f + th / 2, 'wallfill') : box(cx + f - th / 2, zo2 + p2, cx + f + th / 2, zo2 + q2, 'wallfill'));
             pl.walls[k].forEach(h => {
@@ -891,15 +869,15 @@
         } else if (x.type === 'open') {
           const xs = openFrontXs(x, gg);
           xs.forEach(lx => { post(lx, gg.zF); if (gg.free) post(lx, col / 2); });
-          if (!(x.tie !== 'free' && gg.shed)) [xL, xR].forEach(lx => post(lx, col / 2));
+          if (!(x.tie !== 'free' && gg.shed)) [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(x, k)).forEach(([, lx]) => post(lx, col / 2));
           if (gg.onDeck) {
             const gaps = pl.dp.stairs ? [[-STAIR_RAIL_X, STAIR_RAIL_X]] : [];
             for (let k = 0; k < xs.length - 1; k++) subtract(xs[k] + col / 2, xs[k + 1] - col / 2, gaps).forEach(([a, b]) => railPlan(cx + a, zo2 + gg.zF, cx + b, zo2 + gg.zF, [Math.abs(Math.abs(a) - STAIR_RAIL_X) < 0.01, Math.abs(Math.abs(b) - STAIR_RAIL_X) < 0.01]));
-            [xL, xR].forEach(lx => railPlan(cx + lx, zo2 + (gg.free || !gg.shed ? col : 0.25), cx + lx, zo2 + gg.zF - col / 2, [!(gg.free || !gg.shed), false]));
+            [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(x, k)).forEach(([, lx]) => railPlan(cx + lx, zo2 + (gg.free || !gg.shed ? col : 0.25), cx + lx, zo2 + gg.zF - col / 2, [!(gg.free || !gg.shed), false]));
             if (gg.free) for (let k = 0; k < xs.length - 1; k++) railPlan(cx + xs[k] + col / 2, zo2 + col / 2, cx + xs[k + 1] - col / 2, zo2 + col / 2, [false, false]);
           }
         } else {
-          const kinds = [['front', 'x', gg.zF], ['left', 'z', xL], ['right', 'z', xR], ...(gg.free ? [['back', 'x', col / 2]] : [])];
+          const kinds = [['front', 'x', gg.zF], ['left', 'z', xL], ['right', 'z', xR], ...(gg.free ? [['back', 'x', col / 2]] : [])].filter(([k]) => !isHouseSide(x, k));
           kinds.forEach(([k, ax, f]) => {
             pl.walls[k].cols.forEach(c => ax === 'x' ? post(c, f) : (c > 0.05 || gg.free) && post(f, Math.max(c, col / 2)));
             pl.walls[k].open.forEach(o => {
@@ -930,33 +908,52 @@
         text(cx, zo2 + x.d * 0.58 + ft(9), `${ROOF_LABEL[x.roof]} · ${TIE_LABEL[x.tie].toLowerCase()}`, 'note');
         text(cx, zo2 + x.d * 0.58 + ft(17), `${x.w * x.d} SF · ${fmtFt(x.wallH || 8)} walls`, 'note');
       }
-      // Stairs: treads, a down arrow, rails with posts; boxed stairs get a heavy outline.
-      if (sp) {
-        const n = risers(S.H), run = (n - 1) * RUN, sw = STAIR_W, boxed = x.stairBox === 'boxed';
-        const ts = Array.from({ length: n }, (_, k) => k * RUN);
-        const railed = n >= 4;
-        if (sp.edge === 'front') {
-          box(sp.x - sw / 2, sp.z, sp.x + sw / 2, sp.z + run, boxed ? 'stairs-box' : 'stairs');
-          ts.forEach(d => line(sp.x - sw / 2, sp.z + d, sp.x + sw / 2, sp.z + d, 'tread'));
-          line(sp.x, sp.z + 0.3, sp.x, sp.z + run - 0.3, 'arrow'); text(sp.x, sp.z + run + ft(13), `DN · ${n - 1} TREADS${boxed ? ' · BOXED' : ''}`, 'note');
-          if (railed) [-1, 1].forEach(sd => railPlan(sp.x + sd * STAIR_RAIL_X, sp.z, sp.x + sd * STAIR_RAIL_X, sp.z + run, [false, true]));
-        } else {
-          const dir = sp.edge === 'left' ? -1 : 1, xa = sp.x, xb = sp.x + dir * run;
-          box(xa, sp.z - sw / 2, xb, sp.z + sw / 2, boxed ? 'stairs-box' : 'stairs');
-          ts.forEach(d => line(xa + dir * d, sp.z - sw / 2, xa + dir * d, sp.z + sw / 2, 'tread'));
-          line(xa + dir * 0.3, sp.z, xb - dir * 0.3, sp.z, 'arrow'); text(xb + dir * ft(14), sp.z + ft(2), `DN${boxed ? ' · BOXED' : ''}`, 'note');
-          if (railed) [-1, 1].forEach(sd => railPlan(xa, sp.z + sd * STAIR_RAIL_X, xb, sp.z + sd * STAIR_RAIL_X, [false, true]));
+      // Stairs: every flight with treads and a DN arrow, the landing, rails with posts.
+      const sg = stairGeom(x);
+      if (sg) {
+        const boxed = x.stairBox === 'boxed', railed = sg.n >= 4, hw = STAIR_W / 2, W2 = sg.toWorld;
+        const poly = (pts, cls) => out.push(`<polygon class="${cls}" points="${pts.map(([a, b]) => { const [wx, wz] = W2(a, b); return `${X(wx)},${Z(wz)}`; }).join(' ')}"/>`);
+        const ln = (a, b, c2, d, cls) => { const [p1, p2] = [W2(a, b), W2(c2, d)]; line(p1[0], p1[1], p2[0], p2[1], cls); };
+        const rail = (a, b, c2, d, ends) => { const [p1, p2] = [W2(a, b), W2(c2, d)]; railPlan(p1[0], p1[1], p2[0], p2[1], ends); };
+        sg.flights.forEach(f => {
+          const len = (f.k - 1) * RUN;
+          // local → this flight's frame: along = run direction, across = width
+          const P = (along, across) => f.dir ? [f.ox + f.dir * along, f.oz - f.dir * across] : [f.ox + across, f.oz + along];
+          poly([P(0, -hw), P(0, hw), P(len, hw), P(len, -hw)], boxed ? 'stairs-box' : 'stairs');
+          for (let k = 1; k < f.k; k++) ln(...P(k * RUN, -hw), ...P(k * RUN, hw), 'tread');
+          out.push(''); ln(...P(0.3, 0), ...P(Math.max(0.6, len - 0.3), 0), 'arrow');
+          if (railed) [-1, 1].forEach(sd => rail(...P(0, sd * STAIR_RAIL_X), ...P(len, sd * STAIR_RAIL_X), [false, true]));
+        });
+        if (sg.landing) {
+          const z0 = sg.landing.z0;
+          poly([[-hw, z0], [hw, z0], [hw, z0 + LANDING], [-hw, z0 + LANDING]], 'landing');
+          for (let z = z0 + 0.48; z < z0 + LANDING - 0.1; z += 0.48) ln(-hw + 0.1, z, hw - 0.1, z, 'board');
+          const [lx, lz] = W2(0, z0 + LANDING / 2); text(lx, lz + ft(2.5), 'LANDING', 'note');
         }
+        const last = sg.flights[sg.flights.length - 1], llen = (last.k - 1) * RUN;
+        const tip = last.dir ? [last.ox + last.dir * (llen + 1.2), last.oz] : [last.ox, last.oz + llen + 1.2];
+        const [tx, tz] = W2(...tip);
+        text(tx, tz + ft(2.5), `DN · ${sg.n - 1} TREADS${sg.landing ? ' + LANDING' : ''}${boxed ? ' · BOXED' : ''}`, 'note');
+        if (isSel(x)) out.push(`<rect class="stair-hit" data-stairs="1" x="${X(Math.min(...stairFootprint(x).map(q => q[0])))}" y="${Z(Math.min(...stairFootprint(x).map(q => q[1])))}" width="${((Math.max(...stairFootprint(x).map(q => q[0])) - Math.min(...stairFootprint(x).map(q => q[0]))) * PX).toFixed(1)}" height="${((Math.max(...stairFootprint(x).map(q => q[1])) - Math.min(...stairFootprint(x).map(q => q[1]))) * PX).toFixed(1)}"/>`);
       }
       // Dimensions: attached widths along the house, depths on a free side.
       if (offHouse(x)) dim(r.x0, r.x1, r.z1 + ft(12), true, fmtFt(x.w));
       else dim(r.x0, r.x1, -3.6, true, fmtFt(x.w));
-      const stairOut = sp && (sp.edge === 'left' || sp.edge === 'right') ? risers(S.H) * RUN : 0;
-      if (!neighbour(x, 'right')) dim(r.z0, r.z1, r.x1 + ft(14) + (sp && sp.edge === 'right' ? stairOut : 0), false, fmtFt(x.d));
-      else if (!neighbour(x, 'left')) dim(r.z0, r.z1, r.x0 - ft(14) - (sp && sp.edge === 'left' ? stairOut : 0), false, fmtFt(x.d));
+      const fp = stairFootprint(x), stairOut = sp && (sp.edge === 'left' || sp.edge === 'right') ? Math.max(0, ...fp.map(q => sp.edge === 'right' ? q[0] - r.x1 : r.x0 - q[0])) : 0;
+      if (!neighbour(x, 'right') && !isHouseSide(x, 'right')) dim(r.z0, r.z1, r.x1 + ft(14) + (sp && sp.edge === 'right' ? stairOut : 0), false, fmtFt(x.d));
+      else if (!neighbour(x, 'left') && !isHouseSide(x, 'left')) dim(r.z0, r.z1, r.x0 - ft(14) - (sp && sp.edge === 'left' ? stairOut : 0), false, fmtFt(x.d));
       else dim(r.z0, r.z1, r.x0 + ft(10), false, fmtFt(x.d));
     });
     if (att.length > 1) { const ax0 = Math.min(...att.map(a => rect(a).x0)), ax1 = Math.max(...att.map(a => rect(a).x1)); dim(ax0, ax1, -4.8, true, `${fmtFt(ax1 - ax0)} OVERALL`); }
+    // Selected section: dashed outline you can drag, and edge handles to resize.
+    const selx = S.sections.find(isSel);
+    if (selx) {
+      const r = rect(selx), hs = ft(5);
+      box(r.x0, r.z0, r.x1, r.z1, 'sel');
+      const hdl = (x, z, h, cur) => out.push(`<rect class="hdl" data-h="${h}" style="cursor:${cur}" x="${(+X(x) - 5).toFixed(1)}" y="${(+Z(z) - 5).toFixed(1)}" width="10" height="10"/>`);
+      hdl(r.x1, (r.z0 + r.z1) / 2, 'e', 'ew-resize'); hdl(r.x0, (r.z0 + r.z1) / 2, 'w', 'ew-resize'); hdl((r.x0 + r.x1) / 2, r.z1, 's', 'ns-resize');
+      if (offHouse(selx)) hdl((r.x0 + r.x1) / 2, r.z0, 'n', 'ns-resize');
+    }
 
     // Title block fields, written on the sheet's own lines
     const F = sheet.fields, a = splitAddress(S.meta.address), fill = [];
@@ -982,6 +979,8 @@
       .leaf{stroke:#1a1c38;stroke-width:1}.swing{fill:none;stroke:#1a1c38;stroke-width:0.5}
       .roofline{fill:none;stroke:#6d6b66;stroke-width:0.7;stroke-dasharray:5 3}.ridge{stroke:#6d6b66;stroke-width:0.7;stroke-dasharray:2 2}
       .pitch{stroke:#1a1c38;stroke-width:0.6}.pitchhead{fill:#1a1c38}.pitchlbl{font:700 6.5px Helvetica,Arial,sans-serif;fill:#1a1c38;text-anchor:middle}
+      .rwall{fill:#9b958b;stroke:#1a1c38;stroke-width:0.8}.landing{fill:#fbf8f2;stroke:#1a1c38;stroke-width:1}.stair-hit{fill:transparent;stroke:#2c6a4d;stroke-width:1;stroke-dasharray:3 2;cursor:grab}
+      .sel{fill:rgba(44,106,77,.06);stroke:#2c6a4d;stroke-width:1.6;stroke-dasharray:5 3;cursor:move}.hdl{fill:#ffffff;stroke:#2c6a4d;stroke-width:1.4}
       .stairs{fill:none;stroke:#1a1c38;stroke-width:1}.stairs-box{fill:none;stroke:#1a1c38;stroke-width:2.4}.tread{stroke:#1a1c38;stroke-width:0.5}.arrow{stroke:#1a1c38;stroke-width:0.5;marker-end:url(#dnArrow)}
       .dmn,.dimt{stroke:#b03a2e;stroke-width:0.55}.dimlbl{font:700 7px Helvetica,Arial,sans-serif;fill:#b03a2e;text-anchor:middle}
       .room{font:700 8.5px Helvetica,Arial,sans-serif;fill:#1a1c38;text-anchor:middle;letter-spacing:.4px}.note{font:6.2px Helvetica,Arial,sans-serif;fill:#3c3e52;text-anchor:middle}.note-l{font:6.2px Helvetica,Arial,sans-serif;fill:#3c3e52}
@@ -993,9 +992,100 @@
   }
   const currentSheet = () => pickSheet();
   let mode = '3d';
+  // ── Editing on the plan ───────────────────────────────────────────────────
+  function renderTools() {
+    const el = $('plan-tools'), x = S.sections.find(o => o.id === S.sel);
+    if (customer || mode !== '2d' || !x) { el.hidden = true; return; }
+    const b = (grp, v, label, on) => `<button type="button" data-t="${grp}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
+    let h = `<b>${esc(title(x))} ${x.w}′×${x.d}′</b>`;
+    if (x.kind === 'deck') h += `<div class="grp"><span>Stairs</span>${[['front', 'Front'], ['left', 'Left'], ['right', 'Right'], ['none', 'None']].map(([v, l]) => b('stairs', v, l, x.stairs === v)).join('')}</div>`;
+    if (stairEdge(x) && risers(S.H) >= 4) h += `<div class="grp"><span>Landing</span>${[['none', 'None'], ['straight', 'Straight'], ['left', 'Turn left'], ['right', 'Turn right']].map(([v, l]) => b('landing', v, l, (x.landing || 'none') === v)).join('')}</div>`;
+    if (stairEdge(x)) h += `<div class="grp"><span>Sides</span>${b('stairBox', 'open', 'Open', (x.stairBox || 'open') === 'open')}${b('stairBox', 'boxed', 'Boxed', x.stairBox === 'boxed')}</div>`;
+    h += `<div class="grp">${b('flip', '1', 'Flip layout', false)}${S.sections.length > 1 ? `<button type="button" class="danger" data-t="del">Delete</button>` : ''}</div>`;
+    el.innerHTML = h; el.hidden = false;
+  }
+  $('plan-tools').addEventListener('click', (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    const x = S.sections.find(o => o.id === S.sel); if (!x) return;
+    const t = btn.dataset.t, v = btn.dataset.v;
+    if (t === 'flip') {            // mirror the whole build left ↔ right
+      S.sections.forEach(o => { o.x = -o.x; if (o.stairAt != null && (o.stairs === 'front')) o.stairAt = -o.stairAt; if (o.stairs === 'left') o.stairs = 'right'; else if (o.stairs === 'right') o.stairs = 'left'; if (o.landing === 'left') o.landing = 'right'; else if (o.landing === 'right') o.landing = 'left'; });
+    } else if (t === 'del') { S.sections = S.sections.filter(o => o !== x); S.sel = S.sections[0].id; }
+    else { x[t] = v; if (t === 'stairs') x.stairAt = null; }
+    renderEditor(); update();
+  });
+  // Drag: move a section (snaps to the 1′ grid and to neighbouring edges), resize by its
+  // handles, or slide its stairs along their edge.
+  let drag = null, rafPending = false;
+  const snapEdge = (x, v) => {
+    let best = Math.round(v), dist = 0.6;
+    S.sections.forEach(o => { if (o === x || o.kind === 'patio') return; const r = rect(o); [r.x0, r.x1].forEach(e => { if (Math.abs(e - v) < dist) { dist = Math.abs(e - v); best = e; } }); });
+    return best;
+  };
+  function planPoint(ev) {
+    const svg = $('plan').querySelector('svg'); if (!svg || !PLAN) return null;
+    const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return PLAN.toFt(p.x, p.y);
+  }
+  function hitSection(fx, fz) {
+    const hits = S.sections.filter(o => { const r = rect(o); return fx >= r.x0 && fx <= r.x1 && fz >= r.z0 && fz <= r.z1; });
+    hits.sort((a, b) => (a.kind === 'patio') - (b.kind === 'patio') || a.w * a.d - b.w * b.d);
+    if (hits[0]) return hits[0];
+    return S.sections.find(o => { const fp = stairFootprint(o); if (!fp.length) return false; const xs = fp.map(q => q[0]), zs = fp.map(q => q[1]); return fx >= Math.min(...xs) && fx <= Math.max(...xs) && fz >= Math.min(...zs) && fz <= Math.max(...zs); });
+  }
+  const redrawSoon = () => { if (rafPending) return; rafPending = true; requestAnimationFrame(() => { rafPending = false; updateUI(); drawPlan(); }); };
+  $('plan').addEventListener('pointerdown', (ev) => {
+    if (customer || mode !== '2d' || ev.button > 0) return;
+    const f = planPoint(ev); if (!f) return;
+    const hEl = ev.target.closest('[data-h]'), sEl = ev.target.closest('[data-stairs]');
+    let x = S.sections.find(o => o.id === S.sel);
+    if (hEl && x) drag = { kind: 'resize', h: hEl.dataset.h, x, r0: rect(x) };
+    else if (sEl && x) drag = { kind: 'stairs', x };
+    else {
+      x = hitSection(...f);
+      if (!x) { return; }
+      if (x.id !== S.sel) { S.sel = x.id; renderEditor(); }
+      drag = { kind: 'move', x, f0: f, x0: x.x, z0: x.z };
+    }
+    S.sheetLock = { pick: PLAN.pick, xo: PLAN.xo, zo: PLAN.zo };   // keep the sheet steady while dragging
+    $('plan').setPointerCapture(ev.pointerId); ev.preventDefault();
+    redrawSoon();
+  });
+  $('plan').addEventListener('pointermove', (ev) => {
+    if (!drag) return;
+    const f = planPoint(ev); if (!f) return;
+    const x = drag.x, r = rect(x);
+    if (drag.kind === 'move') {
+      const nx = drag.x0 + f[0] - drag.f0[0];
+      const left = snapEdge(x, nx - x.w / 2); x.x = left + x.w / 2;
+      if (offHouse(x)) x.z = Math.max(x.kind === 'patio' ? 0 : 2, Math.round(drag.z0 + f[1] - drag.f0[1]));
+    } else if (drag.kind === 'resize') {
+      const r0 = drag.r0;
+      if (drag.h === 'e') { const x1 = Math.max(r0.x0 + 6, snapEdge(x, f[0])); x.w = Math.round(x1 - r0.x0); x.x = r0.x0 + x.w / 2; }
+      if (drag.h === 'w') { const x0 = Math.min(r0.x1 - 6, snapEdge(x, f[0])); x.w = Math.round(r0.x1 - x0); x.x = r0.x1 - x.w / 2; }
+      if (drag.h === 's') x.d = Math.max(4, Math.round(f[1] - r0.z0));
+      if (drag.h === 'n') { const z0 = Math.min(r0.z1 - 4, Math.max(0, Math.round(f[1]))); x.d = Math.round(r0.z1 - z0); x.z = z0; }
+    } else if (drag.kind === 'stairs' && x.kind === 'deck') {
+      x.stairAt = x.stairs === 'front' ? Math.round(f[0] * 2) / 2 : Math.round(f[1] * 2) / 2;
+    }
+    redrawSoon();
+  });
+  const endDrag = () => { if (!drag) return; drag = null; S.sheetLock = null; renderEditor(); update(); };
+  $('plan').addEventListener('pointerup', endDrag);
+  $('plan').addEventListener('pointercancel', endDrag);
+  // Keyboard: arrows nudge the selected section 1′, Delete removes it.
+  document.addEventListener('keydown', (ev) => {
+    if (mode !== '2d' || customer || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+    const x = S.sections.find(o => o.id === S.sel); if (!x) return;
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
+    if (d) { x.x += d[0]; if (offHouse(x)) x.z = Math.max(0, x.z + d[1]); ev.preventDefault(); renderEditor(); update(); }
+    if ((ev.key === 'Delete' || ev.key === 'Backspace') && S.sections.length > 1) { S.sections = S.sections.filter(o => o !== x); S.sel = S.sections[0].id; renderEditor(); update(); ev.preventDefault(); }
+  });
   function drawPlan() {
     if (mode !== '2d') return;
-    $('plan').innerHTML = planSVG();
+    $('plan').innerHTML = planSVG(true);
+    renderTools();
     const pk = currentSheet(), m = $('plan-msg');
     if (S.sheet === 's11' && pk.key !== 's11') { m.hidden = false; m.textContent = 'This project is too big for 11×17 at 1/4″, so it is on the 18×24 sheet.'; }
   }
@@ -1005,6 +1095,7 @@
     const is2 = m === '2d';
     $('plan').hidden = !is2; $('plan-actions').hidden = !is2; $('plan-msg').hidden = true;
     ['.views', '.render-btn', '.hint', '.summary'].forEach(q => { const el = document.querySelector(q); if (el) el.hidden = is2; });
+    if (!is2) $('plan-tools').hidden = true;
     ['dim-w', 'dim-d'].forEach(id => { $(id).style.display = is2 ? 'none' : ''; });
     drawPlan();
   }
@@ -1196,7 +1287,19 @@
     return c;
   }
 
+  function blockCanvas() {
+    const R = rng(81), [c, x] = cnv(512, 512), pal = ['#a39d93', '#958f86', '#aea89d', '#8c867d', '#9d978c'];
+    x.fillStyle = '#6f6a62'; x.fillRect(0, 0, 512, 512);
+    const rh = 512 / 6, bw = 512 / 3;
+    for (let r = 0; r < 6; r++) for (let i = -1; i < 4; i++) {
+      const bx = i * bw + (r % 2 ? bw / 2 : 0), col = pal[Math.floor(R() * pal.length)];
+      x.fillStyle = col; x.fillRect(bx + 3, r * rh + 3, bw - 6, rh - 6);
+      for (let k = 0; k < 400; k++) { x.fillStyle = shade(col, (R() - .5) * .5, .3); x.fillRect(bx + 3 + R() * (bw - 6), r * rh + 3 + R() * (rh - 6), 2, 2); }
+    }
+    return c;
+  }
   const T = {
+    wallBlock: tex(blockCanvas(), 4, 2),
     brick: tex(brickCanvas(), 4, 4),
     tg: tex(tgCanvas(), 4, 4),
     siding: tex(sidingCanvas(), 4, 4), shingle: tex(shingleCanvas(), 4, 4), grass: tex(grassCanvas(), 9, 9),
@@ -1226,6 +1329,7 @@
     ridge: () => mat('ridge', () => std({ color: '#3e3f43', roughness: 0.95 })),
     concrete: () => mat('concrete', () => std({ color: '#ffffff', map: T.concrete, roughness: 0.95 })),
     pavers: () => mat('pavers', () => std({ color: '#ffffff', map: T.pavers, bumpMap: T.pavers, bumpScale: 0.03, roughness: 0.9 })),
+    block: () => mat('block', () => std({ color: '#9b958b', map: T.wallBlock, bumpMap: T.wallBlock, bumpScale: 0.05, roughness: 0.95 })),
     border: () => mat('border', () => std({ color: '#5d5a55', map: T.concrete, roughness: 0.9 })),
     mulch: () => mat('mulch', () => std({ color: '#ffffff', map: T.mulch, roughness: 1 })),
     bead: () => mat('bead', () => std({ color: '#ffffff', map: T.bead, roughness: 0.7 })),
@@ -1291,7 +1395,7 @@
   scene.add(new THREE.HemisphereLight(0xd6e6ff, 0x4d5a36, 0.35));
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.1);
   sun.castShadow = true; sun.shadow.mapSize.set(3072, 3072);
-  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.09;      // no acne on siding/glass
   scene.add(sun); scene.add(sun.target);
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), std({ color: '#ffffff', map: T.grass, roughness: 1 }));
@@ -1497,39 +1601,92 @@
   }
 
   // Stairs going out from an edge. Built in a local group (stairs run toward +z).
-  function stairs(cx, cz, ry, fy, railed, railStart = -0.2, boxed = false) {
-    const g = group(cx, 0, cz, ry);
-    const n = risers(fy), rise = fy / n, t = 1 / 12;
-    const end = (n - 1) * RUN;
+  // One flight in a local frame (runs toward +z from z=0), from topY down k risers.
+  function flight(fy, k, rise, bottomY, railed, railStart, boxed, toGrade) {
+    const t = 1 / 12, end = (k - 1) * RUN, b = bottomY;
+    for (let i = 1; i < k; i++) {
+      const yt = fy - i * rise, za = (i - 1) * RUN;
+      B(STAIR_W + 0.1, t, RUN / 2 - 0.01, M.deck(0), 0, yt - t / 2, za + RUN * 0.25 + 0.04);
+      B(STAIR_W + 0.1, t, RUN / 2 - 0.01, M.deck(1), 0, yt - t / 2, za + RUN * 0.75 + 0.04);
+      B(STAIR_W, rise - t, 0.06, M.fascia(), 0, yt + (rise - t) / 2, za + 0.03);
+    }
+    const lastH = Math.max(0.05, fy - (k - 1) * rise - t - b);
+    B(STAIR_W, lastH, 0.06, M.fascia(), 0, b + lastH / 2, end + 0.03);
+    if (k > 1) {
+      const pts = [[0, fy - t]];
+      for (let i = 1; i < k; i++) { const yt = fy - i * rise - t; pts.push([(i - 1) * RUN, yt], [i * RUN, yt]); }
+      const cut = [...pts, [end, b], [Math.max(0.2, end - 1.3), b], [0, Math.max(b + 0.15, fy - t - 1.05)]];
+      const full = [...pts, [end, b], [0, b]];
+      [-STAIR_W / 2 + 0.06, 0, STAIR_W / 2 - 0.06].forEach((x, i) => {
+        const P = boxed && i !== 1 ? full : cut;
+        const sh = new THREE.Shape(); sh.moveTo(...P[0]); P.slice(1).forEach(p => sh.lineTo(...p)); sh.closePath();
+        const th = i === 1 ? 0.125 : 0.1;
+        const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false }), i === 1 ? M.pt() : M.fascia());
+        mesh.rotation.y = -Math.PI / 2; mesh.position.set(x + th / 2, 0, 0); mesh.castShadow = mesh.receiveShadow = true; G.add(mesh);
+      });
+    }
+    if (railed) [-1, 1].forEach(sd => railRun(sd * STAIR_RAIL_X, railStart, sd * STAIR_RAIL_X, end + 0.3, fy, fy - (k - 1) * rise, { postA: false, postB: true }));
+    return end;
+  }
+  function stairs(s, fy, railStart = -0.2) {
+    const sg = stairGeom(s); if (!sg) return;
+    const { sp, rise, landing } = sg, railed = sg.n >= 4, boxed = s.stairBox === 'boxed';
+    const g = group(sp.x, 0, sp.z, sp.ry);
+    let foot = null;
     withG(g, () => {
-      for (let i = 1; i < n; i++) {
-        const yt = fy - i * rise, za = (i - 1) * RUN;
-        B(STAIR_W + 0.1, t, RUN / 2 - 0.01, M.deck(0), 0, yt - t / 2, za + RUN * 0.25 + 0.04);
-        B(STAIR_W + 0.1, t, RUN / 2 - 0.01, M.deck(1), 0, yt - t / 2, za + RUN * 0.75 + 0.04);
-        B(STAIR_W, rise - t, 0.06, M.fascia(), 0, yt + (rise - t) / 2, za + 0.03);
-      }
-      const lastH = Math.max(0.05, fy - (n - 1) * rise - t);
-      B(STAIR_W, lastH, 0.06, M.fascia(), 0, lastH / 2, end + 0.03);
-      // Cut stringers: sawtooth top under each tread and riser, straight bottom edge.
-      if (n > 1) {
-        const pts = [[0, fy - t]];
-        for (let i = 1; i < n; i++) { const yt = fy - i * rise - t; pts.push([(i - 1) * RUN, yt], [i * RUN, yt]); }
-        const cut = [...pts, [end, 0], [Math.max(0.2, end - 1.3), 0], [0, Math.max(0.15, fy - t - 1.05)]];
-        const full = [...pts, [end, 0], [0, 0]];        // boxed: the side skirt runs to grade
-        [-STAIR_W / 2 + 0.06, 0, STAIR_W / 2 - 0.06].forEach((x, i) => {
-          const P = boxed && i !== 1 ? full : cut;
-          const sh = new THREE.Shape(); sh.moveTo(...P[0]); P.slice(1).forEach(p => sh.lineTo(...p)); sh.closePath();
-          const th = i === 1 ? 0.125 : 0.1;
-          const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false }), i === 1 ? M.pt() : M.fascia());
-          mesh.rotation.y = -Math.PI / 2; mesh.position.set(x + th / 2, 0, 0); mesh.castShadow = mesh.receiveShadow = true; G.add(mesh);
+      sg.flights.forEach((f, idx) => {
+        const last = idx === sg.flights.length - 1, sub = group(f.ox, 0, f.oz, f.dir ? f.dir * Math.PI / 2 : 0);
+        const end = withG(sub, () => flight(f.top, f.k, rise, last ? 0 : landing.top, railed, idx === 0 ? railStart : -0.1, boxed));
+        if (last) foot = f.dir ? [f.ox + f.dir * (end + 1.75), f.oz] : [f.ox, f.oz + end + 1.75];
+      });
+      if (landing) {
+        // 4′×4′ landing: decking, fascia, posts to grade, rails on the open sides.
+        const z0 = landing.z0, h = landing.top, hw = STAIR_W / 2, bw = 5.5 / 12;
+        for (let z = z0 + 0.02; z < z0 + LANDING - 0.05; z += bw + 0.02) B(STAIR_W, 1 / 12, bw, M.deck(Math.floor(R() * 3)), 0, h - 1 / 24, z + bw / 2);
+        B(STAIR_W + 0.16, 0.9, 0.08, M.fascia(), 0, h - 0.5, z0 + LANDING + 0.04);
+        [-1, 1].forEach(sd => B(0.08, 0.9, LANDING, M.fascia(), sd * (hw + 0.04), h - 0.5, z0 + LANDING / 2));
+        [[-hw + 0.3, z0 + 0.3], [hw - 0.3, z0 + 0.3], [-hw + 0.3, z0 + LANDING - 0.3], [hw - 0.3, z0 + LANDING - 0.3]].forEach(([x, z]) => {
+          if (h - 1 > 0.1) B(0.46, h - 1, 0.46, M.pt(), x, (h - 1) / 2, z);
+          const ft2 = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 16), M.footing()); ft2.position.set(x, 0.06, z); G.add(ft2);
         });
+        if (railed) {
+          const exit = landing.kind === 'straight' ? 'front' : landing.kind;     // side the second flight leaves from
+          if (exit !== 'front') railRun(-hw + 0.2, z0 + LANDING - 0.2, hw - 0.2, z0 + LANDING - 0.2, h, h);
+          if (exit !== 'left') railRun(hw - 0.2, z0 + 0.1, hw - 0.2, z0 + LANDING - 0.2, h, h, { postA: false });
+          if (exit !== 'right') railRun(-hw + 0.2, z0 + 0.1, -hw + 0.2, z0 + LANDING - 0.2, h, h, { postA: false });
+        }
       }
-      if (railed) [-1, 1].forEach(s => railRun(s * STAIR_RAIL_X, railStart, s * STAIR_RAIL_X, end + 0.3, fy, rise, { postA: false, postB: true }));
     });
-    const foot = new THREE.Vector3(0, 0, end + 1.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry).add(new THREE.Vector3(cx, 0, cz));
-    const onPatio = S.sections.some(p => { if (p.kind !== 'patio') return false; const r = rect(p); return foot.x > r.x0 && foot.x < r.x1 && foot.z > r.z0 - 0.5 && foot.z < r.z1; });
-    if (!onPatio) withG(g, () => B(STAIR_W + 1.5, 0.2, 3.2, M.concrete(), 0, 0.1, end + 1.75));
-    return n;
+    const w = new THREE.Vector3(foot[0], 0, foot[1]).applyAxisAngle(new THREE.Vector3(0, 1, 0), sp.ry).add(new THREE.Vector3(sp.x, 0, sp.z));
+    const onPatio = S.sections.some(p => { if (p.kind !== 'patio') return false; const r = rect(p); return w.x > r.x0 && w.x < r.x1 && w.z > r.z0 - 0.5 && w.z < r.z1; });
+    if (!onPatio) { const last = sg.flights[sg.flights.length - 1], pad = group(w.x, 0, w.z, sp.ry + (last.dir ? last.dir * Math.PI / 2 : 0)); withG(pad, () => B(STAIR_W + 1.5, 0.2, 3.2, M.concrete(), 0, 0.1, 0)); }
+  }
+
+  // Flights and landing in the stair's own frame: it starts at the edge (0,0) and runs
+  // toward +z; "left"/"right" are as you walk down. toWorld() maps to plan coordinates.
+  const LANDING = 4;
+  function stairGeom(s) {
+    const sp = stairPlacement(s); if (!sp) return null;
+    const n = risers(S.H), rise = S.H / n, kind = s.landing || 'none';
+    const c = Math.cos(sp.ry), sn = Math.sin(sp.ry);
+    const toWorld = (lx, lz) => [sp.x + lx * c + lz * sn, sp.z - lx * sn + lz * c];
+    if (kind === 'none' || n < 4) return { sp, n, rise, flights: [{ ox: 0, oz: 0, dir: 0, k: n, top: S.H }], landing: null, toWorld };
+    const k1 = Math.ceil(n / 2), L0 = (k1 - 1) * RUN, hL = S.H - k1 * rise;
+    const f2 = kind === 'straight' ? { ox: 0, oz: L0 + LANDING, dir: 0 }
+      : kind === 'left' ? { ox: LANDING / 2, oz: L0 + LANDING / 2, dir: 1 } : { ox: -LANDING / 2, oz: L0 + LANDING / 2, dir: -1 };
+    return { sp, n, rise, toWorld, landing: { z0: L0, top: hL, kind },
+      flights: [{ ox: 0, oz: 0, dir: 0, k: k1, top: S.H }, { ...f2, k: n - k1, top: hL }] };
+  }
+  // Footprint corners (plan coordinates) of every flight and the landing.
+  function stairFootprint(s) {
+    const sg = stairGeom(s); if (!sg) return [];
+    const pts = [], hw = STAIR_W / 2;
+    sg.flights.forEach(f => {
+      const len = (f.k - 1) * RUN, a = f.dir ? [f.ox, f.oz - hw] : [f.ox - hw, f.oz], b = f.dir ? [f.ox + f.dir * len, f.oz + hw] : [f.ox + hw, f.oz + len];
+      [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]].forEach(([x, z]) => pts.push(sg.toWorld(x, z)));
+    });
+    if (sg.landing) [[-hw, sg.landing.z0], [hw, sg.landing.z0], [hw, sg.landing.z0 + LANDING], [-hw, sg.landing.z0 + LANDING]].forEach(([x, z]) => pts.push(sg.toWorld(x, z)));
+    return pts;
   }
 
   function stairPlacement(s) {
@@ -1543,8 +1700,9 @@
       if (st.edge === 'front') return { edge: 'front', c: s.x + st.c, x: s.x + st.c, z: r.z1, ry: 0 };
       return st.edge === 'left' ? { edge: 'left', c: st.c, x: r.x0, z: st.c, ry: -Math.PI / 2 } : { edge: 'right', c: st.c, x: r.x1, z: st.c, ry: Math.PI / 2 };
     }
-    if (e === 'front') return { edge: e, c: s.x, x: s.x, z: r.z1, ry: 0 };
-    const zc = Math.min(Math.max(r.z1 - 3.5, r.z0 + STAIR_W / 2 + 0.5), r.z1 - STAIR_W / 2 - 0.3);
+    const clampTo = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+    if (e === 'front') { const xc = clampTo(s.stairAt ?? s.x, r.x0 + STAIR_W / 2 + 0.3, r.x1 - STAIR_W / 2 - 0.3); return { edge: e, c: xc, x: xc, z: r.z1, ry: 0 }; }
+    const zc = clampTo(s.stairAt ?? r.z1 - 3.5, r.z0 + STAIR_W / 2 + 0.5, r.z1 - STAIR_W / 2 - 0.3);
     return e === 'left' ? { edge: e, c: zc, x: r.x0, z: zc, ry: -Math.PI / 2 } : { edge: e, c: zc, x: r.x1, z: zc, ry: Math.PI / 2 };
   }
 
@@ -1553,7 +1711,7 @@
     const r = rect(s), fy = S.H;
     deckFloor(r.x0, r.x1, r.z0, r.z1, fy);
     const sp = stairPlacement(s);
-    if (sp) stairs(sp.x, sp.z, sp.ry, fy, risers(fy) >= 4, -0.2, s.stairBox === 'boxed');
+    if (sp) stairs(s, fy, -0.2);
     skirting(r.x0, r.x1, r.z0, r.z1, fy, { front: covered(s, 'front'), left: covered(s, 'left'), right: covered(s, 'right') });
     const railed = risers(fy) >= 4;
     const gapAt = (edge) => sp && sp.edge === edge ? [[sp.c - STAIR_RAIL_X, sp.c + STAIR_RAIL_X]] : [];
@@ -1564,12 +1722,31 @@
   }
 
   function buildPatio(s) {
-    const r = rect(s), cx = s.x, cz = (r.z0 + r.z1) / 2;
-    if (s.mat === 'concrete') { B(s.w, 0.33, s.d, M.concrete(), cx, 0.165, cz); return; }
-    B(s.w - 1, 0.25, s.d - 1, M.pavers(), cx, 0.125, cz);
-    B(s.w, 0.24, 0.5, M.border(), cx, 0.12, r.z0 + 0.25); B(s.w, 0.24, 0.5, M.border(), cx, 0.12, r.z1 - 0.25);
-    [r.x0 + 0.25, r.x1 - 0.25].forEach(x => B(0.5, 0.24, s.d - 1, M.border(), x, 0.12, cz));
+    const r = rect(s), cx = s.x, cz = (r.z0 + r.z1) / 2, pw = patioWall(s), h = pw ? pw.H : 0;
+    if (h > 0) {
+      // fill under the raised patio, then the block wall and its cap along the wall runs
+      B(s.w - 0.1, h, s.d - 0.1, M.footing(), cx, h / 2, cz, { cast: false });
+      pw.runs.forEach(w => {
+        const len = w.b - w.a, cap = 0.18;
+        if (w.edge === 'front' || w.edge === 'back') {
+          const z = w.edge === 'front' ? r.z1 - WALL_T / 2 : r.z0 + WALL_T / 2;
+          B(len, h, WALL_T, M.block(), (w.a + w.b) / 2, h / 2, z); B(len + 0.2, cap, WALL_T + 0.2, M.border(), (w.a + w.b) / 2, h + cap / 2, z);
+        } else {
+          const x = w.edge === 'left' ? r.x0 + WALL_T / 2 : r.x1 - WALL_T / 2;
+          B(WALL_T, h, len, M.block(), x, h / 2, (w.a + w.b) / 2); B(WALL_T + 0.2, cap, len + 0.2, M.border(), x, h + cap / 2, (w.a + w.b) / 2);
+        }
+      });
+      if (pw.steps) {
+        const n = pw.steps, rise = h / n;
+        for (let k = 0; k < n; k++) { const top = h - (k + 1) * rise + rise; B(STAIR_W + 1, top, pw.run, M.block(), cx, top / 2, r.z1 + k * pw.run + pw.run / 2); B(STAIR_W + 1.2, 0.15, pw.run + 0.1, M.border(), cx, top + 0.075, r.z1 + k * pw.run + pw.run / 2); }
+      }
+    }
+    if (s.mat === 'concrete') { B(s.w, 0.33, s.d, M.concrete(), cx, h + 0.165, cz); return; }
+    B(s.w - 1, 0.25, s.d - 1, M.pavers(), cx, h + 0.125, cz);
+    B(s.w, 0.24, 0.5, M.border(), cx, h + 0.12, r.z0 + 0.25); B(s.w, 0.24, 0.5, M.border(), cx, h + 0.12, r.z1 - 0.25);
+    [r.x0 + 0.25, r.x1 - 0.25].forEach(x => B(0.5, 0.24, s.d - 1, M.border(), x, h + 0.12, cz));
   }
+
 
   // Hip roof surface: front triangle + two side trapezoids meeting a ridge that runs back to zBack.
   function hipRoof(zBack, zB, span, yE, yR, thick, trim) {
@@ -1636,9 +1813,9 @@
         sideZs.left = sideZs.right = spread(backPost ? col / 2 : 0, zF, LVL_SPAN);
         frontXs.forEach(x => openCol(x, zF, frontTop));
         if (free) frontXs.forEach(x => openCol(x, col / 2, frontTop));
-        [xL, xR].forEach(x => sideZs.left.slice(0, -1).forEach(z => { if (z > 0.05) openCol(x, z, sideTop(z)); }));
+        [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(s, k)).forEach(([, x]) => sideZs.left.slice(0, -1).forEach(z => { if (z > 0.05) openCol(x, z, sideTop(z)); }));
       } else if (s.type !== 'sunroom') {
-        pl.walls.front.cols.forEach(x => lamCol(x, zF, frontTop));
+        pl.walls.front.cols.forEach(x => lamCol(x, zF, frontTop));   // house sides have no columns (empty layout)
         if (free) pl.walls.back.cols.forEach(x => lamCol(x, col / 2, frontTop));
         [['left', xL], ['right', xR]].forEach(([k, x]) => pl.walls[k].cols.slice(0, -1).forEach(z => lamCol(x, Math.max(z, col / 2), sideTop(z))));
       }
@@ -1646,16 +1823,18 @@
       // ── Header across the front; gable roofs also carry level side plates.
       // Shed roofs: rafters run from the house ledger down onto the front header.
       B(W, beamH, col, t, 0, beamTop - beamH / 2, zF);
-      [xL, xR].forEach(x => B(col, beamH, zF, t, x, beamTop - beamH / 2, zF / 2));
+      // Side headers; a house side gets a ledger on the house wall instead.
+      [['left', xL], ['right', xR]].forEach(([k, x]) => isHouseSide(s, k) ? B(0.25, beamH, zF, t, x + (k === 'left' ? -col / 2 + 0.13 : col / 2 - 0.13), beamTop - beamH / 2, zF / 2) : B(col, beamH, zF, t, x, beamTop - beamH / 2, zF / 2));
       if (free) B(W, beamH, col, t, 0, beamTop - beamH / 2, col / 2);
       else if (!shed) B(W, beamH, 0.25, t, 0, beamTop - beamH / 2, 0.13);
       else {
         const rise = roofAt(0) - beamTop, run = zF + col / 2;
-        if ((s.sideGable || 'open') === 'closed' || s.type === 'sunroom') [xL, xR].forEach(x => tri([[0, 0], [run, 0], [0, rise]], col, t, m => { m.rotation.y = -Math.PI / 2; m.position.set(x + col / 2, beamTop, 0); }));
+        const openSides = [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(s, k)).map(([, x]) => x);
+        if ((s.sideGable || 'open') === 'closed' || s.type === 'sunroom') openSides.forEach(x => tri([[0, 0], [run, 0], [0, rise]], col, t, m => { m.rotation.y = -Math.PI / 2; m.position.set(x + col / 2, beamTop, 0); }));
         else if (s.type !== 'open') {
           // Glass or screen in the triangle above each side header, with a sloped rafter trim and a centre mullion.
           const infill = s.type === 'screen' ? M.screen() : M.gableGlass(), k = 1 / Math.cos(Math.atan(rise / run));
-          [xL, xR].forEach(x => {
+          openSides.forEach(x => {
             tri([[0, 0], [run, 0], [0, rise]], 0.02, infill, m => { m.rotation.y = -Math.PI / 2; m.position.set(x + 0.01, beamTop, 0); m.userData.noAO = true; m.castShadow = false; });
             beamYZ(x, beamTop + rise - 0.14, 0, beamTop - 0.14, run, col, 0.28, t);
             const zm = run / 2, h = rise * (1 - zm / run);
@@ -1673,7 +1852,11 @@
         const y1 = roofAt(zs);
         beamYZ(0, y1 + rz / 2 * k, zs, y2 + rz / 2 * k, z2, W + 2, rz, t);
         beamYZ(0, y1 + (rz + 0.05) * k, zs, y2 + (rz + 0.05) * k, z2 + 0.08, W + 2.15, 0.1, M.shingle());
-        if (roofTie) B(W - 2 * col, roofAt(1.7) - (E - 1.1), 0.12, M.siding(), 0, (roofAt(1.7) + E - 1.1) / 2, 1.7);
+        if (roofTie) {
+          B(W - 2 * col, roofAt(1.7) - (E - 1.1), 0.12, M.siding(), 0, (roofAt(1.7) + E - 1.1) / 2, 1.7);
+          // Close the sides: the wedge between the porch rafters and the house roof, at both rakes.
+          if (zs < 0) [-1, 1].forEach(sd => tri([[zs, roofAt(zs)], [1.3, roofAt(1.3)], [1.3, E - 0.65]], 0.12, M.siding(), m => { m.rotation.y = -Math.PI / 2; m.position.set(sd * (hw + 1) + (sd > 0 ? 0.12 : 0), 0, 0); }));
+        }
         beamYZ(0, roofAt(0) - 0.02, 0, roofAt(zF) - 0.02, zF, W - 0.05, 0.03, M.tg(), { cast: false });
         const gy = y2 + rz * k - 0.22;
         B(W + 2.15, 0.38, 0.4, M.gutter(), 0, gy, z2 + 0.25);
@@ -1758,7 +1941,7 @@
         gg.setAttribute('position', new THREE.Float32BufferAttribute([...p.slice(0, 9), ...p.slice(0, 3), ...p.slice(6, 12)], 3)); gg.computeVertexNormals();
         const qm = new THREE.Mesh(gg, m); qm.userData.noAO = true; G.add(qm);
       };
-      const walls = [['front', 'x', zF, 1, () => frontTop], ['left', 'z', xL, -1, sideTop], ['right', 'z', xR, 1, sideTop], ...(free ? [['back', 'x', col / 2, -1, () => frontTop]] : [])];
+      const walls = [['front', 'x', zF, 1, () => frontTop], ['left', 'z', xL, -1, sideTop], ['right', 'z', xR, 1, sideTop], ...(free ? [['back', 'x', col / 2, -1, () => frontTop]] : [])].filter(([k]) => !isHouseSide(s, k));
       // put(u, y, w, h, off, depth, m): a box on a wall, u along it, off = outward offset
       const putter = (axis, fixed, n) => (u, y, w, h, off, d, m) => axis === 'x' ? B(w, h, d, m, u, y, fixed + n * off) : B(d, h, w, m, fixed + n * off, y, u);
 
@@ -1808,7 +1991,7 @@
         // Framed walls with siding, cut for 36″×60″ windows on a 30″ knee wall.
         const th = 0.5, wy0 = fy + SUN.knee / 12, wy1 = wy0 + SUN.h / 12;
         const wallTop = { front: () => beamTop, back: () => beamTop, left: shed ? roofAt : () => beamTop, right: shed ? roofAt : () => beamTop };
-        [['front', 'x', D - th / 2, 1, -hw, hw], ['left', 'z', -hw + th / 2, -1, 0, D], ['right', 'z', hw - th / 2, 1, 0, D], ...(free ? [['back', 'x', th / 2, -1, -hw, hw]] : [])].forEach(([k, axis, fixed, n, a, b]) => {
+        [['front', 'x', D - th / 2, 1, -hw, hw], ['left', 'z', -hw + th / 2, -1, 0, D], ['right', 'z', hw - th / 2, 1, 0, D], ...(free ? [['back', 'x', th / 2, -1, -hw, hw]] : [])].filter(([k]) => !isHouseSide(s, k)).forEach(([k, axis, fixed, n, a, b]) => {
           const top = wallTop[k], sh = new THREE.Shape();
           sh.moveTo(a, fy); sh.lineTo(b, fy); sh.lineTo(b, top(b)); sh.lineTo(a, top(a)); sh.closePath();
           pl.walls[k].forEach(h => {
@@ -1842,7 +2025,7 @@
           subtract(frontXs[i] + col / 2, frontXs[i + 1] - col / 2, gaps).forEach(([a, b]) => railRun(a, zF, b, zF, fy, fy, { postA: atGap(a), postB: atGap(b) }));
         }
         if (free) for (let i = 0; i < frontXs.length - 1; i++) railRun(frontXs[i] + col / 2, col / 2, frontXs[i + 1] - col / 2, col / 2, fy, fy, { postA: false, postB: false });
-        [['left', xL], ['right', xR]].forEach(([k, x]) => {
+        [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(s, k)).forEach(([k, x]) => {
           const zs = [backPost ? col / 2 : 0, ...sideZs[k].filter(z => z > 0.05)];
           for (let i = 0; i < zs.length - 1; i++) {
             const a0 = zs[i] + (i || backPost ? col / 2 : 0.25), b0 = zs[i + 1] - col / 2;
@@ -1852,18 +2035,25 @@
       }
     });
     const sp = stairPlacement(s);
-    if (sp) stairs(sp.x, sp.z, sp.ry, fy, risers(fy) >= 4, -col / 2, s.stairBox === 'boxed');
+    if (sp) stairs(s, fy, -col / 2);
   }
 
   function buildHouse(att) {
     const FF = S.H;
     const xs = att.length ? att.flatMap(s => [rect(s).x0, rect(s).x1]) : [-10, 10];
-    const xmin = Math.min(...xs), xmax = Math.max(...xs), hx = (xmin + xmax) / 2;
-    const HW = Math.max(38, xmax - xmin + 20), HD = 28, rz = 0.55, k = 1.118;
+    // The house stays put: centred on 0 and only grows (symmetrically) if a section runs past
+    // its ends, so moving a porch or deck slides it along the back wall.
+    const reach = Math.max(...xs.map(Math.abs)), hx = 0;
+    const HW = Math.max(44, Math.ceil((reach + 6) / 2) * 4), HD = 28, rz = 0.55, k = 1.118;
     let E = FF + 9.3;
     att.forEach(s => {
-      if (s.kind !== 'porch' || s.tie !== 'wall') return;
-      const g = porchGeom(s), top = g.shed ? g.roofAt(0) + rz * 1.03 : g.beamTop + (s.w / 2) * g.gp + rz * 1.12;
+      if (s.kind !== 'porch') return;
+      const g = porchGeom(s);
+      // Roof-tie shed: the house eave sits where the porch rafters (3/12 min) reach the wall,
+      // so the porch roof ties into the house roof right at the eave.
+      if (s.tie === 'roof' && g.shed) { E = Math.max(E, g.beamTop + g.zF * 3 / 12 - 0.45); return; }
+      if (s.tie !== 'wall') return;
+      const top = g.shed ? g.roofAt(0) + rz * 1.03 : g.beamTop + (s.w / 2) * g.gp + rz * 1.12;
       E = Math.max(E, top + 1.3);
     });
     const fTop = Math.min(Math.max(FF - 0.6, 0.8), 2.6);
@@ -1898,6 +2088,17 @@
       B(b - a, 0.12, 3.4, M.mulch(), (a + b) / 2, 0.06, 1.9, { cast: false });
       for (let x = a + 1.8; x < b - 1.2; x += 3.4) shrub(x + (R() - 0.5) * 0.6, 2 + (R() - 0.5) * 0.5, 1.0 + R() * 0.45);
     });
+    // House wings: a corner porch ("Front + 1 side") sits in an L of the house.
+    att.forEach(a => houseSides(a).forEach(side => {
+      const r = rect(a), sd = side === 'left' ? -1 : 1, xa = side === 'left' ? r.x0 - WING : r.x1, xb = xa + WING, xm = (xa + xb) / 2, zEnd = a.d;
+      B(WING, E - fTop, zEnd, M.siding(), xm, fTop + (E - fTop) / 2, zEnd / 2);
+      B(WING + 0.2, fTop, zEnd + 0.1, M.concrete(), xm, fTop / 2, zEnd / 2);
+      const span = WING / 2 + 1, ang = Math.atan(0.5), k2 = 1 / Math.cos(ang), len = span * k2, L = zEnd + 1;
+      [-1, 1].forEach(q => { const pnl = B(len, rz, L, M.shingle(), xm + q * span / 2, E - 0.5 + (WING / 2 - span / 2) * 0.5 + rz / 2 * k2, L / 2 - 0.01, { swap: true }); pnl.rotation.z = -q * ang; });
+      tri([[-WING / 2, 0], [WING / 2, 0], [0, WING / 4]], 0.2, M.siding(), m => m.position.set(xm, E - 0.5, zEnd - 0.2));
+      [-1, 1].forEach(q => beamXY(zEnd + 0.9, xm, E - 0.5 + WING / 4 + 0.6, xm + q * (span + 0.05), E - 1.0, 0.14, 0.5, M.trim()));
+      windowAt(group(xm, FF + 5.3, zEnd), 3, 4.6);
+    }));
     tree(hx - HW / 2 - 16, -6, 1.1); tree(hx + HW / 2 + 14, -22, 1.25); tree(hx - 6, -HD - 18, 1.3);
     treeline(hx, 0);
     return E;
@@ -1927,7 +2128,7 @@
     const rs = S.sections.map(rect);
     const x0 = Math.min(...rs.map(r => r.x0)), x1 = Math.max(...rs.map(r => r.x1)), z1 = Math.max(...rs.map(r => r.z1));
     bbox = { cx: (x0 + x1) / 2, cz: z1 / 2, size: Math.max(x1 - x0, z1, 16) };
-    const half = bbox.size / 2 + 34;
+    const half = bbox.size / 2 + 22 + S.H;                      // tight shadow box = sharper, cleaner shadows
     sun.target.position.set(bbox.cx, 0, bbox.cz);
     sun.position.set(bbox.cx - 40, 70, bbox.cz + 55);
     Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 260 });
@@ -2017,7 +2218,7 @@
     el.style.left = `${(v3.x + 1) / 2 * viewer.clientWidth}px`; el.style.top = `${(1 - v3.y) / 2 * viewer.clientHeight}px`;
   }
   function frame(now) {
-    if (dirty) { build(); dirty = false; }
+    if (dirty && mode !== '2d') { build(); dirty = false; }
     if (tween) {
       const k = Math.min(1, (now - tween.start) / tween.dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
       camera.position.lerpVectors(tween.p0, tween.pos, e); controls.target.lerpVectors(tween.t0, tween.tgt, e);
