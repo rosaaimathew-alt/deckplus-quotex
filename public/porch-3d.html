@@ -6,16 +6,16 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0;font:14px system-ui,sans-serif} [hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Porch 3D Builder</title>
+<title>Deck Plus 3D Builder</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <style>
-  /* Layout: one-screen tool. Control rail on the left, live 3D model filling the rest; stacks on phones. */
+  /* Layout: one-screen tool. Control rail on the left, live 3D scene filling the rest; stacks on phones. */
   :root {
     --bg: #eef2ef; --panel: #ffffff; --fg: #1b2520; --muted: #5a675f; --line: #d5ddd7;
-    --accent: #2c6a4d; --accent-fg: #ffffff; --accent-soft: #e1eee6; --sky: #cddfe8;
-    --tag-bg: rgba(255,255,255,.92); --tag-fg: #1b2520;
+    --accent: #2c6a4d; --accent-fg: #ffffff; --accent-soft: #e3efe8; --sky: #cddfe8;
+    --tag-bg: rgba(255,255,255,.93); --tag-fg: #1b2520; --danger: #a23b2a;
     --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
     --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -23,49 +23,70 @@
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
     --bg: #111714; --panel: #18201c; --fg: #e4ebe6; --muted: #98a69e; --line: #2a3530;
     --accent: #72c196; --accent-fg: #0c140f; --accent-soft: #1f3128; --sky: #1d2a33;
-    --tag-bg: rgba(20,28,24,.9); --tag-fg: #e4ebe6; color-scheme: dark; } }
+    --tag-bg: rgba(20,28,24,.9); --tag-fg: #e4ebe6; --danger: #e48b78; color-scheme: dark; } }
   :root[data-theme="dark"] {
     --bg: #111714; --panel: #18201c; --fg: #e4ebe6; --muted: #98a69e; --line: #2a3530;
     --accent: #72c196; --accent-fg: #0c140f; --accent-soft: #1f3128; --sky: #1d2a33;
-    --tag-bg: rgba(20,28,24,.9); --tag-fg: #e4ebe6; color-scheme: dark; }
+    --tag-bg: rgba(20,28,24,.9); --tag-fg: #e4ebe6; --danger: #e48b78; color-scheme: dark; }
 
   html, body { height: 100%; }
   body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; }
-  .app { display: grid; grid-template-columns: 350px minmax(0, 1fr); height: 100%; }
+  .app { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: 100%; }
   .rail { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto;
-    padding-block: 20px 24px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: 20px;
-    display: flex; flex-direction: column; gap: 18px; }
+    padding-block: 20px 28px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: 20px;
+    display: flex; flex-direction: column; gap: 20px; }
   .eyebrow { font: 600 11px/1 var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
   h1 { font: 700 28px/1.05 var(--font-display); margin: 6px 0 0; text-wrap: balance; }
+  h2 { font: 700 19px/1.1 var(--font-display); margin: 0; }
   .lede { color: var(--muted); margin: 6px 0 0; line-height: 1.45; font-size: 14px; }
 
   fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
   legend, .label { font: 600 13px/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 8px; }
-  .row-label { display: flex; justify-content: space-between; align-items: baseline; }
-  .row-label output { font: 500 14px/1 var(--font-mono); color: var(--fg); }
+  .row-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .row-label output, .row-label .val { font: 500 13.5px/1 var(--font-mono); color: var(--fg); white-space: nowrap; }
   fieldset[disabled] { opacity: .45; }
 
-  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; margin-bottom: 4px; }
   .seg input { position: absolute; opacity: 0; pointer-events: none; }
-  .seg label { text-align: center; padding: 8px 6px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; line-height: 1.15; user-select: none; }
+  .seg label { text-align: center; padding: 8px 4px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; line-height: 1.15; user-select: none; }
   .seg label small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; margin-top: 2px; }
   .seg input:checked + label { background: var(--accent); color: var(--accent-fg); }
   .seg input:checked + label small { color: inherit; opacity: .8; }
   .seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0 0 6px; }
   .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
   .swatches input { position: absolute; opacity: 0; pointer-events: none; }
-  .swatches label { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
+  .swatches label { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
   .swatches input:checked + label { box-shadow: 0 0 0 2px var(--accent); }
   .swatches input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 3px; }
   .swatch-name { font-size: 13px; color: var(--muted); }
 
+  .sec-list { display: flex; flex-direction: column; gap: 6px; }
+  .sec-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; font: inherit; }
+  .sec-item:hover { border-color: var(--muted); }
+  .sec-item[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .sec-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .kind { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; padding: 4px 6px; border-radius: 4px; background: var(--line); color: var(--fg); min-width: 46px; text-align: center; }
+  .sec-item b { font-weight: 600; min-width: 0; }
+  .sec-item span:last-child { font: 500 12.5px/1 var(--font-mono); color: var(--muted); white-space: nowrap; }
+  .add-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .btn { font: 500 14px/1 var(--font-body); padding: 9px 8px; border-radius: 8px; border: 1px dashed var(--muted); background: transparent; color: var(--fg); cursor: pointer; }
+  .btn:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .editor { border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .editor-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .link-danger { background: none; border: 0; color: var(--danger); font: 500 13px/1 var(--font-body); cursor: pointer; padding: 4px; }
+  .link-danger:focus-visible { outline: 2px solid var(--danger); }
+
   .price { border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 6px; }
-  .price-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+  .price-group { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; }
+  .price-head { display: flex; justify-content: space-between; gap: 12px; font-weight: 600; font-size: 14px; }
+  .price-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
   .price-line span:first-child { color: var(--muted); min-width: 0; }
-  .price-line span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .price-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; }
+  .price-line span:last-child, .price-head span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .price-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
   .price-total strong { font: 700 30px/1 var(--font-display); font-variant-numeric: tabular-nums; }
   .note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 0; }
 
@@ -83,7 +104,7 @@
   .summary span { font-size: 13px; opacity: .8; }
   .hint { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 12px; color: var(--tag-fg); background: var(--tag-bg); padding: 6px 10px; border-radius: 6px; }
   .dim { position: absolute; left: 0; top: 0; font: 500 13px/1 var(--font-mono); background: #1b2520; color: #fff; padding: 5px 7px; border-radius: 4px; pointer-events: none; white-space: nowrap; transform: translate(-50%, -50%); }
-  .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+  .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; padding: 20px; text-align: center; }
 
   @media (max-width: 820px) {
     html, body { height: auto; }
@@ -95,72 +116,48 @@
 </style>
 
 <div class="app">
-  <aside class="rail" aria-label="Porch options">
+  <aside class="rail" aria-label="Build options">
     <div>
       <div class="eyebrow">QuoteX prototype · Deck Plus</div>
-      <h1>Porch 3D Builder</h1>
-      <p class="lede">Pick the options and the model and base price update together. Drag to orbit, scroll or pinch to zoom.</p>
+      <h1>Deck Plus 3D Builder</h1>
+      <p class="lede">Combine porches, decks and patios into one build. Pick a section to edit it, or tap it in the 3D view. Drag to orbit, scroll or pinch to zoom.</p>
     </div>
 
     <fieldset>
-      <legend>Porch type</legend>
-      <div class="seg">
-        <input type="radio" name="type" id="type-screen" value="screen" checked><label for="type-screen">Screen porch<small>ScreenEze</small></label>
-        <input type="radio" name="type" id="type-open" value="open"><label for="type-open">Open porch<small>Railing only</small></label>
+      <legend>Sections</legend>
+      <div class="sec-list" id="sec-list"></div>
+      <div class="add-row">
+        <button type="button" class="btn" data-add="porch">+ Porch</button>
+        <button type="button" class="btn" data-add="deck">+ Deck</button>
+        <button type="button" class="btn" data-add="patio">+ Patio</button>
       </div>
     </fieldset>
 
-    <fieldset>
-      <div class="row-label"><label class="label" for="w">Width (along house)</label><output id="w-out" for="w">16′</output></div>
-      <input type="range" id="w" min="10" max="24" step="1" value="16">
-      <div class="row-label"><label class="label" for="d">Depth (out from house)</label><output id="d-out" for="d">14′</output></div>
-      <input type="range" id="d" min="8" max="20" step="1" value="14">
-    </fieldset>
+    <div class="editor" id="sec-editor"></div>
 
     <fieldset>
-      <legend>Roof connection</legend>
-      <div class="seg">
-        <input type="radio" name="tie" id="tie-wall" value="wall" checked><label for="tie-wall">Wall tie<small>Shed roof</small></label>
-        <input type="radio" name="tie" id="tie-roof" value="roof"><label for="tie-roof">Roof tie<small>Gable roof</small></label>
-      </div>
-    </fieldset>
-
-    <fieldset>
-      <legend>Sits on</legend>
-      <div class="seg">
-        <input type="radio" name="floor" id="floor-deck" value="deck" checked><label for="floor-deck">New PT deck<small>Raised, with steps</small></label>
-        <input type="radio" name="floor" id="floor-patio" value="patio"><label for="floor-patio">Existing patio<small>At grade</small></label>
-      </div>
-    </fieldset>
-
-    <fieldset id="height-group">
-      <div class="row-label"><label class="label" for="h">Deck height</label><output id="h-out" for="h">3′-0″</output></div>
+      <legend>Whole build</legend>
+      <div class="row-label"><label class="label" for="h">Deck &amp; floor height</label><output id="h-out" for="h">3′-0″</output></div>
       <input type="range" id="h" min="1" max="10" step="0.5" value="3">
-    </fieldset>
-
-    <fieldset id="decking-group">
-      <legend>Porch floor</legend>
+      <span class="label">Decking</span>
       <div class="seg">
-        <input type="radio" name="decking" id="deck-pt" value="pt" checked><label for="deck-pt">PT<small>Included</small></label>
-        <input type="radio" name="decking" id="deck-enhance" value="enhance"><label for="deck-enhance">Trex Enhance<small>+$7.70/SF</small></label>
-        <input type="radio" name="decking" id="deck-transcend" value="transcend"><label for="deck-transcend">Trex Transcend<small>+$17.60/SF</small></label>
+        <input type="radio" name="decking" id="deck-pt" value="pt"><label for="deck-pt">PT<small>Pressure treated</small></label>
+        <input type="radio" name="decking" id="deck-enhance" value="enhance" checked><label for="deck-enhance">Trex Enhance<small>Composite</small></label>
+        <input type="radio" name="decking" id="deck-transcend" value="transcend"><label for="deck-transcend">Trex Transcend<small>Composite</small></label>
       </div>
       <div id="color-row">
         <div class="row-label"><span class="label">Decking color</span><span class="swatch-name" id="color-name">Sand</span></div>
         <div class="swatches" id="color-swatches"></div>
       </div>
-    </fieldset>
-
-    <fieldset>
-      <div class="row-label"><span class="label">Posts &amp; trim</span><span class="swatch-name" id="trim-name">White</span></div>
+      <div class="row-label"><span class="label">Posts, rail &amp; trim</span><span class="swatch-name" id="trim-name">White</span></div>
       <div class="swatches" id="trim-swatches"></div>
     </fieldset>
 
     <section class="price" aria-label="Base price">
-      <div class="label">Base price from the rate table</div>
+      <div class="label">Base price from the rate tables</div>
       <div id="price-lines"></div>
       <div class="price-total"><span>Estimate</span><strong id="price-total">$0</strong></div>
-      <p class="note">Uses the Porch Builder base rates. Steps, railing, doors, electrical and roof options are priced in QuoteX and left out here. Wall tie is drawn as a shed roof on a house-wall ledger; roof tie as a gable tied into the house roof.</p>
+      <p class="note">Porch, deck, rail, step and patio rates come from the QuoteX price lists. Electrical, doors, ceiling and roof options, fascia, skirting and permits are priced in QuoteX and left out here.</p>
     </section>
   </aside>
 
@@ -171,10 +168,10 @@
       <button type="button" data-view="front" aria-pressed="false">Front</button>
       <button type="button" data-view="top" aria-pressed="false">Plan</button>
     </div>
-    <div class="summary"><b id="sum-title">16′ × 14′ screen porch</b><span id="sum-sub">224 SF · wall tie · on new PT deck</span></div>
-    <div class="hint">Drag to orbit · right-drag to pan</div>
-    <div class="dim" id="dim-w"></div>
-    <div class="dim" id="dim-d"></div>
+    <div class="summary"><b id="sum-title"></b><span id="sum-sub"></span></div>
+    <div class="hint">Drag to orbit · right-drag to pan · tap a section to edit</div>
+    <div class="dim" id="dim-w" hidden></div>
+    <div class="dim" id="dim-d" hidden></div>
   </main>
 </div>
 
@@ -182,69 +179,201 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 (function () {
-  // ── Rates (sell $/SF) copied from src/porchBuild.js defaults ───────────────
-  const BASE = {
+  // ── Rates (sell price) from the QuoteX price lists ─────────────────────────
+  const PORCH_BASE = {                       // src/porchBuild.js, $/SF
     screen_wall_deck: 80, screen_roof_deck: 90, screen_wall_patio: 72, screen_roof_patio: 80,
     open_wall_deck: 77,   open_roof_deck: 87,   open_wall_patio: 67,   open_roof_patio: 77,
   };
-  const SCREENEZE_SF = 3, DECK_OVER_8_SF = 5, GABLE_OVER_19 = 1000;
-  const FLOOR_UPGRADE = { pt: 0, enhance: 7.7, transcend: 17.6 };
-  const DECK_LABEL = { pt: 'PT', enhance: 'Trex Enhance', transcend: 'Trex Transcend' };
+  const SCREENEZE_SF = 3, DECK_OVER_8_SF = 5, GABLE_OVER_19 = 1000, STEP_FACTOR = 1.5;
+  const DECKING = {                          // src/lib/deckPricing.js + porch floor upgrades
+    pt:        { label: 'PT',             deckSF: 33,   porchUp: 0,    rail: { label: '2×2 picket wood rail', lf: 17 } },
+    enhance:   { label: 'Trex Enhance',   deckSF: 48.4, porchUp: 7.7,  rail: { label: 'Hybrid rail, Trex cap', lf: 30.8 } },
+    transcend: { label: 'Trex Transcend', deckSF: 61.6, porchUp: 17.6, rail: { label: 'Hybrid rail, Trex cap', lf: 30.8 } },
+  };
+  const PATIO = {                            // src/hardscape.js
+    pavers:   { label: 'Paver patio',    item: 'Techo Bloc pavers', sf: 27.5, smallAdd: 6 },
+    concrete: { label: 'Concrete patio', item: 'Concrete 4″',       sf: 17,   smallSF: 30 },
+  };
 
   const COLORS = [
-    { key: 'sand', name: 'Sand', hex: '#b39470' },
-    { key: 'driftwood', name: 'Driftwood gray', hex: '#8f8a80' },
-    { key: 'walnut', name: 'Walnut', hex: '#6b4a34' },
-    { key: 'charcoal', name: 'Charcoal', hex: '#4a4b4e' },
+    { key: 'sand', name: 'Sand', hex: '#a98a68' },
+    { key: 'driftwood', name: 'Driftwood gray', hex: '#8c877e' },
+    { key: 'walnut', name: 'Walnut', hex: '#6a4a35' },
+    { key: 'charcoal', name: 'Charcoal', hex: '#55565a' },
   ];
-  const PT_HEX = '#a88f63';
+  const PT_HEX = '#b09363';
   const TRIMS = [
-    { key: 'white', name: 'White', hex: '#f1f0ea' },
-    { key: 'black', name: 'Black', hex: '#2b2b2b' },
-    { key: 'bronze', name: 'Bronze', hex: '#5d4a38' },
+    { key: 'white', name: 'White', hex: '#f2f1ec' },
+    { key: 'black', name: 'Black', hex: '#2a2a2a' },
+    { key: 'bronze', name: 'Bronze', hex: '#5a4836' },
   ];
 
-  const S = { type: 'screen', W: 16, D: 14, tie: 'wall', floor: 'deck', H: 3, decking: 'pt', color: 'sand', trim: 'white' };
+  let nextId = 1;
+  const DEFAULTS = {
+    porch: { w: 14, d: 14, x: 0, z: 0, type: 'screen', tie: 'wall', floor: 'deck' },
+    deck:  { w: 14, d: 12, x: 0, z: 0, stairs: 'front' },
+    patio: { w: 16, d: 12, x: 0, z: 14, mat: 'pavers' },
+  };
+  const mk = (kind, o) => Object.assign({ id: nextId++, kind }, DEFAULTS[kind], o);
+  const S = {
+    H: 3, decking: 'enhance', color: 'sand', trim: 'white',
+    sections: [
+      mk('porch', { x: -7, w: 14, d: 14 }),
+      mk('deck',  { x: 7, w: 14, d: 12, stairs: 'front' }),
+      mk('patio', { x: 7, z: 16, w: 18, d: 12 }),
+    ],
+    sel: 1,
+  };
 
   const $ = (id) => document.getElementById(id);
-  let update = () => updateUI();
   const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   const ftIn = (ft) => { const f = Math.floor(ft + 1e-6); const i = Math.round((ft - f) * 12); return `${f}′-${i}″`; };
+  const sel = () => S.sections.find(s => s.id === S.sel) || S.sections[0];
+  const raised = (s) => s.kind === 'deck' || (s.kind === 'porch' && s.floor === 'deck');
+  const rect = (s) => ({ x0: s.x - s.w / 2, x1: s.x + s.w / 2, z0: s.kind === 'patio' ? s.z : 0, z1: (s.kind === 'patio' ? s.z : 0) + s.d });
+  const risers = (h) => Math.max(1, Math.ceil(h * 12 / 7.5));
+  const STAIR_W = 4, RUN = 11 / 12;
 
-  // ── Swatches ───────────────────────────────────────────────────────────────
+  function title(s) {
+    if (s.kind === 'porch') return `${s.type === 'screen' ? 'Screen' : 'Open'} porch`;
+    if (s.kind === 'deck') return 'Deck';
+    return PATIO[s.mat].label;
+  }
+
+  // Edges of a raised section that touch another raised section (no rail, door instead).
+  function covered(s, edge) {
+    if (!raised(s)) return [];
+    const r = rect(s), out = [];
+    S.sections.forEach(o => {
+      if (o === s || !raised(o)) return;
+      const q = rect(o);
+      if (edge === 'front' && Math.abs(q.z0 - r.z1) < 0.3) out.push([Math.max(r.x0, q.x0), Math.min(r.x1, q.x1)]);
+      if (edge === 'left' && Math.abs(q.x1 - r.x0) < 0.3) out.push([Math.max(r.z0, q.z0), Math.min(r.z1, q.z1)]);
+      if (edge === 'right' && Math.abs(q.x0 - r.x1) < 0.3) out.push([Math.max(r.z0, q.z0), Math.min(r.z1, q.z1)]);
+    });
+    return out.filter(([a, b]) => b - a > 0.5);
+  }
+  function subtract(a, b, cuts) {
+    let parts = [[a, b]];
+    cuts.forEach(([c, d]) => { parts = parts.flatMap(([p, q]) => (d <= p || c >= q) ? [[p, q]] : [[p, Math.max(p, c)], [Math.min(q, d), q]]); });
+    return parts.filter(([p, q]) => q - p > 0.3);
+  }
+  function stairEdge(s) {
+    if (s.kind === 'deck') return s.stairs === 'none' ? null : s.stairs;
+    if (s.kind === 'porch' && s.floor === 'deck' && !covered(s, 'front').length) return 'front';
+    return null;
+  }
+
+  // ── Price ──────────────────────────────────────────────────────────────────
+  function priceSection(s) {
+    const sf = s.w * s.d, dk = DECKING[S.decking], lines = [];
+    const steps = stairEdge(s) ? risers(S.H) : 0;
+    if (s.kind === 'porch') {
+      const rate = PORCH_BASE[`${s.type}_${s.tie}_${s.floor}`];
+      lines.push([`${s.tie === 'wall' ? 'Wall' : 'Roof'} tie, ${s.floor === 'deck' ? 'on new PT deck' : 'on patio'} · ${sf} SF × $${rate}`, sf * rate]);
+      if (s.type === 'screen') lines.push([`ScreenEze screens · ${sf} SF × $${SCREENEZE_SF}`, sf * SCREENEZE_SF]);
+      if (s.floor === 'deck' && dk.porchUp) lines.push([`${dk.label} floor upgrade · ${sf} SF × $${dk.porchUp.toFixed(2)}`, sf * dk.porchUp]);
+      if (s.tie === 'roof' && s.w > 19) lines.push(['Gable wider than 19′ add', GABLE_OVER_19]);
+      if (s.floor === 'deck' && S.H > 8) lines.push([`Deck above 8′ high · ${sf} SF × $${DECK_OVER_8_SF}`, sf * DECK_OVER_8_SF]);
+      if (steps) lines.push([`${dk.label} steps · ${steps} × ${STAIR_W}′ × ${STEP_FACTOR} × $${dk.deckSF}`, steps * STAIR_W * STEP_FACTOR * dk.deckSF]);
+    } else if (s.kind === 'deck') {
+      lines.push([`${dk.label} deck · ${sf} SF × $${dk.deckSF}`, sf * dk.deckSF]);
+      if (steps) lines.push([`${dk.label} steps · ${steps} × ${STAIR_W}′ × ${STEP_FACTOR} × $${dk.deckSF}`, steps * STAIR_W * STEP_FACTOR * dk.deckSF]);
+      let lf = 0;
+      ['front', 'left', 'right'].forEach(e => {
+        const len = e === 'front' ? s.w : s.d;
+        lf += subtract(0, len, covered(s, e).map(([a, b]) => e === 'front' ? [a - rect(s).x0, b - rect(s).x0] : [a, b])).reduce((t, [a, b]) => t + b - a, 0);
+      });
+      if (steps) lf -= STAIR_W;
+      if (steps >= 4) lf += 2 * Math.hypot((steps - 1) * RUN, S.H);
+      lf = Math.round(lf);
+      if (lf > 0) lines.push([`${dk.rail.label} · ${lf} LF × $${dk.rail.lf}`, lf * dk.rail.lf]);
+      if (S.H > 8) lines.push([`Deck above 8′ high · ${sf} SF × $${DECK_OVER_8_SF}`, sf * DECK_OVER_8_SF]);
+    } else {
+      const p = PATIO[s.mat];
+      if (s.mat === 'concrete') {
+        const r = sf < 200 ? p.smallSF : p.sf;
+        lines.push([`${p.item}${sf < 200 ? ' (under 200 SF)' : ''} · ${sf} SF × $${r}`, sf * r]);
+      } else {
+        lines.push([`${p.item} · ${sf} SF × $${p.sf}`, sf * p.sf]);
+        if (sf < 200) lines.push([`Patio under 200 SF add · ${sf} SF × $${p.smallAdd}`, sf * p.smallAdd]);
+      }
+    }
+    return lines;
+  }
+  function price() {
+    let total = 0;
+    $('price-lines').innerHTML = S.sections.map(s => {
+      const lines = priceSection(s), sub = lines.reduce((a, [, v]) => a + v, 0); total += sub;
+      return `<div class="price-group"><div class="price-head"><span>${title(s)} ${s.w}′ × ${s.d}′</span><span>${money.format(sub)}</span></div>${lines.map(([l, v]) => `<div class="price-line"><span>${l}</span><span>${money.format(v)}</span></div>`).join('')}</div>`;
+    }).join('');
+    $('price-total').textContent = money.format(total);
+  }
+
+  // ── Section list & editor ──────────────────────────────────────────────────
+  const KIND_TAG = { porch: 'Porch', deck: 'Deck', patio: 'Patio' };
+  function renderList() {
+    $('sec-list').innerHTML = S.sections.map(s =>
+      `<button type="button" class="sec-item" data-id="${s.id}" aria-pressed="${s.id === S.sel}"><span class="kind">${KIND_TAG[s.kind]}</span><b>${title(s)}</b><span>${s.w}′ × ${s.d}′</span></button>`).join('');
+  }
+  $('sec-list').addEventListener('click', (e) => { const b = e.target.closest('.sec-item'); if (b) select(+b.dataset.id); });
+
+  const FMT = {
+    w: v => `${v}′`, d: v => `${v}′`, z: v => `${v}′`,
+    x: v => v === 0 ? 'Centered' : `${Math.abs(v)}′ ${v < 0 ? 'left' : 'right'}`,
+  };
+  function renderEditor() {
+    const s = sel(), e = $('sec-editor');
+    const seg = (key, opts) => `<div class="seg">${opts.map(([v, l, sm]) => `<input type="radio" name="e-${key}" id="e-${key}-${v}" value="${v}"${s[key] === v ? ' checked' : ''}><label for="e-${key}-${v}">${l}${sm ? `<small>${sm}</small>` : ''}</label>`).join('')}</div>`;
+    const range = (key, label, min, max, step) => `<div class="row-label"><label class="label" for="e-${key}">${label}</label><output id="e-${key}-out" for="e-${key}">${FMT[key](s[key])}</output></div><input type="range" id="e-${key}" data-key="${key}" min="${min}" max="${max}" step="${step}" value="${s[key]}">`;
+    let body = range('w', s.kind === 'patio' ? 'Width' : 'Width (along house)', 6, 30, 1) + range('d', s.kind === 'patio' ? 'Depth' : 'Depth (out from house)', 6, 24, 1) + range('x', 'Position along house', -30, 30, 0.5);
+    if (s.kind === 'patio') body += range('z', 'Distance from house', 0, 30, 0.5) + `<span class="label">Surface</span>` + seg('mat', [['pavers', 'Pavers', 'Techo Bloc'], ['concrete', 'Concrete', '4″ slab']]);
+    if (s.kind === 'porch') body += `<span class="label">Porch type</span>` + seg('type', [['screen', 'Screen', 'ScreenEze'], ['open', 'Open', 'Railing']])
+      + `<span class="label">Roof connection</span>` + seg('tie', [['wall', 'Wall tie', 'Shed roof'], ['roof', 'Roof tie', 'Gable roof']])
+      + `<span class="label">Sits on</span>` + seg('floor', [['deck', 'New PT deck', 'At deck height'], ['patio', 'Patio', 'At grade']]);
+    if (s.kind === 'deck') body += `<span class="label">Stairs</span>` + seg('stairs', [['front', 'Front'], ['left', 'Left'], ['right', 'Right'], ['none', 'None']]);
+    e.innerHTML = `<div class="editor-head"><h2 id="e-title">${title(s)}</h2>${S.sections.length > 1 ? '<button type="button" class="link-danger" id="e-remove">Remove section</button>' : ''}</div>${body}`;
+    e.querySelectorAll('input[type=range]').forEach(r => r.addEventListener('input', () => {
+      s[r.dataset.key] = +r.value; $(`e-${r.dataset.key}-out`).textContent = FMT[r.dataset.key](s[r.dataset.key]); update();
+    }));
+    e.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => { s[r.name.slice(2)] = r.value; $('e-title').textContent = title(s); update(); }));
+    $('e-remove')?.addEventListener('click', () => {
+      S.sections = S.sections.filter(o => o !== s); S.sel = S.sections[0].id; renderEditor(); update(); goTo(view);
+    });
+  }
+  function select(id) { S.sel = id; renderEditor(); update(); }
+
+  document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
+    const kind = b.dataset.add, att = S.sections.filter(s => s.kind !== 'patio');
+    let o;
+    if (kind === 'patio') { const base = sel(), r = rect(base); o = { x: base.x, z: Math.round(r.z1 + (raised(base) ? risers(S.H) * RUN + 1 : 1)) }; }
+    else { const xmax = att.length ? Math.max(...att.map(s => rect(s).x1)) : -DEFAULTS[kind].w / 2; o = { x: xmax + DEFAULTS[kind].w / 2 }; }
+    const s = mk(kind, o); S.sections.push(s); S.sel = s.id; renderEditor(); update(); goTo(view);
+  }));
+
+  // ── Whole-build controls ───────────────────────────────────────────────────
   function swatches(el, list, name, key, nameEl) {
     el.innerHTML = list.map(c => `<input type="radio" name="${name}" id="${name}-${c.key}" value="${c.key}" aria-label="${c.name}"${c.key === S[key] ? ' checked' : ''}><label for="${name}-${c.key}" title="${c.name}" style="background:${c.hex}"></label>`).join('');
     el.addEventListener('change', (e) => { S[key] = e.target.value; nameEl.textContent = list.find(c => c.key === S[key]).name; update(); });
   }
   swatches($('color-swatches'), COLORS, 'color', 'color', $('color-name'));
   swatches($('trim-swatches'), TRIMS, 'trim', 'trim', $('trim-name'));
-
-  document.querySelectorAll('input[type=radio][name=type],input[name=tie],input[name=floor],input[name=decking]').forEach(r =>
-    r.addEventListener('change', () => { S[r.name] = r.value; update(); }));
-  [['w', 'W'], ['d', 'D'], ['h', 'H']].forEach(([id, k]) => $(id).addEventListener('input', (e) => { S[k] = +e.target.value; update(); }));
-
-  // ── Price ──────────────────────────────────────────────────────────────────
-  function price() {
-    const sf = S.W * S.D, lines = [];
-    const rate = BASE[`${S.type}_${S.tie}_${S.floor}`];
-    lines.push([`${S.type === 'screen' ? 'Screen' : 'Open'} porch · ${S.tie} tie · ${S.floor === 'deck' ? 'new PT deck' : 'patio'} · ${sf} SF × $${rate}`, sf * rate]);
-    if (S.type === 'screen') lines.push([`ScreenEze screens · ${sf} SF × $${SCREENEZE_SF}`, sf * SCREENEZE_SF]);
-    if (S.floor === 'deck' && S.decking !== 'pt') lines.push([`${DECK_LABEL[S.decking]} floor upgrade · ${sf} SF × $${FLOOR_UPGRADE[S.decking].toFixed(2)}`, sf * FLOOR_UPGRADE[S.decking]]);
-    if (S.tie === 'roof' && S.W > 19) lines.push(['Gable wider than 19′ add', GABLE_OVER_19]);
-    if (S.floor === 'deck' && S.H > 8) lines.push([`Deck above 8′ high · ${sf} SF × $${DECK_OVER_8_SF}`, sf * DECK_OVER_8_SF]);
-    $('price-lines').innerHTML = lines.map(([l, v]) => `<div class="price-line"><span>${l}</span><span>${money.format(v)}</span></div>`).join('');
-    $('price-total').textContent = money.format(lines.reduce((a, [, v]) => a + v, 0));
-  }
+  document.querySelectorAll('input[name=decking]').forEach(r => r.addEventListener('change', () => { S.decking = r.value; update(); }));
+  $('h').addEventListener('input', (e) => { S.H = +e.target.value; update(); });
 
   function updateUI() {
-    $('w-out').textContent = `${S.W}′`; $('d-out').textContent = `${S.D}′`; $('h-out').textContent = ftIn(S.H);
-    $('height-group').disabled = S.floor !== 'deck';
-    $('decking-group').disabled = S.floor !== 'deck';
+    $('h-out').textContent = ftIn(S.H);
     $('color-row').hidden = S.decking === 'pt';
-    $('sum-title').textContent = `${S.W}′ × ${S.D}′ ${S.type === 'screen' ? 'screen' : 'open'} porch`;
-    $('sum-sub').textContent = `${S.W * S.D} SF · ${S.tie} tie · ${S.floor === 'deck' ? `on new ${DECK_LABEL[S.decking]} deck, ${ftIn(S.H)} high` : 'on existing patio'}`;
+    renderList();
+    const sf = S.sections.reduce((a, s) => a + s.w * s.d, 0);
+    $('sum-title').textContent = S.sections.map(s => title(s)).join(' + ');
+    $('sum-sub').textContent = `${sf} SF total · ${DECKING[S.decking].label} decking · ${ftIn(S.H)} high`;
     price();
   }
+
+  let update = () => updateUI();
+  let view = 'corner', goTo = () => {};
+  renderEditor();
 
   if (!window.THREE || !THREE.OrbitControls) {
     $('loading').textContent = 'The 3D library did not load. Check your connection and reload the page.';
@@ -252,261 +381,653 @@
     return;
   }
 
-  // ── Scene ──────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 3D
+  // ═══════════════════════════════════════════════════════════════════════════
   const viewer = $('viewer');
   $('loading').remove();
-  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: false });
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   viewer.appendChild(renderer.domElement);
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 600);
+  const camera = new THREE.PerspectiveCamera(36, 1, 0.5, 2500);
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; controls.dampingFactor = 0.08;
-  controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 8; controls.maxDistance = 140;
+  controls.maxPolarAngle = Math.PI / 2 - 0.03; controls.minDistance = 6; controls.maxDistance = 220;
 
-  scene.add(new THREE.HemisphereLight(0xdfeaf2, 0x5d6b45, 0.75));
-  const sun = new THREE.DirectionalLight(0xfff3e2, 0.95);
-  sun.position.set(34, 55, 42); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 160 });
-  sun.shadow.bias = -0.0006;
-  scene.add(sun);
+  // ── Procedural textures (feet-based tiling) ────────────────────────────────
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function cnv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
+  function tex(c, ftU, ftV, color = true) {
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / ftU, 1 / ftV);
+    t.anisotropy = maxAniso; if (color) t.encoding = THREE.sRGBEncoding; return t;
+  }
+  const rgb = (hex) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  function shade(hex, f, a = 1) { const m = v => Math.max(0, Math.min(255, Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f)))); const [r, g, b] = rgb(hex); return `rgba(${m(r)},${m(g)},${m(b)},${a})`; }
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({ color: 0x4a6a2e, roughness: 1 }));
+  function woodCanvas(hex, kind, seed) {
+    const R = rng(seed), W = 1024, H = 128, [c, x] = cnv(W, H);
+    x.fillStyle = hex; x.fillRect(0, 0, W, H);
+    if (kind !== 'pt') for (let i = 0; i < 70; i++) {
+      const y = R() * H, h = 3 + R() * 16, len = 150 + R() * 600, x0 = R() * W;
+      x.fillStyle = shade(hex, (R() - 0.5) * 0.4, 0.2); for (const o of [0, -W]) x.fillRect(x0 + o, y, len, h);
+    }
+    const n = kind === 'pt' ? 460 : 300;
+    for (let i = 0; i < n; i++) {
+      const y = R() * H, len = 80 + R() * 700, x0 = R() * W;
+      x.strokeStyle = shade(hex, (R() - 0.55) * (kind === 'pt' ? 0.55 : 0.32), 0.2 + R() * 0.35); x.lineWidth = 0.6 + R() * 1.6;
+      for (const o of [0, -W]) { x.beginPath(); x.moveTo(x0 + o, y); x.bezierCurveTo(x0 + o + len * .3, y + (R() - .5) * 6, x0 + o + len * .7, y + (R() - .5) * 6, x0 + o + len, y + (R() - .5) * 4); x.stroke(); }
+    }
+    if (kind === 'pt') {
+      for (let k = 0; k < 5; k++) {
+        const kx = R() * W, ky = 10 + R() * 108;
+        for (let r = 11; r > 0; r -= 2.5) { x.strokeStyle = shade(hex, -0.45, 0.3); x.lineWidth = 1.2; x.beginPath(); x.ellipse(kx, ky, r * 2.6, r * 0.9, 0, 0, 7); x.stroke(); }
+        x.fillStyle = shade(hex, -0.6, 0.85); x.beginPath(); x.ellipse(kx, ky, 4.5, 2.6, 0, 0, 7); x.fill();
+      }
+      x.fillStyle = 'rgba(95,115,45,0.07)'; x.fillRect(0, 0, W, H);
+    }
+    for (let i = 0; i < 6000; i++) { x.fillStyle = shade(hex, (R() - 0.5) * 0.3, 0.22); x.fillRect(R() * W, R() * H, 1 + R() * 3, 1); }
+    return c;
+  }
+  function sidingCanvas() {
+    const R = rng(7), [c, x] = cnv(512, 512);
+    for (let i = 0; i < 8; i++) {
+      const y0 = i * 64, g = x.createLinearGradient(0, y0, 0, y0 + 64);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(0.8, '#ececec'); g.addColorStop(1, '#d2d2d2');
+      x.fillStyle = g; x.fillRect(0, y0, 512, 64);
+      x.fillStyle = 'rgba(0,0,0,0.42)'; x.fillRect(0, y0 + 60, 512, 4);
+      x.fillStyle = 'rgba(255,255,255,0.8)'; x.fillRect(0, y0, 512, 1.5);
+    }
+    for (let i = 0; i < 1800; i++) { x.fillStyle = `rgba(0,0,0,${0.025 + R() * 0.04})`; x.fillRect(R() * 512, R() * 512, 8 + R() * 50, 1); }
+    return c;
+  }
+  function shingleCanvas() {
+    const R = rng(11), [c, x] = cnv(512, 512), rows = 10, rh = 512 / rows;
+    x.fillStyle = '#1f2023'; x.fillRect(0, 0, 512, 512);
+    for (let r = 0; r < rows; r++) {
+      const y0 = r * rh; let xx = -R() * 60;
+      while (xx < 512) {
+        const w = 26 + R() * 70, t = (R() - 0.5) * 24, b = [66 + t, 68 + t, 72 + t];
+        for (const o of [0, 512]) {
+          x.fillStyle = `rgb(${b[0]},${b[1]},${b[2]})`; x.fillRect(xx + 1.5 - o, y0, w - 1.5, rh - 2.5);
+        }
+        for (let k = 0; k < w * 7; k++) { const v = (R() - 0.5) * 90; x.fillStyle = `rgba(${120 + v},${120 + v},${124 + v},0.22)`; x.fillRect(xx + R() * w, y0 + R() * (rh - 3), 1.6, 1.6); }
+        xx += w;
+      }
+      const g = x.createLinearGradient(0, y0 + rh * 0.65, 0, y0 + rh); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.42)');
+      x.fillStyle = g; x.fillRect(0, y0 + rh * 0.65, 512, rh * 0.35);
+    }
+    return c;
+  }
+  function noiseCanvas(size, base, n, spread, seed, stroke = [1, 1]) {
+    const R = rng(seed), [c, x] = cnv(size, size); x.fillStyle = base; x.fillRect(0, 0, size, size);
+    for (let i = 0; i < n; i++) { x.fillStyle = shade(base, (R() - 0.5) * spread, 0.18 + R() * 0.3); x.fillRect(R() * size, R() * size, stroke[0] * (0.5 + R()), stroke[1] * (0.5 + R())); }
+    return [c, x, R];
+  }
+  function grassCanvas() {
+    const [c, x, R] = noiseCanvas(512, '#4b6a2b', 50000, 0.7, 21, [1.4, 4]);
+    for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(${R() < .5 ? '90,110,40' : '40,60,25'},0.12)`; x.beginPath(); x.arc(R() * 512, R() * 512, 20 + R() * 60, 0, 7); x.fill(); }
+    return c;
+  }
+  function concreteCanvas() {
+    const [c, x, R] = noiseCanvas(256, '#bdb8ae', 9000, 0.35, 31);
+    for (let i = 0; i < 90; i++) { x.fillStyle = 'rgba(0,0,0,0.035)'; x.fillRect(0, R() * 256, 256, 1); }
+    return c;
+  }
+  function paverCanvas() {
+    const R = rng(41), [c, x] = cnv(512, 512), pal = ['#a39b8f', '#8d877f', '#b3aa9b', '#7e786f', '#9a9184'];
+    x.fillStyle = '#5b564f'; x.fillRect(0, 0, 512, 512);
+    const rowH = 512 / 6;
+    for (let r = 0; r < 6; r++) {
+      let xx = -R() * 80;
+      while (xx < 512) {
+        const w = [rowH, rowH * 1.5, rowH * 2][Math.floor(R() * 3)], col = pal[Math.floor(R() * pal.length)];
+        for (const o of [0, 512]) {
+          const px = xx + 2 - o, py = r * rowH + 2, pw = w - 4, ph = rowH - 4;
+          const g = x.createLinearGradient(px, py, px, py + ph); g.addColorStop(0, shade(col, 0.12)); g.addColorStop(1, shade(col, -0.12));
+          x.fillStyle = g; x.fillRect(px, py, pw, ph);
+          for (let k = 0; k < pw * 3; k++) { x.fillStyle = shade(col, (R() - .5) * .5, .25); x.fillRect(px + R() * pw, py + R() * ph, 1.5, 1.5); }
+        }
+        xx += w;
+      }
+    }
+    return c;
+  }
+  function beadCanvas() {
+    const [c, x] = cnv(256, 256); x.fillStyle = '#f6f4ee'; x.fillRect(0, 0, 256, 256);
+    const step = 256 / (24 / 3.5);
+    for (let p = 0; p < 256; p += step) { x.fillStyle = 'rgba(0,0,0,0.2)'; x.fillRect(p, 0, 2, 256); x.fillStyle = 'rgba(255,255,255,0.9)'; x.fillRect(p + 2, 0, 1.5, 256); }
+    return c;
+  }
+
+  const T = {
+    siding: tex(sidingCanvas(), 4, 4), shingle: tex(shingleCanvas(), 4, 4), grass: tex(grassCanvas(), 9, 9),
+    concrete: tex(concreteCanvas(), 5, 5), pavers: tex(paverCanvas(), 4, 4), bead: tex(beadCanvas(), 2, 2),
+    mulch: tex(noiseCanvas(256, '#3e2b1d', 9000, 0.9, 51, [3, 1.5])[0], 3, 3),
+    pt: tex(woodCanvas(PT_HEX, 'pt', 3), 8, 1),
+  };
+  const woodTex = {};
+  const deckTex = () => {
+    const k = S.decking === 'pt' ? 'pt' : S.color;
+    return woodTex[k] || (woodTex[k] = k === 'pt' ? T.pt : tex(woodCanvas(COLORS.find(c => c.key === k).hex, 'composite', 9 + k.length), 8, 1));
+  };
+
+  // ── Materials ──────────────────────────────────────────────────────────────
+  const mc = {};
+  const mat = (key, make) => mc[key] || (mc[key] = make());
+  const std = (o) => new THREE.MeshStandardMaterial(o);
+  const M = {
+    siding: () => mat('siding', () => std({ color: '#c9cfc6', map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
+    shingle: () => mat('shingle', () => std({ color: '#ffffff', map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95 })),
+    ridge: () => mat('ridge', () => std({ color: '#3e3f43', roughness: 0.95 })),
+    concrete: () => mat('concrete', () => std({ color: '#ffffff', map: T.concrete, roughness: 0.95 })),
+    pavers: () => mat('pavers', () => std({ color: '#ffffff', map: T.pavers, bumpMap: T.pavers, bumpScale: 0.03, roughness: 0.9 })),
+    border: () => mat('border', () => std({ color: '#5d5a55', map: T.concrete, roughness: 0.9 })),
+    mulch: () => mat('mulch', () => std({ color: '#ffffff', map: T.mulch, roughness: 1 })),
+    bead: () => mat('bead', () => std({ color: '#ffffff', map: T.bead, roughness: 0.7 })),
+    pt: () => mat('pt', () => std({ color: '#ffffff', map: T.pt, bumpMap: T.pt, bumpScale: 0.01, roughness: 0.9 })),
+    glass: () => mat('glass', () => std({ color: '#1d2a33', roughness: 0.04, metalness: 0.95, envMapIntensity: 1.2 })),
+    door: () => mat('door', () => std({ color: '#2f3d4a', roughness: 0.45 })),
+    doorPanel: () => mat('doorPanel', () => std({ color: '#384858', roughness: 0.45 })),
+    brass: () => mat('brass', () => std({ color: '#b08a43', metalness: 0.9, roughness: 0.3 })),
+    metal: () => mat('metal', () => std({ color: '#222326', metalness: 0.6, roughness: 0.4 })),
+    bulb: () => mat('bulb', () => std({ color: '#fff4dc', emissive: '#ffd99a', emissiveIntensity: 0.6, roughness: 0.3 })),
+    screen: () => mat('screen', () => std({ color: '#15181a', transparent: true, opacity: 0.5, side: THREE.DoubleSide, roughness: 1, depthWrite: false })),
+    footing: () => mat('footing', () => std({ color: '#a9a49a', map: T.concrete, roughness: 1 })),
+    bark: () => mat('bark', () => std({ color: '#4a3a2c', roughness: 1 })),
+    fanBlade: () => mat('fanBlade', () => std({ color: '#5a4030', roughness: 0.6 })),
+    trim: () => mat('trim-' + S.trim, () => std({ color: TRIMS.find(t => t.key === S.trim).hex, roughness: 0.5 })),
+    rail: () => mat('rail-' + S.trim, () => std({ color: TRIMS.find(t => t.key === S.trim).hex, roughness: 0.45 })),
+    gutter: () => mat('gutter-' + S.trim, () => std({ color: S.trim === 'white' ? '#f4f4f1' : TRIMS.find(t => t.key === S.trim).hex, roughness: 0.35, metalness: 0.2 })),
+    deck: (v) => mat(`deck-${S.decking}-${S.color}-${v}`, () => std({ color: new THREE.Color(1, 1, 1).multiplyScalar([1, 0.93, 1.06][v]), map: deckTex(), bumpMap: deckTex(), bumpScale: 0.006, roughness: 0.75 })),
+    fascia: () => mat(`fascia-${S.decking}-${S.color}`, () => std({ color: new THREE.Color(0.88, 0.88, 0.88), map: deckTex(), roughness: 0.7 })),
+    leaf: (v) => mat('leaf' + v, () => std({ color: ['#2c4a1c', '#36561f', '#27421a', '#41612a'][v], roughness: 1 })),
+  };
+
+  // ── Sky, environment, lights, ground ───────────────────────────────────────
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color('#3f74b5') }, hor: { value: new THREE.Color('#d9e5ee') }, bot: { value: new THREE.Color('#8d9a7a') } },
+    vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'uniform vec3 top; uniform vec3 hor; uniform vec3 bot; varying vec3 vP; void main(){ float h = vP.y; vec3 c = h > 0.0 ? mix(hor, top, pow(h, 0.5)) : mix(hor, bot, pow(-h, 0.35)); gl_FragColor = vec4(c, 1.0); }',
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(1200, 32, 16), skyMat); scene.add(sky);
+  // Reflections: an equirectangular sky/ground gradient, prefiltered for PBR materials.
+  (function () {
+    const [c, x] = cnv(512, 256), g = x.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, '#4f86c9'); g.addColorStop(0.42, '#bcd3e6'); g.addColorStop(0.5, '#e8eff3'); g.addColorStop(0.53, '#9aa58a'); g.addColorStop(1, '#55613f');
+    x.fillStyle = g; x.fillRect(0, 0, 512, 256);
+    x.fillStyle = 'rgba(255,248,230,1)'; x.beginPath(); x.arc(150, 70, 10, 0, 7); x.fill();
+    const t = new THREE.CanvasTexture(c); t.mapping = THREE.EquirectangularReflectionMapping; t.encoding = THREE.sRGBEncoding;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromEquirectangular(t).texture;
+    t.dispose(); pmrem.dispose();
+  })();
+  scene.fog = new THREE.Fog('#d9e5ee', 220, 1000);
+
+  scene.add(new THREE.HemisphereLight(0xd6e6ff, 0x4d5a36, 0.35));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 2.1);
+  sun.castShadow = true; sun.shadow.mapSize.set(3072, 3072);
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  scene.add(sun); scene.add(sun.target);
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), std({ color: '#ffffff', map: T.grass, roughness: 1 }));
+  T.grass.repeat.set(2000 / 9, 2000 / 9);
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
 
-  function setSky() { scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--sky').trim() || '#cddfe8'); }
-  setSky();
-  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', setSky);
-  new MutationObserver(setSky).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
-  const matCache = {};
-  const mat = (hex, opts = {}) => {
-    const k = hex + JSON.stringify(opts);
-    return matCache[k] || (matCache[k] = new THREE.MeshStandardMaterial(Object.assign({ color: hex, roughness: 0.85 }, opts)));
-  };
-  const M = {
-    siding: () => mat('#d8d4c8'), shingle: () => mat('#4a4f56', { roughness: 0.95 }), concrete: () => mat('#bab6ad'),
-    footing: () => mat('#a39f95'), door: () => mat('#3f4a52'), glass: () => mat('#6d8796', { roughness: 0.25, metalness: 0.3 }),
-    screen: () => mat('#1e2326', { transparent: true, opacity: 0.38, side: THREE.DoubleSide, roughness: 1, depthWrite: false }),
-    trim: () => mat(TRIMS.find(t => t.key === S.trim).hex, { roughness: 0.6 }),
-    deck: () => mat(S.decking === 'pt' ? PT_HEX : COLORS.find(c => c.key === S.color).hex, { roughness: 0.8 }),
-    fascia: () => { const c = new THREE.Color(S.decking === 'pt' ? PT_HEX : COLORS.find(c => c.key === S.color).hex).multiplyScalar(0.8); return mat('#' + c.getHexString()); },
-    pt: () => mat('#8d7650'),
-  };
-
-  let model = new THREE.Group(); scene.add(model);
-
-  function box(w, h, d, m, x, y, z, g = model) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh); return mesh;
+  // ── Geometry helpers ───────────────────────────────────────────────────────
+  let R = rng(1), G = null;
+  // Box UVs in feet so textures keep real-world scale; `swap` turns grain along depth.
+  function wuv(g, w, h, d, swap, du, dv) {
+    const uv = g.attributes.uv, dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+    for (let f = 0; f < 6; f++) {
+      const [su, sv] = dims[f];
+      for (let k = 0; k < 4; k++) {
+        const i = f * 4 + k, u = uv.getX(i), v = uv.getY(i);
+        if (swap && (f === 2 || f === 3)) uv.setXY(i, v * sv + du, u * su + dv); else uv.setXY(i, u * su + du, v * sv + dv);
+      }
+    }
   }
-  // Box running between two points in the y–z plane (sloped beams, rails).
-  function beamYZ(x, y1, z1, y2, z2, w, h, m) {
-    const len = Math.hypot(z2 - z1, y2 - y1);
-    const b = box(w, h, len, m, x, (y1 + y2) / 2, (z1 + z2) / 2);
+  function B(w, h, d, m, x, y, z, o = {}) {
+    const g = new THREE.BoxGeometry(w, h, d);
+    if (m.map) wuv(g, w, h, d, o.swap, R() * 8, R());
+    const mesh = new THREE.Mesh(g, m); mesh.position.set(x, y, z);
+    mesh.castShadow = o.cast !== false; mesh.receiveShadow = true; (o.g || G).add(mesh); return mesh;
+  }
+  function beamYZ(x, y1, z1, y2, z2, w, h, m, o) {
+    const b = B(w, h, Math.hypot(z2 - z1, y2 - y1), m, x, (y1 + y2) / 2, (z1 + z2) / 2, o);
     b.rotation.x = -Math.atan2(y2 - y1, z2 - z1); return b;
   }
-  function quad(pts, m) {
-    const g = new THREE.BufferGeometry();
-    const p = pts.flat();
-    g.setAttribute('position', new THREE.Float32BufferAttribute([...p.slice(0, 9), ...p.slice(0, 3), ...p.slice(6, 12)], 3));
-    g.computeVertexNormals();
-    const mesh = new THREE.Mesh(g, m); model.add(mesh); return mesh;
+  function beamXY(z, x1, y1, x2, y2, dz, h, m, o) {
+    const b = B(Math.hypot(x2 - x1, y2 - y1), h, dz, m, (x1 + x2) / 2, (y1 + y2) / 2, z, o);
+    b.rotation.z = Math.atan2(y2 - y1, x2 - x1); return b;
   }
   function tri(points, depth, m, place) {
-    const shape = new THREE.Shape(); shape.moveTo(...points[0]); points.slice(1).forEach(p => shape.lineTo(...p)); shape.closePath();
-    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }), m);
-    mesh.castShadow = mesh.receiveShadow = true; place(mesh); model.add(mesh); return mesh;
+    const sh = new THREE.Shape(); sh.moveTo(...points[0]); points.slice(1).forEach(p => sh.lineTo(...p)); sh.closePath();
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false }), m);
+    mesh.castShadow = mesh.receiveShadow = true; place(mesh); G.add(mesh); return mesh;
   }
-  const spread = (a, b, maxGap) => { const n = Math.max(1, Math.ceil((b - a) / maxGap)); return Array.from({ length: n + 1 }, (_, i) => a + (b - a) * i / n); };
+  const spread = (a, b, maxGap) => { const n = Math.max(1, Math.ceil((b - a) / maxGap - 1e-6)); return Array.from({ length: n + 1 }, (_, i) => a + (b - a) * i / n); };
+  function group(x = 0, y = 0, z = 0, ry = 0) { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; G.add(g); return g; }
+  function withG(g, fn) { const prev = G; G = g; const r = fn(); G = prev; return r; }
 
-  // ── Build the model from S (units: feet; house wall face at z = 0, porch toward +z) ──
+  // Balusters as one instanced mesh per run.
+  const balGeo = new THREE.BoxGeometry(0.125, 1, 0.125);
+  function balusters(list, m) {
+    if (!list.length) return;
+    const im = new THREE.InstancedMesh(balGeo, m, list.length), mx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
+    list.forEach(([x, y0, y1, z], i) => { p.set(x, (y0 + y1) / 2, z); sc.set(1, y1 - y0, 1); mx.compose(p, q, sc); im.setMatrixAt(i, mx); });
+    im.castShadow = true; im.receiveShadow = true; G.add(im);
+  }
+  // Rail between two base points; base heights ya→yb (sloped on stairs).
+  function railRun(ax, az, bx, bz, ya, yb, { postA = true, postB = true } = {}) {
+    const m = M.rail(), len = Math.hypot(bx - ax, bz - az); if (len < 0.4) return;
+    const ux = (bx - ax) / len, uz = (bz - az) / len, H = 3;
+    const posts = [];
+    if (postA) posts.push(0); if (postB) posts.push(len);
+    if (postA && postB && Math.abs(ya - yb) < 0.01) spread(0, len, 6).slice(1, -1).forEach(t => posts.push(t));
+    posts.forEach(t => {
+      const x = ax + ux * t, z = az + uz * t, y = ya + (yb - ya) * t / len;
+      B(0.4, H + 0.2, 0.4, m, x, y + (H + 0.2) / 2, z); B(0.56, 0.1, 0.56, m, x, y + H + 0.25, z); B(0.5, 0.35, 0.5, m, x, y + 0.18, z);
+    });
+    const p1 = new THREE.Vector3(ax, ya, az), p2 = new THREE.Vector3(bx, yb, bz);
+    const bar = (dy, w, h) => { const a = p1.clone().setY(ya + dy), b = p2.clone().setY(yb + dy), mesh = B(w, h, a.distanceTo(b), m, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); mesh.lookAt(b.x, b.y, b.z); };
+    bar(H - 0.08, 0.2, 0.25); bar(H + 0.07, 0.46, 0.08); bar(0.32, 0.2, 0.18);
+    const list = [], n = Math.floor(len / 0.37);
+    for (let i = 1; i < n; i++) {
+      const t = i / n * len; if (posts.some(p => Math.abs(p - t) < 0.3)) continue;
+      const y = ya + (yb - ya) * t / len; list.push([ax + ux * t, y + 0.41, y + H - 0.2, az + uz * t]);
+    }
+    balusters(list, m);
+  }
+
+  // ── Building pieces ────────────────────────────────────────────────────────
+  function windowAt(g, w, h) { withG(g, () => {
+    const t = M.trim();
+    B(w + 0.75, 0.42, 0.14, t, 0, h / 2 + 0.21, 0.07); B(w + 0.95, 0.08, 0.22, t, 0, h / 2 + 0.46, 0.1);
+    [-1, 1].forEach(s => B(0.36, h, 0.14, t, s * (w / 2 + 0.18), 0, 0.07));
+    B(w + 0.95, 0.1, 0.34, t, 0, -h / 2 - 0.05, 0.15); B(w + 0.5, 0.26, 0.1, t, 0, -h / 2 - 0.23, 0.05);
+    B(w, h, 0.04, M.glass(), 0, 0, -0.02, { cast: false });
+    const f = 0.13;
+    B(w, f, 0.08, t, 0, h / 2 - f / 2, 0.03); B(w, f, 0.08, t, 0, -h / 2 + f / 2, 0.03); B(w, 0.14, 0.1, t, 0, 0, 0.05);
+    [-1, 1].forEach(s => B(f, h, 0.08, t, s * (w / 2 - f / 2), 0, 0.03));
+    [-1, 1].forEach(s => B(0.05, h - 0.2, 0.04, t, s * w / 6, 0, 0.03));
+    [-h / 4, h / 4].forEach(y => B(w - 0.2, 0.05, 0.04, t, 0, y, 0.03));
+  }); }
+  function entryDoor(g) { withG(g, () => {
+    const t = M.trim();
+    B(3.75, 0.42, 0.14, t, 0, 7.0, 0.07); [-1, 1].forEach(s => B(0.36, 6.8, 0.14, t, s * 1.68, 3.4, 0.07));
+    B(3, 6.8, 0.15, M.door(), 0, 3.4, -0.02);
+    B(1.9, 2.6, 0.04, M.glass(), 0, 4.95, 0.07, { cast: false });
+    [-0.32, 0.32].forEach(x => B(0.05, 2.6, 0.04, M.door(), x, 4.95, 0.09)); [4.52, 5.38].forEach(y => B(1.9, 0.05, 0.04, M.door(), 0, y, 0.09));
+    [-0.55, 0.55].forEach(x => B(0.8, 2.3, 0.05, M.doorPanel(), x, 1.65, 0.07));
+    const k = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), M.brass()); k.position.set(1.15, 3.1, 0.13); G.add(k);
+    B(3.3, 0.05, 0.35, M.metal(), 0, 0.02, 0.15);
+    [-2.3, 2.3].forEach(x => { B(0.42, 0.7, 0.36, M.metal(), x, 5.9, 0.2); B(0.3, 0.5, 0.3, M.bulb(), x, 5.9, 0.2, { cast: false }); });
+  }); }
+  function sliderDoor(g) { withG(g, () => {
+    const t = M.trim(), w = 6, h = 6.8;
+    B(w + 0.75, 0.42, 0.14, t, 0, h + 0.21, 0.07); [-1, 1].forEach(s => B(0.36, h, 0.14, t, s * (w / 2 + 0.18), h / 2, 0.07));
+    B(w, h, 0.04, M.glass(), 0, h / 2, -0.03, { cast: false });
+    [[-w / 4, 0.06], [w / 4, 0.0]].forEach(([x, z]) => {
+      B(w / 2, 0.22, 0.1, t, x, h - 0.11, z); B(w / 2, 0.35, 0.1, t, x, 0.18, z);
+      [-1, 1].forEach(s => B(0.2, h, 0.1, t, x + s * (w / 4 - 0.1), h / 2, z));
+    });
+    B(0.06, 1, 0.08, M.metal(), -0.35, 3.3, 0.14);
+    B(w + 0.3, 0.05, 0.4, M.metal(), 0, 0.02, 0.18);
+    B(0.42, 0.7, 0.36, M.metal(), w / 2 + 1, 5.9, 0.2); B(0.3, 0.5, 0.3, M.bulb(), w / 2 + 1, 5.9, 0.2, { cast: false });
+  }); }
+  function shrub(x, z, s) {
+    const geo = new THREE.IcosahedronGeometry(1, 3), p = geo.attributes.position, v = new THREE.Vector3();
+    const seed = R() * 100;
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      const n = Math.sin(v.x * 5.1 + seed) * Math.sin(v.y * 4.3 + seed * 1.3) * Math.sin(v.z * 6.7 + seed * 0.7);
+      const k = Math.sin(v.x * 17.3 + v.y * 11.1 + v.z * 13.7 + seed) * 0.05;
+      const nx = v.x, ny = v.y, nz = v.z;
+      v.multiplyScalar(0.9 + n * 0.14 + k); p.setXYZ(i, v.x, v.y, v.z);
+      geo.attributes.normal.setXYZ(i, nx, ny, nz);
+    }
+    const m = new THREE.Mesh(geo, M.leaf(Math.floor(R() * 4)));
+    m.scale.set(s, s * 0.78, s); m.position.set(x, s * 0.62, z); m.castShadow = m.receiveShadow = true; G.add(m);
+    return m;
+  }
+  function tree(x, z, s) {
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * s, 0.75 * s, 12 * s, 10), M.bark());
+    tr.position.set(x, 6 * s, z); tr.castShadow = true; G.add(tr);
+    [[0, 15, 0, 6], [-3.5, 13, 1.5, 4.6], [3.5, 13.5, -1, 4.8], [0.5, 18.5, 0.5, 4.2], [1, 12, 3.5, 4]].forEach(([dx, y, dz, r]) => {
+      const m = shrub(x + dx * s, z + dz * s, r * s); m.position.y = y * s; m.scale.y = r * s * 0.9;
+    });
+  }
+
+  // Raised floor: boards, fascia, framing, posts, footings.
+  function deckFloor(x0, x1, z0, z1, fy, { ledger = true } = {}) {
+    const bw = 5.5 / 12, gap = 0.25 / 12, t = 1 / 12, y = fy - t / 2, W = x1 - x0;
+    B(W, t, bw, M.deck(0), (x0 + x1) / 2, y, z1 - bw / 2);
+    [x0, x1].forEach((x, i) => B(bw, t, z1 - z0 - bw - gap, M.deck(1), x + (i ? -bw / 2 : bw / 2), y, (z0 + z1 - bw - gap) / 2, { swap: true }));
+    for (let z = z0 + 0.02; z + bw < z1 - bw - gap; z += bw + gap) B(W - 2 * (bw + gap), t, bw, M.deck(Math.floor(R() * 3)), (x0 + x1) / 2, y, z + bw / 2);
+    const fh = 11.25 / 12, fz = fy - t - fh / 2;
+    B(W + 0.16, fh, 0.08, M.fascia(), (x0 + x1) / 2, fz, z1 + 0.04);
+    [x0 - 0.04, x1 + 0.04].forEach(x => B(0.08, fh, z1 - z0, M.fascia(), x, fz, (z0 + z1) / 2, { swap: true }));
+    const jh = 9.25 / 12, jy = fy - t - jh / 2;
+    for (let x = x0 + 0.1; x <= x1 - 0.05; x += 16 / 12) B(0.125, jh, z1 - z0 - 0.2, M.pt(), x, jy, (z0 + z1) / 2, { swap: true });
+    if (ledger) B(W, jh, 0.15, M.pt(), (x0 + x1) / 2, jy, z0 + 0.08);
+    const rows = (z1 - z0) > 10 ? [z0 + (z1 - z0) / 2, z1 - 0.8] : [z1 - 0.8];
+    const by = fy - t - jh - 0.4;
+    rows.forEach(z => {
+      B(W - 0.4, 0.8, 0.3, M.pt(), (x0 + x1) / 2, by, z);
+      spread(x0 + 0.5, x1 - 0.5, 8).forEach(x => {
+        const ph = by - 0.4 - 0.25; if (ph > 0.1) B(0.46, ph, 0.46, M.pt(), x, 0.25 + ph / 2, z);
+        const f = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.35, 20), M.footing()); f.position.set(x, 0.08, z); f.receiveShadow = true; G.add(f);
+      });
+    });
+  }
+
+  // Stairs going out from an edge. Built in a local group (stairs run toward +z).
+  function stairs(cx, cz, ry, fy, railed) {
+    const g = group(cx, 0, cz, ry);
+    const n = risers(fy), rise = fy / n, t = 1 / 12;
+    const end = (n - 1) * RUN;
+    withG(g, () => {
+      for (let i = 1; i < n; i++) {
+        const yt = fy - i * rise, za = (i - 1) * RUN;
+        B(STAIR_W + 0.1, t, RUN / 2 - 0.01, M.deck(0), 0, yt - t / 2, za + RUN * 0.25 + 0.04);
+        B(STAIR_W + 0.1, t, RUN / 2 - 0.01, M.deck(1), 0, yt - t / 2, za + RUN * 0.75 + 0.04);
+        B(STAIR_W, rise - t, 0.06, M.fascia(), 0, yt + (rise - t) / 2, za + 0.03);
+      }
+      const lastH = Math.max(0.05, fy - (n - 1) * rise - t);
+      B(STAIR_W, lastH, 0.06, M.fascia(), 0, lastH / 2, end + 0.03);
+      [-STAIR_W / 2 + 0.05, 0, STAIR_W / 2 - 0.05].forEach((x, i) => beamYZ(x, fy - 0.55, 0.1, 0.35, end + 0.4, i === 1 ? 0.125 : 0.08, 0.9, i === 1 ? M.pt() : M.fascia()));
+      if (railed) [-1, 1].forEach(s => railRun(s * (STAIR_W / 2 + 0.1), 0, s * (STAIR_W / 2 + 0.1), end + 0.35, fy, rise, { postA: false, postB: true }));
+    });
+    const foot = new THREE.Vector3(0, 0, end + 1.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry).add(new THREE.Vector3(cx, 0, cz));
+    const onPatio = S.sections.some(p => { if (p.kind !== 'patio') return false; const r = rect(p); return foot.x > r.x0 && foot.x < r.x1 && foot.z > r.z0 - 0.5 && foot.z < r.z1; });
+    if (!onPatio) withG(g, () => B(STAIR_W + 1.5, 0.2, 3.2, M.concrete(), 0, 0.1, end + 1.75));
+    return n;
+  }
+
+  function stairPlacement(s) {
+    const r = rect(s), e = stairEdge(s); if (!e) return null;
+    if (e === 'front') return { edge: e, c: s.x, x: s.x, z: r.z1, ry: 0 };
+    const zc = Math.min(Math.max(r.z1 - 3.5, r.z0 + STAIR_W / 2 + 0.5), r.z1 - STAIR_W / 2 - 0.3);
+    return e === 'left' ? { edge: e, c: zc, x: r.x0, z: zc, ry: -Math.PI / 2 } : { edge: e, c: zc, x: r.x1, z: zc, ry: Math.PI / 2 };
+  }
+
+  // ── Section builders ───────────────────────────────────────────────────────
+  function buildDeck(s) {
+    const r = rect(s), fy = S.H;
+    deckFloor(r.x0, r.x1, r.z0, r.z1, fy);
+    const sp = stairPlacement(s);
+    if (sp) stairs(sp.x, sp.z, sp.ry, fy, risers(fy) >= 4);
+    const gapAt = (edge) => sp && sp.edge === edge ? [[sp.c - STAIR_W / 2 - 0.2, sp.c + STAIR_W / 2 + 0.2]] : [];
+    subtract(r.x0, r.x1, [...covered(s, 'front'), ...gapAt('front')]).forEach(([a, b]) => railRun(a + 0.2, r.z1 - 0.2, b - 0.2, r.z1 - 0.2, fy, fy));
+    [['left', r.x0 + 0.2], ['right', r.x1 - 0.2]].forEach(([e, x]) =>
+      subtract(r.z0, r.z1, [...covered(s, e), ...gapAt(e)]).forEach(([a, b]) => railRun(x, Math.max(a + 0.2, 0.25), x, b - 0.2, fy, fy)));
+  }
+
+  function buildPatio(s) {
+    const r = rect(s), cx = s.x, cz = (r.z0 + r.z1) / 2;
+    if (s.mat === 'concrete') { B(s.w, 0.33, s.d, M.concrete(), cx, 0.165, cz); return; }
+    B(s.w - 1, 0.25, s.d - 1, M.pavers(), cx, 0.125, cz);
+    B(s.w, 0.24, 0.5, M.border(), cx, 0.12, r.z0 + 0.25); B(s.w, 0.24, 0.5, M.border(), cx, 0.12, r.z1 - 0.25);
+    [r.x0 + 0.25, r.x1 - 0.25].forEach(x => B(0.5, 0.24, s.d - 1, M.border(), x, 0.12, cz));
+  }
+
+  function fan(x, z, yC, yF) {
+    const m = M.metal();
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, Math.max(0.2, yC - yF - 0.25), 8), m); rod.position.set(x, (yC + yF + 0.25) / 2, z); G.add(rod);
+    const mot = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.36, 0.3, 20), m); mot.position.set(x, yF, z); mot.castShadow = true; G.add(mot);
+    for (let i = 0; i < 5; i++) { const b = B(2.0, 0.03, 0.42, M.fanBlade(), x + Math.cos(i * 1.2566) * 1.25, yF - 0.05, z + Math.sin(i * 1.2566) * 1.25); b.rotation.y = -i * 1.2566; }
+    const l = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), M.bulb()); l.position.set(x, yF - 0.15, z); G.add(l);
+  }
+
+  function buildPorch(s, E) {
+    const { w: W, d: D } = s, hw = W / 2, cx = s.x;
+    const onDeck = s.floor === 'deck', fy = onDeck ? S.H : 0.33;
+    const P = 8, beamH = 0.95, col = 0.62, rz = 0.55;
+    const shed = s.tie === 'wall', shedPitch = 3 / 12, gp = 6 / 12;
+    const zF = D - col / 2, beamTop = fy + P + beamH;
+    const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;
+    const t = M.trim(), doorW = 3.2;
+    // Neighbour coverage is computed in world x; convert to the porch's local x.
+    const front = !covered(s, 'front').length;
+    const sideDoors = { left: covered(s, 'left').map(([a, b]) => (a + b) / 2), right: covered(s, 'right').map(([a, b]) => (a + b) / 2) };
+    const g = group(cx, 0, 0);
+    withG(g, () => {
+      if (onDeck) deckFloor(-hw, hw, 0, D, fy);
+      else B(W + 1, 0.33, D + 1, M.concrete(), 0, 0.165, (D + 1) / 2);
+
+      const withDoors = (a, b, doors, maxGap) => {
+        let ps = spread(a, b, maxGap);
+        doors.forEach(c => { ps = ps.filter(p => Math.abs(p - c) > doorW / 2 + 1.3 || p === a || p === b).concat([c - doorW / 2 - col / 2, c + doorW / 2 + col / 2]); });
+        return [...new Set(ps)].sort((p, q) => p - q);
+      };
+      const frontXs = withDoors(-hw + col / 2, hw - col / 2, s.type === 'screen' && front ? [0] : [], 9);
+      const backPost = !(s.type === 'open' && shed);
+      const sideZs = {
+        left: withDoors(backPost ? col / 2 : 0, zF, s.type === 'screen' ? sideDoors.left : [], 9),
+        right: withDoors(backPost ? col / 2 : 0, zF, s.type === 'screen' ? sideDoors.right : [], 9),
+      };
+      const postTop = (z) => roofAt(z) - beamH;
+      const column = (x, z) => {
+        const h = postTop(z) - fy;
+        B(col, h, col, t, x, fy + h / 2, z); B(col + 0.2, 0.7, col + 0.2, t, x, fy + 0.35, z);
+        B(col + 0.16, 0.12, col + 0.16, t, x, fy + 0.76, z); B(col + 0.18, 0.28, col + 0.18, t, x, postTop(z) - 0.14, z);
+      };
+      frontXs.forEach(x => column(x, zF));
+      [['left', -hw + col / 2], ['right', hw - col / 2]].forEach(([k, x]) => sideZs[k].slice(0, -1).forEach(z => { if (z > 0.05) column(x, z); }));
+
+      // Beams
+      B(W, beamH, col, t, 0, beamTop - beamH / 2, zF);
+      [-1, 1].forEach(sd => beamYZ(sd * (hw - col / 2), roofAt(0) - beamH / 2, 0, roofAt(zF) - beamH / 2, zF, col, beamH, t));
+      B(W, beamH, 0.25, t, 0, roofAt(0) - beamH / 2, 0.13);
+
+      // Roof
+      if (shed) {
+        const k = 1 / Math.cos(Math.atan(shedPitch)), z2 = D + 1.0, y1 = roofAt(0), y2 = roofAt(z2);
+        beamYZ(0, y1 + rz / 2 * k, 0, y2 + rz / 2 * k, z2, W + 2, rz, t);
+        beamYZ(0, y1 + (rz + 0.05) * k, 0, y2 + (rz + 0.05) * k, z2 + 0.08, W + 2.15, 0.1, M.shingle());
+        beamYZ(0, y1 - 0.02, 0, roofAt(zF) - 0.02, zF, W - 0.1, 0.03, M.bead(), { cast: false });
+        const gy = y2 + rz * k - 0.22;
+        B(W + 2.15, 0.38, 0.4, M.gutter(), 0, gy, z2 + 0.25);
+        const dsx = covered(s, 'right').length ? -(hw + 0.75) : hw + 0.75;
+        B(0.22, gy - 0.4, 0.18, M.gutter(), dsx, (gy + 0.4) / 2, z2 + 0.2); B(0.22, 0.2, 0.9, M.gutter(), dsx, 0.2, z2 + 0.6);
+        B(W + 2.2, 0.3, 0.06, M.metal(), 0, y1 + rz * k + 0.2, 0.03);
+        fan(0, D / 2, roofAt(D / 2) - 0.02, fy + 8.1);
+      } else {
+        const a = Math.atan(gp), k = 1 / Math.cos(a), span = hw + 1, len = span * k;
+        const ridgeU = beamTop + hw * gp;
+        const houseTop = (depth) => E - 0.6 + (depth + 1.2) * 0.5 + rz * 1.118;
+        let back = 2; while (houseTop(back) < ridgeU + (rz + 0.2) * k + 0.3 && back < 12) back += 0.5;
+        const zA = -back, zB = D + 1, zc = (zA + zB) / 2, L = zB - zA;
+        [-1, 1].forEach(sd => {
+          const p = B(len, rz, L, t, sd * span / 2, beamTop + (hw - span / 2) * gp + rz / 2 * k, zc); p.rotation.z = -sd * a;
+          const sh = B(len + 0.12, 0.1, L + 0.1, M.shingle(), sd * span / 2, beamTop + (hw - span / 2) * gp + (rz + 0.05) * k, zc + 0.05, { swap: true }); sh.rotation.z = -sd * a;
+          const c = B(hw * k, 0.03, zF, M.bead(), sd * hw / 2, beamTop + hw / 2 * gp - 0.02, zF / 2, { cast: false }); c.rotation.z = -sd * a;
+          const gy = beamTop - gp + rz * k - 0.22;
+          B(0.4, 0.38, zB, M.gutter(), sd * (span + 0.2), gy, zB / 2);
+          B(0.22, gy - 0.4, 0.18, M.gutter(), sd * (span + 0.2), (gy + 0.4) / 2, zB - 0.3); B(0.22, 0.2, 0.9, M.gutter(), sd * (span + 0.2), 0.2, zB + 0.1);
+        });
+        B(0.9, 0.14, L, M.ridge(), 0, ridgeU + (rz + 0.1) * k + 0.03, zc);
+        tri([[-span, 0], [span, 0], [0, span * gp]], 0.2, M.siding(), m => m.position.set(0, beamTop - gp, zB - 0.22));
+        [-1, 1].forEach(sd => beamXY(zB + 0.02, 0, ridgeU + 0.05, sd * (span + 0.05), beamTop - gp - 0.02, 0.14, 0.55, t));
+        B(2 * span, 0.4, 0.16, t, 0, beamTop - gp + 0.2, zB + 0.02);
+        B(2 * span, 0.05, zB - zF, t, 0, beamTop - gp, (zB + zF) / 2, { cast: false });
+        fan(0, D / 2, ridgeU - 0.05, fy + 8.1);
+      }
+
+      // Enclosure
+      const top = (z) => postTop(z);
+      if (s.type === 'screen') {
+        const scr = M.screen();
+        const panel = (pts) => {
+          const gg = new THREE.BufferGeometry(); const p = pts.flat();
+          gg.setAttribute('position', new THREE.Float32BufferAttribute([...p.slice(0, 9), ...p.slice(0, 3), ...p.slice(6, 12)], 3)); gg.computeVertexNormals();
+          G.add(new THREE.Mesh(gg, scr));
+        };
+        const doorMids = { x: front ? [0] : [], left: sideDoors.left, right: sideDoors.right };
+        const run = (axis, fixed, ps, doorList) => {
+          for (let i = 0; i < ps.length - 1; i++) {
+            const a = ps[i] + (i === 0 && axis === 'z' && ps[0] < 0.2 ? 0.01 : col / 2), b = ps[i + 1] - col / 2, mid = (a + b) / 2, len = b - a;
+            if (len < 0.2) continue;
+            const P3 = (u, y) => axis === 'x' ? [u, y, fixed] : [fixed, y, u];
+            const yt = (u) => axis === 'x' ? top(zF) : top(u);
+            panel([P3(a, fy), P3(b, fy), P3(b, yt(b)), P3(a, yt(a))]);
+            const isDoor = Math.abs(len - doorW) < 0.05 && doorList.some(c => Math.abs(c - mid) < 0.1);
+            const bx = (w, h, d, y, off = 0) => axis === 'x' ? B(w, h, d, t, mid, y, fixed + off) : B(d, h, w, t, fixed + off, y, mid);
+            if (isDoor) {
+              bx(len, 0.22, 0.14, fy + 6.9); bx(len - 0.3, 1.1, 0.08, fy + 0.6, 0.02); bx(len - 0.3, 0.14, 0.08, fy + 3.2, 0.02);
+              [a + 0.09, b - 0.09].forEach(u => axis === 'x' ? B(0.18, 6.8, 0.14, t, u, fy + 3.4, fixed) : B(0.14, 6.8, 0.18, t, fixed, fy + 3.4, u));
+            } else {
+              bx(len, 0.3, 0.14, fy + 0.15); bx(len, 0.16, 0.14, fy + 3);
+            }
+          }
+        };
+        run('x', zF, frontXs, doorMids.x);
+        run('z', -hw + col / 2, [0, ...sideZs.left.filter(z => z > 0.05)], doorMids.left);
+        run('z', hw - col / 2, [0, ...sideZs.right.filter(z => z > 0.05)], doorMids.right);
+      } else if (onDeck) {
+        const gaps = front ? [[-STAIR_W / 2 - 0.2, STAIR_W / 2 + 0.2]] : [];
+        const atGap = (v) => front && Math.abs(Math.abs(v) - STAIR_W / 2 - 0.2) < 0.01;
+        for (let i = 0; i < frontXs.length - 1; i++) {
+          subtract(frontXs[i] + col / 2, frontXs[i + 1] - col / 2, gaps).forEach(([a, b]) => railRun(a, zF, b, zF, fy, fy, { postA: atGap(a), postB: atGap(b) }));
+        }
+        [['left', -hw + col / 2], ['right', hw - col / 2]].forEach(([k, x]) => {
+          const zs = [backPost ? col / 2 : 0, ...sideZs[k].filter(z => z > 0.05)];
+          for (let i = 0; i < zs.length - 1; i++) {
+            const a0 = zs[i] + (i || backPost ? col / 2 : 0.25), b0 = zs[i + 1] - col / 2;
+            subtract(a0, b0, covered(s, k)).forEach(([a, b]) => railRun(x, a, x, b, fy, fy, { postA: !backPost && i === 0 && a === a0, postB: false }));
+          }
+        });
+      }
+    });
+    const sp = stairPlacement(s);
+    if (sp) stairs(sp.x, sp.z, sp.ry, fy, risers(fy) >= 4);
+  }
+
+  function buildHouse(att) {
+    const FF = S.H;
+    const xs = att.length ? att.flatMap(s => [rect(s).x0, rect(s).x1]) : [-10, 10];
+    const xmin = Math.min(...xs), xmax = Math.max(...xs), hx = (xmin + xmax) / 2;
+    const HW = Math.max(38, xmax - xmin + 20), HD = 28, rz = 0.55, k = 1.118;
+    let E = FF + 9.3;
+    att.forEach(s => { if (s.kind === 'porch' && s.tie === 'wall') { const fy = s.floor === 'deck' ? FF : 0.33; E = Math.max(E, fy + 8 + 0.95 + (s.d - 0.31) * 0.25 + rz * 1.03 + 1.3); } });
+    const fTop = Math.min(Math.max(FF - 0.6, 0.8), 2.6);
+    B(HW + 0.2, fTop, HD + 0.2, M.concrete(), hx, fTop / 2, -HD / 2);
+    B(HW, E - fTop, HD, M.siding(), hx, fTop + (E - fTop) / 2, -HD / 2);
+    [-1, 1].forEach(sd => { B(0.42, E - fTop, 0.12, M.trim(), hx + sd * (HW / 2 - 0.15), fTop + (E - fTop) / 2, 0.06); B(0.12, E - fTop, 0.42, M.trim(), hx + sd * (HW / 2 + 0.06), fTop + (E - fTop) / 2, -0.15); });
+    B(HW, 0.55, 0.1, M.trim(), hx, E - 0.28, 0.05);
+    const run = HD / 2 + 1.2, yr = E - 0.6 + run * 0.5;
+    beamYZ(hx, E - 0.6 + rz / 2 * k, 1.2, yr + rz / 2 * k, -HD / 2, HW + 2, rz, M.trim());
+    beamYZ(hx, E - 0.6 + (rz + 0.05) * k, 1.28, yr + (rz + 0.05) * k, -HD / 2, HW + 2.15, 0.1, M.shingle());
+    beamYZ(hx, yr + rz / 2 * k, -HD / 2, E - 0.6 + rz / 2 * k, -HD - 1.2, HW + 2, rz, M.trim());
+    beamYZ(hx, yr + (rz + 0.05) * k, -HD / 2, E - 0.6 + (rz + 0.05) * k, -HD - 1.28, HW + 2.15, 0.1, M.shingle());
+    B(HW + 2.15, 0.16, 1.1, M.ridge(), hx, yr + (rz + 0.1) * k + 0.04, -HD / 2);
+    [-1, 1].forEach(sd => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * 0.5]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(hx + sd * HW / 2 - (sd > 0 ? 0.2 : 0), E, 0); }));
+    const gy = E - 0.6 + rz * k - 0.22;
+    B(HW + 2.15, 0.38, 0.4, M.gutter(), hx, gy, 1.45);
+    [-1, 1].forEach(sd => { const x = hx + sd * (HW / 2 + 0.5); B(0.22, gy - 0.4, 0.18, M.gutter(), x, (gy + 0.4) / 2, 1.3); B(0.22, 0.2, 0.9, M.gutter(), x, 0.2, 1.75); });
+
+    // Doors behind each attached section, windows in the gaps.
+    const doors = att.map(s => ({ x: s.x, w: s.kind === 'deck' ? 6 : 3, y: s.kind === 'porch' && s.floor === 'patio' ? 0.33 : FF, kind: s.kind }));
+    doors.forEach(d => { const g = group(d.x, d.y, 0); d.kind === 'deck' ? sliderDoor(g) : entryDoor(g); });
+    for (let x = hx - HW / 2 + 4.5; x <= hx + HW / 2 - 4.5; x += 7.5) {
+      if (doors.some(d => Math.abs(x - d.x) < d.w / 2 + 3.6)) continue;
+      windowAt(group(x, FF + 5.3, 0), 3, 4.6);
+    }
+    [-1, 1].forEach(sd => [-7, -19].forEach(z => windowAt(group(hx + sd * HW / 2, FF + 5.3, z, sd * Math.PI / 2), 3, 4.6)));
+
+    // Landscaping beds in front of the house where nothing is built.
+    const spans = att.map(s => [rect(s).x0 - 1, rect(s).x1 + 1]);
+    subtract(hx - HW / 2, hx + HW / 2, spans).forEach(([a, b]) => {
+      if (b - a < 3) return;
+      B(b - a, 0.12, 3.4, M.mulch(), (a + b) / 2, 0.06, 1.9, { cast: false });
+      for (let x = a + 1.8; x < b - 1.2; x += 3.4) shrub(x + (R() - 0.5) * 0.6, 2 + (R() - 0.5) * 0.5, 1.0 + R() * 0.45);
+    });
+    tree(hx - HW / 2 - 16, -6, 1.1); tree(hx + HW / 2 + 14, -22, 1.25); tree(hx - 6, -HD - 18, 1.3);
+    return E;
+  }
+
+  // ── Build the whole scene ──────────────────────────────────────────────────
+  let model = new THREE.Group(); scene.add(model);
+  const secGroups = [];
+  const target = new THREE.Vector3();
+  let bbox = { cx: 0, cz: 8, size: 30 };
+  const outline = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#2fd17f', dashSize: 0.8, gapSize: 0.5, depthTest: false, transparent: true }));
+  outline.renderOrder = 10; scene.add(outline);
+  const dimAnchors = { w: new THREE.Vector3(), d: new THREE.Vector3() };
+
   function build() {
     scene.remove(model);
-    model.traverse(o => { if (o.geometry) o.geometry.dispose(); });
-    model = new THREE.Group(); scene.add(model);
+    model.traverse(o => { if (o.geometry && o.geometry !== balGeo) o.geometry.dispose(); });
+    model = new THREE.Group(); scene.add(model); secGroups.length = 0;
+    R = rng(1); G = model;
+    const att = S.sections.filter(s => s.kind !== 'patio');
+    const E = buildHouse(att);
+    S.sections.forEach(s => {
+      const g = group(); g.userData.sec = s.id; secGroups.push(g);
+      withG(g, () => { if (s.kind === 'porch') buildPorch(s, E); else if (s.kind === 'deck') buildDeck(s); else buildPatio(s); });
+    });
 
-    const { W, D } = S, hw = W / 2;
-    const onDeck = S.floor === 'deck';
-    const fy = onDeck ? S.H : 0.33;              // finished floor height
-    const P = 8;                                  // post height to beam
-    const shed = S.tie === 'wall';
-    const shedPitch = 3 / 12, gablePitch = 6 / 12, housePitch = 6 / 12;
-    const zF = D - 0.25;                          // front post line
-    const beamTop = fy + P + 0.9;
-    // Underside of the roof framing at depth z.
-    const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;
-    const ridgeY = beamTop + hw * gablePitch;
+    const rs = S.sections.map(rect);
+    const x0 = Math.min(...rs.map(r => r.x0)), x1 = Math.max(...rs.map(r => r.x1)), z1 = Math.max(...rs.map(r => r.z1));
+    bbox = { cx: (x0 + x1) / 2, cz: z1 / 2, size: Math.max(x1 - x0, z1, 16) };
+    const half = bbox.size / 2 + 34;
+    sun.target.position.set(bbox.cx, 0, bbox.cz);
+    sun.position.set(bbox.cx - 40, 70, bbox.cz + 55);
+    Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 260 });
+    sun.shadow.camera.updateProjectionMatrix();
 
-    // House
-    const HW = Math.max(W + 18, 34), HD = 26;
-    const E = shed ? Math.max(fy + 9, roofAt(0) + 1.2) : fy + 9.5;
-    box(HW, E, HD, M.siding(), 0, E / 2, -HD / 2);
-    box(HW + 0.2, 1, HD + 0.2, M.concrete(), 0, 0.5, -HD / 2);
-    const hRun = HD / 2 + 1, hLen = hRun / Math.cos(Math.atan(housePitch));
-    const front = box(HW + 2, 0.4, hLen, M.shingle(), 0, E + (HD / 2 - 1) / 2 * housePitch + 0.2, 1 - hRun / 2);
-    front.rotation.x = Math.atan(housePitch);
-    const back = box(HW + 2, 0.4, hLen, M.shingle(), 0, E + (HD / 2 - 1) / 2 * housePitch + 0.2, -HD - 1 + hRun / 2);
-    back.rotation.x = -Math.atan(housePitch);
-    [-1, 1].forEach(s => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * housePitch]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(s * HW / 2 - (s > 0 ? 0.2 : 0), E, 0); }));
-    // House openings: door centered on porch, windows either side.
-    box(3.4, 7.1, 0.12, M.trim(), 0, fy + 3.55, 0.06); box(3, 6.8, 0.16, M.door(), 0, fy + 3.4, 0.08);
-    const winXs = W >= 14 ? [-hw / 2 - 1, hw / 2 + 1] : [];
-    [...winXs, -hw - 5, hw + 5].forEach(x => { box(3.4, 4.6, 0.12, M.trim(), x, fy + 4.6, 0.06); box(3, 4.2, 0.16, M.glass(), x, fy + 4.6, 0.08); });
-
-    // Floor system
-    if (onDeck) {
-      box(W, 0.1, D, M.deck(), 0, fy - 0.05, D / 2);
-      box(W + 0.2, 0.9, 0.12, M.fascia(), 0, fy - 0.55, D + 0.04);
-      [-1, 1].forEach(s => box(0.12, 0.9, D, M.fascia(), s * (hw + 0.04), fy - 0.55, D / 2));
-      box(W, 0.9, 0.2, M.pt(), 0, fy - 0.55, 0.1); // ledger
-      const rows = D > 10 ? [D / 2, D - 0.6] : [D - 0.6];
-      rows.forEach(z => {
-        box(W, 0.8, 0.45, M.pt(), 0, fy - 1.4, z); // drop beam
-        spread(-hw + 0.4, hw - 0.4, 8).forEach(x => {
-          box(0.46, fy - 1.8, 0.46, M.pt(), x, (fy - 1.8) / 2, z);
-          const f = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 20), M.footing());
-          f.position.set(x, 0.12, z); f.receiveShadow = true; model.add(f);
-        });
-      });
-    } else {
-      box(W + 2, 0.33, D + 1.5, M.concrete(), 0, 0.165, (D + 1.5) / 2);
-    }
-
-    // Posts
-    const stairW = 4, doorW = 3.2;
-    let frontXs = spread(-hw + 0.25, hw - 0.25, 9);
-    if (S.type === 'screen') {
-      frontXs = frontXs.filter(x => Math.abs(x) > doorW / 2 + 1.2).concat([-doorW / 2 - 0.25, doorW / 2 + 0.25]).sort((a, b) => a - b);
-    }
-    const backPosts = !(S.type === 'open' && shed);
-    const sideZs = [...(backPosts ? [0.25] : []), ...(D > 12 ? [D / 2] : []), zF];
-    const postTop = (z) => roofAt(z) - 0.9;
-    frontXs.forEach(x => box(0.5, postTop(zF) - fy, 0.5, M.trim(), x, (postTop(zF) + fy) / 2, zF));
-    [-1, 1].forEach(s => sideZs.slice(0, -1).forEach(z => box(0.5, postTop(z) - fy, 0.5, M.trim(), s * (hw - 0.25), (postTop(z) + fy) / 2, z)));
-
-    // Beams
-    box(W, 0.9, 0.5, M.trim(), 0, beamTop - 0.45, zF);
-    [-1, 1].forEach(s => beamYZ(s * (hw - 0.25), roofAt(0) - 0.45, 0, roofAt(zF) - 0.45, zF, 0.5, 0.9, M.trim()));
-    box(W, 0.9, 0.25, M.trim(), 0, roofAt(0) - 0.45, 0.13); // roof ledger
-
-    // Roof
-    if (shed) {
-      const z2 = D + 0.9, y1 = roofAt(0), y2 = roofAt(z2);
-      const t = 0.35, off = t / 2 / Math.cos(Math.atan(shedPitch));
-      beamYZ(0, y1 + off, 0, y2 + off, z2, W + 2, t, M.shingle());
-      beamYZ(0, y1 - 0.02, 0.01, y2 - 0.02, z2, W + 1.6, 0.04, M.trim()); // soffit
-      box(W + 2, 0.6, 0.1, M.trim(), 0, y2 - 0.05, z2 + 0.03);           // fascia
-    } else {
-      const span = hw + 1, a = Math.atan(gablePitch), len = span / Math.cos(a), t = 0.35;
-      const houseRoofAt = (depth) => E - 0.5 + (depth + 1) * housePitch;
-      let back = 2; while (houseRoofAt(back) < ridgeY + 0.6 && back < HD / 2 - 1) back += 0.5;
-      const zA = -back, zB = D + 1, zc = (zA + zB) / 2, L = zB - zA;
-      [-1, 1].forEach(s => {
-        const p = box(len, t, L, M.shingle(), s * span / 2, beamTop + (hw - span / 2) * gablePitch + t / 2 / Math.cos(a), zc);
-        p.rotation.z = -s * a;
-      });
-      box(W + 1.2, 0.05, D + 1 - zF, M.trim(), 0, beamTop - 0.3, (zF + D + 1) / 2); // gable soffit
-      tri([[-hw - 0.6, 0], [hw + 0.6, 0], [0, (hw + 0.6) * gablePitch]], 0.1, M.trim(), m => m.position.set(0, beamTop - 0.3, D + 0.95)); // rake trim
-      tri([[-hw + 0.1, 0.05], [hw - 0.1, 0.05], [0, hw * gablePitch - 0.1]], 0.12, M.siding(), m => m.position.set(0, beamTop - 0.25, D + 0.97));
-    }
-
-    // Enclosure: screens or railing
-    const top = (z) => postTop(z);
-    if (S.type === 'screen') {
-      const scr = M.screen();
-      for (let i = 0; i < frontXs.length - 1; i++) {
-        const x1 = frontXs[i] + 0.25, x2 = frontXs[i + 1] - 0.25, mid = (x1 + x2) / 2, isDoor = Math.abs(mid) < 0.01;
-        const yt = top(zF);
-        quad([[x1, fy, zF], [x2, fy, zF], [x2, yt, zF], [x1, yt, zF]], scr);
-        if (isDoor) { // screen door
-          const dw = x2 - x1, dh = 6.8;
-          box(dw, 0.2, 0.14, M.trim(), mid, fy + dh, zF);
-          [x1 + 0.08, x2 - 0.08].forEach(x => box(0.16, dh, 0.14, M.trim(), x, fy + dh / 2, zF));
-          box(dw - 0.3, 1.2, 0.08, M.trim(), mid, fy + 0.6, zF + 0.02);
-          box(dw - 0.3, 0.12, 0.08, M.trim(), mid, fy + 3.1, zF + 0.02);
-          box(0.12, 0.12, 0.2, mat('#9aa0a6', { metalness: 0.8, roughness: 0.3 }), x2 - 0.45, fy + 3.3, zF + 0.1);
-        } else {
-          box(x2 - x1, 0.25, 0.14, M.trim(), mid, fy + 0.125, zF);
-          box(x2 - x1, 0.16, 0.14, M.trim(), mid, fy + 3, zF);
-        }
-      }
-      [-1, 1].forEach(s => {
-        const x = s * (hw - 0.25), zs = [0, ...sideZs.slice(backPosts ? 1 : 0)];
-        for (let i = 0; i < zs.length - 1; i++) {
-          const z1 = zs[i] + (i === 0 ? 0.01 : 0.25), z2 = zs[i + 1] - 0.25;
-          quad([[x, fy, z1], [x, fy, z2], [x, top(z2), z2], [x, top(z1), z1]], scr);
-          box(0.14, 0.25, z2 - z1, M.trim(), x, fy + 0.125, (z1 + z2) / 2);
-          box(0.14, 0.16, z2 - z1, M.trim(), x, fy + 3, (z1 + z2) / 2);
-        }
-      });
-    } else if (onDeck) {
-      const railH = 3, runs = [];
-      runs.push([-hw + 0.25, zF, -stairW / 2, zF], [stairW / 2, zF, hw - 0.25, zF]);
-      [-1, 1].forEach(s => runs.push([s * (hw - 0.25), 0.15, s * (hw - 0.25), zF]));
-      const tr = M.trim();
-      runs.forEach(([x1, z1, x2, z2]) => {
-        const len = Math.hypot(x2 - x1, z2 - z1), mx = (x1 + x2) / 2, mz = (z1 + z2) / 2, alongX = Math.abs(z2 - z1) < 1e-6;
-        const rail = (y, h) => box(alongX ? len : 0.3, h, alongX ? 0.3 : len, tr, mx, y, mz);
-        rail(fy + railH, 0.15); rail(fy + 0.35, 0.12);
-        const n = Math.floor(len / 0.36);
-        for (let i = 1; i < n; i++) {
-          const f = i / n, x = x1 + (x2 - x1) * f, z = z1 + (z2 - z1) * f;
-          box(0.12, railH - 0.4, 0.12, tr, x, fy + 0.35 + (railH - 0.4) / 2, z);
-        }
-      });
-    }
-
-    // Steps
-    if (onDeck) {
-      const n = Math.max(1, Math.ceil(S.H * 12 / 7.5)), rise = S.H / n, run = 10.5 / 12;
-      for (let i = 1; i < n; i++) {
-        const yTop = S.H - i * rise, z = D + (i - 0.5) * run;
-        box(stairW, yTop, run, M.fascia(), 0, yTop / 2, z);
-        box(stairW + 0.1, 0.08, run + 0.05, M.deck(), 0, yTop - 0.04, z);
-      }
-      if (S.H > 2) {
-        const zEnd = D + (n - 1) * run;
-        [-1, 1].forEach(s => {
-          beamYZ(s * (stairW / 2 + 0.05), S.H + 3, D, rise + 3, zEnd, 0.15, 0.15, M.trim());
-          box(0.4, rise + 3, 0.4, M.trim(), s * (stairW / 2 + 0.05), (rise + 3) / 2, zEnd);
-        });
-      }
-      box(stairW + 1, 0.2, 3, M.concrete(), 0, 0.1, D + (n - 1) * run + 1.5); // landing pad
-    }
-
-    dimAnchors.w.set(-hw / 2 - 1, onDeck ? fy - 1.2 : 0.5, D + 0.6);
-    dimAnchors.d.set(hw + 0.8, onDeck ? fy - 1.2 : 0.5, D / 2);
-    $('dim-w').textContent = `${W}′-0″`; $('dim-d').textContent = `${D}′-0″`;
-    target.set(0, fy + 3.5, D / 2);
+    const s = sel(), r = rect(s), y = (raised(s) ? S.H : 0.35) + 0.06;
+    outline.geometry.dispose();
+    outline.geometry = new THREE.BufferGeometry().setFromPoints([[r.x0, r.z0], [r.x1, r.z0], [r.x1, r.z1], [r.x0, r.z1]].map(([x, z]) => new THREE.Vector3(x, y, z)));
+    outline.computeLineDistances();
+    dimAnchors.w.set(s.x, y, r.z1 + 0.8); dimAnchors.d.set(r.x1 + 0.9, y, (r.z0 + r.z1) / 2);
+    $('dim-w').textContent = `${s.w}′-0″`; $('dim-d').textContent = `${s.d}′-0″`;
+    target.set(bbox.cx, S.H + 2, bbox.cz);
   }
 
   // ── Camera views ───────────────────────────────────────────────────────────
-  const target = new THREE.Vector3();
-  const dimAnchors = { w: new THREE.Vector3(), d: new THREE.Vector3() };
-  let view = 'corner';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let tween = null;
+  let tween = null, dirty = true;
   function viewPos(v) {
-    const s = Math.max(S.W, S.D) / 16 * Math.max(1, 1.25 / Math.max(camera.aspect, 0.4)), fy = S.floor === 'deck' ? S.H : 0;
-    if (v === 'front') return { pos: new THREE.Vector3(0, fy + 7, S.D + 34 * s + 6), tgt: new THREE.Vector3(0, fy + 5, S.D / 2) };
-    if (v === 'top') return { pos: new THREE.Vector3(0, 62 * s + 18, S.D / 2 + 0.01), tgt: new THREE.Vector3(0, 0, S.D / 2) };
-    return { pos: new THREE.Vector3(S.W * 0.9 + 18 * s + 6, fy + 13 + 6 * s, S.D + 26 * s + 6), tgt: target.clone() };
+    const s = bbox.size / 16 * Math.max(1, 1.25 / Math.max(camera.aspect, 0.4)), fy = S.H, cx = bbox.cx, cz = bbox.cz;
+    if (v === 'front') return { pos: new THREE.Vector3(cx, fy + 6, cz + 24 * s + 12), tgt: new THREE.Vector3(cx, fy + 4, cz) };
+    if (v === 'top') return { pos: new THREE.Vector3(cx, 44 * s + 22, cz + 0.01), tgt: new THREE.Vector3(cx, 0, cz) };
+    return { pos: new THREE.Vector3(cx + 13 * s + 9, fy + 8 + 5 * s, cz + 18 * s + 11), tgt: target.clone() };
   }
-  function goTo(v, instant) {
+  goTo = function (v, instant) {
     view = v;
     document.querySelectorAll('.views button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+    if (dirty) { build(); dirty = false; }
     const { pos, tgt } = viewPos(v);
     if (instant || reduce) { camera.position.copy(pos); controls.target.copy(tgt); controls.update(); tween = null; return; }
     tween = { p0: camera.position.clone(), t0: controls.target.clone(), pos, tgt, start: performance.now(), dur: 700 };
-  }
+  };
   document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => goTo(b.dataset.view)));
   controls.addEventListener('start', () => { tween = null; });
+
+  // Tap a section in the scene to select it.
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  let down = null;
+  renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+  renderer.domElement.addEventListener('pointerup', e => {
+    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    const rc = renderer.domElement.getBoundingClientRect();
+    ndc.set((e.clientX - rc.left) / rc.width * 2 - 1, -(e.clientY - rc.top) / rc.height * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(secGroups, true)[0];
+    if (!hit) return;
+    let o = hit.object; while (o && o.userData.sec == null) o = o.parent;
+    if (o && o.userData.sec !== S.sel) select(o.userData.sec);
+  });
 
   // ── Loop ───────────────────────────────────────────────────────────────────
   function resize() {
@@ -518,25 +1039,26 @@
   const v3 = new THREE.Vector3();
   function placeDim(el, p) {
     v3.copy(p).project(camera);
-    const vis = v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1;
+    const vis = v3.z < 1 && Math.abs(v3.x) < 1.05 && Math.abs(v3.y) < 1.05;
     el.hidden = !vis; if (!vis) return;
     el.style.left = `${(v3.x + 1) / 2 * viewer.clientWidth}px`; el.style.top = `${(1 - v3.y) / 2 * viewer.clientHeight}px`;
   }
   function frame(now) {
+    if (dirty) { build(); dirty = false; }
     if (tween) {
       const k = Math.min(1, (now - tween.start) / tween.dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
       camera.position.lerpVectors(tween.p0, tween.pos, e); controls.target.lerpVectors(tween.t0, tween.tgt, e);
       if (k >= 1) tween = null;
     }
     controls.update();
+    sky.position.copy(camera.position);
     renderer.render(scene, camera);
     placeDim($('dim-w'), dimAnchors.w); placeDim($('dim-d'), dimAnchors.d);
     requestAnimationFrame(frame);
   }
 
-  let first = true;
-  update = () => { updateUI(); build(); if (first) { resize(); goTo('corner', true); first = false; } };
-  update();
+  update = () => { updateUI(); dirty = true; };
+  updateUI(); resize(); build(); dirty = false; goTo('corner', true);
   requestAnimationFrame(frame);
 })();
 </script>
