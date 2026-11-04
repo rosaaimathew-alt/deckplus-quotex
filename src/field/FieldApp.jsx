@@ -25,6 +25,7 @@ import { getStages, JOB_TYPE_OPTIONS } from '../pages/Jobs'
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
 import { setViewPref } from './fieldMode'
+import InstallCard from './InstallCard'
 
 // ── Date helpers (local calendar days, not UTC) ─────────────────────────────
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -196,6 +197,8 @@ function TodayScreen() {
       </div>
 
       <ScopeToggle scope={scope} setScope={setScope} hasMine={hasMine} />
+
+      <InstallCard />
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">
