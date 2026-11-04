@@ -70,7 +70,8 @@ export default function Dashboard() {
   const { proposals, canChoose, reps, repId, mineOnly, repName, setRep } = useScopedProposals()
   const jobCosts   = useStore(s => s.jobCosts) || {}
   const { can, role } = useNav()
-  const attention  = attentionItems({ proposals, jobCosts, can, role })
+  const permitPulse = useStore(s => s.permitPulse)
+  const attention  = attentionItems({ proposals, jobCosts, can, role, permitPulse })
 
   const [periodKey, setPeriodKey] = useState('year')
   const [showCounted, setShowCounted] = useState(false)
