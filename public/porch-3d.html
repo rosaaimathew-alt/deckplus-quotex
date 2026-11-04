@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0;font:14px system-ui,sans-serif} [hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Porch 3D Builder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+  /* Layout: one-screen tool. Control rail on the left, live 3D model filling the rest; stacks on phones. */
+  :root {
+    --bg: #eef2ef; --panel: #ffffff; --fg: #1b2520; --muted: #5a675f; --line: #d5ddd7;
+    --accent: #2c6a4d; --accent-fg: #ffffff; --accent-soft: #e1eee6; --sky: #cddfe8;
+    --tag-bg: rgba(255,255,255,.92); --tag-fg: #1b2520;
+    --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+    --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #111714; --panel: #18201c; --fg: #e4ebe6; --muted: #98a69e; --line: #2a3530;
+    --accent: #72c196; --accent-fg: #0c140f; --accent-soft: #1f3128; --sky: #1d2a33;
+    --tag-bg: rgba(20,28,24,.9); --tag-fg: #e4ebe6; color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --bg: #111714; --panel: #18201c; --fg: #e4ebe6; --muted: #98a69e; --line: #2a3530;
+    --accent: #72c196; --accent-fg: #0c140f; --accent-soft: #1f3128; --sky: #1d2a33;
+    --tag-bg: rgba(20,28,24,.9); --tag-fg: #e4ebe6; color-scheme: dark; }
+
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; }
+  .app { display: grid; grid-template-columns: 350px minmax(0, 1fr); height: 100%; }
+  .rail { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto;
+    padding-block: 20px 24px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: 20px;
+    display: flex; flex-direction: column; gap: 18px; }
+  .eyebrow { font: 600 11px/1 var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  h1 { font: 700 28px/1.05 var(--font-display); margin: 6px 0 0; text-wrap: balance; }
+  .lede { color: var(--muted); margin: 6px 0 0; line-height: 1.45; font-size: 14px; }
+
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  legend, .label { font: 600 13px/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 8px; }
+  .row-label { display: flex; justify-content: space-between; align-items: baseline; }
+  .row-label output { font: 500 14px/1 var(--font-mono); color: var(--fg); }
+  fieldset[disabled] { opacity: .45; }
+
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg label { text-align: center; padding: 8px 6px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; line-height: 1.15; user-select: none; }
+  .seg label small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  .seg input:checked + label { background: var(--accent); color: var(--accent-fg); }
+  .seg input:checked + label small { color: inherit; opacity: .8; }
+  .seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatches input { position: absolute; opacity: 0; pointer-events: none; }
+  .swatches label { width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
+  .swatches input:checked + label { box-shadow: 0 0 0 2px var(--accent); }
+  .swatches input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .swatch-name { font-size: 13px; color: var(--muted); }
+
+  .price { border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .price-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+  .price-line span:first-child { color: var(--muted); min-width: 0; }
+  .price-line span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .price-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; }
+  .price-total strong { font: 700 30px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+  .note { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 0; }
+
+  .stage { position: relative; min-width: 0; background: var(--sky); }
+  #viewer { position: absolute; inset: 0; }
+  #viewer canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .views { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: max(14px, env(safe-area-inset-right, 0px)); display: flex; gap: 4px;
+    background: var(--tag-bg); border-radius: 8px; padding: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+  .views button { font: 500 13px/1 var(--font-body); color: var(--tag-fg); background: transparent; border: 0; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+  .views button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+  .views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .summary { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--tag-bg); color: var(--tag-fg);
+    border-radius: 8px; padding: 10px 14px; box-shadow: 0 1px 4px rgba(0,0,0,.15); max-width: calc(100% - 28px); }
+  .summary b { font: 700 18px/1.1 var(--font-display); display: block; }
+  .summary span { font-size: 13px; opacity: .8; }
+  .hint { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 12px; color: var(--tag-fg); background: var(--tag-bg); padding: 6px 10px; border-radius: 6px; }
+  .dim { position: absolute; left: 0; top: 0; font: 500 13px/1 var(--font-mono); background: #1b2520; color: #fff; padding: 5px 7px; border-radius: 4px; pointer-events: none; white-space: nowrap; transform: translate(-50%, -50%); }
+  .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 820px) {
+    html, body { height: auto; }
+    .app { grid-template-columns: 1fr; height: auto; }
+    .stage { height: 58vh; min-height: 340px; order: -1; }
+    .rail { border-right: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+    .hint { display: none; }
+  }
+</style>
+
+<div class="app">
+  <aside class="rail" aria-label="Porch options">
+    <div>
+      <div class="eyebrow">QuoteX prototype · Deck Plus</div>
+      <h1>Porch 3D Builder</h1>
+      <p class="lede">Pick the options and the model and base price update together. Drag to orbit, scroll or pinch to zoom.</p>
+    </div>
+
+    <fieldset>
+      <legend>Porch type</legend>
+      <div class="seg">
+        <input type="radio" name="type" id="type-screen" value="screen" checked><label for="type-screen">Screen porch<small>ScreenEze</small></label>
+        <input type="radio" name="type" id="type-open" value="open"><label for="type-open">Open porch<small>Railing only</small></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="row-label"><label class="label" for="w">Width (along house)</label><output id="w-out" for="w">16′</output></div>
+      <input type="range" id="w" min="10" max="24" step="1" value="16">
+      <div class="row-label"><label class="label" for="d">Depth (out from house)</label><output id="d-out" for="d">14′</output></div>
+      <input type="range" id="d" min="8" max="20" step="1" value="14">
+    </fieldset>
+
+    <fieldset>
+      <legend>Roof connection</legend>
+      <div class="seg">
+        <input type="radio" name="tie" id="tie-wall" value="wall" checked><label for="tie-wall">Wall tie<small>Shed roof</small></label>
+        <input type="radio" name="tie" id="tie-roof" value="roof"><label for="tie-roof">Roof tie<small>Gable roof</small></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Sits on</legend>
+      <div class="seg">
+        <input type="radio" name="floor" id="floor-deck" value="deck" checked><label for="floor-deck">New PT deck<small>Raised, with steps</small></label>
+        <input type="radio" name="floor" id="floor-patio" value="patio"><label for="floor-patio">Existing patio<small>At grade</small></label>
+      </div>
+    </fieldset>
+
+    <fieldset id="height-group">
+      <div class="row-label"><label class="label" for="h">Deck height</label><output id="h-out" for="h">3′-0″</output></div>
+      <input type="range" id="h" min="1" max="10" step="0.5" value="3">
+    </fieldset>
+
+    <fieldset id="decking-group">
+      <legend>Porch floor</legend>
+      <div class="seg">
+        <input type="radio" name="decking" id="deck-pt" value="pt" checked><label for="deck-pt">PT<small>Included</small></label>
+        <input type="radio" name="decking" id="deck-enhance" value="enhance"><label for="deck-enhance">Trex Enhance<small>+$7.70/SF</small></label>
+        <input type="radio" name="decking" id="deck-transcend" value="transcend"><label for="deck-transcend">Trex Transcend<small>+$17.60/SF</small></label>
+      </div>
+      <div id="color-row">
+        <div class="row-label"><span class="label">Decking color</span><span class="swatch-name" id="color-name">Sand</span></div>
+        <div class="swatches" id="color-swatches"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <div class="row-label"><span class="label">Posts &amp; trim</span><span class="swatch-name" id="trim-name">White</span></div>
+      <div class="swatches" id="trim-swatches"></div>
+    </fieldset>
+
+    <section class="price" aria-label="Base price">
+      <div class="label">Base price from the rate table</div>
+      <div id="price-lines"></div>
+      <div class="price-total"><span>Estimate</span><strong id="price-total">$0</strong></div>
+      <p class="note">Uses the Porch Builder base rates. Steps, railing, doors, electrical and roof options are priced in QuoteX and left out here. Wall tie is drawn as a shed roof on a house-wall ledger; roof tie as a gable tied into the house roof.</p>
+    </section>
+  </aside>
+
+  <main class="stage">
+    <div id="viewer"><div class="loading" id="loading">Loading 3D model…</div></div>
+    <div class="views" role="group" aria-label="Camera view">
+      <button type="button" data-view="corner" aria-pressed="true">Corner</button>
+      <button type="button" data-view="front" aria-pressed="false">Front</button>
+      <button type="button" data-view="top" aria-pressed="false">Plan</button>
+    </div>
+    <div class="summary"><b id="sum-title">16′ × 14′ screen porch</b><span id="sum-sub">224 SF · wall tie · on new PT deck</span></div>
+    <div class="hint">Drag to orbit · right-drag to pan</div>
+    <div class="dim" id="dim-w"></div>
+    <div class="dim" id="dim-d"></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  // ── Rates (sell $/SF) copied from src/porchBuild.js defaults ───────────────
+  const BASE = {
+    screen_wall_deck: 80, screen_roof_deck: 90, screen_wall_patio: 72, screen_roof_patio: 80,
+    open_wall_deck: 77,   open_roof_deck: 87,   open_wall_patio: 67,   open_roof_patio: 77,
+  };
+  const SCREENEZE_SF = 3, DECK_OVER_8_SF = 5, GABLE_OVER_19 = 1000;
+  const FLOOR_UPGRADE = { pt: 0, enhance: 7.7, transcend: 17.6 };
+  const DECK_LABEL = { pt: 'PT', enhance: 'Trex Enhance', transcend: 'Trex Transcend' };
+
+  const COLORS = [
+    { key: 'sand', name: 'Sand', hex: '#b39470' },
+    { key: 'driftwood', name: 'Driftwood gray', hex: '#8f8a80' },
+    { key: 'walnut', name: 'Walnut', hex: '#6b4a34' },
+    { key: 'charcoal', name: 'Charcoal', hex: '#4a4b4e' },
+  ];
+  const PT_HEX = '#a88f63';
+  const TRIMS = [
+    { key: 'white', name: 'White', hex: '#f1f0ea' },
+    { key: 'black', name: 'Black', hex: '#2b2b2b' },
+    { key: 'bronze', name: 'Bronze', hex: '#5d4a38' },
+  ];
+
+  const S = { type: 'screen', W: 16, D: 14, tie: 'wall', floor: 'deck', H: 3, decking: 'pt', color: 'sand', trim: 'white' };
+
+  const $ = (id) => document.getElementById(id);
+  let update = () => updateUI();
+  const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  const ftIn = (ft) => { const f = Math.floor(ft + 1e-6); const i = Math.round((ft - f) * 12); return `${f}′-${i}″`; };
+
+  // ── Swatches ───────────────────────────────────────────────────────────────
+  function swatches(el, list, name, key, nameEl) {
+    el.innerHTML = list.map(c => `<input type="radio" name="${name}" id="${name}-${c.key}" value="${c.key}" aria-label="${c.name}"${c.key === S[key] ? ' checked' : ''}><label for="${name}-${c.key}" title="${c.name}" style="background:${c.hex}"></label>`).join('');
+    el.addEventListener('change', (e) => { S[key] = e.target.value; nameEl.textContent = list.find(c => c.key === S[key]).name; update(); });
+  }
+  swatches($('color-swatches'), COLORS, 'color', 'color', $('color-name'));
+  swatches($('trim-swatches'), TRIMS, 'trim', 'trim', $('trim-name'));
+
+  document.querySelectorAll('input[type=radio][name=type],input[name=tie],input[name=floor],input[name=decking]').forEach(r =>
+    r.addEventListener('change', () => { S[r.name] = r.value; update(); }));
+  [['w', 'W'], ['d', 'D'], ['h', 'H']].forEach(([id, k]) => $(id).addEventListener('input', (e) => { S[k] = +e.target.value; update(); }));
+
+  // ── Price ──────────────────────────────────────────────────────────────────
+  function price() {
+    const sf = S.W * S.D, lines = [];
+    const rate = BASE[`${S.type}_${S.tie}_${S.floor}`];
+    lines.push([`${S.type === 'screen' ? 'Screen' : 'Open'} porch · ${S.tie} tie · ${S.floor === 'deck' ? 'new PT deck' : 'patio'} · ${sf} SF × $${rate}`, sf * rate]);
+    if (S.type === 'screen') lines.push([`ScreenEze screens · ${sf} SF × $${SCREENEZE_SF}`, sf * SCREENEZE_SF]);
+    if (S.floor === 'deck' && S.decking !== 'pt') lines.push([`${DECK_LABEL[S.decking]} floor upgrade · ${sf} SF × $${FLOOR_UPGRADE[S.decking].toFixed(2)}`, sf * FLOOR_UPGRADE[S.decking]]);
+    if (S.tie === 'roof' && S.W > 19) lines.push(['Gable wider than 19′ add', GABLE_OVER_19]);
+    if (S.floor === 'deck' && S.H > 8) lines.push([`Deck above 8′ high · ${sf} SF × $${DECK_OVER_8_SF}`, sf * DECK_OVER_8_SF]);
+    $('price-lines').innerHTML = lines.map(([l, v]) => `<div class="price-line"><span>${l}</span><span>${money.format(v)}</span></div>`).join('');
+    $('price-total').textContent = money.format(lines.reduce((a, [, v]) => a + v, 0));
+  }
+
+  function updateUI() {
+    $('w-out').textContent = `${S.W}′`; $('d-out').textContent = `${S.D}′`; $('h-out').textContent = ftIn(S.H);
+    $('height-group').disabled = S.floor !== 'deck';
+    $('decking-group').disabled = S.floor !== 'deck';
+    $('color-row').hidden = S.decking === 'pt';
+    $('sum-title').textContent = `${S.W}′ × ${S.D}′ ${S.type === 'screen' ? 'screen' : 'open'} porch`;
+    $('sum-sub').textContent = `${S.W * S.D} SF · ${S.tie} tie · ${S.floor === 'deck' ? `on new ${DECK_LABEL[S.decking]} deck, ${ftIn(S.H)} high` : 'on existing patio'}`;
+    price();
+  }
+
+  if (!window.THREE || !THREE.OrbitControls) {
+    $('loading').textContent = 'The 3D library did not load. Check your connection and reload the page.';
+    updateUI();
+    return;
+  }
+
+  // ── Scene ──────────────────────────────────────────────────────────────────
+  const viewer = $('viewer');
+  $('loading').remove();
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  viewer.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 600);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 8; controls.maxDistance = 140;
+
+  scene.add(new THREE.HemisphereLight(0xdfeaf2, 0x5d6b45, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff3e2, 0.95);
+  sun.position.set(34, 55, 42); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 160 });
+  sun.shadow.bias = -0.0006;
+  scene.add(sun);
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshStandardMaterial({ color: 0x4a6a2e, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+  function setSky() { scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--sky').trim() || '#cddfe8'); }
+  setSky();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', setSky);
+  new MutationObserver(setSky).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  const matCache = {};
+  const mat = (hex, opts = {}) => {
+    const k = hex + JSON.stringify(opts);
+    return matCache[k] || (matCache[k] = new THREE.MeshStandardMaterial(Object.assign({ color: hex, roughness: 0.85 }, opts)));
+  };
+  const M = {
+    siding: () => mat('#d8d4c8'), shingle: () => mat('#4a4f56', { roughness: 0.95 }), concrete: () => mat('#bab6ad'),
+    footing: () => mat('#a39f95'), door: () => mat('#3f4a52'), glass: () => mat('#6d8796', { roughness: 0.25, metalness: 0.3 }),
+    screen: () => mat('#1e2326', { transparent: true, opacity: 0.38, side: THREE.DoubleSide, roughness: 1, depthWrite: false }),
+    trim: () => mat(TRIMS.find(t => t.key === S.trim).hex, { roughness: 0.6 }),
+    deck: () => mat(S.decking === 'pt' ? PT_HEX : COLORS.find(c => c.key === S.color).hex, { roughness: 0.8 }),
+    fascia: () => { const c = new THREE.Color(S.decking === 'pt' ? PT_HEX : COLORS.find(c => c.key === S.color).hex).multiplyScalar(0.8); return mat('#' + c.getHexString()); },
+    pt: () => mat('#8d7650'),
+  };
+
+  let model = new THREE.Group(); scene.add(model);
+
+  function box(w, h, d, m, x, y, z, g = model) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+    mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh); return mesh;
+  }
+  // Box running between two points in the y–z plane (sloped beams, rails).
+  function beamYZ(x, y1, z1, y2, z2, w, h, m) {
+    const len = Math.hypot(z2 - z1, y2 - y1);
+    const b = box(w, h, len, m, x, (y1 + y2) / 2, (z1 + z2) / 2);
+    b.rotation.x = -Math.atan2(y2 - y1, z2 - z1); return b;
+  }
+  function quad(pts, m) {
+    const g = new THREE.BufferGeometry();
+    const p = pts.flat();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([...p.slice(0, 9), ...p.slice(0, 3), ...p.slice(6, 12)], 3));
+    g.computeVertexNormals();
+    const mesh = new THREE.Mesh(g, m); model.add(mesh); return mesh;
+  }
+  function tri(points, depth, m, place) {
+    const shape = new THREE.Shape(); shape.moveTo(...points[0]); points.slice(1).forEach(p => shape.lineTo(...p)); shape.closePath();
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }), m);
+    mesh.castShadow = mesh.receiveShadow = true; place(mesh); model.add(mesh); return mesh;
+  }
+  const spread = (a, b, maxGap) => { const n = Math.max(1, Math.ceil((b - a) / maxGap)); return Array.from({ length: n + 1 }, (_, i) => a + (b - a) * i / n); };
+
+  // ── Build the model from S (units: feet; house wall face at z = 0, porch toward +z) ──
+  function build() {
+    scene.remove(model);
+    model.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    model = new THREE.Group(); scene.add(model);
+
+    const { W, D } = S, hw = W / 2;
+    const onDeck = S.floor === 'deck';
+    const fy = onDeck ? S.H : 0.33;              // finished floor height
+    const P = 8;                                  // post height to beam
+    const shed = S.tie === 'wall';
+    const shedPitch = 3 / 12, gablePitch = 6 / 12, housePitch = 6 / 12;
+    const zF = D - 0.25;                          // front post line
+    const beamTop = fy + P + 0.9;
+    // Underside of the roof framing at depth z.
+    const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;
+    const ridgeY = beamTop + hw * gablePitch;
+
+    // House
+    const HW = Math.max(W + 18, 34), HD = 26;
+    const E = shed ? Math.max(fy + 9, roofAt(0) + 1.2) : fy + 9.5;
+    box(HW, E, HD, M.siding(), 0, E / 2, -HD / 2);
+    box(HW + 0.2, 1, HD + 0.2, M.concrete(), 0, 0.5, -HD / 2);
+    const hRun = HD / 2 + 1, hLen = hRun / Math.cos(Math.atan(housePitch));
+    const front = box(HW + 2, 0.4, hLen, M.shingle(), 0, E + (HD / 2 - 1) / 2 * housePitch + 0.2, 1 - hRun / 2);
+    front.rotation.x = Math.atan(housePitch);
+    const back = box(HW + 2, 0.4, hLen, M.shingle(), 0, E + (HD / 2 - 1) / 2 * housePitch + 0.2, -HD - 1 + hRun / 2);
+    back.rotation.x = -Math.atan(housePitch);
+    [-1, 1].forEach(s => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * housePitch]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(s * HW / 2 - (s > 0 ? 0.2 : 0), E, 0); }));
+    // House openings: door centered on porch, windows either side.
+    box(3.4, 7.1, 0.12, M.trim(), 0, fy + 3.55, 0.06); box(3, 6.8, 0.16, M.door(), 0, fy + 3.4, 0.08);
+    const winXs = W >= 14 ? [-hw / 2 - 1, hw / 2 + 1] : [];
+    [...winXs, -hw - 5, hw + 5].forEach(x => { box(3.4, 4.6, 0.12, M.trim(), x, fy + 4.6, 0.06); box(3, 4.2, 0.16, M.glass(), x, fy + 4.6, 0.08); });
+
+    // Floor system
+    if (onDeck) {
+      box(W, 0.1, D, M.deck(), 0, fy - 0.05, D / 2);
+      box(W + 0.2, 0.9, 0.12, M.fascia(), 0, fy - 0.55, D + 0.04);
+      [-1, 1].forEach(s => box(0.12, 0.9, D, M.fascia(), s * (hw + 0.04), fy - 0.55, D / 2));
+      box(W, 0.9, 0.2, M.pt(), 0, fy - 0.55, 0.1); // ledger
+      const rows = D > 10 ? [D / 2, D - 0.6] : [D - 0.6];
+      rows.forEach(z => {
+        box(W, 0.8, 0.45, M.pt(), 0, fy - 1.4, z); // drop beam
+        spread(-hw + 0.4, hw - 0.4, 8).forEach(x => {
+          box(0.46, fy - 1.8, 0.46, M.pt(), x, (fy - 1.8) / 2, z);
+          const f = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 20), M.footing());
+          f.position.set(x, 0.12, z); f.receiveShadow = true; model.add(f);
+        });
+      });
+    } else {
+      box(W + 2, 0.33, D + 1.5, M.concrete(), 0, 0.165, (D + 1.5) / 2);
+    }
+
+    // Posts
+    const stairW = 4, doorW = 3.2;
+    let frontXs = spread(-hw + 0.25, hw - 0.25, 9);
+    if (S.type === 'screen') {
+      frontXs = frontXs.filter(x => Math.abs(x) > doorW / 2 + 1.2).concat([-doorW / 2 - 0.25, doorW / 2 + 0.25]).sort((a, b) => a - b);
+    }
+    const backPosts = !(S.type === 'open' && shed);
+    const sideZs = [...(backPosts ? [0.25] : []), ...(D > 12 ? [D / 2] : []), zF];
+    const postTop = (z) => roofAt(z) - 0.9;
+    frontXs.forEach(x => box(0.5, postTop(zF) - fy, 0.5, M.trim(), x, (postTop(zF) + fy) / 2, zF));
+    [-1, 1].forEach(s => sideZs.slice(0, -1).forEach(z => box(0.5, postTop(z) - fy, 0.5, M.trim(), s * (hw - 0.25), (postTop(z) + fy) / 2, z)));
+
+    // Beams
+    box(W, 0.9, 0.5, M.trim(), 0, beamTop - 0.45, zF);
+    [-1, 1].forEach(s => beamYZ(s * (hw - 0.25), roofAt(0) - 0.45, 0, roofAt(zF) - 0.45, zF, 0.5, 0.9, M.trim()));
+    box(W, 0.9, 0.25, M.trim(), 0, roofAt(0) - 0.45, 0.13); // roof ledger
+
+    // Roof
+    if (shed) {
+      const z2 = D + 0.9, y1 = roofAt(0), y2 = roofAt(z2);
+      const t = 0.35, off = t / 2 / Math.cos(Math.atan(shedPitch));
+      beamYZ(0, y1 + off, 0, y2 + off, z2, W + 2, t, M.shingle());
+      beamYZ(0, y1 - 0.02, 0.01, y2 - 0.02, z2, W + 1.6, 0.04, M.trim()); // soffit
+      box(W + 2, 0.6, 0.1, M.trim(), 0, y2 - 0.05, z2 + 0.03);           // fascia
+    } else {
+      const span = hw + 1, a = Math.atan(gablePitch), len = span / Math.cos(a), t = 0.35;
+      const houseRoofAt = (depth) => E - 0.5 + (depth + 1) * housePitch;
+      let back = 2; while (houseRoofAt(back) < ridgeY + 0.6 && back < HD / 2 - 1) back += 0.5;
+      const zA = -back, zB = D + 1, zc = (zA + zB) / 2, L = zB - zA;
+      [-1, 1].forEach(s => {
+        const p = box(len, t, L, M.shingle(), s * span / 2, beamTop + (hw - span / 2) * gablePitch + t / 2 / Math.cos(a), zc);
+        p.rotation.z = -s * a;
+      });
+      box(W + 1.2, 0.05, D + 1 - zF, M.trim(), 0, beamTop - 0.3, (zF + D + 1) / 2); // gable soffit
+      tri([[-hw - 0.6, 0], [hw + 0.6, 0], [0, (hw + 0.6) * gablePitch]], 0.1, M.trim(), m => m.position.set(0, beamTop - 0.3, D + 0.95)); // rake trim
+      tri([[-hw + 0.1, 0.05], [hw - 0.1, 0.05], [0, hw * gablePitch - 0.1]], 0.12, M.siding(), m => m.position.set(0, beamTop - 0.25, D + 0.97));
+    }
+
+    // Enclosure: screens or railing
+    const top = (z) => postTop(z);
+    if (S.type === 'screen') {
+      const scr = M.screen();
+      for (let i = 0; i < frontXs.length - 1; i++) {
+        const x1 = frontXs[i] + 0.25, x2 = frontXs[i + 1] - 0.25, mid = (x1 + x2) / 2, isDoor = Math.abs(mid) < 0.01;
+        const yt = top(zF);
+        quad([[x1, fy, zF], [x2, fy, zF], [x2, yt, zF], [x1, yt, zF]], scr);
+        if (isDoor) { // screen door
+          const dw = x2 - x1, dh = 6.8;
+          box(dw, 0.2, 0.14, M.trim(), mid, fy + dh, zF);
+          [x1 + 0.08, x2 - 0.08].forEach(x => box(0.16, dh, 0.14, M.trim(), x, fy + dh / 2, zF));
+          box(dw - 0.3, 1.2, 0.08, M.trim(), mid, fy + 0.6, zF + 0.02);
+          box(dw - 0.3, 0.12, 0.08, M.trim(), mid, fy + 3.1, zF + 0.02);
+          box(0.12, 0.12, 0.2, mat('#9aa0a6', { metalness: 0.8, roughness: 0.3 }), x2 - 0.45, fy + 3.3, zF + 0.1);
+        } else {
+          box(x2 - x1, 0.25, 0.14, M.trim(), mid, fy + 0.125, zF);
+          box(x2 - x1, 0.16, 0.14, M.trim(), mid, fy + 3, zF);
+        }
+      }
+      [-1, 1].forEach(s => {
+        const x = s * (hw - 0.25), zs = [0, ...sideZs.slice(backPosts ? 1 : 0)];
+        for (let i = 0; i < zs.length - 1; i++) {
+          const z1 = zs[i] + (i === 0 ? 0.01 : 0.25), z2 = zs[i + 1] - 0.25;
+          quad([[x, fy, z1], [x, fy, z2], [x, top(z2), z2], [x, top(z1), z1]], scr);
+          box(0.14, 0.25, z2 - z1, M.trim(), x, fy + 0.125, (z1 + z2) / 2);
+          box(0.14, 0.16, z2 - z1, M.trim(), x, fy + 3, (z1 + z2) / 2);
+        }
+      });
+    } else if (onDeck) {
+      const railH = 3, runs = [];
+      runs.push([-hw + 0.25, zF, -stairW / 2, zF], [stairW / 2, zF, hw - 0.25, zF]);
+      [-1, 1].forEach(s => runs.push([s * (hw - 0.25), 0.15, s * (hw - 0.25), zF]));
+      const tr = M.trim();
+      runs.forEach(([x1, z1, x2, z2]) => {
+        const len = Math.hypot(x2 - x1, z2 - z1), mx = (x1 + x2) / 2, mz = (z1 + z2) / 2, alongX = Math.abs(z2 - z1) < 1e-6;
+        const rail = (y, h) => box(alongX ? len : 0.3, h, alongX ? 0.3 : len, tr, mx, y, mz);
+        rail(fy + railH, 0.15); rail(fy + 0.35, 0.12);
+        const n = Math.floor(len / 0.36);
+        for (let i = 1; i < n; i++) {
+          const f = i / n, x = x1 + (x2 - x1) * f, z = z1 + (z2 - z1) * f;
+          box(0.12, railH - 0.4, 0.12, tr, x, fy + 0.35 + (railH - 0.4) / 2, z);
+        }
+      });
+    }
+
+    // Steps
+    if (onDeck) {
+      const n = Math.max(1, Math.ceil(S.H * 12 / 7.5)), rise = S.H / n, run = 10.5 / 12;
+      for (let i = 1; i < n; i++) {
+        const yTop = S.H - i * rise, z = D + (i - 0.5) * run;
+        box(stairW, yTop, run, M.fascia(), 0, yTop / 2, z);
+        box(stairW + 0.1, 0.08, run + 0.05, M.deck(), 0, yTop - 0.04, z);
+      }
+      if (S.H > 2) {
+        const zEnd = D + (n - 1) * run;
+        [-1, 1].forEach(s => {
+          beamYZ(s * (stairW / 2 + 0.05), S.H + 3, D, rise + 3, zEnd, 0.15, 0.15, M.trim());
+          box(0.4, rise + 3, 0.4, M.trim(), s * (stairW / 2 + 0.05), (rise + 3) / 2, zEnd);
+        });
+      }
+      box(stairW + 1, 0.2, 3, M.concrete(), 0, 0.1, D + (n - 1) * run + 1.5); // landing pad
+    }
+
+    dimAnchors.w.set(-hw / 2 - 1, onDeck ? fy - 1.2 : 0.5, D + 0.6);
+    dimAnchors.d.set(hw + 0.8, onDeck ? fy - 1.2 : 0.5, D / 2);
+    $('dim-w').textContent = `${W}′-0″`; $('dim-d').textContent = `${D}′-0″`;
+    target.set(0, fy + 3.5, D / 2);
+  }
+
+  // ── Camera views ───────────────────────────────────────────────────────────
+  const target = new THREE.Vector3();
+  const dimAnchors = { w: new THREE.Vector3(), d: new THREE.Vector3() };
+  let view = 'corner';
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let tween = null;
+  function viewPos(v) {
+    const s = Math.max(S.W, S.D) / 16 * Math.max(1, 1.25 / Math.max(camera.aspect, 0.4)), fy = S.floor === 'deck' ? S.H : 0;
+    if (v === 'front') return { pos: new THREE.Vector3(0, fy + 7, S.D + 34 * s + 6), tgt: new THREE.Vector3(0, fy + 5, S.D / 2) };
+    if (v === 'top') return { pos: new THREE.Vector3(0, 62 * s + 18, S.D / 2 + 0.01), tgt: new THREE.Vector3(0, 0, S.D / 2) };
+    return { pos: new THREE.Vector3(S.W * 0.9 + 18 * s + 6, fy + 13 + 6 * s, S.D + 26 * s + 6), tgt: target.clone() };
+  }
+  function goTo(v, instant) {
+    view = v;
+    document.querySelectorAll('.views button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+    const { pos, tgt } = viewPos(v);
+    if (instant || reduce) { camera.position.copy(pos); controls.target.copy(tgt); controls.update(); tween = null; return; }
+    tween = { p0: camera.position.clone(), t0: controls.target.clone(), pos, tgt, start: performance.now(), dur: 700 };
+  }
+  document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => goTo(b.dataset.view)));
+  controls.addEventListener('start', () => { tween = null; });
+
+  // ── Loop ───────────────────────────────────────────────────────────────────
+  function resize() {
+    const w = viewer.clientWidth, h = viewer.clientHeight; if (!w || !h) return;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(viewer);
+
+  const v3 = new THREE.Vector3();
+  function placeDim(el, p) {
+    v3.copy(p).project(camera);
+    const vis = v3.z < 1 && Math.abs(v3.x) < 1.1 && Math.abs(v3.y) < 1.1;
+    el.hidden = !vis; if (!vis) return;
+    el.style.left = `${(v3.x + 1) / 2 * viewer.clientWidth}px`; el.style.top = `${(1 - v3.y) / 2 * viewer.clientHeight}px`;
+  }
+  function frame(now) {
+    if (tween) {
+      const k = Math.min(1, (now - tween.start) / tween.dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      camera.position.lerpVectors(tween.p0, tween.pos, e); controls.target.lerpVectors(tween.t0, tween.tgt, e);
+      if (k >= 1) tween = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    placeDim($('dim-w'), dimAnchors.w); placeDim($('dim-d'), dimAnchors.d);
+    requestAnimationFrame(frame);
+  }
+
+  let first = true;
+  update = () => { updateUI(); build(); if (first) { resize(); goTo('corner', true); first = false; } };
+  update();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
