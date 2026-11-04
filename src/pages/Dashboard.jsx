@@ -73,6 +73,7 @@ export default function Dashboard() {
   const attention  = attentionItems({ proposals, jobCosts, can, role })
 
   const [periodKey, setPeriodKey] = useState('year')
+  const [showCounted, setShowCounted] = useState(false)
   const pick = PERIODS.find(x => x.value === periodKey) || PERIODS[3]
   const { start: pStart, end: pEnd } = getPeriodRange(pick.p, shiftPeriod(pick.p, new Date(), pick.back))
   const pLabel = pick.label.toLowerCase()
@@ -158,12 +159,33 @@ export default function Dashboard() {
             sub={`${active.length} open quote${active.length !== 1 ? 's' : ''}`}
             onClick={() => navigate('/sales?tab=pipeline')} />
           <Stat label="Win rate" value={winRate !== null ? `${winRate}%` : '—'}
-            sub={`${wonClients.length} of ${outcomes.length} · ${pLabel}`}
-            onClick={() => navigate(insights ? '/insights?tab=winloss' : '/sales?tab=proposals')} />
+            sub={`${wonClients.length} of ${outcomes.length} clients · ${pLabel} · ${showCounted ? 'hide' : 'see who'}`}
+            onClick={() => setShowCounted(v => !v)} />
           <Stat label="Average job" value={won.length ? money(wonRevenue / won.length) : '—'}
             sub={`per won job · ${pLabel}`}
             onClick={() => navigate(insights ? '/insights?tab=overview' : '/sales?tab=proposals&status=Won')} />
         </div>
+        {/* Who the win rate counts: one row per client (every version of a deal is one client) */}
+        {showCounted && (
+          <div className="border-t border-gray-100 px-5 py-3">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-xs font-semibold text-gray-700">Clients in the win rate · {pLabel}</p>
+              {insights && <LinkBtn onClick={() => navigate('/insights?tab=winloss')}>Win / loss detail</LinkBtn>}
+            </div>
+            <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1 text-sm list-decimal list-inside">
+              {outcomes
+                .map(g => { const shown = [...g.all].reverse().find(p => p.status !== 'Draft' && p.status !== 'Archived') || g.all[g.all.length - 1]; return { g, shown, won: wonClients.includes(g), name: (shown.client || 'No name').trim() } })
+                .sort((a, b) => (b.won - a.won) || a.name.localeCompare(b.name))
+                .map(({ g, shown, won, name }) => (
+                  <li key={g.root.id} className="truncate text-gray-700">
+                    <button type="button" className="hover:underline" onClick={() => showProposal(shown, navigate)}>{name}</button>
+                    <span className={`ml-1.5 text-xs ${won ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>{won ? 'Won' : `${g.all.length} version${g.all.length !== 1 ? 's' : ''}`}</span>
+                  </li>
+                ))}
+            </ol>
+            <p className="text-[11px] text-gray-400 mt-2">Every version of a deal counts as one client. Archive or delete a test or duplicate proposal to take it out.</p>
+          </div>
+        )}
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
