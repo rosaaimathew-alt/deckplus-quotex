@@ -530,11 +530,17 @@
   function porchDoors(s) { const d = porchDoors0(s); if (s.steps === false && d) d.stairs = null; return d; }
   function porchDoors0(s) {
     const g = porchGeom(s), cvF = covered(s, 'front'), cvL = covered(s, 'left'), cvR = covered(s, 'right'), mid = ([a, b]) => (a + b) / 2;
-    if (s.type === 'open') return { front: [], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
-    const dw = s.doorWall === 'left' || s.doorWall === 'right' ? s.doorWall : null;
-    if (dw && !isHouseSide(s, dw) && !(dw === 'left' ? cvL : cvR).length) {
-      const z = Math.max(2.2, s.d - Math.max(3.5, sw(s) / 2 + 1));       // door toward the front of the side wall
-      return { front: [], left: [...(dw === 'left' ? [z] : []), ...(isHouseSide(s, 'left') ? [] : cvL.map(mid))], right: [...(dw === 'right' ? [z] : []), ...(isHouseSide(s, 'right') ? [] : cvR.map(mid))], stairs: g.onDeck ? { edge: dw, c: z } : null };
+    const dpos = s.doorPos != null && s.doorPos !== '' && Number.isFinite(+s.doorPos) ? +s.doorPos : null;
+    const clampD = (wall, v) => wall === 'front' ? Math.min(s.w / 2 - Math.max(2, sw(s) / 2 + 0.6), Math.max(-s.w / 2 + Math.max(2, sw(s) / 2 + 0.6), v)) : Math.min(s.d - 2.2, Math.max(2.2, v));
+    if (s.type === 'open') return { front: [], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: dpos != null ? clampD('front', dpos) : 0 } : null };
+    const dw = ['front', 'left', 'right'].includes(s.doorWall) ? s.doorWall : null;
+    if (dw && (dw !== 'front' || dpos != null) && (dw === 'front' || !isHouseSide(s, dw))) {
+      const cv = { front: cvF, left: cvL, right: cvR }[dw];
+      const pos = clampD(dw, dpos != null ? dpos : dw === 'front' ? 0 : cv.length ? mid(cv[0]) : s.d - Math.max(3.5, sw(s) / 2 + 1));
+      const ontoDeck = cv.some(([a, b]) => pos > a + 0.8 && pos < b - 0.8);   // the door opens onto a joined deck: no steps
+      const others = (k) => isHouseSide(s, k) || k === dw ? [] : (k === 'left' ? cvL : cvR).map(mid);
+      return { front: dw === 'front' ? [pos] : [], left: dw === 'left' ? [pos, ...cvL.map(mid).filter(v => Math.abs(v - pos) > 3)] : others('left'), right: dw === 'right' ? [pos, ...cvR.map(mid).filter(v => Math.abs(v - pos) > 3)] : others('right'),
+        stairs: g.onDeck && !ontoDeck ? { edge: dw, c: pos } : null };
     }
     if (s.type === 'sunroom') {
       if (houseSides(s).length === 2) return { front: [0], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
@@ -714,9 +720,10 @@
   function openFrontXs(s, g) {
     const hw = s.w / 2, xL = -hw + g.col / 2, xR = hw - g.col / 2;
     let xs = spread(xL, xR, 24);
-    if (porchDoors(s).stairs) {
-      const clear = srx(s) + g.col / 2 + 0.05, flank = srx(s) + g.col / 2 + 0.15;
-      if (xs.some(x => Math.abs(x) < clear)) xs = [...xs.filter(x => Math.abs(x) >= clear + 1.2 || x === xL || x === xR), -flank, flank].filter(x => x >= xL && x <= xR).sort((a, b) => a - b);
+    const st = porchDoors(s).stairs;
+    if (st && st.edge === 'front') {
+      const c = st.c, clear = srx(s) + g.col / 2 + 0.05, flank = srx(s) + g.col / 2 + 0.15;
+      if (xs.some(x => Math.abs(x - c) < clear)) xs = [...xs.filter(x => Math.abs(x - c) >= clear + 1.2 || x === xL || x === xR), c - flank, c + flank].filter(x => x >= xL && x <= xR).sort((a, b) => a - b);
     }
     return xs;
   }
@@ -922,8 +929,8 @@
           xs.forEach(lx => { post(lx, gg.zF); if (gg.free) post(lx, col / 2); });
           if (!(x.tie !== 'free' && gg.shed)) [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(x, k)).forEach(([, lx]) => post(lx, col / 2));
           if (gg.onDeck) {
-            const gaps = pl.dp.stairs?.edge === 'front' ? [[-srx(x), srx(x)]] : [];
-            for (let k = 0; k < xs.length - 1; k++) subtract(xs[k] + col / 2, xs[k + 1] - col / 2, gaps).forEach(([a, b]) => railPlan(cx + a, zo2 + gg.zF, cx + b, zo2 + gg.zF, [Math.abs(Math.abs(a) - srx(x)) < 0.01, Math.abs(Math.abs(b) - srx(x)) < 0.01]));
+            const sc = pl.dp.stairs?.c || 0, gaps = pl.dp.stairs?.edge === 'front' ? [[sc - srx(x), sc + srx(x)]] : [];
+            for (let k = 0; k < xs.length - 1; k++) subtract(xs[k] + col / 2, xs[k + 1] - col / 2, gaps).forEach(([a, b]) => railPlan(cx + a, zo2 + gg.zF, cx + b, zo2 + gg.zF, [Math.abs(Math.abs(a - sc) - srx(x)) < 0.01, Math.abs(Math.abs(b - sc) - srx(x)) < 0.01]));
             [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(x, k)).forEach(([, lx]) => railPlan(cx + lx, zo2 + (gg.free || !gg.shed ? col : 0.25), cx + lx, zo2 + gg.zF - col / 2, [!(gg.free || !gg.shed), false]));
             if (gg.free) for (let k = 0; k < xs.length - 1; k++) railPlan(cx + xs[k] + col / 2, zo2 + col / 2, cx + xs[k + 1] - col / 2, zo2 + col / 2, [false, false]);
           }
@@ -1914,9 +1921,9 @@
       if (s.type === 'open') {
         // LVL headers clear-span up to 24′: corner posts only. Wider spans get the fewest extra posts.
         frontXs = spread(xL, xR, LVL_SPAN);
-        if (dp.stairs) {
-          const clear = srx(s) + col / 2 + 0.05, flank = srx(s) + col / 2 + 0.15;
-          if (frontXs.some(x => Math.abs(x) < clear)) frontXs = [...frontXs.filter(x => Math.abs(x) >= clear + 1.2 || x === xL || x === xR), -flank, flank].filter(x => x >= xL && x <= xR).sort((a, b) => a - b);
+        if (dp.stairs && dp.stairs.edge === 'front') {
+          const c = dp.stairs.c, clear = srx(s) + col / 2 + 0.05, flank = srx(s) + col / 2 + 0.15;
+          if (frontXs.some(x => Math.abs(x - c) < clear)) frontXs = [...frontXs.filter(x => Math.abs(x - c) >= clear + 1.2 || x === xL || x === xR), c - flank, c + flank].filter(x => x >= xL && x <= xR).sort((a, b) => a - b);
         }
         sideZs.left = sideZs.right = spread(backPost ? col / 2 : 0, zF, LVL_SPAN);
         frontXs.forEach(x => openCol(x, zF, frontTop));
@@ -2159,9 +2166,9 @@
           });
         });
       } else if (onDeck) {
-        const front = !covered(s, 'front').length && s.steps !== false;
-        const gaps = front ? [[-srx(s), srx(s)]] : [];
-        const atGap = (v) => front && Math.abs(Math.abs(v) - srx(s)) < 0.01;
+        const front = !covered(s, 'front').length && s.steps !== false, sc = porchDoors(s).stairs?.c || 0;
+        const gaps = front ? [[sc - srx(s), sc + srx(s)]] : [];
+        const atGap = (v) => front && Math.abs(Math.abs(v - sc) - srx(s)) < 0.01;
         for (let i = 0; i < frontXs.length - 1; i++) {
           subtract(frontXs[i] + col / 2, frontXs[i + 1] - col / 2, gaps).forEach(([a, b]) => railRun(a, zF, b, zF, fy, fy, { postA: atGap(a), postB: atGap(b) }));
         }
@@ -2576,12 +2583,22 @@
       if (m.meta) S.meta = { ...S.meta, ...m.meta };
       resize(); build(); dirty = false;
       if (!framed || m.frame) { framed = true; goTo('corner', true); }
-      const att = [];
+      const att = [], doors = [];
       S.sections.forEach(x => {
+        if (x.kind === 'porch') {
+          const dp = porchDoors(x), wall = x.type === 'open' ? (dp.stairs ? 'front' : null) : ['front', 'left', 'right'].includes(x.doorWall) && dp[x.doorWall]?.length ? x.doorWall : ['front', 'right', 'left'].find(k => dp[k]?.length);
+          let pos = x.type === 'open' ? dp.stairs.c : dp[wall][0];
+          if (wall && x.type !== 'open') {         // where the panel layout actually put the door
+            const pl = porchPlan(x), list = x.type === 'sunroom' ? pl.walls?.[wall] : pl.walls?.[wall]?.open;
+            const dd = (list || []).filter(o => o.door).sort((a, b) => Math.abs((a.a + a.b) / 2 - pos) - Math.abs((b.a + b.b) / 2 - pos))[0];
+            if (dd) pos = (dd.a + dd.b) / 2;
+          }
+          if (wall) doors.push({ id: x.id, wall, pos });
+        }
         if (x.kind === 'porch') { const sp = stairPlacement(x); if (sp) att.push({ id: x.id, x: sp.x, z: sp.z, rot: sp.ry * 180 / Math.PI, w: sw(x), n: risers(S.H), run: RUN, landing: x.landing || 'none' }); }
         if (x.kind === 'patio') { const pw = patioWall(x); if (pw?.steps) att.push({ id: x.id, x: x.x, z: rect(x).z1, rot: 0, w: STAIR_W + 1, n: pw.steps + 1, run: pw.run }); }
       });
-      window.parent.postMessage({ type: 'qx-attached', list: att }, '*');
+      window.parent.postMessage({ type: 'qx-attached', list: att, doors }, '*');
     });
     // The editor asks for the floor plan on the design sheet (to print or export).
     window.addEventListener('message', (ev) => {

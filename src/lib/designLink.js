@@ -20,6 +20,8 @@ export function designParts(lines = []) {
         flooring: pb.flooring, railing: { product: pb.railing?.product || '' }, sides: pb.sides || '',
         // Where the door (and the steps off a raised porch) go, how wide the steps are, and a landing.
         doorWall: pb.doorWall || '', stairWidthFt: n(pb.steps?.stairWidthFt) || 0, landings: n(pb.landings?.count) || 0,
+        // Steps are on the quote only when a stair product is picked; otherwise the porch walks out level onto the deck.
+        stepsQuoted: !!String(pb.steps?.product || '').trim(),
       })
       continue
     }

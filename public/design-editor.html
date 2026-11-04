@@ -217,8 +217,15 @@
         floor: p.floor === 'patio' ? 'patio' : 'deck', h: Number(p.deckHeightFt) || 3, wallH: Math.min(10, Math.max(8, (Number(p.wallHeightIn) || 96) / 12)),
         enclose: /front only/i.test(p.sides || '') ? 'front0' : /1 side/i.test(p.sides || '') ? 'front1' : 'front2',
         gableEnd: (Number(p.glassEnds) || 0) > 0 ? 'glass' : (type === 'screen' ? 'screen' : 'siding'),
-        stairW: Math.min(30, Math.max(3, Number(p.stairWidthFt) || 4)), landing: (Number(p.landings) || 0) > 0 ? 'straight' : 'none', doorWall: p.doorWall };
+        stairW: Math.min(30, Math.max(3, Number(p.stairWidthFt) || 4)), landing: (Number(p.landings) || 0) > 0 ? 'straight' : 'none', doorWall: p.doorWall,
+        stepsQuoted: p.stepsQuoted !== false };
     }).map(q => {
+      // No steps on the porch quote and a deck on the job: the porch walks out level onto the deck
+      // (same floor height, no gap), its door opens onto the deck, and the deck has the steps down.
+      if (q.floor === 'deck' && !q.stepsQuoted && plats.length && q.tie !== 'free' && q.enclose !== 'front0') {
+        q.joined = true; q.steps = false; q.h = Number(plats[0].height) || q.h; q.cornerSide = 'left'; q.doorWall = q.ptype === 'open' ? 'front' : 'right';
+        return q;
+      }
       // "side" in the porch builder: the open side wall (a corner porch's house wall is on cornerSide).
       q.doorWall = q.ptype === 'open' || q.doorWall !== 'side' ? 'front' : q.enclose === 'front1' ? ((q.cornerSide || 'right') === 'right' ? 'left' : 'right') : q.enclose === 'front0' ? 'front' : 'left';   // porches are laid out left of the decks: the outside end
       return q;
@@ -226,7 +233,8 @@
     const allW = porchEls.reduce((a, q) => a + q.w + 2, 0);
     const total = plats.reduce((a, p) => a + (Number(p.width) || 12), 0) + 2 * Math.max(0, plats.length - 1);
     let x = -Math.round((total + allW) / 2);
-    porchEls.forEach(q => { q.id = id++; q.x = x + q.w / 2; els.push(q); x += q.w + 2; });
+    porchEls.forEach((q, i) => { q.id = id++; q.x = x + q.w / 2; els.push(q); x += q.w + (q.joined && i === porchEls.length - 1 ? 0 : 2); });
+    porchEls.forEach(q => { delete q.joined; delete q.stepsQuoted; });
     plats.forEach(p => {
       const W = Number(p.width) || 12, D0 = Number(p.depth) || 10, H = Number(p.height) || 3, zA = p.freestanding ? 3 : 0, D = zA + D0;
       els.push({ id: id++, type: 'deck', h: H, pts: [[x, zA], [x + W, zA], [x + W, D], [x, D]] });
@@ -271,11 +279,19 @@
   }
   const $ = (id) => document.getElementById(id);
   let EMPTY_NOTE = '';
+  const PDOOR = {};      // porch id → { wall: 'front'|'left'|'right', pos } as the 3D placed the door
   const rad = (d) => d * Math.PI / 180;
   const fmt = (ft) => { const t = Math.round(ft * 12), f = Math.floor(t / 12), i = t - f * 12; return `${f}′-${i}″`; };
   const snapV = (v, s = 0.5) => Math.round(v / s) * s;
 
   // Rectangles (landing) → corner points in plan coordinates
+  // A porch door on the plan: centre point, along-wall and outward unit vectors.
+  function doorPts(e, d) {
+    const z0 = e.z, x0 = e.x - e.w / 2, x1 = e.x + e.w / 2;
+    if (d.wall === 'front') return { c: [e.x + d.pos, z0 + e.d], t: [1, 0], n: [0, 1], sweep: 1 };
+    if (d.wall === 'left') return { c: [x0, z0 + d.pos], t: [0, 1], n: [-1, 0], sweep: 0 };
+    return { c: [x1, z0 + d.pos], t: [0, 1], n: [1, 0], sweep: 1 };
+  }
   function rectPts(e) {
     const c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), hw = e.w / 2, hd = e.d / 2;
     return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([u, v]) => [e.x + u * c + v * s, e.z - u * s + v * c]);
@@ -473,6 +489,12 @@
         if (!info.host) { const w = W(0, -0.6); const tw = el('text', { x: w[0], y: w[1], 'font-size': P * 11, 'text-anchor': 'middle', fill: '#b03a2e', 'font-family': 'Barlow, sans-serif', 'font-weight': 700 }, grp); tw.textContent = 'not attached'; }
       }
     });
+    S.els.filter(e => e.type === 'porch' && PDOOR[e.id]).forEach(e => { const grp = el('g', { 'pointer-events': 'none' });
+      const dr = doorPts(e, PDOOR[e.id]), half = e.ptype === 'open' ? (e.stairW || 4) / 2 : 1.5;
+      const [a, b] = [[dr.c[0] - dr.t[0] * half, dr.c[1] - dr.t[1] * half], [dr.c[0] + dr.t[0] * half, dr.c[1] + dr.t[1] * half]];
+      el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: '#e6e1d6', 'stroke-width': P * 5 }, grp);
+      if (e.ptype !== 'open') el('path', { d: `M${a[0]} ${a[1]} L${a[0] + dr.n[0] * 3} ${a[1] + dr.n[1] * 3} A3 3 0 0 ${dr.sweep} ${b[0]} ${b[1]}`, fill: 'none', stroke: '#1a1c38', 'stroke-width': P * 1 }, grp);
+    });
     const defs = el('defs', {}); const m = el('marker', { id: 'arrow', viewBox: '0 0 6 6', refX: 5, refY: 3, markerWidth: 6, markerHeight: 6, orient: 'auto' }, defs); el('path', { d: 'M0 0L6 3L0 6Z', fill: '#1a1c38' }, m);
     // selection handles
     const e = byId(sel);
@@ -487,6 +509,10 @@
       if (e.type === 'landing') {
         const [, b, c2] = rectPts(e);
         el('rect', { x: c2[0] - hs / 2, y: c2[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2, 'data-h': 'size', style: 'cursor:nwse-resize' });
+      }
+      if (e.type === 'porch' && PDOOR[e.id] && !CUSTOMER) {
+        const dr = doorPts(e, PDOOR[e.id]);
+        el('circle', { cx: dr.c[0], cy: dr.c[1], r: hs * 0.62, fill: '#b03a2e', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'door', style: 'cursor:grab' });
       }
       if (e.type === 'porch' || e.type === 'patio') {
         el('rect', { x: e.x + e.w / 2 - hs / 2, y: e.z + e.d - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2, 'data-h': 'box', style: 'cursor:nwse-resize' });
@@ -541,6 +567,7 @@
       const h = hEl.dataset.h;
       if (h === 'rot') drag = { kind: 'rot', e, c: e.type === 'stairs' ? [e.x, e.z] : centroid(polyOf(e)), pts0: e.pts ? e.pts.map(p => [...p]) : null, rot0: e.rot || 0, a0: null };
       else if (h === 'size') drag = { kind: 'size', e };
+      else if (h === 'door') drag = { kind: 'door', e };
       else if (h === 'box') drag = { kind: 'box', e, x0: e.x - e.w / 2 };
       else if (h[0] === 'v') drag = { kind: 'vertex', e, i: +h.slice(1) };
       else if (h[0] === 'm' && ev.altKey) { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, [snapV((a[0] + b[0]) / 2), snapV((a[1] + b[1]) / 2)]); drag = { kind: 'vertex', e, i: i + 1 }; }
@@ -571,6 +598,22 @@
       else if (e.type === 'porch') { e.x = snapV(o.x + dx); e.z = e.tie === 'free' ? Math.max(2, snapV(o.z + dz)) : 0; }
       else if (e.type === 'patio') { e.x = snapV(o.x + dx); e.z = Math.max(0, snapV(o.z + dz)); }
       else if (e.of == null) { e.x = o.x + dx; e.z = o.z + dz; snapStairs(e); }
+    }
+    if (drag.kind === 'door') {
+      // Slide along the porch's own walls (not the house side); jumps to the nearest wall.
+      const z0 = e.z, x0 = e.x - e.w / 2, x1 = e.x + e.w / 2, open = e.ptype === 'open', half = Math.max(2, (e.stairW || 4) / 2 + 0.6);
+      const houseL = e.tie !== 'free' && (e.enclose === 'front0' || (e.enclose === 'front1' && (e.cornerSide || 'right') === 'left'));
+      const houseR = e.tie !== 'free' && (e.enclose === 'front0' || (e.enclose === 'front1' && (e.cornerSide || 'right') === 'right'));
+      const cand = [{ wall: 'front', d: Math.abs(z - (z0 + e.d)), pos: Math.min(e.w / 2 - half, Math.max(-e.w / 2 + half, x - e.x)) }];
+      if (!open && !houseL) cand.push({ wall: 'left', d: Math.abs(x - x0), pos: Math.min(e.d - 2.2, Math.max(2.2, z - z0)) });
+      if (!open && !houseR) cand.push({ wall: 'right', d: Math.abs(x - x1), pos: Math.min(e.d - 2.2, Math.max(2.2, z - z0)) });
+      const best = cand.sort((a, b) => a.d - b.d)[0];
+      e.doorWall = best.wall; e.doorPos = snapV(best.pos); PDOOR[e.id] = { id: e.id, wall: best.wall, pos: e.doorPos };
+      if (e.floor === 'deck') {
+        const dr = doorPts(e, PDOOR[e.id]), ox = dr.c[0] + dr.n[0] * 0.6, oz = dr.c[1] + dr.n[1] * 0.6;
+        const onto = S.els.some(o => (o.type === 'deck' || o.type === 'landing') && Math.abs(elH(o) - e.h) < 0.3 && inPoly(ox, oz, polyOf(o)));
+        if (onto) e.steps = false; else delete e.steps;
+      }
     }
     if (drag.kind === 'edge') {
       const d = snapV((x - drag.f0[0]) * drag.n[0] + (z - drag.f0[1]) * drag.n[1]);
@@ -819,6 +862,7 @@
         + num('wallH', 'Wall height', e.wallH, 0.5, 8)
         + (e.roof === 'shed' && !free ? pick('sideGable', 'Above side headers', [['open', e.ptype === 'screen' ? 'Screen' : e.ptype === 'open' ? 'Open' : 'Glass'], ['closed', 'Closed']], e.sideGable) : '')
         + (gab ? pick('gableEnd', 'Gable end', [['glass', 'Glass'], ...(e.ptype === 'screen' ? [['screen', 'Screen']] : []), ['siding', 'Siding']], e.gableEnd || (e.ptype === 'screen' ? 'screen' : e.ptype === 'open' ? 'siding' : 'glass')) : '')
+        + `<span class="ro" style="align-self:center">Drag the red dot on the plan to slide the ${e.ptype === 'open' ? 'steps' : 'door'}</span>`
         + (e.ptype !== 'open' ? pick('doorWall', 'Door on', [['front', 'Front'], ['left', 'Left side', !free && (e.enclose === 'front0' || (e.enclose === 'front1' && (e.cornerSide || 'right') === 'left'))], ['right', 'Right side', !free && (e.enclose === 'front0' || (e.enclose === 'front1' && (e.cornerSide || 'right') === 'right'))]], e.doorWall || 'front') : '')
         + (e.floor === 'deck' ? pick('steps', 'Steps at the door', [['1', 'Yes'], ['', 'None']], e.steps === false ? '' : '1') : '')
         + (e.floor === 'deck' && e.steps !== false ? num('stairW', 'Step width', e.stairW || 4, 0.5, 3) + pick('landing', 'Step landing', [['none', 'None'], ['straight', 'Straight'], ['left', 'Turn left'], ['right', 'Turn right']], e.landing || 'none') : '')
@@ -853,6 +897,7 @@
         if (e.type === 'porch') {
           if (k === 'tie') { if (v === 'free') { if (e.roof === 'shed' || e.roof === 'hip') e.roof = 'gable'; e.z = Math.max(e.z || 0, 6); e.enclose = 'front2'; } else e.z = 0; }
           if (k === 'ptype') e.gableEnd = null;
+          if (k === 'doorWall' || k === 'enclose' || k === 'cornerSide' || k === 'ptype') e.doorPos = null;
         }
       }
       commit(); changed();
@@ -922,7 +967,7 @@
     S.els.filter(e => e.type === 'stairs' && e.of == null).forEach(e => { const i = stairInfo(e); stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
     const sections = [];
     S.els.forEach(e => {
-      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, doorWall: e.doorWall || 'front', stairW: e.stairW || 4, landing: e.landing || 'none', steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
+      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, doorWall: e.doorWall || 'front', doorPos: e.doorPos ?? null, stairW: e.stairW || 4, landing: e.landing || 'none', steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
       if (e.type === 'patio') sections.push({ id: e.id, kind: 'patio', x: e.x, z: e.z, w: e.w, d: e.d, mat: e.mat, wallH: Number(e.wallH) || 0, wallLen: Number(e.wallLen) || 0, steps: e.steps !== false });
     });
     const porchOnDeck = S.els.find(e => e.type === 'porch' && e.floor === 'deck');
@@ -951,6 +996,8 @@
     window.addEventListener('message', (ev) => {
       if (ev.source !== frame.contentWindow || ev.data?.type !== 'qx-attached') return;
       let moved = false;
+      Object.keys(PDOOR).forEach(k => delete PDOOR[k]);
+      (ev.data.doors || []).forEach(d => { PDOOR[d.id] = d; moved = true; });
       (ev.data.list || []).forEach(a => { const st = S.els.find(e => e.of === a.id); if (!st) return;
         ['x', 'z', 'rot', 'w', 'n', 'run'].forEach(k => { if (Math.abs((st[k] ?? 1e9) - a[k]) > 1e-3) { st[k] = a[k]; moved = true; } }); });
       if (moved) { lastSaved = snap(); drawPlan(); }
