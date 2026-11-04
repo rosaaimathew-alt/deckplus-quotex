@@ -261,7 +261,7 @@ function NextCell({ proposal, edit }) {
   return (
     <div className="flex lg:flex-col gap-1" onClick={e => e.stopPropagation()}>
       <select value={next.code || ''} onChange={e => save({ code: e.target.value })}
-        className="text-xs border border-gray-200 rounded-md px-1 py-1 bg-white w-full">
+        className="qx-select text-xs border border-gray-200 rounded-md px-1.5 py-1 bg-white w-full">
         <option value="">—</option>
         {INSPECTION_TYPES.map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
       </select>
@@ -304,7 +304,7 @@ export default function InspectionBoard() {
   const counties = [...new Set(jobs.map(j => j.county).filter(Boolean))].sort()
   // Only the inspection columns some job actually has
   const cols = BOARD_COLUMNS.filter(c => jobs.some(j => j.cells[c.key]))
-  const grid = `1.25rem minmax(0,1fr) repeat(${cols.length}, 3.4rem) 11.5rem`
+  const grid = `1.25rem minmax(0,1fr) ${cols.length ? `repeat(${cols.length}, 3.4rem) ` : ''}11.5rem`
   const wide = useWide()
   const shown = jobs.filter(j => {
     if (pm && j.pm !== pm) return false
@@ -422,13 +422,13 @@ export default function InspectionBoard() {
           {query && <button onClick={() => setQuery('')} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>}
         </div>
         {counties.length > 1 && (
-          <select value={countyFilter} onChange={e => setCountyFilter(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
+          <select value={countyFilter} onChange={e => setCountyFilter(e.target.value)} className="qx-select text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
             <option value="">All counties</option>
             {counties.map(c => <option key={c} value={c}>{c}{CONNECTED_COUNTIES.includes(c) ? '' : ' (by hand)'}</option>)}
           </select>
         )}
         {pms.length > 0 && (
-          <select value={pm} onChange={e => setPm(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
+          <select value={pm} onChange={e => setPm(e.target.value)} className="qx-select text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
             <option value="">All PMs</option>
             {pms.map(x => <option key={x} value={x}>PM {x}</option>)}
           </select>
