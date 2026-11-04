@@ -81,18 +81,19 @@ export default function HardscapePanel({ onClose, onAdd, initial, saved }) {
   const add = () => {
     const P = inp.patio
     const W = Number(P.width) || 0, D = Number(P.depth) || 0
+    const irregular = P.sizeMode === 'sf'
     const isSurface = (l) => l.group === 'patio' && (HS_CONCRETE.some(c => c.key === l.key) || HS_PAVERS.some(p => p.key === l.key) || l.key === 'concreteSmall')
     // Scope: each piece of work in the catalog's own wording, this job's numbers filled in.
     const description = result.lines.map(l => scopeFor(catalog, l.catalogName, {
-      size: isSurface(l) ? [W, D] : null,
+      size: isSurface(l) && !irregular ? [W, D] : null,
       sqft: l.unit === 'SF' ? l.qty : null, lf: l.unit === 'LF' ? l.qty : null, count: l.qty,
     }, isSurface(l)
-      ? `Install a ${l.label.toLowerCase()} patio, approximately ${W}’ × ${D}’ (${result.area} SF).`
+      ? (irregular ? `Install a ${l.label.toLowerCase()} patio, approximately ${result.area} SF (irregular shape).` : `Install a ${l.label.toLowerCase()} patio, approximately ${W}’ × ${D}’ (${result.area} SF).`)
       : `${l.label}${l.unit === 'LS' || l.qty === 1 ? '' : ` — ${l.qty} ${l.unit}`}${l.note && !/÷/.test(l.note) ? ` (${l.note})` : ''}.`)).filter(Boolean).join('\n')
     // Name: the patio, then the other kinds of work included.
     const surface = result.lines.find(isSurface)
     const parts = []
-    if (surface) parts.push(`${surface.label} patio ${W}′×${D}′ (${result.area} SF)`)
+    if (surface) parts.push(irregular ? `${surface.label} patio (${result.area} SF)` : `${surface.label} patio ${W}′×${D}′ (${result.area} SF)`)
     if (result.lines.some(l => l.group === 'wall')) parts.push('retaining wall')
     if (result.lines.some(l => l.group === 'accessory' || (l.group === 'patio' && !isSurface(l)))) parts.push('patio accessories')
     if (result.lines.some(l => l.group === 'kitchen')) parts.push('outdoor kitchen')
@@ -129,9 +130,29 @@ export default function HardscapePanel({ onClose, onAdd, initial, saved }) {
 
       {/* Patio */}
       <Section title="Patio" total={groupTotal('patio')}>
+        {/* Patio size: width × depth, or the total SF for irregular patios */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Size by</span>
+          <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50" role="group" aria-label="Patio size by">
+            {[['dims', 'Width × depth'], ['sf', 'Total SF (irregular patio)']].map(([k, label]) => (
+              <button key={k} type="button" onClick={() => setIn('patio', { sizeMode: k })} aria-pressed={(inp.patio.sizeMode || 'dims') === k}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${(inp.patio.sizeMode || 'dims') === k ? 'bg-white shadow-sm font-semibold text-gray-900' : 'text-gray-500'}`}>{label}</button>
+            ))}
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Field label="Width (ft)"><input type="number" min="0" aria-label="Patio width (ft)" className={inputCls} value={inp.patio.width} onChange={e => setIn('patio', { width: e.target.value })} /></Field>
-          <Field label="Depth (ft)" hint={`${result.area} SF`}><input type="number" min="0" aria-label="Patio depth (ft)" className={inputCls} value={inp.patio.depth} onChange={e => setIn('patio', { depth: e.target.value })} /></Field>
+          {inp.patio.sizeMode === 'sf' ? (
+            <div className="md:col-span-2">
+              <Field label="Patio area (SF)" hint="Total square footage of the irregular patio">
+                <input type="number" min="0" aria-label="Patio area (SF)" placeholder="e.g. 340" className={inputCls} value={inp.patio.areaSF ?? ''} onChange={e => setIn('patio', { areaSF: e.target.value })} />
+              </Field>
+            </div>
+          ) : (
+            <>
+              <Field label="Width (ft)"><input type="number" min="0" aria-label="Patio width (ft)" className={inputCls} value={inp.patio.width} onChange={e => setIn('patio', { width: e.target.value })} /></Field>
+              <Field label="Depth (ft)" hint={`${result.area} SF`}><input type="number" min="0" aria-label="Patio depth (ft)" className={inputCls} value={inp.patio.depth} onChange={e => setIn('patio', { depth: e.target.value })} /></Field>
+            </>
+          )}
           <Field label="Surface" hint={result.area > 0 && result.area < 200 && inp.patio.surface ? (isConcrete ? (inp.patio.surface === 'concrete4' ? 'Under 200 SF — priced as a small slab.' : undefined) : 'Under 200 SF — small-patio add applies.') : undefined}>
             <select aria-label="Patio surface" className={selCls} value={inp.patio.surface} onChange={e => setIn('patio', { surface: e.target.value })}>
               <option value="">No patio</option>

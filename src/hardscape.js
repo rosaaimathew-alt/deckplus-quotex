@@ -100,7 +100,7 @@ export function hsRate(item, catalog = []) {
 }
 
 export const HS_INPUT_DEFAULTS = {
-  patio:   { width: 16, depth: 14, surface: '', pumpTruck: false },
+  patio:   { width: 16, depth: 14, surface: '', pumpTruck: false, sizeMode: 'dims', areaSF: '' },   // sizeMode 'sf' = irregular patio, priced on areaSF
   stepping: 0,
   wall:    { type: '', length: 0, height: 0, backfillDepth: 0 },
   granite: { level: '', length: 0, depth: 0, finish: false },
@@ -131,7 +131,7 @@ export function computeHardscape(input, catalog) {
   }
 
   // Patio surface
-  const area = r2(n(inp.patio.width) * n(inp.patio.depth))
+  const area = r2(inp.patio.sizeMode === 'sf' ? n(inp.patio.areaSF) : n(inp.patio.width) * n(inp.patio.depth))
   const surface = inp.patio.surface
   const concrete = HS_CONCRETE.find(c => c.key === surface)
   const paver = HS_PAVERS.find(p => p.key === surface)

@@ -4,8 +4,8 @@
 // proposal on its own:
 //
 //   • Base permit, by job type (one per quote — porch, else deck, else hardscape)
-//     Porch:     "Permit + gutters + pressure wash + PortaJohn"
-//     Deck:      "Permit + Porta John"
+//     Porch:     "Permit + gutters + pressure wash"
+//     Deck:      "Permit (Deck)"
 //     Hardscape: "Permit"
 //   • Porch roof over 250 SF → "Roof over 250sf permit fee"
 //   • Mecklenburg County, NC → "Mecklenburg add"
@@ -16,11 +16,11 @@
 // only the fallback. The county comes from the ZIP code (Charlotte-area
 // counties), then from the city name.
 
-// label = what the customer reads on the proposal
-const P = (key, catalogName, label, rate) => ({ key, catalogName, label, rate })
+// label = what the customer reads on the proposal; oldNames = earlier catalog names still matched
+const P = (key, catalogName, label, rate, oldNames = []) => ({ key, catalogName, label, rate, oldNames })
 export const FEE_ITEMS = {
-  permitPorch:  P('permitPorch',  'Permit + gutters + pressure wash + PortaJohn',          'Permit, gutters, pressure wash & porta-john', 2000),
-  permitDeck:   P('permitDeck',   'Permit + Porta John',                                   'Permit & porta-john', 950),
+  permitPorch:  P('permitPorch',  'Permit + gutters + pressure wash',                      'Permit, gutters & pressure wash', 2000, ['Permit + gutters + pressure wash + PortaJohn']),
+  permitDeck:   P('permitDeck',   'Permit (Deck)',                                         'Permit',                          950,  ['Permit + Porta John']),
   permitHard:   P('permitHard',   'Permit',                                                'Permit', 750),
   roof250:      P('roof250',      'Roof over 250sf permit fee',                            'Permit fee — roof over 250 SF', 650),
   meck:         P('meck',         'Mecklenburg add',                                       'Mecklenburg County permit add', 600),
@@ -113,7 +113,8 @@ function porchRoofSF(lines = []) {
 
 const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim()
 export function feePrice(item, catalog = []) {
-  const hit = catalog.find(c => norm(c.name) === norm(item.catalogName))
+  const names = [item.catalogName, ...(item.oldNames || [])].map(norm)
+  const hit = catalog.find(c => names.includes(norm(c.name)))
   return hit
     ? { rate: Number(hit.unitPrice) || 0, cost: (Number(hit.costMaterials) || 0) + (Number(hit.costSub) || 0), catalogId: hit.id }
     : { rate: item.rate, cost: 0, catalogId: null }
@@ -129,7 +130,7 @@ export function requiredFees({ address, lines, projectTypes, catalog, overrides 
   if (!anyWork || !loc.known) return { loc, kinds, fees: out }
   const place = [loc.county && `${loc.county} County`, loc.state].filter(Boolean).join(', ')
   // A fee the rep already added by hand (same catalog item) isn't added twice
-  const manual = (item) => lines.some(l => !l.autoFee && [item.catalogName, item.label].some(nm => norm(l.name) === norm(nm)))
+  const manual = (item) => lines.some(l => !l.autoFee && [item.catalogName, item.label, ...(item.oldNames || [])].some(nm => norm(l.name) === norm(nm)))
   const add = (item, why) => { if (!manual(item)) out.push({ ...item, ...feePrice(item, catalog), why }) }
 
   if (kinds.porch)          add(FEE_ITEMS.permitPorch, 'Porch permit')

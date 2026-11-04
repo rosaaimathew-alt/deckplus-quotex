@@ -18,13 +18,24 @@
 // address and status.
 
 const ORIGIN = 'https://aca-prod.accela.com'
-const BASE = `${ORIGIN}/MECKLENBURG`
+
+// Counties on Accela Citizen Access: the agency in the URL, and the module
+// house permits are filed under. Every function below takes one of these
+// (Mecklenburg when left out).
+export const SITES = {
+  Mecklenburg: { county: 'Mecklenburg', agency: 'MECKLENBURG', module: 'Building' },
+  Cabarrus:    { county: 'Cabarrus',    agency: 'CABARRUS',    module: 'Permits' },
+}
+const MECK = SITES.Mecklenburg
+const baseOf = (site) => `${ORIGIN}/${site.agency}`
 const UA = 'Mozilla/5.0 (compatible; DeckPlusQuoteX/1.0; permit status check)'
 const REFRESH_BTN = 'ctl00$PlaceHolderMain$InspectionList$btnRefreshGridView'
 const UPDATE_PANEL = 'ctl00$PlaceHolderMain$InspectionList$inspectionUpdatePanel'
 
-// "RES-ADD-26-000807", "RES-ALT-26-001778"
-export const RECORD_RE = /^[A-Z]{2,5}-[A-Z]{2,5}-\d{2}-\d{4,7}$/
+// "RES-ADD-26-000807", "RES-ALT-26-001778" (Mecklenburg); other counties
+// number their records differently, so a record is any short run of letters,
+// digits and dashes with at least one digit.
+export const RECORD_RE = /^(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,29}$/
 // capID1..3 of a record page link, e.g. REC26 / 00000 / 026G2
 const CAP_ID_RE = /^[A-Z0-9]{1,10}$/
 
@@ -37,8 +48,8 @@ export function capIdsFromUrl(url) {
   } catch { return null }
 }
 
-export function recordUrl([id1, id2, id3]) {
-  return `${BASE}/Cap/CapDetail.aspx?Module=Building&TabName=Building&capID1=${id1}&capID2=${id2}&capID3=${id3}&agencyCode=MECKLENBURG&IsToShowInspection=`
+export function recordUrl([id1, id2, id3], site = MECK) {
+  return `${baseOf(site)}/Cap/CapDetail.aspx?Module=${site.module}&TabName=${site.module}&capID1=${id1}&capID2=${id2}&capID3=${id3}&agencyCode=${site.agency}&IsToShowInspection=`
 }
 
 // ── Tiny HTTP client with a cookie jar (the postback needs the session) ─────
@@ -111,10 +122,12 @@ function formFields(html) {
 function headerInfo(html) {
   const lines = textOf(html)
   const after = (label) => { const i = lines.indexOf(label); return i >= 0 ? lines[i + 1] || '' : '' }
-  const recIdx = lines.indexOf('Record')
+  // The header reads "<module> / <record #> / : / <record type>" — "Record" in
+  // Mecklenburg, "Permits" in Cabarrus — so find it by that shape.
+  const recIdx = lines.findIndex((l, i) => RECORD_RE.test(l) && lines[i + 1] === ':' && i < lines.indexOf('Record Status:'))
   return {
-    record: recIdx >= 0 && RECORD_RE.test(lines[recIdx + 1] || '') ? lines[recIdx + 1] : '',
-    recordType: recIdx >= 0 && lines[recIdx + 2] === ':' ? lines[recIdx + 3] || '' : '',
+    record: recIdx >= 0 ? lines[recIdx] : '',
+    recordType: recIdx >= 0 ? lines[recIdx + 2] || '' : '',
     recordStatus: after('Record Status:'),
     expires: after('Expiration Date:'),
   }
@@ -128,23 +141,43 @@ const toIsoDate = (mdy) => {
 // One row of the Upcoming or Completed grid → an inspection.
 //   ["Passed", "FT - Footing (232867)", "Result by: Bryan Guzman Lopez on 10/31/2025 at 05:05 PM"]
 //   ["Scheduled", "FR - Framing (271234)", "11/04/2026 AM", "Inspector: …"]
+// Counties that don't put a code in front of the name ("Footing", "Framing
+// (Sheathing, …)", "Final") get the same codes Mecklenburg uses, so the board
+// lines up across counties.
+const NAME_CODES = [
+  [/footing|foundation|pier/i, 'FT'], [/slab/i, 'SL'], [/rough/i, 'RF'],
+  [/fram/i, 'FR'], [/insulation/i, 'IN'], [/final/i, 'FI'],
+]
+export function codeForName(name) {
+  for (const [re, code] of NAME_CODES) if (re.test(name)) return code
+  return String(name || '').replace(/[^A-Za-z ]/g, '').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 3).toUpperCase() || '?'
+}
+
+// One row of the Upcoming or Completed grid → an inspection.
+//   ["Passed", "FT - Footing (232867)", "Result by: Bryan Guzman Lopez on 10/31/2025 at 05:05 PM"]
+//   ["Pass", "Framing (Sheathing, Exterior, …) (1794836)", "Result by: …"]       (Cabarrus)
+//   ["10/29/2026 at TBD Scheduled", "FR - Framing (771234)", "Inspector: …"]
 function parseRow(lines, section) {
+  // The line ending in "(inspection id)" names the inspection; what's before
+  // it is the result (completed) or date + status (upcoming).
+  const k = lines.findIndex(l => /\((\d{4,})\)\s*$/.test(l))
+  if (k < 0) return null
+  const id = lines[k].match(/\((\d{4,})\)\s*$/)[1]
+  const label = lines[k].replace(/\s*\(\d{4,}\)\s*$/, '').trim()
+  const coded = label.match(/^([A-Z]{1,4}) - (.+)$/)
   const joined = lines.join(' | ')
-  const head = joined.match(/^(.*?)\s*\|?\s*([A-Z]{1,4} - [^|()]+?)\s*\((\d+)\)/)
-  if (!head) return null
-  // Completed rows start with the result ("Passed"); upcoming rows with
-  // "10/29/2026 at TBD Scheduled".
-  const lead = head[1].replace(/\|/g, ' ').replace(/\s+/g, ' ').trim()
+  const lead = lines.slice(0, k).join(' ').replace(/\s+/g, ' ').trim()
   const leadDate = lead.match(/(\d{1,2}\/\d{1,2}\/\d{4})(?:\s+at\s+([^A-Za-z]*[AP]M|TBD))?/i)
   const status = lead.replace(/\d{1,2}\/\d{1,2}\/\d{4}(?:\s+at\s+(?:[\d:]+\s*[AP]M|TBD))?/i, '').trim()
-  const [code, ...rest] = head[2].split(' - ')
-  const by = joined.match(/Result by:\s*(.+?)\s+on\s+(\d{1,2}\/\d{1,2}\/\d{4})(?:\s+at\s+([\d:]+\s*[AP]M))?/i)
-  const anyDate = joined.slice(head.index + head[0].length).match(/(\d{1,2}\/\d{1,2}\/\d{4})/)
+  const rest = lines.slice(k + 1).join(' | ')
+  const by = rest.match(/Result by:\s*(.+?)\s+on\s+(\d{1,2}\/\d{1,2}\/\d{4})(?:\s+at\s+([\d:]+\s*[AP]M))?/i)
+  const anyDate = rest.match(/(\d{1,2}\/\d{1,2}\/\d{4})/)
   const inspector = by?.[1] || joined.match(/Inspector:\s*([^|]+)/i)?.[1]?.trim() || ''
+  const name = coded ? coded[2].trim() : label
   return {
-    id: head[3],
-    code: code.trim(),
-    name: rest.join(' - ').trim(),
+    id,
+    code: coded ? coded[1] : codeForName(name),
+    name,
     result: section === 'completed' ? status : '',
     status: section === 'completed' ? 'completed' : (status || 'Scheduled'),
     date: toIsoDate(by?.[2] || leadDate?.[1] || anyDate?.[1]),
@@ -173,9 +206,9 @@ export function parseInspections(panelHtml) {
 
 // ── Public: everything we can read about one permit ─────────────────────────
 // capIds: [capID1, capID2, capID3] from the record page link.
-export async function fetchPermit(capIds) {
+export async function fetchPermit(capIds, site = MECK) {
   const request = client()
-  const url = recordUrl(capIds)
+  const url = recordUrl(capIds, site)
   const page = await request(url)
   const info = headerInfo(page.text)
   if (!info.record) throw new Error('Permit page not found on the county site')
@@ -201,11 +234,11 @@ export async function fetchPermit(capIds) {
 }
 
 // ── Inspector notes ("Result Comments" on the View Details page) ────────────
-export async function fetchInspectionNotes(record, capIds, inspectionId) {
+export async function fetchInspectionNotes(record, capIds, inspectionId, site = MECK) {
   if (!RECORD_RE.test(record) || !/^\d{1,10}$/.test(String(inspectionId))) return []
   const [id1, id2, id3] = capIds
-  const url = `${BASE}/Inspection/InspectionDetails.aspx?agencyCode=MECKLENBURG&RecordAltID=${record}` +
-    `&RecordID1=${id1}&RecordID2=${id2}&RecordID3=${id3}&Module=Building&PublicUserID=PUBLICUSER0` +
+  const url = `${baseOf(site)}/Inspection/InspectionDetails.aspx?agencyCode=${site.agency}&RecordAltID=${encodeURIComponent(record)}` +
+    `&RecordID1=${id1}&RecordID2=${id2}&RecordID3=${id3}&Module=${site.module}&PublicUserID=PUBLICUSER0` +
     `&ScheduledType=Unknown&Action=ViewDetails&ID=${inspectionId}&IsFromWizardPage=False&RequestDayOption=0` +
     `&ContactChangeOption=Unknown&isPopup=Y&Status=Unknown&NavigationBeginPage=ViewDetails&TimeOption=Unknow`
   const { text } = await client()(url)
@@ -230,26 +263,26 @@ export function parseNotes(lines) {
 }
 
 // ── Find a job's permit by address ──────────────────────────────────────────
-const SEARCH_URL = `${BASE}/Cap/CapHome.aspx?module=Building&TabName=Building`
+const searchUrl = (site) => `${baseOf(site)}/Cap/CapHome.aspx?module=${site.module}&TabName=${site.module}`
 const F = 'ctl00$PlaceHolderMain$generalSearchForm$'
 
 // A record by its number ("RES-ADD-26-000807"), via the same search form.
-export async function searchByRecord(record) {
+export async function searchByRecord(record, site = MECK) {
   const rec = String(record || '').trim().toUpperCase()
   if (!RECORD_RE.test(rec)) return []
-  return runSearch({ [`${F}txtGSPermitNumber`]: rec })
+  return runSearch({ [`${F}txtGSPermitNumber`]: rec }, site)
 }
 
-export async function searchByAddress(number, street) {
+export async function searchByAddress(number, street, site = MECK) {
   const num = String(number || '').replace(/\D/g, '').slice(0, 8)
   const name = String(street || '').replace(/[^A-Za-z0-9 '-]/g, '').trim().slice(0, 40)
   if (!num || !name) return []
-  return runSearch({ [`${F}txtGSNumber$ChildControl0`]: num, [`${F}txtGSStreetName`]: name })
+  return runSearch({ [`${F}txtGSNumber$ChildControl0`]: num, [`${F}txtGSStreetName`]: name }, site)
 }
 
-async function runSearch(values) {
+async function runSearch(values, site) {
   const request = client()
-  const page = await request(SEARCH_URL)
+  const page = await request(searchUrl(site))
   const fields = formFields(page.text)
   for (const [k, v] of Object.entries(values)) fields.set(k, v)
   fields.set('ctl00$ScriptManager1', 'ctl00$PlaceHolderMain$updatePanel|ctl00$PlaceHolderMain$btnNewSearch')
@@ -273,7 +306,7 @@ async function runSearch(values) {
   if (!redirect) return []
   const capIds = capIdsFromUrl(new URL(decodeURIComponent(redirect[1]), ORIGIN).toString())
   if (!capIds) return []
-  const detail = await request(recordUrl(capIds))
+  const detail = await request(recordUrl(capIds, site))
   return [rowFromDetail(detail.text, capIds)].filter(r => r.record)
 }
 

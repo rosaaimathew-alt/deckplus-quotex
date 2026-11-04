@@ -209,6 +209,8 @@ create table if not exists rr_events (
   created_at timestamptz not null default now()
 );
 create index if not exists rr_events_time on rr_events (created_at);
+-- Which day ("2026-11-06|8" = date | times offered) or time (ISO) was picked.
+alter table rr_events add column if not exists detail text;
 alter table rr_events enable row level security;
 drop policy if exists rr_events_staff on rr_events;
 create policy rr_events_staff on rr_events for select using (auth_role() in ('office','admin'));

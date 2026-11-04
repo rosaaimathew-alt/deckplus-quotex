@@ -4,6 +4,7 @@
 // numbers always agree wherever you see them.
 import { getStages } from '../pages/Jobs'
 import { latestIterations } from './proposalScope'
+import { connectionAlerts } from './permitHealth'
 
 const DAY = 86400000
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }
@@ -30,8 +31,20 @@ export const isJobClosed = (p) => (p.jobData?.completedStages || []).includes('c
 export const isJob = (p) => p.status === 'Won' || p.status === 'Imported'
 
 // Each item: { key, tone, title, detail, count, people: [{ id, name, note }], to, cta }
-export function attentionItems({ proposals = [], jobCosts = {}, can = () => true, role = 'manager' }) {
+export function attentionItems({ proposals = [], jobCosts = {}, can = () => true, role = 'manager', permitPulse = null }) {
   const items = []
+
+  // A county permit site the inspection check can't read (lib/permitHealth.js)
+  if (role === 'manager' && can('/jobs')) {
+    for (const a of connectionAlerts(permitPulse, { hasJobs: proposals.some(p => p.countyPermit) })) {
+      items.push({
+        key: `inspections-${a.key}`, tone: 'alert',
+        title: a.stale ? 'Inspection checks have stopped' : `${a.county} inspection results aren't coming through`,
+        detail: a.stale ? 'No county check has run in over a day' : `The county site couldn't be read for ${a.failed} of ${a.total} jobs`,
+        count: a.stale ? 1 : a.failed, people: [], to: '/projects?tab=inspections', cta: 'Open inspections',
+      })
+    }
+  }
   const live = proposals.filter(p => p.status !== 'Archived')
 
   if (can('/tracker')) {

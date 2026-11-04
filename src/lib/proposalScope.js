@@ -31,15 +31,5 @@ export function useScopedProposals() {
   }
 }
 
-// One proposal per client: the latest version — unless an earlier version was
-// won, which is the deal that actually closed. Keeps the pipeline from counting
-// every revision of the same job.
-export function latestIterations(proposals) {
-  const ids = new Set(proposals.map(p => p.id))
-  return proposals
-    .filter(p => !p.parentId || !ids.has(p.parentId))
-    .map(root => {
-      const all = [root, ...proposals.filter(p => p.parentId === root.id).sort((a, b) => (a.version || 2) - (b.version || 2))]
-      return all.find(p => p.status === 'Won') || all[all.length - 1]
-    })
-}
+// One proposal per client — see src/lib/proposalGroups.js
+export { latestIterations } from './proposalGroups'
