@@ -3,7 +3,7 @@
 // 3D model and 2D floor plan one click away. The model is drawn from the
 // proposal's own builder inputs (see src/lib/designLink.js).
 import { useMemo, useState } from 'react'
-import { Box, Ruler, Search } from 'lucide-react'
+import { Box, Ruler, Search, PenTool } from 'lucide-react'
 import { useStore } from '../store'
 import { designSummary, designUrl, hasDesign } from '../lib/designLink'
 
@@ -33,11 +33,18 @@ export default function Designs() {
     <div className="p-4 sm:p-6 max-w-7xl space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-gray-500">3D renderings and floor plans for every porch, deck and patio quoted in QuoteX.</p>
-        <label className="relative">
-          <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search client or address"
-            aria-label="Search designs" className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg w-64 max-w-full" />
-        </label>
+        <div className="flex items-center gap-2 flex-wrap">
+          <label className="relative">
+            <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search client or address"
+              aria-label="Search designs" className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg w-64 max-w-full" />
+          </label>
+          {/* Free-form editor: draw decks, stair runs and landings anywhere, with live 3D */}
+          <a href="/design-editor.html" target="_blank" rel="noopener"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)]">
+            <PenTool size={15} /> Design editor
+          </a>
+        </div>
       </div>
 
       {rows.length === 0 ? (
