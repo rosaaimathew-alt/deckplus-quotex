@@ -11,8 +11,7 @@
     "api/sign/[token].js":              { "maxDuration": 20 },
     "api/co/[token].js":                { "maxDuration": 20 },
     "api/booking.js":                   { "maxDuration": 15 },
-    "api/permit-pulse.js":              { "maxDuration": 60 },
-    "api/permit-alert.js":              { "maxDuration": 20 }
+    "api/permit-pulse.js":              { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/booking?report=1", "schedule": "43 12 * * *" }

@@ -1,32 +1,28 @@
 /**
  * County connection alert email.
- *   POST /api/permit-alert  { county, state: 'down' | 'up', error, failed, total }
+ *   POST /api/permit-pulse  { alert: { county, state: 'down' | 'up', error, failed, total } }
+ *
+ * Served by the permit-pulse function (Vercel's Hobby plan allows 12
+ * functions per deployment, so this doesn't get one of its own).
  *
  * Sent by an office / admin screen when the inspection check finds a county's
  * permit site can't be read (state 'down') or works again ('up') — see
  * src/lib/permitHealth.js. Goes to every office and admin member of the
  * sender's company, from the company mailbox.
  */
-import { fileURLToPath } from 'url'
-import { dirname, resolve } from 'path'
-import dotenv from 'dotenv'
 import { requireAuth, staffMembership, asUser } from './_auth.js'
 import { sendMail } from './_mailer.js'
-
-dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const clean = (s, max) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+export async function sendPermitAlert(req, res, body) {
   const staff = await requireAuth(req, res)
   if (!staff) return
   const token = (req.headers.authorization || '').replace(/^Bearer /, '') || req.headers['x-qx-token']
   const member = await staffMembership(token, staff)
   if (!member || !['office', 'admin'].includes(member.role)) return res.status(403).json({ error: 'Only the office can send connection alerts.' })
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
   const county = clean(body.county, 40) || 'A county'
   const down = body.state !== 'up'
   const error = clean(body.error, 400)
