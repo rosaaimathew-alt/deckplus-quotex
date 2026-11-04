@@ -119,6 +119,15 @@
   .modal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .modal-card p { margin: 0; color: var(--muted); line-height: 1.45; font-size: 14px; }
   .modal-card textarea { width: 100%; min-height: 110px; font: 13px/1.4 var(--font-mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; box-sizing: border-box; }
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .step { display: flex; flex-direction: column; gap: 6px; align-items: stretch; text-align: left; font: 600 14px/1.2 var(--font-body);
+    padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; text-decoration: none; }
+  .step small { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+  .step .num { font: 700 12px/1 var(--font-mono); color: var(--accent); }
+  .step:hover { border-color: var(--accent); }
+  .step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .step.done { border-color: var(--accent); background: var(--accent-soft); }
+  @media (max-width: 600px) { .steps { grid-template-columns: 1fr; } }
   .modal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .modal-actions button, .modal-actions a { font: 600 14px/1 var(--font-body); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; text-decoration: none; }
   .modal-actions .primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
@@ -198,8 +207,7 @@
       <button type="button" data-view="top" aria-pressed="false">Plan</button>
     </div>
     <div class="render-btn">
-      <button type="button" class="primary" id="btn-render">Photo render</button>
-      <button type="button" class="ghost" id="btn-chatgpt">Copy for ChatGPT</button>
+      <button type="button" class="primary" id="btn-chatgpt">Render in ChatGPT</button>
     </div>
     <div class="summary"><b id="sum-title"></b><span id="sum-sub"></span></div>
     <div class="hint">Drag to orbit · right-drag to pan · tap a section to edit</div>
@@ -1528,15 +1536,6 @@
     outline.visible = outline0; dims.forEach(d => d.style.visibility = '');
     return c.toDataURL('image/jpeg', 0.88);
   }
-  function sessionToken() {
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (/^sb-.*-auth-token$/.test(k)) { const v = JSON.parse(localStorage.getItem(k)); return v?.access_token || v?.currentSession?.access_token || null; }
-      }
-    } catch (e) { /* storage blocked */ }
-    return null;
-  }
   const modal = $('modal'), mBody = $('modal-body');
   let lastFocus = null;
   function openModal(title, html) { lastFocus = document.activeElement; $('modal-title').textContent = title; mBody.innerHTML = html; modal.hidden = false; $('modal-close').focus(); }
@@ -1544,43 +1543,41 @@
   $('modal-close').addEventListener('click', closeModal);
   modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
-  const fileName = () => `deckplus-render-${new Date().toISOString().slice(0, 10)}`;
 
-  function manualHTML(view, note) {
-    return `${note ? `<p>${note}</p>` : ''}
-      <p><b>Use ChatGPT or the Gemini app:</b> 1) save this view image, 2) copy the prompt, 3) in ChatGPT attach the image, paste the prompt and send.</p>
-      <img src="${view}" alt="Current 3D view">
-      <textarea id="m-prompt" readonly aria-label="Render prompt">${promptText().replace(/</g, '&lt;')}</textarea>
-      <div class="modal-actions"><button type="button" class="primary" id="m-copy">Copy prompt</button><a id="m-save" href="${view}" download="${fileName()}-view.jpg">Save view image</a></div>
-      <p id="m-msg" aria-live="polite"></p>`;
+  // Three taps: copy the view image, open ChatGPT, copy the prompt. Paste each into ChatGPT.
+  function manualHTML(view) {
+    return `<div class="steps">
+        <button type="button" class="step" id="m-img"><span class="num">1</span>Copy image<small>Then paste it into ChatGPT (Ctrl+V / ⌘V)</small></button>
+        <a class="step" id="m-open" href="https://chatgpt.com/" target="_blank" rel="noopener"><span class="num">2</span>Open ChatGPT<small>Opens in a new tab</small></a>
+        <button type="button" class="step" id="m-copy"><span class="num">3</span>Copy prompt<small>Paste it after the image and send</small></button>
+      </div>
+      <p id="m-msg" aria-live="polite">Tip: keep this window open and switch back for step 3.</p>
+      <img id="m-view" src="${view}" alt="Current 3D view">
+      <textarea id="m-prompt" readonly aria-label="Render prompt">${promptText().replace(/</g, '&lt;')}</textarea>`;
   }
-  function wireManual() {
-    $('m-copy').addEventListener('click', () => {
-      const t = $('m-prompt'), done = () => { $('m-msg').textContent = 'Prompt copied. Paste it in ChatGPT with the image.'; };
-      navigator.clipboard?.writeText(t.value).then(done, () => { t.select(); $('m-msg').textContent = 'Press Ctrl+C (Cmd+C on Mac) to copy the selected prompt.'; }) ?? (t.select());
+  function wireManual(view) {
+    const msg = (t) => { $('m-msg').textContent = t; };
+    const done = (id) => $(id).classList.add('done');
+    $('m-img').addEventListener('click', async () => {
+      try {
+        const blob = fetch(view).then(r => r.blob()).then(b => new Promise(res => {
+          const im = new Image(); im.onload = () => { const [c, x] = cnv(im.width, im.height); x.drawImage(im, 0, 0); c.toBlob(res, 'image/png'); }; im.src = URL.createObjectURL(b);
+        }));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        done('m-img'); msg('Image copied. Paste it into ChatGPT, then copy the prompt.');
+      } catch (e) {
+        msg('This browser blocked copying the image. Right-click (or long-press) the picture below and choose Copy image.');
+      }
     });
-    $('m-save').addEventListener('click', () => { setTimeout(() => { $('m-msg').textContent = 'If nothing downloaded, right-click (or long-press) the image above and save it.'; }, 600); });
+    $('m-open').addEventListener('click', () => { done('m-open'); msg('Paste the image into the new chat, then come back for the prompt.'); });
+    $('m-copy').addEventListener('click', () => {
+      const t = $('m-prompt');
+      const ok = () => { done('m-copy'); msg('Prompt copied. Paste it after the image in ChatGPT and send.'); };
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t.value).then(ok, () => { t.select(); msg('Press Ctrl+C (⌘C on Mac) to copy the selected prompt.'); });
+      else { t.select(); msg('Press Ctrl+C (⌘C on Mac) to copy the selected prompt.'); }
+    });
   }
-  $('btn-chatgpt').addEventListener('click', () => { openModal('Render with ChatGPT', manualHTML(snapshot())); wireManual(); });
-  $('btn-render').addEventListener('click', async () => {
-    const view = snapshot(1400), token = sessionToken();
-    if (!token) { openModal('Photo render', manualHTML(view, 'Automatic rendering works when this builder is opened from QuoteX while signed in. You can still render this view by hand:')); wireManual(); return; }
-    openModal('Photo render', `<p>Rendering a photo of this view. This takes about 10–30 seconds.</p><div class="spinner" role="status" aria-label="Rendering"></div><img src="${view}" alt="Current 3D view" style="opacity:.5">`);
-    try {
-      const r = await fetch('/api/render', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ image: view.split(',')[1], mimeType: 'image/jpeg', description: describe() }) });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok || !data.image) throw new Error(data.error || `The render service answered ${r.status}.`);
-      if (modal.hidden) return;
-      const url = `data:${data.mimeType};base64,${data.image}`;
-      mBody.innerHTML = `<img src="${url}" alt="Photo render of the build"><p>AI concept image: final materials and details follow the signed contract.</p>
-        <div class="modal-actions"><a class="primary" href="${url}" download="${fileName()}.png">Save image</a><button type="button" id="m-again">Render again</button></div>`;
-      $('m-again').addEventListener('click', () => { closeModal(); $('btn-render').click(); });
-    } catch (err) {
-      if (modal.hidden) return;
-      mBody.innerHTML = manualHTML(view, `Automatic render didn't work: ${String(err.message).replace(/</g, '&lt;')} You can render this view by hand instead:`); wireManual();
-    }
-  });
+  $('btn-chatgpt').addEventListener('click', () => { const v = snapshot(); openModal('Render in ChatGPT', manualHTML(v)); wireManual(v); });
 
   update = () => { updateUI(); dirty = true; };
   updateUI(); resize(); build(); dirty = false; goTo('corner', true);
