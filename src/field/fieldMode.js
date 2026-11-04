@@ -46,9 +46,27 @@ export const canUseField = (role) => role === 'pm' || role === 'manager'
 export function useFieldHome() {
   const role = useStore(s => s.role || 'manager')
   const phone = useIsPhone()
+  if (role === 'paint') return true          // the paint PM only ever gets Field mode
   if (!phone || !canUseField(role)) return false
   const pref = readViewPref()
   if (pref === 'full') return false
   if (pref === 'field') return true
   return FIELD_ROLES.has(role)
+}
+
+// ── Paint view ──────────────────────────────────────────────────────────────
+// The paint PM gets their own Field screens (PaintApp). Two ways in:
+//   • team role 'paint' — always the paint view, no way out to other screens
+//   • a PM / manager flips "I manage paint" in the Field menu (per phone)
+const PAINT_KEY = 'qx.fieldPaint'
+const readPaintPref = () => { try { return localStorage.getItem(PAINT_KEY) === '1' } catch { return false } }
+export function setPaintPref(on) {
+  try { on ? localStorage.setItem(PAINT_KEY, '1') : localStorage.removeItem(PAINT_KEY) } catch { /* not remembered */ }
+}
+export function usePaintView() {
+  const role = useStore(s => s.role || 'manager')
+  const [pref, setPref] = useState(readPaintPref)
+  const locked = role === 'paint'
+  const toggle = (on) => { setPaintPref(on); setPref(on) }
+  return { paint: locked || (canUseField(role) && pref), locked, toggle }
 }
