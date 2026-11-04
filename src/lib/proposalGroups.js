@@ -32,7 +32,12 @@ export function clientGroups(proposals = []) {
   })
 }
 
-// One proposal per client: the won version if one was won, else the latest.
+// One proposal per client: the won version if one was won, else the latest
+// version the customer actually has (an unsent draft revision or an archived
+// one doesn't replace it), else the latest of all.
 export function latestIterations(proposals = []) {
-  return clientGroups(proposals).map(({ all }) => all.find(p => p.status === 'Won') || all[all.length - 1])
+  return clientGroups(proposals).map(({ all }) => {
+    const live = all.filter(p => p.status !== 'Draft' && p.status !== 'Archived')
+    return all.find(p => p.status === 'Won') || live[live.length - 1] || all[all.length - 1]
+  })
 }
