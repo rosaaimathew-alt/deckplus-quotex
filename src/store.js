@@ -629,6 +629,8 @@ export const useStore = create(
               activities: [],
               reminders: [],
               isHistorical: true,
+              // Owned by whoever logs them: the database only saves a rep's own deals.
+              ownerId: currentUserId(),
             }
           })
           return { proposals: [...s.proposals, ...newProposals], nextProposalId: id }
@@ -669,6 +671,8 @@ export const useStore = create(
                 activities: [],
                 reminders: [],
                 isHistorical: true,
+                // Owned by whoever logs it: the database only saves a rep's own deals.
+                ownerId: currentUserId(),
               },
             ],
             nextProposalId: id + 1,

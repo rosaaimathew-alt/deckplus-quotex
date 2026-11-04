@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { MenuChip } from '../components/FilterBar'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
+import { HISTORICAL_JOBS, HISTORICAL_APPTS } from '../historicalData'
 import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
 
 // ── Sales Heat Map ────────────────────────────────────────────────────────────
@@ -336,8 +337,8 @@ function PastJobPanel() {
 
       {open && (
         <div className="border-t border-gray-100 px-5 py-4">
-          {/* One-click load of the real 2024–2025 history */}
-          {!historyImported ? (
+          {/* One-click load of a bundled history (src/historicalData.js) — only when it has any */}
+          {HISTORICAL_JOBS.length + HISTORICAL_APPTS.length === 0 ? null : !historyImported ? (
             <div className="mb-4 flex items-center justify-between gap-3 bg-[var(--brand-50)] border border-[var(--brand-200)] rounded-xl px-4 py-3 flex-wrap">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Load 2024–2025 history</p>
