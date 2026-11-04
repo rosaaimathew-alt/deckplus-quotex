@@ -98,6 +98,11 @@ function qxConfigPlugin(env) {
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), localStorePlugin(), qxConfigPlugin(loadEnv(mode, process.cwd(), 'VITE_'))],
+  // Compile for older browsers too (Safari 13+ / Chrome 80+ — e.g. an older Mac).
+  // The default target only covers the last couple of years of browsers; on
+  // anything older the app's code can't even be read and the page sits on
+  // index.html's "App failed to load" message.
+  build: { target: ['es2019', 'safari13', 'chrome80', 'edge88', 'firefox78'] },
   server: {
     host: true,
     proxy: {

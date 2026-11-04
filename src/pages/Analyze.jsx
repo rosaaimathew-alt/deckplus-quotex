@@ -1,10 +1,9 @@
 import { useState, useRef, lazy, Suspense } from 'react'
-import * as pdfjsLib from 'pdfjs-dist'
+import { loadPdfjs } from '../lib/pdfjs'
 import { getAnalyzeModel } from '../gemini'
 import { Upload, FileText, Image, File, Trash2, CheckCircle, AlertCircle, Save, RefreshCw } from 'lucide-react'
 import { useStore } from '../store'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
 
 const ANALYZE_SYSTEM_PROMPT = `You are a construction estimating assistant. Extract ONLY priced line items from the estimate.
 
@@ -156,6 +155,7 @@ function AnalyzeTab() {
   const extractPdfText = async (f) => {
     try {
       const buf = await f.arrayBuffer()
+      const pdfjsLib = await loadPdfjs()
       const pdf = await pdfjsLib.getDocument({ data: buf }).promise
       let text = ''
       for (let i = 1; i <= pdf.numPages; i++) {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import * as pdfjsLib from 'pdfjs-dist'
+import { loadPdfjs } from '../lib/pdfjs'
 import { useStore } from '../store'
 import {
   Upload, Plus, X, Trash2, Pencil, CreditCard, Loader, Check, Search, Wallet, AlertTriangle,
@@ -12,7 +12,6 @@ import {
 import JobFinancials from '../components/JobFinancials'
 import { parseStatementText } from '../lib/statementParse'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
 
 // ── Finance ──────────────────────────────────────────────────────────────────
 // Every dollar out lands in one bucket (src/lib/finance.js): a job, operating,
@@ -34,6 +33,7 @@ const jobName = (j) => j ? `${j.client || 'Job'} · #${j.id}` : ''
 // on the page, then read "date … description … amount" from each line.
 async function extractPdfText(file) {
   const buf = await file.arrayBuffer()
+  const pdfjsLib = await loadPdfjs()
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise
   const out = []
   for (let i = 1; i <= pdf.numPages; i++) {
