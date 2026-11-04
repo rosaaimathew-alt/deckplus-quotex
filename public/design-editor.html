@@ -281,6 +281,8 @@
   let EMPTY_NOTE = '';
   const PDOOR = {};      // porch id → { wall: 'front'|'left'|'right', pos } as the 3D placed the door
   const rad = (d) => d * Math.PI / 180;
+  // Stairs turn in 45° steps only (square, or straight off a corner).
+  const snap45 = (v) => { const r = Math.round(v / 45) * 45; return ((r % 360) + 540) % 360 - 180; };
   const fmt = (ft) => { const t = Math.round(ft * 12), f = Math.floor(t / 12), i = t - f * 12; return `${f}′-${i}″`; };
   const snapV = (v, s = 0.5) => Math.round(v / s) * s;
 
@@ -656,7 +658,7 @@
       e.pts = ctx.pts0.map(([px2, pz]) => { const u = px2 - cx, v = pz - cz; return [cx + u * c + v * s, cz - u * s + v * c]; });
       if (Math.abs(d % 90) < 0.01) e.pts = e.pts.map(p => [snapV(p[0]), snapV(p[1])]);
     } else if (e.type === 'porch' || e.type === 'patio') { /* square to the house */ }
-    else { e.rot = ((ctx.rot0 + d) % 360 + 540) % 360 - 180; if (e.type === 'stairs') e.manual = true; }
+    else { e.rot = ((ctx.rot0 + d) % 360 + 540) % 360 - 180; if (e.type === 'stairs') { e.rot = snap45(e.rot); e.manual = true; } }
   }
 
   // ── Toolbar & keys ───────────────────────────────────────────────────────
@@ -810,7 +812,7 @@
         best = { d, q, rot: Math.atan2(Math.sin(r1) + Math.sin(r2), Math.cos(r1) + Math.cos(r2)) * 180 / Math.PI };
       }); });
       if (!best) return;
-      e.x = best.q[0]; e.z = best.q[1]; e.rot = Math.round(best.rot); e.manual = true;
+      e.x = best.q[0]; e.z = best.q[1]; e.rot = snap45(best.rot); e.manual = true;
     } else if (act.startsWith('land:')) {
       const turn = act.slice(5), i = stairInfo(e), top = i.top - i.bottom;
       const n = Math.max(1, Math.ceil(top / RISE_MAX)), rise = top / n, n1 = Math.ceil(n / 2);
@@ -880,7 +882,7 @@
       h = `<b>${o?.type === 'patio' ? 'Patio block steps' : 'Porch steps'}</b>${o?.type === 'porch' ? pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '') : ''}<label>Steps<span class="ro">${i.n - 1} treads · from ${fmt(i.top)}</span></label><span class="ro" style="align-self:center">Sits at the ${o?.type === 'patio' ? 'patio front' : 'porch door'} · Delete removes it</span>`;
     } else {
       const i = stairInfo(e);
-      h = `<b>Stairs</b>${num('rot', 'Angle°', e.rot, 1, -180)}${num('w', 'Width', e.w, 0.5, 3)}${pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '')}<label>From → to<span class="ro">${fmt(i.top)} → ${i.foot ? 'landing ' + fmt(i.bottom) : 'grade'}</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label>${e.manual ? '<button type="button" id="b-square">Square to edge</button>' : ''}`
+      h = `<b>Stairs</b>${num('rot', 'Angle°', e.rot, 45, -180)}${num('w', 'Width', e.w, 0.5, 3)}${pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '')}<label>From → to<span class="ro">${fmt(i.top)} → ${i.foot ? 'landing ' + fmt(i.bottom) : 'grade'}</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label>${e.manual ? '<button type="button" id="b-square">Square to edge</button>' : ''}`
         + `<span class="hrow"><span class="ro">Turn</span><button type="button" class="ghost-btn" data-st="rot:90" title="Turn 90° counter-clockwise">↺ 90°</button><button type="button" class="ghost-btn" data-st="rot:45">↺ 45°</button><button type="button" class="ghost-btn" data-st="rot:-45">↻ 45°</button><button type="button" class="ghost-btn" data-st="rot:-90" title="Turn 90° clockwise">↻ 90°</button><button type="button" class="ghost-btn" data-st="corner">Off nearest corner</button></span>`
         + `<span class="hrow"><span class="ro">Landing partway down, then</span><button type="button" class="ghost-btn" data-st="land:straight">Straight</button><button type="button" class="ghost-btn" data-st="land:left">Turn left</button><button type="button" class="ghost-btn" data-st="land:right">Turn right</button></span>`;
     }
@@ -912,7 +914,7 @@
           e.pts = e.pts.map(q => { const r = [...q]; r[i] = snapV(k(q[i]), 0.25); return r; });
           riders.forEach(o => { if (i === 0) o.x = k(o.x); else o.z = k(o.z); });
         }
-      } else if (inp.dataset.k === 'rot') { e.rot = ((v % 360) + 540) % 360 - 180; if (e.type === 'stairs') e.manual = true; } else e[inp.dataset.k] = v;
+      } else if (inp.dataset.k === 'rot') { e.rot = ((v % 360) + 540) % 360 - 180; if (e.type === 'stairs') { e.rot = snap45(e.rot); e.manual = true; } } else e[inp.dataset.k] = v;
       commit(); changed();
     }));
     $('b-square')?.addEventListener('click', () => { e.manual = false; snapStairs(e); commit(); changed(); });
