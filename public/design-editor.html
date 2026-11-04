@@ -525,7 +525,8 @@
       else if (h[0] === 'm' && ev.altKey) { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, [snapV((a[0] + b[0]) / 2), snapV((a[1] + b[1]) / 2)]); drag = { kind: 'vertex', e, i: i + 1 }; }
       else if (h[0] === 'm') {
         const i = +h.slice(1), j = (i + 1) % e.pts.length, a = e.pts[i], b = e.pts[j], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-        drag = { kind: 'edge', e, i, j, a0: [...a], b0: [...b], n: [-(b[1] - a[1]) / L, (b[0] - a[0]) / L], f0: [x, z] };
+        const riders = S.els.filter(o => o.type === 'stairs' && o.of == null && projSeg(o.x, o.z, a, b).d < 0.35).map(o => ({ o, x: o.x, z: o.z }));   // stairs on this edge go with it
+        drag = { kind: 'edge', e, i, j, a0: [...a], b0: [...b], n: [-(b[1] - a[1]) / L, (b[0] - a[0]) / L], f0: [x, z], riders };
       }
     } else {
       const hit = spaceDown ? null : hitElement(x, z);
@@ -554,6 +555,7 @@
       const d = snapV((x - drag.f0[0]) * drag.n[0] + (z - drag.f0[1]) * drag.n[1]);
       e.pts[drag.i] = [drag.a0[0] + drag.n[0] * d, Math.max(0, drag.a0[1] + drag.n[1] * d)];
       e.pts[drag.j] = [drag.b0[0] + drag.n[0] * d, Math.max(0, drag.b0[1] + drag.n[1] * d)];
+      drag.riders.forEach(r => { r.o.x = r.x + drag.n[0] * d; r.o.z = r.z + drag.n[1] * d; });
     }
     if (drag.kind === 'vertex') { e.pts[drag.i] = [snapV(x), Math.max(0, snapV(z))]; }
     if (drag.kind === 'box') { e.w = Math.max(6, Math.round(x - drag.x0)); e.x = drag.x0 + e.w / 2; e.d = Math.max(4, Math.round(z - e.z)); }
@@ -727,7 +729,12 @@
       const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
       if (inp.dataset.k === 'dw' || inp.dataset.k === 'dd') {     // stretch the deck: house side and left side stay put
         const i = inp.dataset.k === 'dw' ? 0 : 1, vs = e.pts.map(q => q[i]), lo = Math.min(...vs), span = Math.max(...vs) - lo;
-        if (v >= 3 && span > 0) e.pts = e.pts.map(q => { const r = [...q]; r[i] = snapV(lo + (q[i] - lo) * v / span, 0.25); return r; });
+        if (v >= 3 && span > 0) {
+          const riders = S.els.filter(o => o.type === 'stairs' && o.of == null && edges(e.pts).some(([a, b]) => projSeg(o.x, o.z, a, b).d < 0.35));
+          const k = (t) => lo + (t - lo) * v / span;
+          e.pts = e.pts.map(q => { const r = [...q]; r[i] = snapV(k(q[i]), 0.25); return r; });
+          riders.forEach(o => { if (i === 0) o.x = k(o.x); else o.z = k(o.z); });
+        }
       } else if (inp.dataset.k === 'rot') { e.rot = ((v % 360) + 540) % 360 - 180; if (e.type === 'stairs') e.manual = true; } else e[inp.dataset.k] = v;
       commit(); changed();
     }));
