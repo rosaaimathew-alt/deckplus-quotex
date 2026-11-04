@@ -96,9 +96,14 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
   return { done, failed, total: jobs.length, stats }
 }
 
-// Tracked jobs the county site has never been read for (e.g. just imported).
+// Tracked jobs the county site has never been read for (e.g. just imported),
+// or whose last read failed on the site's end (slow or down) before we had any
+// result — tried again on the next 10-minute tick instead of the next 8 AM / 1 PM.
 export function uncheckedJobIds() {
-  return useStore.getState().proposals.filter(p => isJob(p) && permitTracked(p) && countyConnected(p) && !p.countyPermit).map(p => p.id)
+  return useStore.getState().proposals
+    .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
+    .filter(p => !p.countyPermit || (p.countyPermit.siteError && !p.countyPermit.permits?.length))
+    .map(p => p.id)
 }
 
 // The scheduled run (and "Check county now", with force). The run is marked
