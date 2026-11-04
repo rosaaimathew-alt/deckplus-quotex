@@ -107,6 +107,7 @@
     <h1>Design Editor</h1>
     <span class="proj" id="proj"></span>
     <div class="sheetg"><select id="sheet" aria-label="Design sheet"><option value="auto">Sheet: auto</option><option value="s11">11×17</option><option value="s24">18×24</option></select>
+      <button type="button" class="ghost-btn" id="b-reset" hidden title="Rebuild the drawing from the proposal (undo brings it back)">Reset to proposal</button>
       <button type="button" class="ghost-btn" id="b-print">Print plan</button><button type="button" class="ghost-btn" id="b-svg">Export SVG</button></div>
     <div class="saveg"><span class="save-status" id="save-status" role="status"></span><button type="button" class="save-btn" id="b-save" disabled>Save to proposal</button></div>
   </header>
@@ -308,6 +309,10 @@
     return best;
   }
   function stairInfo(e) {
+    if (e.of != null) {             // a porch's steps or a raised patio's block steps (built by the 3D engine)
+      const o = byId(e.of), top = o ? elH(o) : 3, n = Math.max(1, e.n || Math.ceil(top / RISE_MAX)), len = (n - 1) * (e.run || RUN);
+      return { host: o ? { el: o } : null, top, bottom: 0, n, rise: top / n, len, foot: null };
+    }
     const host = edgeHost(e), top = host ? elH(host.el) : 3;
     const dx = Math.sin(rad(e.rot)), dz = Math.cos(rad(e.rot));
     // For each lower deck/landing, work out where a stair reaching its height would end;
@@ -321,6 +326,15 @@
     });
     const n = Math.max(1, Math.ceil((top - bottom) / RISE_MAX)), len = (n - 1) * RUN;
     return { host, top, bottom, n, rise: (top - bottom) / n, len, foot };
+  }
+  // Keep one steps piece per porch on a deck floor and per raised patio, unless it was deleted.
+  const wantsSteps = (o) => o.steps !== false && ((o.type === 'porch' && o.floor === 'deck') || (o.type === 'patio' && Number(o.wallH) > 0));
+  function syncAttached() {
+    S.els = S.els.filter(e => e.of == null || (byId(e.of) && wantsSteps(byId(e.of))));
+    S.els.filter(wantsSteps).forEach(o => {
+      if (S.els.some(e => e.of === o.id)) return;
+      S.els.push({ id: nextId++, type: 'stairs', of: o.id, x: o.x, z: (o.type === 'porch' && o.tie !== 'free' ? 0 : o.z) + o.d, rot: 0, w: o.type === 'patio' ? 5 : 4 });
+    });
   }
   function stairFootprint(e) {
     const info = stairInfo(e), c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), hw = e.w / 2, L = Math.max(info.len, 0.6);
@@ -342,7 +356,7 @@
 
   // ═══ History ═════════════════════════════════════════════════════════════
   const hist = [], fut = [];
-  const snap = () => JSON.stringify({ els: S.els, color: S.color, build: S.build, nextId });
+  const snap = () => JSON.stringify({ v: 2, els: S.els, color: S.color, build: S.build, nextId });
   let lastSaved = snap();
   let onChange = () => {};        // set once the saved design has loaded (see Save to the proposal)
   function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); onChange(); }
@@ -446,7 +460,8 @@
       el('polygon', { points: ptsAttr(pts), fill: 'none', stroke: '#2c6a4d', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}`, 'pointer-events': 'none' });
       if (e.type === 'deck') {
         e.pts.forEach((p, i) => el('rect', { x: p[0] - hs / 2, y: p[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2, 'data-h': `v${i}`, style: 'cursor:crosshair' }));
-        edges(e.pts).forEach(([a, b], i) => el('circle', { cx: (a[0] + b[0]) / 2, cy: (a[1] + b[1]) / 2, r: hs * 0.38, fill: '#2c6a4d', 'data-h': `m${i}`, style: 'cursor:copy' }));
+        edges(e.pts).forEach(([a, b], i) => { const vert = Math.abs(b[0] - a[0]) < Math.abs(b[1] - a[1]);
+          el('rect', { x: (a[0] + b[0]) / 2 - hs * (vert ? 0.35 : 0.9), y: (a[1] + b[1]) / 2 - hs * (vert ? 0.9 : 0.35), width: hs * (vert ? 0.7 : 1.8), height: hs * (vert ? 1.8 : 0.7), rx: hs * 0.3, fill: '#2c6a4d', stroke: '#fff', 'stroke-width': P, 'data-h': `m${i}`, style: `cursor:${vert ? 'ew' : 'ns'}-resize` }); });
       }
       if (e.type === 'landing') {
         const [, b, c2] = rectPts(e);
@@ -457,7 +472,7 @@
       }
       // rotation handle: beyond the element in its facing direction
       const [cx, cz] = e.type === 'stairs' ? [e.x, e.z] : centroid(pts);
-      if (e.type !== 'porch' && e.type !== 'patio') {
+      if (e.type !== 'porch' && e.type !== 'patio' && e.of == null) {
       const ang = e.type === 'deck' ? 180 : (e.rot || 0), reach = e.type === 'stairs' ? -2.2 : Math.max(...pts.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + 1.6;
       const hx = cx + Math.sin(rad(ang)) * reach, hz = cz + Math.cos(rad(ang)) * reach;
       el('line', { x1: cx, y1: cz, x2: hx, y2: hz, stroke: '#2c6a4d', 'stroke-width': P * 1.2, 'pointer-events': 'none' });
@@ -507,7 +522,11 @@
       else if (h === 'size') drag = { kind: 'size', e };
       else if (h === 'box') drag = { kind: 'box', e, x0: e.x - e.w / 2 };
       else if (h[0] === 'v') drag = { kind: 'vertex', e, i: +h.slice(1) };
-      else if (h[0] === 'm') { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, [snapV((a[0] + b[0]) / 2), snapV((a[1] + b[1]) / 2)]); drag = { kind: 'vertex', e, i: i + 1 }; }
+      else if (h[0] === 'm' && ev.altKey) { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, [snapV((a[0] + b[0]) / 2), snapV((a[1] + b[1]) / 2)]); drag = { kind: 'vertex', e, i: i + 1 }; }
+      else if (h[0] === 'm') {
+        const i = +h.slice(1), j = (i + 1) % e.pts.length, a = e.pts[i], b = e.pts[j], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        drag = { kind: 'edge', e, i, j, a0: [...a], b0: [...b], n: [-(b[1] - a[1]) / L, (b[0] - a[0]) / L], f0: [x, z] };
+      }
     } else {
       const hit = spaceDown ? null : hitElement(x, z);
       if (hit && ev.altKey) {                         // Alt/Option-drag: drag a copy, leave the original
@@ -529,7 +548,12 @@
       else if (e.type === 'landing') { e.x = snapV(o.x + dx); e.z = snapV(o.z + dz); }
       else if (e.type === 'porch') { e.x = snapV(o.x + dx); e.z = e.tie === 'free' ? Math.max(2, snapV(o.z + dz)) : 0; }
       else if (e.type === 'patio') { e.x = snapV(o.x + dx); e.z = Math.max(0, snapV(o.z + dz)); }
-      else { e.x = o.x + dx; e.z = o.z + dz; snapStairs(e); }
+      else if (e.of == null) { e.x = o.x + dx; e.z = o.z + dz; snapStairs(e); }
+    }
+    if (drag.kind === 'edge') {
+      const d = snapV((x - drag.f0[0]) * drag.n[0] + (z - drag.f0[1]) * drag.n[1]);
+      e.pts[drag.i] = [drag.a0[0] + drag.n[0] * d, Math.max(0, drag.a0[1] + drag.n[1] * d)];
+      e.pts[drag.j] = [drag.b0[0] + drag.n[0] * d, Math.max(0, drag.b0[1] + drag.n[1] * d)];
     }
     if (drag.kind === 'vertex') { e.pts[drag.i] = [snapV(x), Math.max(0, snapV(z))]; }
     if (drag.kind === 'box') { e.w = Math.max(6, Math.round(x - drag.x0)); e.x = drag.x0 + e.w / 2; e.d = Math.max(4, Math.round(z - e.z)); }
@@ -583,7 +607,11 @@
     S.els.push(e); sel = e.id; setTool('select'); commit(); changed();
   }));
   function copySel() { const e = byId(sel); if (!e) return; const c = JSON.parse(JSON.stringify(e)); c.id = nextId++; if (c.pts) c.pts = c.pts.map(p => [p[0] + 2, p[1] + 2]); else { c.x += 2; c.z += 2; } S.els.push(c); sel = c.id; commit(); changed(); }
-  function delSel() { if (!sel) return; S.els = S.els.filter(e => e.id !== sel); sel = null; commit(); changed(); }
+  function delSel() {
+    if (!sel) return; const e = byId(sel);
+    if (e?.of != null && byId(e.of)) byId(e.of).steps = false;          // deleting a porch's steps: the porch keeps none
+    S.els = S.els.filter(x => x.id !== sel && x.of !== sel); sel = null; commit(); changed();
+  }
   function rotSel(d) { const e = byId(sel); if (!e) return; rotateBy(e, d, { c: e.type === 'stairs' ? [e.x, e.z] : centroid(polyOf(e)), pts0: e.pts, rot0: e.rot || 0 }); commit(); changed(); }
   $('b-copy').addEventListener('click', copySel); $('b-del').addEventListener('click', delSel);
   $('b-rotl').addEventListener('click', () => rotSel(-15)); $('b-rotr').addEventListener('click', () => rotSel(15));
@@ -661,14 +689,19 @@
         + num('wallH', 'Wall height', e.wallH, 0.5, 8)
         + (e.roof === 'shed' && !free ? pick('sideGable', 'Above side headers', [['open', e.ptype === 'screen' ? 'Screen' : e.ptype === 'open' ? 'Open' : 'Glass'], ['closed', 'Closed']], e.sideGable) : '')
         + (gab ? pick('gableEnd', 'Gable end', [['glass', 'Glass'], ...(e.ptype === 'screen' ? [['screen', 'Screen']] : []), ['siding', 'Siding']], e.gableEnd || (e.ptype === 'screen' ? 'screen' : e.ptype === 'open' ? 'siding' : 'glass')) : '')
+        + (e.floor === 'deck' ? pick('steps', 'Steps at the door', [['1', 'Yes'], ['', 'None']], e.steps === false ? '' : '1') : '')
         + (free ? num('z', 'From house', e.z, 0.5, 2) : '');
     } else if (e.type === 'patio') {
-      h = `<b>Patio</b>${pick('mat', 'Surface', [['pavers', 'Pavers (Techo Bloc)'], ['concrete', 'Concrete 4″']], e.mat)}${num('w', 'Width', e.w, 1, 4)}${num('d', 'Depth', e.d, 1, 4)}${num('wallH', 'Retaining wall height', e.wallH, 0.5, 0)}${Number(e.wallH) > 0 ? num('wallLen', 'Wall length (0 = all edges)', e.wallLen, 1, 0) : ''}`;
+      h = `<b>Patio</b>${pick('mat', 'Surface', [['pavers', 'Pavers (Techo Bloc)'], ['concrete', 'Concrete 4″']], e.mat)}${num('w', 'Width', e.w, 1, 4)}${num('d', 'Depth', e.d, 1, 4)}${num('wallH', 'Retaining wall height', e.wallH, 0.5, 0)}${Number(e.wallH) > 0 ? num('wallLen', 'Wall length (0 = all edges)', e.wallLen, 1, 0) + pick('steps', 'Block steps', [['1', 'Yes'], ['', 'None']], e.steps === false ? '' : '1') : ''}`;
     } else if (e.type === 'deck') {
       const pts = e.pts, area = Math.abs(pts.reduce((a, q, i) => { const r = pts[(i + 1) % pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2);
-      h = `<b>Deck</b>${num('h', 'Height (ft)', e.h, 0.25)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`;
+      const xs = pts.map(q => q[0]), zs = pts.map(q => q[1]);
+      h = `<b>Deck</b>${num('h', 'Height (ft)', e.h, 0.25)}${num('dw', 'Width', Math.max(...xs) - Math.min(...xs), 0.5, 3)}${num('dd', 'Depth', Math.max(...zs) - Math.min(...zs), 0.5, 3)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`;
     } else if (e.type === 'landing') {
       h = `<b>Landing</b>${num('h', 'Height (ft)', e.h, 0.25)}${num('w', 'Width', e.w, 0.5, 3)}${num('d', 'Depth', e.d, 0.5, 3)}${num('rot', 'Angle°', e.rot, 1, -180)}`;
+    } else if (e.of != null) {
+      const i = stairInfo(e), o = byId(e.of);
+      h = `<b>${o?.type === 'patio' ? 'Patio block steps' : 'Porch steps'}</b>${o?.type === 'porch' ? pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '') : ''}<label>Steps<span class="ro">${i.n - 1} treads · from ${fmt(i.top)}</span></label><span class="ro" style="align-self:center">Sits at the ${o?.type === 'patio' ? 'patio front' : 'porch door'} · Delete removes it</span>`;
     } else {
       const i = stairInfo(e);
       h = `<b>Stairs</b>${num('rot', 'Angle°', e.rot, 1, -180)}${num('w', 'Width', e.w, 0.5, 3)}${pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '')}<label>From → to<span class="ro">${fmt(i.top)} → ${i.foot ? 'landing ' + fmt(i.bottom) : 'grade'}</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label>${e.manual ? '<button type="button" id="b-square">Square to edge</button>' : ''}`;
@@ -680,6 +713,7 @@
         const bk = k.slice(2); S.build[bk] = v;
         if (bk === 'decking') { const l = OPTS.lines.find(x => x.key === v); S.build.color = l?.colors[0]?.key || v; }
       } else if (k === 'boxed') e.boxed = !!v;
+      else if (k === 'steps') e.steps = !!v;
       else {
         e[k] = v;
         if (e.type === 'porch') {
@@ -691,7 +725,10 @@
     }));
     p.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
       const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
-      if (inp.dataset.k === 'rot') { e.rot = ((v % 360) + 540) % 360 - 180; if (e.type === 'stairs') e.manual = true; } else e[inp.dataset.k] = v;
+      if (inp.dataset.k === 'dw' || inp.dataset.k === 'dd') {     // stretch the deck: house side and left side stay put
+        const i = inp.dataset.k === 'dw' ? 0 : 1, vs = e.pts.map(q => q[i]), lo = Math.min(...vs), span = Math.max(...vs) - lo;
+        if (v >= 3 && span > 0) e.pts = e.pts.map(q => { const r = [...q]; r[i] = snapV(lo + (q[i] - lo) * v / span, 0.25); return r; });
+      } else if (inp.dataset.k === 'rot') { e.rot = ((v % 360) + 540) % 360 - 180; if (e.type === 'stairs') e.manual = true; } else e[inp.dataset.k] = v;
       commit(); changed();
     }));
     $('b-square')?.addEventListener('click', () => { e.manual = false; snapStairs(e); commit(); changed(); });
@@ -713,7 +750,7 @@
     const plats = [], stairs = [];
     const stairCuts = (a, b) => {
       const cuts = [];
-      S.els.filter(x => x.type === 'stairs').forEach(st => {
+      S.els.filter(x => x.type === 'stairs' && x.of == null).forEach(st => {
         const p = projSeg(st.x, st.z, a, b); if (p.d < .35) cuts.push([p.t * p.len - st.w / 2 + .1, p.t * p.len + st.w / 2 - .1]);
         const i = stairInfo(st); if (i.foot) { const fx = st.x + Math.sin(rad(st.rot)) * i.len, fz = st.z + Math.cos(rad(st.rot)) * i.len, q = projSeg(fx, fz, a, b); if (q.d < 1.6) cuts.push([q.t * q.len - st.w / 2 - .4, q.t * q.len + st.w / 2 + .4]); }
       });
@@ -742,11 +779,11 @@
       });
       plats.push({ pts, h, edges: eds, posts, houseSpan });
     });
-    S.els.filter(e => e.type === 'stairs').forEach(e => { const i = stairInfo(e); stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
+    S.els.filter(e => e.type === 'stairs' && e.of == null).forEach(e => { const i = stairInfo(e); stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
     const sections = [];
     S.els.forEach(e => {
-      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd });
-      if (e.type === 'patio') sections.push({ id: e.id, kind: 'patio', x: e.x, z: e.z, w: e.w, d: e.d, mat: e.mat, wallH: Number(e.wallH) || 0, wallLen: Number(e.wallLen) || 0 });
+      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
+      if (e.type === 'patio') sections.push({ id: e.id, kind: 'patio', x: e.x, z: e.z, w: e.w, d: e.d, mat: e.mat, wallH: Number(e.wallH) || 0, wallLen: Number(e.wallLen) || 0, steps: e.steps !== false });
     });
     const porchOnDeck = S.els.find(e => e.type === 'porch' && e.floor === 'deck');
     const H = porchOnDeck ? porchOnDeck.h : Math.max(3, ...plats.filter(q => q.houseSpan).map(q => q.h));
@@ -770,6 +807,14 @@
       if (!S.build.color) { const l = OPTS.lines.find(x => x.key === S.build.decking); S.build.color = l?.colors[0]?.key || 'enhance-toasted-sand'; }
       renderProps(); send3D(true);
     });
+    // Where the 3D engine put each porch's steps and each patio's block steps
+    window.addEventListener('message', (ev) => {
+      if (ev.source !== frame.contentWindow || ev.data?.type !== 'qx-attached') return;
+      let moved = false;
+      (ev.data.list || []).forEach(a => { const st = S.els.find(e => e.of === a.id); if (!st) return;
+        ['x', 'z', 'rot', 'w', 'n', 'run'].forEach(k => { if (Math.abs((st[k] ?? 1e9) - a[k]) > 1e-3) { st[k] = a[k]; moved = true; } }); });
+      if (moved) { lastSaved = snap(); drawPlan(); }
+    });
     // Floor plan on the design sheet, drawn from this same design
     window.addEventListener('message', (ev) => {
       if (ev.source !== frame.contentWindow || ev.data?.type !== 'qx-plan') return;
@@ -784,12 +829,16 @@
     });
     const askPlan = (action) => { clearTimeout(sendT); if (!frame?.contentWindow || !OPTS) return; frame.contentWindow.postMessage(renderModel(), '*'); frame.contentWindow.postMessage({ type: 'qx-plan-request', sheet: $('sheet').value, action }, '*'); };
     $('b-print').addEventListener('click', () => askPlan('print'));
+    if (DESIGN) { $('b-reset').hidden = false; $('b-reset').addEventListener('click', () => {
+      const els = layoutFrom(DESIGN); if (!els.length) return;
+      S.els = els; nextId = Math.max(...els.map(e => e.id)) + 1; sel = null; commit(); changed(); send3D(true); fitPlan();
+    }); }
     $('b-svg').addEventListener('click', () => askPlan('svg'));
   }
   const frame3D = () => send3D(true);
 
   // ═══ Glue ════════════════════════════════════════════════════════════════
-  function changed(full = true) { drawPlan(); renderProps(); refreshButtons(); send3D(); }
+  function changed(full = true) { syncAttached(); drawPlan(); renderProps(); refreshButtons(); send3D(); }
   new ResizeObserver(() => drawPlan()).observe(svg);
   // Zoom the plan to the whole project (plus a strip of the house)
   function fitPlan() {
@@ -825,7 +874,8 @@
   else {
     setStatus('Loading…');
     store.load(PID).then(saved => {
-      if (saved && Array.isArray(saved.els) && saved.els.length) {
+      const proposalHasMore = DESIGN && ((DESIGN.porches || []).length || (DESIGN.patios || []).length);
+      if (saved && Array.isArray(saved.els) && saved.els.length && (saved.v >= 2 || !proposalHasMore)) {
         restore(JSON.stringify(saved)); hist.length = 0; fut.length = 0; sel = null;
         if (!saved.build && saved.color) { if (OPTS) Object.assign(S.build, legacyBuild(saved.color)); else S.pendingLegacy = saved.color; }
         changed(); refreshButtons(); frame3D(); fitPlan();
