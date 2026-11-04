@@ -25,7 +25,11 @@ export function designParts(lines = []) {
       continue
     }
     const patio = l.builder?.tool === 'hardscape' ? st?.inp?.patio : null
-    if (patio && n(patio.width) > 0 && n(patio.depth) > 0) {
+    // Irregular patios are priced on total SF (sizeMode 'sf'); draw them as a square of that area.
+    if (patio?.sizeMode === 'sf' && n(patio.areaSF) > 0) {
+      const side = Math.max(4, Math.round(Math.sqrt(n(patio.areaSF))))
+      patios.push({ name: l.name || '', width: side, depth: side, surface: patio.surface || '', irregular: true })
+    } else if (patio && n(patio.width) > 0 && n(patio.depth) > 0) {
       patios.push({ name: l.name || '', width: n(patio.width), depth: n(patio.depth), surface: patio.surface || '' })
     }
   }
