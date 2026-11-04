@@ -5,7 +5,7 @@
 // at 8 AM and 1 PM (and right away for jobs never checked), or by "Check county now".
 import { useStore } from '../store'
 import { getStages } from '../pages/Jobs'
-import { permitTracked, countyPassedStages, pulseDue } from './permitTracking'
+import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty } from './permitTracking'
 import { isJob } from './attention'
 import { countyOf, gradeRun, sendConnectionAlert } from './permitHealth'
 
@@ -35,7 +35,7 @@ function withNotes(result, prev) {
 export async function runPermitPulse({ ids, onProgress } = {}) {
   const { proposals, setCountyPermit } = useStore.getState()
   const jobs = proposals
-    .filter(p => isJob(p) && permitTracked(p))
+    .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
     .filter(p => !ids || ids.includes(p.id))
   let done = 0, failed = 0, lastError = null
   // Per county: jobs whose county site was read, and jobs where it wasn't
@@ -56,8 +56,9 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
             id: p.id,
             address: p.address,
             client: p.client,
+            county: jobCounty(p),
             pick: p.jobData?.countyPick || null,
-            record: (String(p.imported?.permit || '').match(/[A-Z]{2,5}-[A-Z]{2,5}-\d{2}-\d{4,7}/i) || [])[0] || '',
+            record: (String(p.imported?.permit || '').toUpperCase().match(/\b[A-Z]{1,5}-?(?:[A-Z]{2,5}-)?\d{2,4}-\d{3,7}\b/) || [])[0] || '',
             knownNotes: Object.keys(knownNotes(p.countyPermit)),
           })),
         }),
@@ -96,7 +97,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
 
 // Tracked jobs the county site has never been read for (e.g. just imported).
 export function uncheckedJobIds() {
-  return useStore.getState().proposals.filter(p => isJob(p) && permitTracked(p) && !p.countyPermit).map(p => p.id)
+  return useStore.getState().proposals.filter(p => isJob(p) && permitTracked(p) && countyConnected(p) && !p.countyPermit).map(p => p.id)
 }
 
 // The scheduled run (and "Check county now", with force). The run is marked

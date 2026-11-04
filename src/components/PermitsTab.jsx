@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store'
 import {
   PERMIT_KEYS, isInspectionKey, today, daysUntil, INSPECTION_TYPES, inspectionLabel,
-  countyByStage, countyPassed, countyLast, isFailResult, isPassResult,
+  countyByStage, countyPassed, countyLast, isFailResult, isPassResult, jobCounty, jobJurisdiction, countyConnected,
 } from '../lib/permitTracking'
 import { runPermitPulse } from '../lib/permitPulse'
 import { DEMO } from '../demo'
@@ -23,7 +23,10 @@ const RESULT_STYLE = {
 const fmtDate = d => d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 const fmtWhen = iso => iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
 const resultStyle = r => RESULT_STYLE[r] || (isPassResult(r) ? RESULT_STYLE.Passed : isFailResult(r) ? RESULT_STYLE.Failed : RESULT_STYLE.Cancelled)
-const CountyTag = () => <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--brand-600)] bg-[var(--brand-50,#f5efe6)] px-1.5 py-0.5 rounded">County</span>
+// "County" for what the county site posted, "Office" for a result recorded by hand
+const CountyTag = ({ office }) => office
+  ? <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded">Office</span>
+  : <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--brand-600)] bg-[var(--brand-50,#f5efe6)] px-1.5 py-0.5 rounded">County</span>
 
 function permitStatus(permit = {}) {
   if (permit.approved) return { label: 'Approved', cls: 'bg-green-100 text-green-700' }
@@ -164,7 +167,7 @@ function InspectionCard({ proposal, stage, readOnly, county = [] }) {
           {county.map(c => (
             <div key={`${c.record}-${c.id}`} className="text-sm bg-gray-50 rounded-lg px-3 py-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <CountyTag />
+                <CountyTag office={c.role === 'office'} />
                 <span className="text-xs font-semibold text-gray-700">{fmtDate(c.date)}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${resultStyle(c.result)}`}>{c.result}</span>
                 <span className="text-xs text-gray-500">{c.code} - {c.name}</span>
@@ -257,10 +260,10 @@ function CountyPanel({ proposal, readOnly }) {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <ShieldCheck size={14} className="text-gray-400" />
-          <span className="text-sm font-semibold text-gray-800">Mecklenburg County permit</span>
+          <span className="text-sm font-semibold text-gray-800">{jobJurisdiction(proposal) || jobCounty(proposal) || 'County'}{jobJurisdiction(proposal) ? '' : ' County'} permit</span>
           {cp?.checkedAt && <span className="text-xs text-gray-400">checked {fmtWhen(cp.checkedAt)}</span>}
         </div>
-        {!readOnly && !DEMO && (
+        {!readOnly && !DEMO && countyConnected(proposal) && (
           <button onClick={check} disabled={busy}
             className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50">
             {busy ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />} {busy ? 'Checking…' : 'Check county now'}
@@ -268,7 +271,9 @@ function CountyPanel({ proposal, readOnly }) {
         )}
       </div>
 
-      {!cp && <p className="text-xs text-gray-400 italic">Not checked yet. The county site is read every morning and afternoon.</p>}
+      {!countyConnected(proposal)
+        ? <p className="text-xs text-amber-700">This {jobJurisdiction(proposal) ? 'city' : 'county'}'s permit site isn't connected yet. Record inspection results by hand below.</p>
+        : !cp && <p className="text-xs text-gray-400 italic">Not checked yet. The county site is read at 8 AM and 1 PM.</p>}
       {(err || cp?.error) && (
         <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 flex items-start gap-1.5">
           <AlertTriangle size={12} className="mt-0.5 shrink-0" /> {err || cp.error}
@@ -389,11 +394,11 @@ export default function PermitsTab({ proposal, stages, readOnly }) {
       )}
       {county.other.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Other county inspections</p>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Other inspections</p>
           {county.other.map(c => (
             <div key={`${c.record}-${c.id}`} className="text-sm bg-gray-50 rounded-lg px-3 py-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <CountyTag />
+                <CountyTag office={c.role === 'office'} />
                 <span className="text-xs font-semibold text-gray-700">{fmtDate(c.date)}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${resultStyle(c.result)}`}>{c.result}</span>
                 <span className="text-xs text-gray-500">{c.code} - {c.name}</span>

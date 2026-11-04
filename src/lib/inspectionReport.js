@@ -2,7 +2,7 @@
 // A printable page for the weekly job-progress meeting: every ongoing
 // Mecklenburg job, grouped by PM, with where each inspection stands, what
 // happened in the past 7 days, what's next, and only the latest note on file.
-import { BOARD_COLUMNS, boardCells, inspectionLabel } from './permitTracking'
+import { BOARD_COLUMNS, boardCells, inspectionLabel, allPermits, jobCounty } from './permitTracking'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -21,7 +21,7 @@ const noteTime = (at, fallback) => {
 export function lastNote(proposal) {
   let best = null
   const consider = (n) => { if (n.text && (!best || n.t > best.t)) best = n }
-  for (const p of proposal.countyPermit?.permits || []) {
+  for (const p of allPermits(proposal)) {
     for (const ins of p.completed || []) {
       for (const n of ins.notes || []) {
         consider({ t: noteTime(n.at, ins.date), date: ins.date, by: n.by || ins.inspector, what: `${ins.code} - ${ins.name}`, result: ins.result, text: n.text })
@@ -39,7 +39,7 @@ export function lastNote(proposal) {
 // Inspections resulted or scheduled between from and to (ISO dates, inclusive).
 function activity(proposal, from, to) {
   const out = []
-  for (const p of proposal.countyPermit?.permits || []) {
+  for (const p of allPermits(proposal)) {
     for (const ins of p.completed || []) if (ins.date >= from && ins.date <= to) out.push({ ...ins, kind: 'done' })
   }
   return out.sort((a, b) => a.date.localeCompare(b.date))
@@ -64,6 +64,8 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
     return { p, type, pm: pm || 'not assigned', building, cells, week, failed, next: nextUp(p), note: lastNote(p) }
   }).sort((a, b) => a.pm.localeCompare(b.pm) || String(a.p.client).localeCompare(String(b.p.client)))
 
+  const countyNames = [...new Set(rows.map(r => jobCounty(r.p)).filter(Boolean))].sort()
+  const counties = countyNames.length === 1 ? `${countyNames[0]} County` : countyNames.length ? `${countyNames.join(', ')} counties` : ''
   const allWeek = rows.flatMap(r => r.week)
   const passed = allWeek.filter(i => /^pass/i.test(i.result)).length
   const failedWk = allWeek.filter(i => /fail|partial|inaccessible/i.test(i.result)).length
@@ -90,7 +92,7 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
       <td class="job">
         <b>${esc(r.p.client)}</b>${r.failed ? ' <span class="flag">FAILED</span>' : ''}
         ${r.type ? `<div class="type">${esc(r.type)}</div>` : ''}
-        <div class="sub">${esc(r.p.address)}</div>
+        <div class="sub">${esc(r.p.address)}${jobCounty(r.p) ? ` · ${esc(jobCounty(r.p))}${r.p.imported?.jurisdiction ? ` (${esc(r.p.imported.jurisdiction)})` : ''}` : ''}</div>
         <div class="sub"><span class="mono">${esc(r.building?.record || r.p.imported?.permit || '')}</span>${r.building?.recordStatus ? ` · ${esc(r.building.recordStatus)}` : ''}</div>
       </td>
       <td class="ins">${chips(r)}</td>
@@ -140,7 +142,7 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
   <div class="head">
     <div>
       <h1>Weekly inspection report</h1>
-      <div>${esc(company)}${company ? ' · ' : ''}Mecklenburg County · ${long(from)} – ${long(to)}</div>
+      <div>${esc(company)}${company ? ' · ' : ''}${esc(counties)} · ${long(from)} – ${long(to)}</div>
     </div>
     <div class="muted">Printed ${now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
   </div>

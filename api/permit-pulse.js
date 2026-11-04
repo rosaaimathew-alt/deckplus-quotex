@@ -21,14 +21,21 @@ import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
 import { requireAuth, staffRole } from './_auth.js'
 import { sendPermitAlert } from './_permit-alert.js'
-import { searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, RECORD_RE } from './_accela.js'
+import { SITES, searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, RECORD_RE } from './_accela.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
 const MAX_JOBS = 8          // per request; the app sends the rest in further requests
 const MAX_NEW_NOTES = 12    // "View Details" pages read per job per pulse
-const BUILDING_RE = /^RES-(ADD|ALT|NEW|ACC|DEM)-/i
-const TRADE_RE = /^RES-(ELC|MEC|PLM)-/i
+
+// Connected counties: which site to read, how it numbers building and trade
+// (electrical / mechanical / plumbing) permits, and whether its "project
+// name" is the client (Mecklenburg) or the contractor (Cabarrus) — in which
+// case only the address picks the permit.
+export const COUNTIES = {
+  Mecklenburg: { site: SITES.Mecklenburg, building: /^RES-(ADD|ALT|NEW|ACC|DEM)-/i, trade: /^RES-(ELC|MEC|PLM)-/i, byName: true },
+  Cabarrus:    { site: SITES.Cabarrus,    building: /^BU\d/i,                      trade: /^(EL|ME|MC|PL)\d/i,   byName: false },
+}
 
 // ── Address ──────────────────────────────────────────────────────────────────
 const SUFFIXES = new Set(('dr drive ln lane rd road ct court st street ave avenue blvd boulevard pl place way wy cir circle ' +
@@ -75,26 +82,30 @@ function sameClient(ourClient, projectName) {
   return true
 }
 
-const summary = (r) => ({
+const summary = (r, site) => ({
   record: r.record, type: r.type, description: r.description, projectName: r.projectName,
-  address: r.address, status: r.status, date: r.date, capIds: r.capIds, url: recordUrl(r.capIds),
+  address: r.address, status: r.status, date: r.date, capIds: r.capIds, url: recordUrl(r.capIds, site),
 })
 
 // ── One job ──────────────────────────────────────────────────────────────────
 export async function checkJob(job) {
+  const rule = COUNTIES[job.county || 'Mecklenburg']
+  if (!rule) return { unsupported: true, error: `${job.county || 'This county'}'s permit site isn't connected yet. Record its results by hand.` }
+  const { site } = rule
+  const sum = (r) => summary(r, site)
   const addr = parseAddress(job.address)
   if (!addr.number || !addr.name) return { error: 'The job has no street address to search the county by.' }
 
-  let rows = await searchByAddress(addr.number, addr.name)
-  if (!rows.length && addr.name.includes(' ')) rows = await searchByAddress(addr.number, addr.name.split(' ')[0])
+  let rows = await searchByAddress(addr.number, addr.name, site)
+  if (!rows.length && addr.name.includes(' ')) rows = await searchByAddress(addr.number, addr.name.split(' ')[0], site)
   rows = rows.filter(r => sameAddress(addr, r.address))
-  const building = rows.filter(r => BUILDING_RE.test(r.record))
+  const building = rows.filter(r => rule.building.test(r.record))
 
   // A permit # the office typed in: used only if it's for this same house
   // number, so it can never land on another customer's permit.
   if (!job.pick && job.record) {
-    const [hit] = await searchByRecord(job.record)
-    if (hit && parseAddress(hit.address).number === addr.number && BUILDING_RE.test(hit.record)) {
+    const [hit] = await searchByRecord(job.record, site)
+    if (hit && parseAddress(hit.address).number === addr.number && rule.building.test(hit.record)) {
       job.pick = hit.capIds
       if (!rows.some(r => r.record === hit.record)) rows.push(hit)
       if (!building.some(r => r.record === hit.record)) building.push(hit)
@@ -104,26 +115,29 @@ export async function checkJob(job) {
   let main = null
   if (Array.isArray(job.pick) && job.pick.length === 3) {
     main = building.find(r => r.capIds.join('-') === job.pick.join('-')) || null
-    if (!main) return { error: 'The permit picked for this job is no longer listed at its address.', candidates: building.map(summary), needsPick: building.length > 0 }
+    if (!main) return { error: 'The permit picked for this job is no longer listed at its address.', candidates: building.map(sum), needsPick: building.length > 0 }
   } else {
-    const named = building.filter(r => sameClient(job.client, r.projectName))
+    // Where the county's project name is the contractor, the address alone
+    // narrows it down; two open permits at one address still ask the office.
+    const named = rule.byName ? building.filter(r => sameClient(job.client, r.projectName)) : building
     const open = named.filter(r => !/closed|finaled|void|withdrawn|expired|cancel/i.test(r.status))
     const pool = open.length ? open : named
     if (pool.length === 1) main = pool[0]
     else if (!building.length) return { error: 'No building permit found at this address on the county site.' }
-    else return { needsPick: true, candidates: building.map(summary) }
+    else return { needsPick: true, candidates: building.map(sum) }
   }
 
-  // Trade permits filed for the same project: same address (already), same
-  // project name, within 60 days of the building permit.
+  // Trade permits filed for the same project: same address (already), within
+  // 60 days of the building permit, and — where project names are clients —
+  // the same project name.
   const near = (d) => !d || !main.date || Math.abs(new Date(d) - new Date(main.date)) <= 60 * 86400000
-  const trades = rows.filter(r => TRADE_RE.test(r.record) && near(r.date) &&
-    (nameWords(r.projectName).join(' ') === nameWords(main.projectName).join(' ') || r.description === main.description))
+  const trades = rows.filter(r => rule.trade.test(r.record) && near(r.date) && (!rule.byName ||
+    nameWords(r.projectName).join(' ') === nameWords(main.projectName).join(' ') || r.description === main.description))
 
   // The permits side by side, then the notes we don't have yet, a few at a
   // time — the first check of a job reads them all, so this is what's slow.
   const known = new Set((job.knownNotes || []).map(String))
-  const pages = await Promise.all([main, ...trades].map(r => fetchPermit(r.capIds)))
+  const pages = await Promise.all([main, ...trades].map(r => fetchPermit(r.capIds, site)))
   const todo = []
   pages.forEach((p, k) => {
     const r = k === 0 ? main : trades[k - 1]
@@ -131,11 +145,11 @@ export async function checkJob(job) {
   })
   await inBatches(todo.slice(0, MAX_NEW_NOTES), 4, async (t) => {
     if (Date.now() > job.deadline) return   // out of time: the next pulse reads the rest
-    try { t.ins.notes = await fetchInspectionNotes(t.record, t.capIds, t.ins.id) } catch { /* next pulse tries again */ }
+    try { t.ins.notes = await fetchInspectionNotes(t.record, t.capIds, t.ins.id, site) } catch { /* next pulse tries again */ }
   })
   const permits = pages.map((p, k) => {
     const r = k === 0 ? main : trades[k - 1]
-    return { ...summary(r), role: k === 0 ? 'building' : 'trade', recordStatus: p.recordStatus, expires: p.expires, upcoming: p.upcoming, completed: p.completed }
+    return { ...sum(r), role: k === 0 ? 'building' : 'trade', recordStatus: p.recordStatus, expires: p.expires, upcoming: p.upcoming, completed: p.completed }
   })
   return { permits }
 }
@@ -162,6 +176,7 @@ export default async function handler(req, res) {
     id: String(j?.id ?? ''),
     address: String(j?.address || '').slice(0, 200),
     client: String(j?.client || '').slice(0, 120),
+    county: Object.hasOwn(COUNTIES, String(j?.county || '')) ? String(j.county) : (j?.county ? String(j.county).slice(0, 40) : 'Mecklenburg'),
     pick: Array.isArray(j?.pick) ? j.pick.map(String).slice(0, 3) : null,
     record: RECORD_RE.test(String(j?.record || '').trim().toUpperCase()) ? String(j.record).trim().toUpperCase() : '',
     knownNotes: Array.isArray(j?.knownNotes) ? j.knownNotes.slice(0, 500) : [],
