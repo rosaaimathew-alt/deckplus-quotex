@@ -12,6 +12,7 @@ import { nextReminderDate, isJobClosed, isJob } from '../../lib/attention'
 
 import ProposalTracker from '../ProposalTracker'
 import ClientList from '../ClientList'
+import GalleryAdmin from '../GalleryAdmin'
 import Jobs from '../Jobs'
 import InspectionBoard from '../InspectionBoard'
 import { permitTracked, boardCells } from '../../lib/permitTracking'
@@ -57,6 +58,7 @@ export function SalesHub() {
     pipeline:  () => <ProposalTracker view="pipeline" initialStatus={status} />,
     clients:   () => <ClientList initialQuery={q} />,
     opens:     () => <ProposalTracker view="activity" />,
+    gallery:   () => <GalleryAdmin />,
   }, { proposals: { count: dueCount, countTone: 'alert' } })
 
   return <Hub title="Sales" subtitle="Every quote from first draft to signed — and who you sent it to." tabs={tabs} actions={<NewQuoteButton />} rememberKey="sales" />

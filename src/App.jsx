@@ -15,6 +15,7 @@ import SignPage from './pages/SignPage'
 import COSignPage from './pages/COSignPage'
 import ContractViewFull from './pages/ContractViewFull'
 import PublicProposal from './pages/PublicProposal'
+import Gallery from './pages/Gallery'
 import Legal from './pages/Legal'
 import EsignCertificate from './pages/EsignCertificate'
 import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub } from './pages/hubs/Hubs'
@@ -403,6 +404,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/sign/:token" element={<SignBoundary><SignPage /></SignBoundary>} />
         <Route path="/p/:token"    element={<PublicProposal />} />
+        <Route path="/gallery"     element={<Gallery />} />
         <Route path="/legal"       element={<Legal />} />
         <Route path="/legal/:doc"  element={<Legal />} />
         <Route path="/co/:token"   element={<SignBoundary><COSignPage /></SignBoundary>} />

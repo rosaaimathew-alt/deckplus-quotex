@@ -10,7 +10,7 @@ import { useMemo } from 'react'
 import {
   House, Handshake, HardHat, ChartColumn, Package, List, Columns3, Users, Eye,
   ClipboardCheck, FileSignature, CalendarDays, Wrench, TrendingUp, Wallet, Target,
-  Upload, Sparkles, Calculator, Hammer, ShieldCheck,
+  Upload, Sparkles, Calculator, Hammer, ShieldCheck, Images,
 } from 'lucide-react'
 import { useStore } from './store'
 import { canAccessRoute } from './plans'
@@ -27,6 +27,7 @@ export const DESTINATIONS = [
       { key: 'pipeline',  label: 'Pipeline',  icon: Columns3, access: '/tracker', hint: 'Board by status', keywords: 'kanban board stages' },
       { key: 'clients',   label: 'Clients',   icon: Users, access: '/clients', hint: 'One row per customer', keywords: 'customers contacts people' },
       { key: 'opens',     label: 'Opens',     icon: Eye, access: '/tracker', hint: 'When customers open proposals', keywords: 'activity views tracking opened' },
+      { key: 'gallery',   label: 'Gallery',   icon: Images, access: '/gallery', hint: 'Project photos customers search for ideas', keywords: 'portfolio photos inspiration showcase pictures colors catalog' },
     ] },
 
   // Contracts get their own place: sales prepares and sends them, managers and

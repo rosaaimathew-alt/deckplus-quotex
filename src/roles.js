@@ -19,14 +19,14 @@ const ALL = [
   '/', '/clients', '/analyze', '/ai', '/catalog', '/quote', '/analytics',
   '/proposal', '/tracker', '/settings', '/contracts', '/contract',
   '/jobs', '/subs', '/scheduler', '/profitability', '/pipeline', '/finance',
-  '/checklists',
+  '/checklists', '/gallery',
 ]
 
 // Sales: the current app minus the Subcontractors, Profitability & Finance.
 const SALES = ALL.filter(r => r !== '/subs' && r !== '/profitability' && r !== '/finance')
 
 // PM: job-management focus + read-only quote/contract viewing + scheduling.
-const PM = ['/', '/jobs', '/subs', '/scheduler', '/proposal', '/contract', '/contracts', '/settings', '/checklists']
+const PM = ['/', '/jobs', '/subs', '/scheduler', '/proposal', '/contract', '/contracts', '/settings', '/checklists', '/gallery']
 
 export function roleRoutes(role) {
   if (role === 'sales') return new Set(SALES)
