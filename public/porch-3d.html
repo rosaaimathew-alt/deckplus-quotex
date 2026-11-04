@@ -2277,6 +2277,27 @@
     const hs = HS(), STORY = 9.5, stories = hs ? hs.stories : 1, pitch = hs ? hs.roofPitch / 12 : 0.5;
     const HW = Math.max(hs ? Math.round(hs.wallWidthFt * 2) / 2 : 44, Math.ceil((reach + 6) / 2) * 4), HD = hs && Number(hs.depthFt) > 0 ? Math.min(60, Math.max(16, Number(hs.depthFt))) : 28, rz = 0.55, k = Math.hypot(1, pitch);
     const roofStyle = hs?.roofStyle || 'gable-side';
+    // Hip roof over X0..X1 × Z0..Z1 from eave height yb at pitch pp (ridge along the longer side).
+    const hipMesh = (X0, X1, Z0, Z1, yb, pp) => {
+      const alongX = X1 - X0 >= Z1 - Z0, R2 = Math.min(X1 - X0, Z1 - Z0) / 2, yt = yb + R2 * pp, xm = (X0 + X1) / 2, zm = (Z0 + Z1) / 2;
+      const rA = alongX ? [X0 + R2, yt, zm] : [xm, yt, Z0 + R2], rB = alongX ? [X1 - R2, yt, zm] : [xm, yt, Z1 - R2];
+      const c00 = [X0, yb, Z0], c10 = [X1, yb, Z0], c11 = [X1, yb, Z1], c01 = [X0, yb, Z1];
+      const faces = alongX
+        ? [[c01, c11, rB, rA, [1, 0, 0], [0, 0, -1]], [c10, c00, rA, rB, [-1, 0, 0], [0, 0, 1]], [c00, c01, rA, null, [0, 0, 1], [1, 0, 0]], [c11, c10, rB, null, [0, 0, -1], [-1, 0, 0]]]
+        : [[c00, c01, rB, rA, [0, 0, 1], [1, 0, 0]], [c11, c10, rA, rB, [0, 0, -1], [-1, 0, 0]], [c01, c11, rB, null, [1, 0, 0], [0, 0, -1]], [c10, c00, rA, null, [-1, 0, 0], [0, 0, 1]]];
+      const pos = [], uv = [], kk = Math.hypot(1, pp);
+      const uvOf = (q, a, e, n) => [(q[0] - a[0]) * e[0] + (q[2] - a[2]) * e[2], ((q[0] - a[0]) * n[0] + (q[2] - a[2]) * n[2]) * kk];
+      faces.forEach(([a, b, c, d, e, n]) => (d ? [[a, b, c], [a, c, d]] : [[a, b, c]]).forEach(t => t.forEach(q => { pos.push(...q); uv.push(...uvOf(q, a, e, n)); })));
+      const gh = new THREE.BufferGeometry(); gh.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gh.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gh.computeVertexNormals();
+      const hm = new THREE.Mesh(gh, mat('hipShingle', () => { const m = M.shingle().clone(); m.side = THREE.DoubleSide; return m; })); hm.castShadow = hm.receiveShadow = true; G.add(hm);
+      return { yt, rA, rB };
+    };
+    // Wall sections left to right (bump-outs project toward the yard from the main wall at z = 0).
+    const wallWs = hs ? Math.min(HW, hs.wallWidthFt) : HW;
+    const segE = (st) => st >= stories ? E : Math.min(E, FF + 9.3 + (st - 1) * STORY);
+    const SEGS = [];
+    if (hs && Array.isArray(hs.segments)) { let x = hx - wallWs / 2; hs.segments.forEach(g => { const w = Number(g.widthFt) || 0; if (w > 0) SEGS.push({ x0: x, x1: x + w, out: Math.max(0, Number(g.outFt) || 0), st: Math.max(1, Math.min(stories, g.stories || 1)), roof: g.roof || 'shed' }); x += w; }); }
+    const segAt = (x) => SEGS.find(g => g.out > 0.5 && x > g.x0 + 0.2 && x < g.x1 - 0.2);
     let E = FF + 9.3 + (stories - 1) * STORY, matchE = null;
     // A gable, semi-vault or hip porch tied into the house roof sets the house eave, so the
     // gutters, soffits and 1′ overhangs of house, porch and wing all run at one level.
@@ -2319,23 +2340,8 @@
       [-1, 1].forEach(sd => beamXY(1.0, hx, yrx + 0.05, hx + sd * (runX + 0.05), E - 0.52, 0.14, 0.55, M.trim()));   // rake boards on the yard gable
     } else if (roofStyle === 'hip') {
       // Four slopes down to eaves on every side; the ridge runs along the back wall.
-      const o = 1.0, X0 = hx - HW / 2 - o, X1 = hx + HW / 2 + o, Z0 = -HD - o, Z1 = o, yb = E - 0.5 + (rz + 0.05) * k;
-      const half = (Z1 - Z0) / 2, zm = (Z0 + Z1) / 2, R2 = Math.min(half, (X1 - X0) / 2), yt = yb + R2 * pitch;
-      const rA = [X0 + R2, yt, zm], rB = [X1 - R2, yt, zm];
-      const faces = [
-        [[X0, yb, Z1], [X1, yb, Z1], rB, rA, [1, 0, 0], [0, 0, -1]],     // front (yard side)
-        [[X1, yb, Z0], [X0, yb, Z0], rA, rB, [-1, 0, 0], [0, 0, 1]],     // back
-        [[X0, yb, Z0], [X0, yb, Z1], rA, null, [0, 0, 1], [1, 0, 0]],    // left end
-        [[X1, yb, Z1], [X1, yb, Z0], rB, null, [0, 0, -1], [-1, 0, 0]],  // right end
-      ];
-      const pos = [], uv = [], kk = Math.hypot(1, pitch);
-      const uvOf = (p, a, e, n) => [(p[0] - a[0]) * e[0] + (p[2] - a[2]) * e[2], ((p[0] - a[0]) * n[0] + (p[2] - a[2]) * n[2]) * kk];
-      faces.forEach(([a, b, c, d, e, n]) => {
-        const tris = d ? [[a, b, c], [a, c, d]] : [[a, b, c]];
-        tris.forEach(t => t.forEach(p => { pos.push(...p); uv.push(...uvOf(p, a, e, n)); }));
-      });
-      const gh = new THREE.BufferGeometry(); gh.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gh.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); gh.computeVertexNormals();
-      const hm = new THREE.Mesh(gh, mat('hipShingle', () => { const m = M.shingle().clone(); m.side = THREE.DoubleSide; return m; })); hm.castShadow = hm.receiveShadow = true; G.add(hm);
+      const o = 1.0, X0 = hx - HW / 2 - o, X1 = hx + HW / 2 + o, Z0 = -HD - o, Z1 = o, yb = E - 0.5 + (rz + 0.05) * k, zm = (Z0 + Z1) / 2;
+      const { yt, rA, rB } = hipMesh(X0, X1, Z0, Z1, yb, pitch);
       B(rB[0] - rA[0] + 0.3, 0.16, 0.9, M.ridge(), (rA[0] + rB[0]) / 2, yt + 0.06, zm);
       // fascia on all four eaves, soffits on the sides and back
       B(X1 - X0, 0.5, 0.1, M.trim(), hx, yb - 0.3, Z0); [-1, 1].forEach(sd => B(0.1, 0.5, Z1 - Z0, M.trim(), hx + sd * (HW / 2 + o), yb - 0.3, zm));
@@ -2349,6 +2355,37 @@
       B(HW + 2.15, 0.16, 1.1, M.ridge(), hx, yr + (rz + 0.1) * k + 0.04, -HD / 2);
       [-1, 1].forEach(sd => tri([[0, 0], [HD, 0], [HD / 2, HD / 2 * pitch]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(hx + sd * HW / 2 - (sd > 0 ? 0.2 : 0), E, 0); }));
     }
+    SEGS.filter(g => g.out > 0.5).forEach(g => {
+      const w = g.x1 - g.x0, cx = (g.x0 + g.x1) / 2, out = g.out, top = segE(g.st);
+      B(w + 0.2, fTop, out + 0.1, M.concrete(), cx, fTop / 2, out / 2);
+      if (lowTop > fTop) B(w + 0.04, Math.min(lowTop, top) - fTop, out + 0.04, specSiding({ siding: hs.lower, sidingColor: hs.lowerColor || '#9c4a36' }), cx, fTop + (Math.min(lowTop, top) - fTop) / 2, out / 2);
+      const wb = Math.max(fTop, Math.min(lowTop, top));
+      B(w, top - wb, out, M.siding(), cx, wb + (top - wb) / 2, out / 2);
+      [-1, 1].forEach(sd => B(0.42, top - fTop, 0.12, M.trim(), cx + sd * (w / 2 - 0.15), fTop + (top - fTop) / 2, out + 0.06));
+      const ze = out + 1;
+      if (g.roof === 'gable') {
+        const ry = top - 0.5 + (w / 2 + 1) * pitch; g.roofTop = ry + 0.5;
+        [-1, 1].forEach(sd => {
+          beamXY(ze / 2, cx, ry + rz / 2 * k, cx + sd * (w / 2 + 1), top - 0.5 + rz / 2 * k, ze, rz, M.trim());
+          beamXY(ze / 2 + 0.04, cx, ry + (rz + 0.05) * k, cx + sd * (w / 2 + 1.08), top - 0.5 + (rz + 0.05) * k, ze + 0.08, 0.1, M.shingle());
+          beamXY(ze, cx, ry + 0.05, cx + sd * (w / 2 + 1.05), top - 0.52, 0.14, 0.55, M.trim());
+          B(0.4, 0.38, ze, M.gutter(), cx + sd * (w / 2 + 1.25), top - 0.5 + rz * k - 0.22, ze / 2);
+        });
+        B(1.1, 0.16, ze + 0.1, M.ridge(), cx, ry + (rz + 0.1) * k + 0.04, ze / 2);
+        tri([[-w / 2, 0], [w / 2, 0], [0, w / 2 * pitch]], 0.2, M.siding(), m => m.position.set(cx, top, out - 0.2));
+      } else if (g.roof === 'hip') {
+        const yb = top - 0.5 + (rz + 0.05) * k, { yt } = hipMesh(cx - w / 2 - 1, cx + w / 2 + 1, -ze, ze, yb, pitch); g.roofTop = yt + 0.3;
+        B(w + 2.15, 0.38, 0.4, M.gutter(), cx, top - 0.5 + rz * k - 0.22, ze + 0.25);
+        B(w + 2, 0.05, 1.0, M.trim(), cx, top - 0.03, out + 0.5, { cast: false });
+      } else {
+        const p2 = top >= E - 0.01 ? pitch : Math.min(pitch, 4 / 12), k2 = Math.hypot(1, p2), yE = top - 0.5, yW = yE + ze * p2; g.roofTop = yW + 0.4;
+        beamYZ(cx, yW + rz / 2 * k2, 0, yE + rz / 2 * k2, ze, w + 2, rz, M.trim());
+        beamYZ(cx, yW + (rz + 0.05) * k2, 0, yE + (rz + 0.05) * k2, ze + 0.08, w + 2.15, 0.1, M.shingle());
+        [-1, 1].forEach(sd => tri([[0, 0], [-out, 0], [0, yW - top]], 0.2, M.siding(), m => { m.rotation.y = Math.PI / 2; m.position.set(cx + sd * w / 2 - (sd > 0 ? 0.2 : 0), top, 0); }));
+        B(w + 2.15, 0.38, 0.4, M.gutter(), cx, yE + rz * k2 - 0.22, ze + 0.25);
+        B(w + 2, 0.05, 1.0, M.trim(), cx, top - 0.03, out + 0.5, { cast: false });
+      }
+    });
     // Chimney: on an end wall, on the back wall, or up through the roof; capped above the ridge.
     if (hs && hs.chimney && hs.chimney !== 'none') {
       const cm = hs.chimneyMaterial === 'siding' ? M.siding() : specSiding({ siding: hs.chimneyMaterial === 'stone' ? 'stone' : 'brick', sidingColor: hs.chimneyColor || '#9c4a36' });
@@ -2388,6 +2425,9 @@
         if (w.story === 1) HOUSE_WIN.push([x - w.widthFt / 2 - 0.5, x + w.widthFt / 2 + 0.5]);
         const wallTop = roofStyle === 'gable-front' ? E + Math.max(0, HW / 2 - Math.abs(x - hx) - 1) * pitch : E;
         if (y + w.heightFt / 2 > wallTop - 0.8) return;
+        const sg = segAt(x);
+        if (sg && w.story <= sg.st) { if (y + w.heightFt / 2 > segE(sg.st) - 0.8) return; windowAt(group(x, y, sg.out), w.widthFt, w.heightFt); return; }
+        if (sg && y - w.heightFt / 2 < (sg.roofTop || 0) + 0.3) return;      // would sit behind the bump-out's roof
         if (w.story === 1 && doors.some(d => Math.abs(x - d.x) < d.w / 2 + w.widthFt / 2 + 0.6)) return;
         windowAt(group(x, y, 0), w.widthFt, w.heightFt);
       });

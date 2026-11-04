@@ -26,7 +26,7 @@ const SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: ['usable', 'reason', 'stories', 'walkout', 'siding', 'sidingColor', 'trimColor', 'roofColor', 'roofPitch', 'roofStyle', 'wallWidthFt',
-    'lower', 'lowerHeightFt', 'lowerColor', 'chimney', 'chimneyAt', 'chimneyMaterial', 'chimneyColor', 'shutters', 'shutterColor', 'windows', 'doors', 'notes'],
+    'lower', 'lowerHeightFt', 'lowerColor', 'chimney', 'chimneyAt', 'chimneyMaterial', 'chimneyColor', 'shutters', 'shutterColor', 'segments', 'windows', 'doors', 'notes'],
   properties: {
     usable: { type: 'boolean', description: 'false if the photo does not show a house wall clearly enough to describe' },
     reason: { type: 'string', description: 'If not usable, why, in one short sentence for the salesperson. Otherwise empty.' },
@@ -48,9 +48,22 @@ const SCHEMA = {
     shutters: { type: 'boolean', description: 'true if the windows have shutters' },
     shutterColor: COLOR,
     wallWidthFt: { type: 'number', description: 'Estimated width of the main wall facing the camera, in feet (a standard door is 3 ft wide, 6 ft 8 in tall)' },
+    segments: {
+      type: 'array',
+      description: 'The wall facing the camera split into sections, left to right as seen in the photo, wherever its plane changes (bump-outs, bay or sunroom projections, a garage set forward or back). One section if the wall is flat. Widths add up to the whole wall. outFt is how far that section sticks out toward the camera from the main back wall (the large, furthest-back plane); 0 for the main wall.',
+      items: {
+        type: 'object', additionalProperties: false, required: ['widthFt', 'outFt', 'stories', 'roof'],
+        properties: {
+          widthFt: { type: 'number' },
+          outFt: { type: 'number', description: '0 for the main wall; how far a bump-out projects toward the camera' },
+          stories: { type: 'integer', description: 'Height of this section in stories (a one-story bump-out on a two-story house is 1)' },
+          roof: { type: 'string', enum: ['main', 'shed', 'gable', 'hip'], description: 'main = no separate roof (the main wall, or the main roof simply covers it); otherwise the bump-out roof' },
+        },
+      },
+    },
     windows: {
       type: 'array',
-      description: 'Windows on the main wall facing the camera, left to right as seen in the photo',
+      description: 'Windows on the wall facing the camera (including on bump-out faces), left to right as seen in the photo',
       items: {
         type: 'object', additionalProperties: false, required: ['center', 'story', 'widthFt', 'heightFt'],
         properties: {
@@ -114,7 +127,11 @@ export async function houseHandler(req, res) {
     try { house = JSON.parse(text) } catch { return res.status(502).json({ error: 'Could not read the house description. Try again.' }) }
     if (!house.usable) return res.status(422).json({ error: house.reason || 'The photo does not show the house clearly enough.' })
     const out = clean(house)
-    if (known) out.wallWidthFt = known                     // the measured width wins over the estimate
+    if (known) {                                           // the measured width wins over the estimate
+      const f = known / out.wallWidthFt
+      out.wallWidthFt = known
+      out.segments.forEach(g => { g.widthFt = Math.round(g.widthFt * f * 2) / 2 })
+    }
     return res.status(200).json({ house: out, model: response.model })
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) return res.status(503).json({ error: 'The Anthropic API key on the server was not accepted.' })
@@ -127,6 +144,18 @@ export async function houseHandler(req, res) {
 // Keep the numbers in a sane range before they reach the 3D model.
 const clamp = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d }
 const hex = (v, d) => (/^#[0-9a-f]{6}$/i.test(String(v)) ? String(v).toLowerCase() : d)
+// Wall sections: sane sizes, widths scaled so they add up to the wall width.
+function segs(h) {
+  const W = clamp(h.wallWidthFt, 16, 120, 44)
+  let list = (Array.isArray(h.segments) ? h.segments : []).slice(0, 8).map(g => ({
+    widthFt: clamp(g.widthFt, 2, 120, 10), outFt: clamp(g.outFt, 0, 20, 0), stories: clamp(g.stories, 1, 3, 1) | 0,
+    roof: ['main', 'shed', 'gable', 'hip'].includes(g.roof) ? g.roof : 'main',
+  }))
+  if (!list.length) return [{ widthFt: W, outFt: 0, stories: clamp(h.stories, 1, 3, 1) | 0, roof: 'main' }]
+  const sum = list.reduce((a, g) => a + g.widthFt, 0)
+  list.forEach(g => { g.widthFt = Math.round(g.widthFt * W / sum * 2) / 2; if (g.outFt < 0.75) { g.outFt = 0; g.roof = 'main' } else if (g.roof === 'main') g.roof = 'shed' })
+  return list
+}
 function clean(h) {
   return {
     stories: clamp(h.stories, 1, 3, 1) | 0,
@@ -147,6 +176,7 @@ function clean(h) {
     shutters: !!h.shutters,
     shutterColor: hex(h.shutterColor, '#2a2a2a'),
     wallWidthFt: clamp(h.wallWidthFt, 16, 120, 44),
+    segments: segs(h),
     windows: (Array.isArray(h.windows) ? h.windows : []).slice(0, 24).map(w => ({
       center: clamp(w.center, 0, 1, 0.5), story: clamp(w.story, 1, 3, 1) | 0, widthFt: clamp(w.widthFt, 1.5, 12, 3), heightFt: clamp(w.heightFt, 1.5, 8, 4.5),
     })),

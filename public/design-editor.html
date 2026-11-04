@@ -76,6 +76,10 @@
   .props select { font: 500 13.5px/1.2 var(--font-body); padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); max-width: 220px; }
   .props { max-height: 46%; overflow-y: auto; }
   .props input { font: 500 14px/1 var(--font-mono); width: 76px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+  .props .htable { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+  .props .hgrid { display: grid; grid-template-columns: repeat(4, minmax(64px, 110px)) 36px; gap: 6px; align-items: center; }
+  .props .hgrid > span { font: 600 11px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6d6b66); }
+  .props .hgrid input, .props .hgrid select { width: 100%; }
   .props .hrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }
   .props input[type=color] { width: 56px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
   .props .ro { font: 500 13px/1.3 var(--font-mono); color: var(--fg); text-transform: none; letter-spacing: 0; }
@@ -445,6 +449,25 @@
     // house
     el('rect', { x: vb.x, y: Math.min(vb.z, -40), width: vb.w, height: Math.max(0, -Math.min(vb.z, -40)), fill: '#e4e2dc' });
     el('line', { x1: vb.x, y1: 0, x2: vb.x + vb.w, y2: 0, stroke: '#1a1c38', 'stroke-width': P * 4 });
+    if (S.house) {
+      const H = S.house, W = H.wallWidthFt || 44;
+      [-1, 1].forEach(sd => el('line', { x1: sd * W / 2, y1: -40, x2: sd * W / 2, y2: 0, stroke: '#8e8c86', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}` }));
+      let x = -W / 2;
+      (H.segments || []).forEach(g => {
+        const w = Number(g.widthFt) || 0, out = Number(g.outFt) || 0;
+        if (out > 0.5) {
+          el('rect', { x, y: 0, width: w, height: out, fill: '#e4e2dc', stroke: '#1a1c38', 'stroke-width': P * 3 });
+          const t = el('text', { x: x + w / 2, y: out / 2 + P * 4, 'font-size': P * 10, 'text-anchor': 'middle', fill: '#6d6b66', 'font-family': 'Barlow, sans-serif', 'font-weight': 700 }); t.textContent = `BUMP-OUT ${fmt(w)} × ${fmt(out)}`;
+        }
+        x += w;
+      });
+      // windows on the wall (first floor solid, upper floors dashed)
+      let x2 = -W / 2; const segs = (H.segments || []).map(g => { const r = { x0: x2, x1: x2 + (Number(g.widthFt) || 0), out: Number(g.outFt) || 0, st: g.stories || 1 }; x2 = r.x1; return r; });
+      (H.windows || []).forEach(w => {
+        const cx = (w.center - 0.5) * W, sg = segs.find(g => g.out > 0.5 && cx > g.x0 && cx < g.x1 && w.story <= g.st), z = sg ? sg.out : 0;
+        el('line', { x1: cx - w.widthFt / 2, y1: z, x2: cx + w.widthFt / 2, y2: z, stroke: '#4a90c2', 'stroke-width': P * (w.story > 1 ? 3 : 6), 'stroke-dasharray': w.story > 1 ? `${P * 4} ${P * 3}` : 'none' });
+      });
+    }
     const ht = el('text', { x: vb.x + P * 12, y: -P * 10, 'font-size': P * 12, fill: '#8e8c86', 'font-family': 'Barlow, sans-serif', 'font-weight': 700, 'letter-spacing': P * 2 }); ht.textContent = 'EXISTING HOUSE';
     // elements, lowest first
     const order = [...S.els].sort((a, b) => (a.type === 'stairs') - (b.type === 'stairs') || (a.h || 0) - (b.h || 0));
@@ -773,6 +796,21 @@
       + (h.chimney && h.chimney !== 'none' ? sel('chimneyMaterial', 'Chimney', [['brick', 'Brick'], ['stone', 'Stone'], ['siding', 'Siding']], h.chimneyMaterial || 'brick') + (['back', 'roof'].includes(h.chimney) ? n('chimneyAtFt', 'Chimney from left (ft)', (h.chimneyAt ?? 0.5) * h.wallWidthFt, 0.5, 0) : '') + (h.chimneyMaterial !== 'siding' ? col('chimneyColor', 'Chimney color') : '') : '')
       + sel('shutters', 'Shutters', [['', 'None'], ['1', 'Yes']], h.shutters ? '1' : '')
       + (h.shutters ? col('shutterColor', 'Shutter color') : '');
+    if (h) {
+      const W = h.wallWidthFt || 44, segs = h.segments || [], sum = segs.reduce((a, g) => a + (Number(g.widthFt) || 0), 0);
+      const ni = (attr, v, step = 0.5) => `<input type="number" ${attr} step="${step}" min="0" value="${+(+v).toFixed(2)}">`;
+      const si = (attr, opts, v) => `<select ${attr}>${opts.map(([a, t]) => `<option value="${a}"${String(a) === String(v) ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+      out += `<div class="htable"><b>Back wall, left to right</b><span class="ro">${sum ? `${fmt(sum)} of ${fmt(W)}` : 'One flat wall'}</span>`
+        + `<div class="hgrid sec"><span>Width (ft)</span><span>Bumps out (ft)</span><span>Stories</span><span>Roof</span><span></span>`
+        + segs.map((g, i) => ni(`data-seg="${i}:widthFt"`, g.widthFt) + ni(`data-seg="${i}:outFt"`, g.outFt) + si(`data-seg="${i}:stories"`, [[1, '1'], [2, '2'], [3, '3']], g.stories || 1)
+          + si(`data-seg="${i}:roof"`, [['main', 'Main wall'], ['shed', 'Shed'], ['gable', 'Gable'], ['hip', 'Hip']], g.roof || 'main') + `<button type="button" class="ghost-btn" data-segdel="${i}">✕</button>`).join('')
+        + `</div><button type="button" class="ghost-btn" id="seg-add">Add a section</button></div>`;
+      out += `<div class="htable"><b>Windows on the back</b><span class="ro">Centre measured from the left end of the house</span>`
+        + `<div class="hgrid win"><span>Centre (ft)</span><span>Width (ft)</span><span>Height (ft)</span><span>Floor</span><span></span>`
+        + (h.windows || []).map((w, i) => ni(`data-win="${i}:at"`, w.center * W) + ni(`data-win="${i}:widthFt"`, w.widthFt) + ni(`data-win="${i}:heightFt"`, w.heightFt)
+          + si(`data-win="${i}:story"`, [[1, '1st'], [2, '2nd'], [3, '3rd']], w.story || 1) + `<button type="button" class="ghost-btn" data-windel="${i}">✕</button>`).join('')
+        + `</div><button type="button" class="ghost-btn" id="win-add">Add a window</button></div>`;
+    }
     return out;
   }
   function photoToJpeg(file) {          // ≤1568 px on the long side keeps the upload small and the cost low
@@ -810,12 +848,47 @@
         const best = OPTS.trims.map(o => ({ o, d: rgb(o.hex).reduce((a, v, i) => a + (v - t[i]) ** 2, 0) })).sort((a, b) => a.d - b.d)[0];
         if (best && best.d < 3 * 60 ** 2) S.build.trim = best.o.key;
       }
+      // An educated guess at where the work goes: the porch on the back door, a deck on the slider.
+      const drs = d.house.doors || [], Wd = d.house.wallWidthFt || 44, at = (dr) => snapV((dr.center - 0.5) * Wd);
+      if (drs.length) {
+        const entry = drs.find(x => x.kind === 'entry') || drs[0], slider = drs.find(x => x.kind === 'slider') || drs[0];
+        const porch = S.els.find(e => e.type === 'porch' && e.tie !== 'free');
+        if (porch) porch.x = at(entry);
+        const deckDoor = porch ? (slider !== entry ? slider : null) : slider;
+        const deck = S.els.find(e => e.type === 'deck' && e.pts.some(q => Math.abs(q[1]) < 0.05));
+        if (deck && deckDoor) {
+          const xs = deck.pts.filter(q => Math.abs(q[1]) < 0.05).map(q => q[0]), dx = at(deckDoor) - (Math.min(...xs) + Math.max(...xs)) / 2;
+          S.els.forEach(e => { if (e.type === 'porch') return; if (e.pts) e.pts = e.pts.map(q => [q[0] + dx, q[1]]); else e.x += dx; });
+        }
+      }
       houseMsg = d.house.notes || 'Matched from photo. Adjust below if needed.';
       commit(); changed(); send3D(true);
     } catch (e) { houseMsg = e.message; }
     houseBusy = false; renderProps();
   }
   function bindHouse(p) {
+    const h0 = S.house;
+    p.querySelectorAll('[data-seg]').forEach(inp => inp.addEventListener('change', () => {
+      const [i, k] = inp.dataset.seg.split(':'), g = h0.segments[+i]; if (!g) return;
+      if (k === 'roof') g.roof = inp.value; else { const v = parseFloat(inp.value); if (!Number.isFinite(v)) return; g[k] = k === 'stories' ? v | 0 : Math.max(0, Math.min(k === 'outFt' ? 30 : 120, v)); }
+      if (k === 'outFt' && g.outFt > 0.5 && g.roof === 'main') g.roof = 'shed';
+      commit(); changed();
+    }));
+    p.querySelectorAll('[data-segdel]').forEach(b => b.addEventListener('click', () => { h0.segments.splice(+b.dataset.segdel, 1); commit(); changed(); }));
+    $('seg-add')?.addEventListener('click', () => {
+      const segs = h0.segments = h0.segments || [], W = h0.wallWidthFt || 44, used = segs.reduce((a, g) => a + (Number(g.widthFt) || 0), 0);
+      if (!segs.length) segs.push({ widthFt: Math.max(2, W - 10), outFt: 0, stories: h0.stories || 1, roof: 'main' });
+      segs.push({ widthFt: Math.max(4, Math.min(10, W - segs.reduce((a, g) => a + g.widthFt, 0))) || 8, outFt: 4, stories: 1, roof: 'shed' });
+      commit(); changed();
+    });
+    p.querySelectorAll('[data-win]').forEach(inp => inp.addEventListener('change', () => {
+      const [i, k] = inp.dataset.win.split(':'), w = h0.windows[+i], v = parseFloat(inp.value); if (!w || !Number.isFinite(v)) return;
+      if (k === 'at') w.center = Math.max(0, Math.min(1, v / (h0.wallWidthFt || 44)));
+      else if (k === 'story') w.story = v | 0; else w[k] = Math.max(1, Math.min(12, v));
+      commit(); changed();
+    }));
+    p.querySelectorAll('[data-windel]').forEach(b => b.addEventListener('click', () => { h0.windows.splice(+b.dataset.windel, 1); commit(); changed(); }));
+    $('win-add')?.addEventListener('click', () => { (h0.windows = h0.windows || []).push({ center: 0.5, story: 1, widthFt: 3, heightFt: 5 }); commit(); changed(); });
     $('h-photo')?.addEventListener('click', () => $('h-file').click());
     $('h-known')?.addEventListener('change', (ev) => { const v = parseFloat(ev.target.value); houseKnownW = v > 0 ? v : 0; if (houseKnownW && S.house) { S.house.wallWidthFt = houseKnownW; commit(); changed(); } });
     $('h-file')?.addEventListener('change', (ev) => { const f = ev.target.files?.[0]; if (f) matchHouse(f); });
@@ -925,7 +998,7 @@
         + `<span class="hrow"><span class="ro">Landing partway down, then</span><button type="button" class="ghost-btn" data-st="land:straight">Straight</button><button type="button" class="ghost-btn" data-st="land:left">Turn left</button><button type="button" class="ghost-btn" data-st="land:right">Turn right</button></span>`;
     }
     p.innerHTML = h; p.hidden = false; bindHouse(p);
-    p.querySelectorAll('select:not([data-hk])').forEach(sl => sl.addEventListener('change', () => {
+    p.querySelectorAll('select:not([data-hk]):not([data-seg]):not([data-win])').forEach(sl => sl.addEventListener('change', () => {
       const k = sl.dataset.k, v = sl.value;
       if (k.startsWith('b:')) {
         const bk = k.slice(2); S.build[bk] = v;
@@ -942,7 +1015,7 @@
       }
       commit(); changed();
     }));
-    p.querySelectorAll('input:not([data-hk]):not([type=file]):not(#h-known)').forEach(inp => inp.addEventListener('change', () => {
+    p.querySelectorAll('input:not([data-hk]):not([type=file]):not(#h-known):not([data-seg]):not([data-win])').forEach(inp => inp.addEventListener('change', () => {
       const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
       if (inp.dataset.k === 'dw' || inp.dataset.k === 'dd') {     // stretch the deck: house side and left side stay put
         const i = inp.dataset.k === 'dw' ? 0 : 1, vs = e.pts.map(q => q[i]), lo = Math.min(...vs), span = Math.max(...vs) - lo;
