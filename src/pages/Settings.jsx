@@ -789,7 +789,8 @@ export default function Settings() {
               </div>
               <p className="text-xs text-gray-400 mb-4">Switches the whole app between the Sales, Project Manager, and Manager experiences.</p>
               <div className="grid grid-cols-3 gap-2">
-                {ROLE_ORDER.map(key => {
+                {/* Paint PM is Field mode only, with no way back — not a demo view */}
+                {ROLE_ORDER.filter(key => key !== 'paint').map(key => {
                   const active = role === key
                   return (
                     <button

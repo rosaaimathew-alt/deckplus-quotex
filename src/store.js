@@ -1401,8 +1401,9 @@ if (DEMO && typeof window !== 'undefined') {
 // ── Org bootstrap (rows architecture) ────────────────────────────────────────
 // After sign-in: load every row this user may see (RLS decides), put it in the
 // store in the store's own shape, then arm the adapter so changes flow both
-// ways. Membership role → app role: rep→sales, pm→pm, office/admin→manager.
-const ROLE_MAP = { rep: 'sales', pm: 'pm', office: 'manager', admin: 'manager' }
+// ways. Membership role → app role: rep→sales, pm→pm, paint→paint (Field mode
+// only), office/admin→manager.
+const ROLE_MAP = { rep: 'sales', pm: 'pm', paint: 'paint', office: 'manager', admin: 'manager' }
 const SETTINGS_DEFAULTS = () => ({
   projectTypes: ['Open Deck', 'Screen Porches', 'Eze-Breeze Porches', 'Open Porches', 'Porch Conversions', 'Sunrooms', 'Hardscapes'],
   catalogCategories: ['Fencing', 'Gates', 'Demo', 'Materials', 'Labor', 'Framing', 'Concrete', 'Electrical',
@@ -1430,8 +1431,9 @@ export function bootstrapOrg() {
     useStore.setState({ ...cols, ...merged, orgId, me, members, role: ROLE_MAP[me.role] || 'manager', orgLoaded: true })
     armAdapter(useStore, orgId, settings)
     // A brand-new org gets the built-in email templates once; the adapter
-    // writes them as rows because they arrive after arming.
-    if (!(collections.emailTemplates || []).length) useStore.setState({ emailTemplates: DEFAULT_EMAIL_TEMPLATES })
+    // writes them as rows because they arrive after arming. (Not for the paint
+    // PM: they can't read templates, so an empty list doesn't mean a new org.)
+    if (me.role !== 'paint' && !(collections.emailTemplates || []).length) useStore.setState({ emailTemplates: DEFAULT_EMAIL_TEMPLATES })
     // Reserve an id block so this session never mints an id another rep has.
     try {
       const start = await reserveIdBlock()

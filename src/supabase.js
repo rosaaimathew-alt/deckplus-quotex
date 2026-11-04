@@ -85,6 +85,8 @@ export async function resetMemberPassword(userId) {
   await rpc('admin_set_member_password', { p_user: userId, p_password: temp })
   return temp
 }
+// Admin / office: change someone's team role (office: non-admins only).
+export const setMemberRole = (userId, role) => rpc('set_member_role', { p_user: userId, p_role: role })
 export const claimInvite  = (code, name) => rpc('claim_invite', { p_code: code || null, p_name: name || null })
 
 // Creates the login. Returns { session } when signed in straight away, or

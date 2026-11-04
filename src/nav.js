@@ -90,7 +90,9 @@ export function makeAccess(plan, role) {
 }
 
 // Destinations (with only their allowed tabs) for the signed-in role and plan.
+// The paint PM has no sidebar at all: they only ever get Field mode (App.jsx).
 export function visibleDestinations(plan, role) {
+  if (role === 'paint') return []
   const can = makeAccess(plan, role)
   const out = []
   for (const d of DESTINATIONS) {

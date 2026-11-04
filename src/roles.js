@@ -6,12 +6,14 @@
 //   sales   — the selling side (proposals, pipeline, contracts); no subs
 //   pm      — project management: jobs, subcontractors, scheduling, view quotes
 //   manager — full access, plus the controls / finance side
+//   paint   — the paint PM: phone Field mode's paint screens only (src/field)
 
-export const ROLE_ORDER = ['sales', 'pm', 'manager']
+export const ROLE_ORDER = ['sales', 'pm', 'paint', 'manager']
 
 export const ROLE_META = {
   sales:   { label: 'Sales',           blurb: 'Proposals, pipeline & contracts' },
   pm:      { label: 'Project Manager', blurb: 'Jobs, subcontractors & scheduling' },
+  paint:   { label: 'Paint PM',        blurb: 'Paint queue, schedule and touch-ups' },
   manager: { label: 'Manager / Owner', blurb: 'Everything, plus controls & finance' },
 }
 
@@ -28,9 +30,14 @@ const SALES = ALL.filter(r => r !== '/subs' && r !== '/profitability' && r !== '
 // PM: job-management focus + read-only quote/contract viewing + scheduling.
 const PM = ['/', '/jobs', '/subs', '/scheduler', '/proposal', '/contract', '/contracts', '/settings', '/checklists']
 
+// Paint PM: Field mode only. '/' is the paint Queue (App.jsx ShellSwitch
+// renders Field mode for this role at every address); no full-app page.
+const PAINT = ['/']
+
 export function roleRoutes(role) {
   if (role === 'sales') return new Set(SALES)
   if (role === 'pm')    return new Set(PM)
+  if (role === 'paint') return new Set(PAINT)
   return new Set(ALL) // manager (and any unknown role → full, never lock out)
 }
 

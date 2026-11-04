@@ -135,7 +135,11 @@ function NavItem({ d, badge, onClick }) {
 function ShellSwitch() {
   const location = useLocation()
   const fieldHome = useFieldHome()
+  const role = useStore(s => s.role)
   const path = location.pathname
+  // The paint PM only ever gets Field mode — at every address, on every
+  // device — so typing /sales or /settings can't reach the full app.
+  if (role === 'paint') return <FieldApp />
   if (path === '/field' || path.startsWith('/field/')) return <FieldApp />
   if (path === '/' && fieldHome) return <FieldApp />
   return <AppShell />

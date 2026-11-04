@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Users, Copy, X, KeyRound, CheckCircle2, UserMinus } from 'lucide-react'
 import { useStore } from '../store'
-import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword } from '../supabase'
+import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword, setMemberRole } from '../supabase'
 import { DEMO } from '../demo'
 
 // ── Settings › Team ──────────────────────────────────────────────────────────
@@ -11,6 +11,7 @@ import { DEMO } from '../demo'
 const ROLES = [
   { key: 'rep',    label: 'Sales',           blurb: 'Proposals, pipeline, contracts' },
   { key: 'pm',     label: 'Project Manager', blurb: 'Jobs, subs, scheduling' },
+  { key: 'paint',  label: 'Paint PM',        blurb: 'Paint queue, schedule and touch-ups' },
   { key: 'office', label: 'Office',          blurb: 'Everything, plus settings' },
   { key: 'admin',  label: 'Admin',           blurb: 'Everything, plus the team' },
 ]
@@ -42,6 +43,24 @@ export function TeamCard() {
       useStore.setState(s => ({ members: (s.members || []).filter(x => x.id !== m.id) }))
     } catch (e) { setError(e.message) }
     setRemoving('')
+  }
+
+  // Change someone's role. Admin: anyone but yourself (never the last admin).
+  // Office: non-admins, to a non-admin role. The database checks the same.
+  const [changing, setChanging] = useState('')   // user id whose role is saving
+  const canChangeRole = (m) => !DEMO && m.id !== me?.id && (isAdmin || m.role !== 'admin')
+    && !(m.role === 'admin' && adminCount <= 1)
+  const changeRole = async (m, next) => {
+    if (next === m.role) return
+    const label = roleLabel(next)
+    const extra = next === 'paint' ? '\n\nPaint PM only gets the phone paint screens (Queue, Schedule, Touch-ups) and won jobs.' : ''
+    if (!window.confirm(`Change ${m.displayName || m.email} to ${label}?${extra}\n\nThey'll see the change the next time they open the app.`)) return
+    setChanging(m.id); setError('')
+    try {
+      await setMemberRole(m.id, next)
+      useStore.setState(s => ({ members: (s.members || []).map(x => x.id === m.id ? { ...x, role: next } : x) }))
+    } catch (e) { setError(e.message) }
+    setChanging('')
   }
 
   // Admin: a new temporary password for someone who's locked out (no email needed).
@@ -168,7 +187,15 @@ export function TeamCard() {
           {members.map(m => (
             <div key={m.id} className="flex items-center gap-3 px-3 py-2 text-sm">
               <p className="flex-1 min-w-0 truncate text-gray-800">{m.displayName || m.email}<span className="text-gray-400"> · {m.email}</span></p>
-              <span className="text-xs text-gray-500">{roleLabel(m.role)}{m.id === me?.id ? ' (you)' : ''}</span>
+              {canChangeRole(m) ? (
+                <select value={m.role} disabled={!!changing} onChange={e => changeRole(m, e.target.value)}
+                  aria-label={`Role for ${m.displayName || m.email}`}
+                  className="text-xs text-gray-600 border border-gray-200 rounded px-1.5 py-1 bg-white disabled:opacity-50">
+                  {ROLES.filter(r => isAdmin || r.key !== 'admin').map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                </select>
+              ) : (
+                <span className="text-xs text-gray-500">{roleLabel(m.role)}{m.id === me?.id ? ' (you)' : ''}</span>
+              )}
               {canReset(m) && (
                 <button onClick={() => resetPw(m)} disabled={!!resetting} title={`Give ${m.displayName || m.email} a new temporary password`}
                   className="flex items-center gap-1 text-xs text-gray-600 hover:bg-gray-100 rounded px-2 py-1 disabled:opacity-50">

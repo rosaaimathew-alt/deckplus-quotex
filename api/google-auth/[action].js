@@ -1,6 +1,6 @@
 /* global process */
 import { getAuthUrl, handleCallback, isAuthenticated, getConnectedEmail } from '../_google-drive.js'
-import { verifyToken, staffMembership } from '../_auth.js'
+import { verifyStaff, staffMembership } from '../_auth.js'
 import { smtpUser, sendMail } from '../_mailer.js'
 import { MAIL_PROVIDERS, mailboxesAvailable, mailboxForUser, companyMailbox, saveMailbox, clearMailbox, setCompanyDefault, verifyLogin, inviteSignup,
   googleSignInReady, googleMailboxAuthUrl, readState, finishGoogleMailbox } from '../_mailboxes.js'
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   if (action === 'start' || action === 'status' || MAILBOX_ACTIONS.includes(action)) {
     const header = req.headers.authorization || ''
     bearer = header.startsWith('Bearer ') ? header.slice(7) : (req.headers['x-qx-token'] || null)
-    staff = await verifyToken(bearer)
+    staff = await verifyStaff(bearer)
     if (!staff) return res.status(401).json({ error: 'Unauthorized' })
   }
 

@@ -9,7 +9,7 @@ create table if not exists public.org_invites (
   code         text primary key,
   org_id       uuid not null references public.orgs(id) on delete cascade,
   email        text not null,
-  role         text not null check (role in ('rep','pm','office','admin')),
+  role         text not null check (role in ('rep','pm','paint','office','admin')),
   display_name text,
   invited_by   uuid,
   created_at   timestamptz not null default now(),

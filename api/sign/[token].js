@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { uploadToDrive } from '../_google-drive.js'
-import { verifyToken, canSeeRecord, staffMembership, asUser } from '../_auth.js'
+import { verifyToken, verifyStaff, canSeeRecord, staffMembership, asUser } from '../_auth.js'
 import { getKV } from '../_kv.js'
 import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, buildCompanySignature, verifyRecord } from '../_esign.js'
 import { sendWelcomeEmail } from '../_welcome.js'
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const bearer = header.startsWith('Bearer ') ? header.slice(7) : (req.headers['x-qx-token'] || null)
   let staff = null
   if (isAdminAction) {
-    staff = await verifyToken(bearer)
+    staff = await verifyStaff(bearer)
     if (!staff) return res.status(401).json({ error: 'Unauthorized' })
   }
 
