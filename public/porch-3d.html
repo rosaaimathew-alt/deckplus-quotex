@@ -153,6 +153,11 @@
   .plan-actions { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; z-index: 3; }
   .plan-actions button { font: 600 13px/1 var(--font-body); border: 0; border-radius: 8px; padding: 10px 12px; cursor: pointer; background: var(--accent); color: var(--accent-fg); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
   .plan-msg { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(64px + env(safe-area-inset-bottom, 0px)); background: var(--tag-bg); color: var(--tag-fg); font-size: 13px; padding: 8px 12px; border-radius: 6px; z-index: 3; max-width: calc(100% - 32px); }
+  body.customer .edit-only { display: none !important; }
+  .cust-note { display: none; border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: 14px; line-height: 1.5; color: var(--fg); background: var(--accent-soft); }
+  body.customer .cust-note { display: block; }
+  body.customer .sec-item { cursor: default; }
+  body.customer .dim { display: none !important; }
   .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; padding: 20px; text-align: center; }
 
   @media (max-width: 820px) {
@@ -169,23 +174,24 @@
     <div>
       <div class="eyebrow">QuoteX prototype · Deck Plus</div>
       <h1>Deck Plus 3D Builder</h1>
-      <p class="lede" id="from-est" hidden><b>Loaded from the estimate.</b> Porch type, size, roof connection, roof style, floor, heights, gable glass, decking and railing come from the Porch Builder.</p>
-      <p class="lede">Combine porches, decks and patios into one build. Pick a section to edit it, or tap it in the 3D view. Drag to orbit, scroll or pinch to zoom.</p>
+      <p class="lede" id="from-est" hidden><b id="from-est-who">Loaded from the proposal.</b> Sizes, porch type, roof connection, roof style, floor and wall heights, gable glass, decking and railing come from the estimate.</p>
+      <p class="lede edit-only">Combine porches, decks and patios into one build. Pick a section to edit it, or tap it in the 3D view. Drag to orbit, scroll or pinch to zoom.</p>
     </div>
 
+    <div class="cust-note" id="cust-note"><b>Your design.</b> This model shows the porch, deck and patio in your proposal, built from your designer's measurements. Spin it, zoom in, or switch to the floor plan. Sizes, materials and options are set by your Deck Plus designer, and any change needs an updated quote.</div>
     <fieldset>
       <legend>Sections</legend>
       <div class="sec-list" id="sec-list"></div>
-      <div class="add-row">
+      <div class="add-row edit-only">
         <button type="button" class="btn" data-add="porch">+ Porch</button>
         <button type="button" class="btn" data-add="deck">+ Deck</button>
         <button type="button" class="btn" data-add="patio">+ Patio</button>
       </div>
     </fieldset>
 
-    <div class="editor" id="sec-editor"></div>
+    <div class="editor edit-only" id="sec-editor"></div>
 
-    <fieldset>
+    <fieldset class="edit-only">
       <legend>Whole build</legend>
       <div class="row-label"><label class="label" for="h">Deck &amp; floor height</label><output id="h-out" for="h">3′-0″</output></div>
       <input type="range" id="h" min="1" max="10" step="0.5" value="3">
@@ -211,7 +217,7 @@
       <div class="swatches" id="trim-swatches"></div>
     </fieldset>
 
-    <section class="price" aria-label="Base price">
+    <section class="price edit-only" aria-label="Base price">
       <div class="label">Base price from the rate tables</div>
       <div id="price-lines"></div>
       <div class="price-total"><span>Estimate</span><strong id="price-total">$0</strong></div>
@@ -233,7 +239,7 @@
       <button type="button" data-view="front" aria-pressed="false">Front</button>
       <button type="button" data-view="top" aria-pressed="false">Plan</button>
     </div>
-    <div class="render-btn">
+    <div class="render-btn edit-only" id="render-btns">
       <button type="button" class="primary" id="btn-chatgpt">Render in ChatGPT</button>
     </div>
     <div class="summary"><b id="sum-title"></b><span id="sum-sub"></span></div>
@@ -327,31 +333,59 @@
     sel: 1,
   };
 
-  // ── Open straight from an estimate: /porch-3d.html?pb=<Porch Builder inputs as JSON> ──
-  // Same field names as PORCH_BUILD_INPUT_DEFAULTS in src/porchBuild.js.
+  // ── Open straight from QuoteX ──────────────────────────────────────────────
+  //   ?pb=<Porch Builder inputs>          one porch (Porch Builder → View in 3D)
+  //   ?design=<{client,address,porches,decks,patios}>   a whole proposal (Sales → Designs)
+  //   &mode=2d                             open on the floor plan
+  // Field names match PORCH_BUILD_INPUT_DEFAULTS, the deck builder's saved state and
+  // the hardscape patio inputs (see src/lib/designLink.js).
   const FLOOR_LINE = { trex_enhance: 'enhance', trex_transcend: 'transcend', trex_lineage: 'lineage', trex_signature: 'signature', timbertech_prime: 'prime', timbertech_terrain: 'terrain', timbertech_reserve: 'reserve', timbertech_landmark: 'landmark' };
-  let fromEstimate = false;
+  const COLL_LINE = { 'trex enhance': 'enhance', 'trex transcend': 'transcend', 'trex lineage': 'lineage', 'trex signature': 'signature', 'timbertech prime': 'prime', 'timbertech terrain': 'terrain', 'timbertech reserve': 'reserve', 'timbertech landmark': 'landmark', 'pt': 'pt' };
+  const num = (v, d) => (Number(v) > 0 ? Number(v) : d);
+  function porchFrom(pb) {
+    const type = ['open', 'screen', 'ezebreeze', 'sunroom'].includes(pb.type) ? pb.type : 'screen';
+    const tie = ['wall', 'roof', 'free'].includes(pb.tie) ? pb.tie : 'wall';
+    let roof = ['shed', 'gable', 'semivault', 'hip'].includes(pb.roof) ? pb.roof : 'shed';
+    if (tie === 'free') roof = roof === 'semivault' ? 'semivault' : 'gable';     // same rule as the Porch Builder
+    return mk('porch', {
+      z: tie === 'free' ? 6 : 0, w: Math.round(num(pb.width, 16)), d: Math.round(num(pb.depth, 14)),
+      type, tie, roof, floor: pb.floor === 'patio' ? 'patio' : 'deck',
+      wallH: Math.min(10, Math.max(8, num(pb.wallHeightIn, 96) / 12)),
+      gableEnd: (Number(pb.glassEnds) || 0) > 0 ? 'glass' : (type === 'screen' ? 'screen' : 'siding'),
+    });
+  }
+  let fromEstimate = false, startMode = '3d';
+  // ?view=customer → look-only: no editing, no prices (for the customer's proposal link).
+  const customer = new URLSearchParams(location.search).get('view') === 'customer';
+  if (customer) document.body.classList.add('customer');
+  S.meta = { client: '', address: '' };
   try {
-    const raw = new URLSearchParams(location.search).get('pb');
-    if (raw) {
-      const pb = JSON.parse(raw), num = (v, d) => (Number(v) > 0 ? Number(v) : d);
-      const type = ['open', 'screen', 'ezebreeze', 'sunroom'].includes(pb.type) ? pb.type : 'screen';
-      const tie = ['wall', 'roof', 'free'].includes(pb.tie) ? pb.tie : 'wall';
-      let roof = ['shed', 'gable', 'semivault', 'hip'].includes(pb.roof) ? pb.roof : 'shed';
-      if (tie === 'free') roof = roof === 'semivault' ? 'semivault' : 'gable';     // same rule as the Porch Builder
-      const glassEnds = Number(pb.glassEnds) || 0;
-      const porch = mk('porch', {
-        x: 0, z: tie === 'free' ? 6 : 0, w: Math.round(num(pb.width, 16)), d: Math.round(num(pb.depth, 14)),
-        type, tie, roof, floor: pb.floor === 'patio' ? 'patio' : 'deck',
-        wallH: Math.min(10, Math.max(8, num(pb.wallHeightIn, 96) / 12)),
-        gableEnd: glassEnds > 0 ? 'glass' : (type === 'screen' ? 'screen' : 'siding'),
+    const qs = new URLSearchParams(location.search);
+    startMode = qs.get('mode') === '2d' ? '2d' : '3d';
+    let d = null;
+    if (qs.get('design')) d = JSON.parse(qs.get('design'));
+    else if (qs.get('pb')) d = { porches: [JSON.parse(qs.get('pb'))], decks: [], patios: [] };
+    if (d && ((d.porches || []).length + (d.decks || []).length + (d.patios || []).length)) {
+      const porches = (d.porches || []).map(porchFrom);
+      const decks = (d.decks || []).map(x => mk('deck', { w: Math.round(num(x.width, 14)), d: Math.round(num(x.depth, 12)), stairs: 'front' }));
+      // Lay the attached parts side by side along the house, centred.
+      const att = [...porches, ...decks], total = att.reduce((a, x) => a + x.w, 0);
+      let cur = -total / 2; att.forEach(x => { x.x = cur + x.w / 2; cur += x.w; });
+      S.sections = [...att];
+      // Patios land at the foot of the first deck's stairs, else in front of the first porch.
+      const H0 = num(d.porches?.[0]?.deckHeightFt, 0) || num(d.decks?.[0]?.height, 3);
+      S.H = Math.min(10, Math.max(1, H0));
+      (d.patios || []).forEach((x, k) => {
+        const base = decks[k] || decks[0] || porches[0], zFront = base ? base.d + Math.max(1, Math.ceil(S.H * 12 / 7.5)) * (11 / 12) + 1 : 4;   // stairs run-out
+        S.sections.push(mk('patio', { x: base ? base.x : 0, z: Math.round(zFront), w: Math.round(num(x.width, 16)), d: Math.round(num(x.depth, 12)), mat: /concrete/i.test(x.surface || '') ? 'concrete' : 'pavers' }));
       });
-      S.sections = [porch]; S.sel = porch.id;
-      S.H = Math.min(10, Math.max(1, num(pb.deckHeightFt, 3)));
-      const fl = String(pb.flooring || '').replace(/^deckfloor_/, '');
-      const line = Object.keys(FLOOR_LINE).find(k => fl.startsWith(k));
-      S.decking = line ? FLOOR_LINE[line] : 'pt';
-      if (/alum/i.test(pb.railing?.product || '')) S.rail = 'aluminum';
+      S.sel = S.sections[0].id;
+      const coll = String(d.decks?.[0]?.collKey || '').toLowerCase().replace(/[^a-z ]+/g, ' ').replace(/\s+/g, ' ').trim();
+      const fl = String(d.porches?.[0]?.flooring || '').replace(/^deckfloor_/, '');
+      const ck = Object.keys(COLL_LINE).find(k => coll.startsWith(k)), fk = Object.keys(FLOOR_LINE).find(k => fl.startsWith(k));
+      S.decking = ck ? COLL_LINE[ck] : fk ? FLOOR_LINE[fk] : 'pt';
+      if (/alum/i.test(`${d.decks?.[0]?.rail || ''} ${d.porches?.[0]?.railing?.product || ''}`)) S.rail = 'aluminum';
+      S.meta = { client: String(d.client || ''), address: String(d.address || '') };
       fromEstimate = true;
     }
   } catch (e) { /* bad link: fall back to the sample build */ }
@@ -580,7 +614,7 @@
     $('sec-list').innerHTML = S.sections.map(s =>
       `<button type="button" class="sec-item" data-id="${s.id}" aria-pressed="${s.id === S.sel}"><span class="kind">${KIND_TAG[s.kind]}</span><b>${title(s)}</b><span>${s.w}′ × ${s.d}′</span></button>`).join('');
   }
-  $('sec-list').addEventListener('click', (e) => { const b = e.target.closest('.sec-item'); if (b) select(+b.dataset.id); });
+  $('sec-list').addEventListener('click', (e) => { if (customer) return; const b = e.target.closest('.sec-item'); if (b) select(+b.dataset.id); });
 
   const FMT = {
     w: v => `${v}′`, d: v => `${v}′`, z: v => `${v}′`,
@@ -692,8 +726,9 @@
     // Existing house
     const hx0 = Math.min(x0 + 2, ...rs.map(r => r.x0 - 6)), hx1 = Math.max(x1 - 2, ...rs.map(r => r.x1 + 6));
     box(hx0, z0, hx1, 0, 'house'); line(hx0, 0, hx1, 0, 'wall');
-    text((hx0 + hx1) / 2, z0 + 4.2, 'EXISTING HOUSE', 'house-lbl');
-    att.forEach(a => { const w = a.kind === 'deck' ? 6 : 3; line(a.x - w / 2, 0, a.x + w / 2, 0, 'opening'); text(a.x, -0.9, a.kind === 'deck' ? 'EXIST. SLIDER' : 'EXIST. DOOR', 'note'); });
+    text((hx0 + hx1) / 2, z0 + 2.6, 'EXISTING HOUSE', 'house-lbl');
+    att.forEach(a => { const w = a.kind === 'deck' ? 6 : 3; line(a.x - w / 2, 0, a.x + w / 2, 0, 'opening'); text(a.x, -0.55, a.kind === 'deck' ? 'EXIST. SLIDER' : 'EXIST. DOOR', 'note'); });
+    const neighbour = (x, side) => S.sections.some(o => o !== x && o.kind !== 'patio' && x.kind !== 'patio' && (side === 'left' ? Math.abs(rect(o).x1 - rect(x).x0) < 0.3 : Math.abs(rect(o).x0 - rect(x).x1) < 0.3));
 
     S.sections.forEach(x => {
       const r = rect(x), sp = stairPlacement(x);
@@ -771,19 +806,26 @@
         else { const dir = sp.edge === 'left' ? -1 : 1, xa = sp.x, xb = sp.x + dir * run; box(xa, sp.z - sw / 2, xb, sp.z + sw / 2, 'stairs'); pts.forEach(d => draw(xa + dir * d, sp.z - sw / 2, xa + dir * d, sp.z + sw / 2)); text(xb + dir * 1.4, sp.z, 'DN', 'note'); }
       }
       // dimensions
-      dim(r.x0, r.x1, r.z1 + (sp && sp.edge === 'front' ? risers(S.H) * RUN + 2 : 2.2), true, fmtFt(x.w));
-      dim(r.z0, r.z1, (sp && sp.edge === 'right' ? r.x1 + risers(S.H) * RUN + 1.5 : r.x1 + 2.2), false, fmtFt(x.d));
+      // Width: attached parts along the house wall; patios below themselves.
+      if (offHouse(x)) dim(r.x0, r.x1, r.z1 + 1.8, true, fmtFt(x.w));
+      else dim(r.x0, r.x1, -2.1, true, fmtFt(x.w));
+      // Depth: on whichever side has no neighbour (and no side stairs), else just inside.
+      const stairOut = sp && (sp.edge === 'left' || sp.edge === 'right') ? risers(S.H) * RUN + 1.2 : 0;
+      if (!neighbour(x, 'right')) dim(r.z0, r.z1, r.x1 + 1.8 + (sp && sp.edge === 'right' ? stairOut : 0), false, fmtFt(x.d));
+      else if (!neighbour(x, 'left')) dim(r.z0, r.z1, r.x0 - 1.8 - (sp && sp.edge === 'left' ? stairOut : 0), false, fmtFt(x.d));
+      else dim(r.z0, r.z1, r.x0 + 1.4, false, fmtFt(x.d));
     });
     // overall width along the house
     const ax0 = Math.min(...att.map(a => rect(a).x0)), ax1 = Math.max(...att.map(a => rect(a).x1));
-    if (att.length > 1) dim(ax0, ax1, -2.6, true, `${fmtFt(ax1 - ax0)} OVERALL`);
+    if (att.length > 1) dim(ax0, ax1, -4.2, true, `${fmtFt(ax1 - ax0)} OVERALL`);
 
     // title block
     const ty = (z1 - z0) * PX, date = new Date().toLocaleDateString('en-US');
     out.push(`<g class="tb"><rect x="0" y="${ty}" width="${W}" height="${tbH}"/>
       <line x1="${W * 0.42}" y1="${ty}" x2="${W * 0.42}" y2="${ty + tbH}"/><line x1="${W * 0.72}" y1="${ty}" x2="${W * 0.72}" y2="${ty + tbH}"/>
       <text class="tb-big" x="20" y="${ty + 44}">DECK PLUS</text><text class="tb-sm" x="20" y="${ty + 74}">Plan view · not for construction until reviewed</text>
-      <text class="tb-sm" x="20" y="${ty + 100}">${esc(S.sections.map(title).join(' + '))}</text>
+      <text class="tb-sm" x="20" y="${ty + 100}">${esc(S.meta.client ? `${S.meta.client}${S.meta.address ? ' · ' + S.meta.address : ''}` : S.sections.map(title).join(' + '))}</text>
+      <text class="tb-sm" x="20" y="${ty + 126}">${esc(S.meta.client ? S.sections.map(title).join(' + ') : '')}</text>
       <text class="tb-sm" x="${W * 0.42 + 16}" y="${ty + 44}">SCALE 1/4″ = 1′-0″ (at 100%)</text><text class="tb-sm" x="${W * 0.42 + 16}" y="${ty + 74}">DECKING: ${esc(DECKING[S.decking].label)}${S.decking === 'pt' ? '' : ' · ' + esc(COLORS.find(c => c.key === S.color).name)}</text>
       <text class="tb-sm" x="${W * 0.42 + 16}" y="${ty + 100}">FLOOR HEIGHT: ${fmtFt(S.H)} · RAIL: ${S.rail === 'aluminum' ? 'ALUMINUM' : 'HYBRID'}</text>
       <text class="tb-sm" x="${W * 0.72 + 16}" y="${ty + 44}">DATE: ${date}</text><text class="tb-sm" x="${W * 0.72 + 16}" y="${ty + 74}">DRAWN: QuoteX 3D Builder</text><text class="tb-sm" x="${W * 0.72 + 16}" y="${ty + 100}">REV: —</text></g>`);
@@ -816,6 +858,7 @@
     drawPlan();
   }
   document.querySelectorAll('.mode button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  if (startMode === '2d') setTimeout(() => setMode('2d'), 0);
   $('btn-svg').addEventListener('click', () => {
     const svg = planSVG(), blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + svg], { type: 'image/svg+xml' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `deckplus-plan-${new Date().toISOString().slice(0, 10)}.svg`;
@@ -824,7 +867,9 @@
     setTimeout(() => { m.hidden = true; }, 6000);
   });
 
-  $('from-est').hidden = !fromEstimate;
+  $('from-est').hidden = !fromEstimate || customer;
+  if (customer) { document.querySelector('h1').textContent = 'Your Deck Plus Design'; document.querySelector('.eyebrow').textContent = S.meta.client ? `${S.meta.client}${S.meta.address ? ' · ' + S.meta.address : ''}` : 'Deck Plus'; document.querySelector('.hint').textContent = 'Drag to spin · scroll or pinch to zoom'; }
+  if (S.meta.client) $('from-est-who').textContent = `${S.meta.client}${S.meta.address ? ' · ' + S.meta.address : ''}.`;
   $('h').value = S.H; document.querySelectorAll('input[name=rail]').forEach(r => { r.checked = r.value === S.rail; });
   let update = () => { updateUI(); drawPlan(); };
   let view = 'corner', goTo = () => {};
@@ -1723,6 +1768,7 @@
     sun.shadow.camera.updateProjectionMatrix();
 
     const s = sel(), r = rect(s), y = (raised(s) ? S.H : 0.35) + 0.06;
+    outline.visible = !customer;
     outline.geometry.dispose();
     outline.geometry = new THREE.BufferGeometry().setFromPoints([[r.x0, r.z0], [r.x1, r.z0], [r.x1, r.z1], [r.x0, r.z1]].map(([x, z]) => new THREE.Vector3(x, y, z)));
     outline.computeLineDistances();
@@ -1763,7 +1809,7 @@
     const hit = ray.intersectObjects(secGroups, true)[0];
     if (!hit) return;
     let o = hit.object; while (o && o.userData.sec == null) o = o.parent;
-    if (o && o.userData.sec !== S.sel) select(o.userData.sec);
+    if (!customer && o && o.userData.sec !== S.sel) select(o.userData.sec);
   });
 
   // ── Ambient occlusion (contact shadows in corners and joints) + FXAA ────────

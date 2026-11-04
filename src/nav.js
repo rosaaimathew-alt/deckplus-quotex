@@ -8,7 +8,7 @@
 // LEGACY_REDIRECTS, so bookmarks and emailed links keep working.
 import { useMemo } from 'react'
 import {
-  House, Handshake, HardHat, ChartColumn, Package, List, Columns3, Users, Eye,
+  House, Handshake, HardHat, ChartColumn, Package, List, Columns3, Users, Eye, Ruler,
   ClipboardCheck, FileSignature, CalendarDays, Wrench, TrendingUp, Wallet, Target,
   Upload, Sparkles, Calculator, Hammer, ShieldCheck,
 } from 'lucide-react'
@@ -27,6 +27,7 @@ export const DESTINATIONS = [
       { key: 'pipeline',  label: 'Pipeline',  icon: Columns3, access: '/tracker', hint: 'Board by status', keywords: 'kanban board stages' },
       { key: 'clients',   label: 'Clients',   icon: Users, access: '/clients', hint: 'One row per customer', keywords: 'customers contacts people' },
       { key: 'opens',     label: 'Opens',     icon: Eye, access: '/tracker', hint: 'When customers open proposals', keywords: 'activity views tracking opened' },
+      { key: 'designs',   label: 'Designs',   icon: Ruler, access: '/tracker', hint: '3D renderings and floor plans', keywords: 'drawings floor plan rendering 3d 2d cad illustrator design' },
     ] },
 
   // Contracts get their own place: sales prepares and sends them, managers and

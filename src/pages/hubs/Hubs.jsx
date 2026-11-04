@@ -25,6 +25,7 @@ import Finance from '../Finance'
 import ItemCatalog from '../ItemCatalog'
 import Analyze from '../Analyze'
 import AiChat from '../AiChat'
+import Designs from '../Designs'
 
 function NewQuoteButton() {
   const navigate = useNavigate()
@@ -57,6 +58,7 @@ export function SalesHub() {
     pipeline:  () => <ProposalTracker view="pipeline" initialStatus={status} />,
     clients:   () => <ClientList initialQuery={q} />,
     opens:     () => <ProposalTracker view="activity" />,
+    designs:   () => <Designs />,
   }, { proposals: { count: dueCount, countTone: 'alert' } })
 
   return <Hub title="Sales" subtitle="Every quote from first draft to signed — and who you sent it to." tabs={tabs} actions={<NewQuoteButton />} rememberKey="sales" />
