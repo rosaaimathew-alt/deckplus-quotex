@@ -461,6 +461,8 @@
   const STAIR_W = 4, RUN = 11 / 12;
   // Rail sections: equal spacing, 8′ max (stock 6′/8′ rails), fewest posts.
   const STAIR_RAIL_X = STAIR_W / 2 - 0.2, LVL_SPAN = 24, RAIL_SECTION = 8;
+  // A section's own stair width (porch builder "stair width", deck builder "across"); 4′ when not set.
+  const sw = (s) => Math.min(30, Math.max(3, Number(s?.stairW) || STAIR_W)), srx = (s) => sw(s) / 2 - 0.2;
 
   const PORCH_TYPES = { sunroom: 'Sunroom', ezebreeze: 'Eze-Breeze porch', screen: 'Screen porch', open: 'Open porch' };
   function title(s) {
@@ -529,6 +531,11 @@
   function porchDoors0(s) {
     const g = porchGeom(s), cvF = covered(s, 'front'), cvL = covered(s, 'left'), cvR = covered(s, 'right'), mid = ([a, b]) => (a + b) / 2;
     if (s.type === 'open') return { front: [], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
+    const dw = s.doorWall === 'left' || s.doorWall === 'right' ? s.doorWall : null;
+    if (dw && !isHouseSide(s, dw) && !(dw === 'left' ? cvL : cvR).length) {
+      const z = Math.max(2.2, s.d - Math.max(3.5, sw(s) / 2 + 1));       // door toward the front of the side wall
+      return { front: [], left: [...(dw === 'left' ? [z] : []), ...(isHouseSide(s, 'left') ? [] : cvL.map(mid))], right: [...(dw === 'right' ? [z] : []), ...(isHouseSide(s, 'right') ? [] : cvR.map(mid))], stairs: g.onDeck ? { edge: dw, c: z } : null };
+    }
     if (s.type === 'sunroom') {
       if (houseSides(s).length === 2) return { front: [0], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
       let side = cvL.length ? 'left' : 'right'; if (isHouseSide(s, side)) side = side === 'left' ? 'right' : 'left';
@@ -708,7 +715,7 @@
     const hw = s.w / 2, xL = -hw + g.col / 2, xR = hw - g.col / 2;
     let xs = spread(xL, xR, 24);
     if (porchDoors(s).stairs) {
-      const clear = 1.8 + g.col / 2 + 0.05, flank = 1.8 + g.col / 2 + 0.15;
+      const clear = srx(s) + g.col / 2 + 0.05, flank = srx(s) + g.col / 2 + 0.15;
       if (xs.some(x => Math.abs(x) < clear)) xs = [...xs.filter(x => Math.abs(x) >= clear + 1.2 || x === xL || x === xR), -flank, flank].filter(x => x >= xL && x <= xR).sort((a, b) => a - b);
     }
     return xs;
@@ -886,7 +893,7 @@
       if (x.kind === 'deck') {
         box(r.x0, r.z0, r.x1, r.z1, 'floor');
         decking(r.x0, r.z0, r.x1, r.z1, { front: true, left: !neighbour(x, 'left'), right: !neighbour(x, 'right') });
-        const gaps = sp ? [[sp.c - STAIR_RAIL_X, sp.c + STAIR_RAIL_X]] : [];
+        const gaps = sp ? [[sp.c - srx(x), sp.c + srx(x)]] : [];
         subtract(r.x0 + 0.2, r.x1 - 0.2, [...covered(x, 'front'), ...(sp && sp.edge === 'front' ? gaps : [])]).forEach(([a, b]) => railPlan(a, r.z1 - 0.2, b, r.z1 - 0.2));
         [['left', r.x0 + 0.2], ['right', r.x1 - 0.2]].forEach(([ed, xx]) => subtract(r.z0 + 0.25, r.z1 - 0.2, [...covered(x, ed), ...(sp && sp.edge === ed ? gaps : [])]).forEach(([a, b]) => railPlan(xx, a, xx, b)));
         text(x.x, (r.z0 + r.z1) / 2 - ft(2), 'NEW DECK', 'room');
@@ -915,8 +922,8 @@
           xs.forEach(lx => { post(lx, gg.zF); if (gg.free) post(lx, col / 2); });
           if (!(x.tie !== 'free' && gg.shed)) [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(x, k)).forEach(([, lx]) => post(lx, col / 2));
           if (gg.onDeck) {
-            const gaps = pl.dp.stairs ? [[-STAIR_RAIL_X, STAIR_RAIL_X]] : [];
-            for (let k = 0; k < xs.length - 1; k++) subtract(xs[k] + col / 2, xs[k + 1] - col / 2, gaps).forEach(([a, b]) => railPlan(cx + a, zo2 + gg.zF, cx + b, zo2 + gg.zF, [Math.abs(Math.abs(a) - STAIR_RAIL_X) < 0.01, Math.abs(Math.abs(b) - STAIR_RAIL_X) < 0.01]));
+            const gaps = pl.dp.stairs?.edge === 'front' ? [[-srx(x), srx(x)]] : [];
+            for (let k = 0; k < xs.length - 1; k++) subtract(xs[k] + col / 2, xs[k + 1] - col / 2, gaps).forEach(([a, b]) => railPlan(cx + a, zo2 + gg.zF, cx + b, zo2 + gg.zF, [Math.abs(Math.abs(a) - srx(x)) < 0.01, Math.abs(Math.abs(b) - srx(x)) < 0.01]));
             [['left', xL], ['right', xR]].filter(([k]) => !isHouseSide(x, k)).forEach(([, lx]) => railPlan(cx + lx, zo2 + (gg.free || !gg.shed ? col : 0.25), cx + lx, zo2 + gg.zF - col / 2, [!(gg.free || !gg.shed), false]));
             if (gg.free) for (let k = 0; k < xs.length - 1; k++) railPlan(cx + xs[k] + col / 2, zo2 + col / 2, cx + xs[k + 1] - col / 2, zo2 + col / 2, [false, false]);
           }
@@ -955,7 +962,7 @@
       // Stairs: every flight with treads and a DN arrow, the landing, rails with posts.
       const sg = stairGeom(x);
       if (sg) {
-        const boxed = x.stairBox === 'boxed', railed = sg.n >= 4, hw = STAIR_W / 2, W2 = sg.toWorld;
+        const boxed = x.stairBox === 'boxed', railed = sg.n >= 4, hw = sw(x) / 2, W2 = sg.toWorld;
         const poly = (pts, cls) => out.push(`<polygon class="${cls}" points="${pts.map(([a, b]) => { const [wx, wz] = W2(a, b); return `${X(wx)},${Z(wz)}`; }).join(' ')}"/>`);
         const ln = (a, b, c2, d, cls) => { const [p1, p2] = [W2(a, b), W2(c2, d)]; line(p1[0], p1[1], p2[0], p2[1], cls); };
         const rail = (a, b, c2, d, ends) => { const [p1, p2] = [W2(a, b), W2(c2, d)]; railPlan(p1[0], p1[1], p2[0], p2[1], ends); };
@@ -966,7 +973,7 @@
           poly([P(0, -hw), P(0, hw), P(len, hw), P(len, -hw)], boxed ? 'stairs-box' : 'stairs');
           for (let k = 1; k < f.k; k++) ln(...P(k * RUN, -hw), ...P(k * RUN, hw), 'tread');
           out.push(''); ln(...P(0.3, 0), ...P(Math.max(0.6, len - 0.3), 0), 'arrow');
-          if (railed) [-1, 1].forEach(sd => rail(...P(0, sd * STAIR_RAIL_X), ...P(len, sd * STAIR_RAIL_X), [false, true]));
+          if (railed) [-1, 1].forEach(sd => rail(...P(0, sd * srx(x)), ...P(len, sd * srx(x)), [false, true]));
         });
         if (sg.landing) {
           const z0 = sg.landing.z0;
@@ -1722,14 +1729,14 @@
     withG(g, () => {
       sg.flights.forEach((f, idx) => {
         const last = idx === sg.flights.length - 1, sub = group(f.ox, 0, f.oz, f.dir ? f.dir * Math.PI / 2 : 0);
-        const end = withG(sub, () => flight(f.top, f.k, rise, last ? 0 : landing.top, railed, idx === 0 ? railStart : -0.1, boxed));
+        const end = withG(sub, () => flight(f.top, f.k, rise, last ? 0 : landing.top, railed, idx === 0 ? railStart : -0.1, boxed, false, sw(s)));
         if (last) foot = f.dir ? [f.ox + f.dir * (end + 1.75), f.oz] : [f.ox, f.oz + end + 1.75];
       });
       if (landing) {
         // 4′×4′ landing: decking, fascia, posts to grade, rails on the open sides.
-        const z0 = landing.z0, h = landing.top, hw = STAIR_W / 2, bw = 5.5 / 12;
-        for (let z = z0 + 0.02; z < z0 + LANDING - 0.05; z += bw + 0.02) B(STAIR_W, 1 / 12, bw, M.deck(Math.floor(R() * 3)), 0, h - 1 / 24, z + bw / 2);
-        B(STAIR_W + 0.16, 0.9, 0.08, M.fascia(), 0, h - 0.5, z0 + LANDING + 0.04);
+        const z0 = landing.z0, h = landing.top, hw = sw(s) / 2, bw = 5.5 / 12;
+        for (let z = z0 + 0.02; z < z0 + LANDING - 0.05; z += bw + 0.02) B(sw(s), 1 / 12, bw, M.deck(Math.floor(R() * 3)), 0, h - 1 / 24, z + bw / 2);
+        B(sw(s) + 0.16, 0.9, 0.08, M.fascia(), 0, h - 0.5, z0 + LANDING + 0.04);
         [-1, 1].forEach(sd => B(0.08, 0.9, LANDING, M.fascia(), sd * (hw + 0.04), h - 0.5, z0 + LANDING / 2));
         [[-hw + 0.3, z0 + 0.3], [hw - 0.3, z0 + 0.3], [-hw + 0.3, z0 + LANDING - 0.3], [hw - 0.3, z0 + LANDING - 0.3]].forEach(([x, z]) => {
           if (h - 1 > 0.1) B(0.46, h - 1, 0.46, M.pt(), x, (h - 1) / 2, z);
@@ -1745,7 +1752,7 @@
     });
     const w = new THREE.Vector3(foot[0], 0, foot[1]).applyAxisAngle(new THREE.Vector3(0, 1, 0), sp.ry).add(new THREE.Vector3(sp.x, 0, sp.z));
     const onPatio = S.sections.some(p => { if (p.kind !== 'patio') return false; const r = rect(p); return w.x > r.x0 && w.x < r.x1 && w.z > r.z0 - 0.5 && w.z < r.z1; });
-    if (!onPatio) { const last = sg.flights[sg.flights.length - 1], pad = group(w.x, 0, w.z, sp.ry + (last.dir ? last.dir * Math.PI / 2 : 0)); withG(pad, () => B(STAIR_W + 1.5, 0.2, 3.2, M.concrete(), 0, 0.1, 0)); }
+    if (!onPatio) { const last = sg.flights[sg.flights.length - 1], pad = group(w.x, 0, w.z, sp.ry + (last.dir ? last.dir * Math.PI / 2 : 0)); withG(pad, () => B(sw(s) + 1.5, 0.2, 3.2, M.concrete(), 0, 0.1, 0)); }
   }
 
   // Flights and landing in the stair's own frame: it starts at the edge (0,0) and runs
@@ -1766,7 +1773,7 @@
   // Footprint corners (plan coordinates) of every flight and the landing.
   function stairFootprint(s) {
     const sg = stairGeom(s); if (!sg) return [];
-    const pts = [], hw = STAIR_W / 2;
+    const pts = [], hw = sw(s) / 2;
     sg.flights.forEach(f => {
       const len = (f.k - 1) * RUN, a = f.dir ? [f.ox, f.oz - hw] : [f.ox - hw, f.oz], b = f.dir ? [f.ox + f.dir * len, f.oz + hw] : [f.ox + hw, f.oz + len];
       [[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]].forEach(([x, z]) => pts.push(sg.toWorld(x, z)));
@@ -1787,8 +1794,8 @@
       return st.edge === 'left' ? { edge: 'left', c: st.c, x: r.x0, z: st.c, ry: -Math.PI / 2 } : { edge: 'right', c: st.c, x: r.x1, z: st.c, ry: Math.PI / 2 };
     }
     const clampTo = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
-    if (e === 'front') { const xc = clampTo(s.stairAt ?? s.x, r.x0 + STAIR_W / 2 + 0.3, r.x1 - STAIR_W / 2 - 0.3); return { edge: e, c: xc, x: xc, z: r.z1, ry: 0 }; }
-    const zc = clampTo(s.stairAt ?? r.z1 - 3.5, r.z0 + STAIR_W / 2 + 0.5, r.z1 - STAIR_W / 2 - 0.3);
+    if (e === 'front') { const xc = clampTo(s.stairAt ?? s.x, r.x0 + sw(s) / 2 + 0.3, r.x1 - sw(s) / 2 - 0.3); return { edge: e, c: xc, x: xc, z: r.z1, ry: 0 }; }
+    const zc = clampTo(s.stairAt ?? r.z1 - 3.5, r.z0 + sw(s) / 2 + 0.5, r.z1 - sw(s) / 2 - 0.3);
     return e === 'left' ? { edge: e, c: zc, x: r.x0, z: zc, ry: -Math.PI / 2 } : { edge: e, c: zc, x: r.x1, z: zc, ry: Math.PI / 2 };
   }
 
@@ -1800,7 +1807,7 @@
     if (sp) stairs(s, fy, -0.2);
     skirting(r.x0, r.x1, r.z0, r.z1, fy, { front: covered(s, 'front'), left: covered(s, 'left'), right: covered(s, 'right') });
     const railed = risers(fy) >= 4;
-    const gapAt = (edge) => sp && sp.edge === edge ? [[sp.c - STAIR_RAIL_X, sp.c + STAIR_RAIL_X]] : [];
+    const gapAt = (edge) => sp && sp.edge === edge ? [[sp.c - srx(s), sp.c + srx(s)]] : [];
     const ends = (a, b, lo, hi) => [Math.abs(a - lo) < 0.01 ? a + 0.2 : a, Math.abs(b - hi) < 0.01 ? b - 0.2 : b];
     subtract(r.x0, r.x1, [...covered(s, 'front'), ...gapAt('front')]).forEach(([a, b]) => { const [p, q] = ends(a, b, r.x0, r.x1); railRun(p, r.z1 - 0.2, q, r.z1 - 0.2, fy, fy); });
     [['left', r.x0 + 0.2], ['right', r.x1 - 0.2]].forEach(([e, x]) =>
@@ -1860,6 +1867,21 @@
     const l = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), M.bulb()); l.position.set(x, yF - 0.15, z); G.add(l);
   }
 
+  // Downspout the way we hang them: a short drop from the gutter outlet, a 45° run back in
+  // to the outside face of the front corner post, straight down the post, then a kick-out
+  // elbow onto a splash block. (ox, oz) outlet, gy gutter height, (px, pz) on the post face,
+  // sd = which side is outward (-1 left, +1 right).
+  function downspout(ox, oz, gy, px, pz, sd) {
+    const m = M.gutter(), y1 = gy - 0.55;
+    B(0.22, gy - y1, 0.18, m, ox, (gy + y1) / 2, oz);
+    const dx = px - ox, dz = pz - oz, L = Math.hypot(dx, dz), y2 = y1 - L;
+    if (L > 0.05) { const r = B(0.2, 0.17, Math.hypot(L, L) + 0.12, m, (ox + px) / 2, (y1 + y2) / 2, (oz + pz) / 2); r.rotation.order = 'YXZ'; r.rotation.y = Math.atan2(dx, dz); r.rotation.x = Math.PI / 4; }
+    const yb = 0.75;
+    B(0.22, y2 - yb, 0.18, m, px, (y2 + yb) / 2, pz);
+    [y2 - 0.6, yb + 0.6].forEach(y => { if (y > yb + 0.2 && y < y2 - 0.2) B(0.26, 0.06, 0.22, M.trim(), px, y, pz); });   // straps
+    const k = B(0.2, 0.17, 0.75, m, px + sd * 0.25, yb - 0.2, pz); k.rotation.z = sd * Math.PI / 4;
+    B(0.5, 0.08, 1.3, M.concrete(), px + sd * 0.75, 0.04, pz, { cast: false });
+  }
   function buildPorch(s, E) {
     const { w: W, d: D } = s, hw = W / 2, cx = s.x;
     const pl = porchPlan(s), { onDeck, fy, beamH, col, shed, free, gp, zF, beamTop, frontTop, sideTop } = pl.g;
@@ -1893,7 +1915,7 @@
         // LVL headers clear-span up to 24′: corner posts only. Wider spans get the fewest extra posts.
         frontXs = spread(xL, xR, LVL_SPAN);
         if (dp.stairs) {
-          const clear = STAIR_RAIL_X + col / 2 + 0.05, flank = STAIR_RAIL_X + col / 2 + 0.15;
+          const clear = srx(s) + col / 2 + 0.05, flank = srx(s) + col / 2 + 0.15;
           if (frontXs.some(x => Math.abs(x) < clear)) frontXs = [...frontXs.filter(x => Math.abs(x) >= clear + 1.2 || x === xL || x === xR), -flank, flank].filter(x => x >= xL && x <= xR).sort((a, b) => a - b);
         }
         sideZs.left = sideZs.right = spread(backPost ? col / 2 : 0, zF, LVL_SPAN);
@@ -1946,8 +1968,8 @@
         beamYZ(0, roofAt(0) - 0.02, 0, roofAt(zF) - 0.02, zF, W - 0.05, 0.03, M.tg(), { cast: false });
         const gy = y2 + rz * k - 0.22;
         B(W + 2.15, 0.38, 0.4, M.gutter(), 0, gy, z2 + 0.25);
-        const dsx = covered(s, 'right').length ? -(hw + 0.75) : hw + 0.75;
-        B(0.22, gy - 0.4, 0.18, M.gutter(), dsx, (gy + 0.4) / 2, z2 + 0.2); B(0.22, 0.2, 0.9, M.gutter(), dsx, 0.2, z2 + 0.6);
+        const dsd = covered(s, 'right').length ? -1 : 1;
+        downspout(dsd * (hw + 0.75), z2 + 0.2, gy, dsd * (hw + 0.11), zF, dsd);
         if (!roofTie) B(W + 2.2, 0.3, 0.06, M.metal(), 0, y1 + rz * k + 0.2, 0.03);
         fan(0, D / 2, roofAt(D / 2) - 0.02, fy + Math.min(8.1, roofAt(D / 2) - fy - 0.6));
       } else if (s.roof === 'hip') {
@@ -1959,7 +1981,7 @@
         hipRoof(zBack, zB, span, beamTop - gp, ridgeU, rz * k, t);
         const gy = beamTop - gp + rz * k - 0.22;
         B(2 * span + 0.4, 0.38, 0.4, M.gutter(), 0, gy, zB + 0.2);
-        [-1, 1].forEach(sd => { B(0.4, 0.38, zB - Math.max(zBack, 0), M.gutter(), sd * (span + 0.2), gy, (zB + Math.max(zBack, 0)) / 2); B(0.22, gy - 0.4, 0.18, M.gutter(), sd * (span + 0.2), (gy + 0.4) / 2, zB); B(0.22, 0.2, 0.9, M.gutter(), sd * (span + 0.2), 0.2, zB + 0.4); });
+        [-1, 1].forEach(sd => { B(0.4, 0.38, zB - Math.max(zBack, 0), M.gutter(), sd * (span + 0.2), gy, (zB + Math.max(zBack, 0)) / 2); if (!covered(s, sd < 0 ? 'left' : 'right').length) downspout(sd * (span + 0.2), zB - 0.2, gy, sd * (hw + 0.11), zF, sd); });
         // soffit under the overhang, and the flat ceiling the hip roof requires
         B(2 * span, 0.05, zB - zF, t, 0, beamTop - gp, (zB + zF) / 2, { cast: false });
         [-1, 1].forEach(sd => B(span - hw, 0.05, zB, t, sd * (hw + (span - hw) / 2), beamTop - gp, zB / 2, { cast: false }));
@@ -2001,7 +2023,7 @@
           }
           const gy = beamTop - gp + rz * k - 0.22;
           B(0.4, 0.38, L, M.gutter(), sd * (span + 0.2), gy, zc);
-          B(0.22, gy - 0.4, 0.18, M.gutter(), sd * (span + 0.2), (gy + 0.4) / 2, zB - 0.3); B(0.22, 0.2, 0.9, M.gutter(), sd * (span + 0.2), 0.2, zB + 0.1);
+          if (!covered(s, sd < 0 ? 'left' : 'right').length) downspout(sd * (span + 0.2), zB - 0.3, gy, sd * (hw + 0.11), zF, sd);
         });
         // Ceiling: a full vault for a gable; a semi-vault slopes up partway, then runs flat.
         const z0c = free ? col / 2 : 0, zLen = zF - z0c, zMid = (zF + z0c) / 2;
@@ -2137,9 +2159,9 @@
           });
         });
       } else if (onDeck) {
-        const front = !covered(s, 'front').length;
-        const gaps = front ? [[-STAIR_RAIL_X, STAIR_RAIL_X]] : [];
-        const atGap = (v) => front && Math.abs(Math.abs(v) - STAIR_RAIL_X) < 0.01;
+        const front = !covered(s, 'front').length && s.steps !== false;
+        const gaps = front ? [[-srx(s), srx(s)]] : [];
+        const atGap = (v) => front && Math.abs(Math.abs(v) - srx(s)) < 0.01;
         for (let i = 0; i < frontXs.length - 1; i++) {
           subtract(frontXs[i] + col / 2, frontXs[i + 1] - col / 2, gaps).forEach(([a, b]) => railRun(a, zF, b, zF, fy, fy, { postA: atGap(a), postB: atGap(b) }));
         }
@@ -2556,7 +2578,7 @@
       if (!framed || m.frame) { framed = true; goTo('corner', true); }
       const att = [];
       S.sections.forEach(x => {
-        if (x.kind === 'porch') { const sp = stairPlacement(x); if (sp) att.push({ id: x.id, x: sp.x, z: sp.z, rot: sp.ry * 180 / Math.PI, w: STAIR_W, n: risers(S.H), run: RUN }); }
+        if (x.kind === 'porch') { const sp = stairPlacement(x); if (sp) att.push({ id: x.id, x: sp.x, z: sp.z, rot: sp.ry * 180 / Math.PI, w: sw(x), n: risers(S.H), run: RUN, landing: x.landing || 'none' }); }
         if (x.kind === 'patio') { const pw = patioWall(x); if (pw?.steps) att.push({ id: x.id, x: x.x, z: rect(x).z1, rot: 0, w: STAIR_W + 1, n: pw.steps + 1, run: pw.run }); }
       });
       window.parent.postMessage({ type: 'qx-attached', list: att }, '*');
