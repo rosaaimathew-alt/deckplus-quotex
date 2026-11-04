@@ -2054,10 +2054,17 @@
           B(0.46, 0.7, zLen, M.tg(), 0, ridgeU - 0.3, zMid);           // ridge beam inside the vault
         }
         const end = gableEndOf(s);
-        const gableFace = (zFace, dir) => {
-          const y0 = beamTop - gp, apex = span * gp;
-          [-1, 1].forEach(sd => beamXY(zFace + dir * 0.02, 0, ridgeU + 0.05, sd * (span + 0.05), beamTop - gp - 0.02, 0.14, 0.55, t));
-          B(2 * span, 0.4, 0.16, t, 0, beamTop - gp + 0.2, zFace + dir * 0.02);
+        // The gable end sits on the header, flush with its face (zFace); only the roof and the
+        // rake boards run out to the overhang (zRake). Sloped soffits close the overhang underneath.
+        const gableFace = (zRake, zFace, dir) => {
+          const span = hw, y0 = beamTop, apex = span * gp;
+          [-1, 1].forEach(sd => beamXY(zRake + dir * 0.02, 0, ridgeU + 0.05, sd * (hw + 1.05), beamTop - gp - 0.02, 0.14, 0.55, t));
+          B(2 * hw, 0.2, 0.16, t, 0, beamTop + 0.1, zFace - dir * 0.06);
+          const a2 = Math.atan(gp), k2 = 1 / Math.cos(a2), zS0 = Math.min(zFace, zRake), zS1 = Math.max(zFace, zRake);
+          [-1, 1].forEach(sd => {
+            const vx = valleyX(s, sd < 0 ? 'left' : 'right', E), sw2 = vx != null ? Math.min(hw + 1, Math.abs(vx)) : hw + 1;
+            const so = B(sw2 * k2, 0.04, zS1 - zS0, t, sd * sw2 / 2, beamTop + (hw - sw2 / 2) * gp - 0.04, (zS0 + zS1) / 2, { cast: false }); so.rotation.z = -sd * a2;
+          });
           if (end === 'siding') { tri([[-span, 0], [span, 0], [0, apex]], 0.2, M.porchSiding(), m => m.position.set(0, y0, zFace - (dir > 0 ? 0.22 : -0.02))); return; }
           // Three panes like the job photos: two side triangles and a centre pane with clipped top corners.
           const f = 0.28, base = 0.42, mx = Math.min(W / 6, span * 0.42), m = 0.16;
@@ -2075,9 +2082,10 @@
           const infill = end === 'screen' ? M.screen() : M.gableGlass();
           panes.forEach(pts => tri(pts, 0.02, infill, mm => { mm.position.set(0, y0, zFace - dir * 0.15); mm.userData.noAO = true; mm.castShadow = false; }));
         };
-        B(2 * span, 0.05, zB - zF, t, 0, beamTop - gp, (zB + zF) / 2, { cast: false });
-        gableFace(zB, 1);
-        if (free) { B(2 * span, 0.05, col / 2 - zA, t, 0, beamTop - gp, (col / 2 + zA) / 2, { cast: false }); gableFace(zA, -1); }
+        // Eave returns: the short flat piece at each front corner, under the rake.
+        [-1, 1].forEach(sd => B(1.0, 0.05, zB - zF - col / 2, t, sd * (hw + 0.5), beamTop - gp, (zB + zF + col / 2) / 2, { cast: false }));
+        gableFace(zB, zF + col / 2, 1);
+        if (free) gableFace(zA, 0, -1);
         // Roof tie: inside the vault the house wall runs up to the ceiling, hiding the old eave.
         if (roofTie) tri([[-hw + col, 0], [hw - col, 0], [0, (hw - col) * gp]], 0.1, M.siding(), m => m.position.set(0, beamTop - 0.04, 1.75));
         fan(0, D / 2, semi ? beamTop + (hw * 0.58) * gp - 0.05 : ridgeU - 0.65, fy + 8.1);
