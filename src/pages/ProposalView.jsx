@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Printer, Copy, ArrowLeft, CheckCircle, Send, X, Loader, Link2 } from 'lucide-react'
 import { useStore } from '../store'
 import { buildProposalSnapshot } from '../proposalSnapshot'
+import { withSavedDesign } from '../lib/designSnapshot'
 import { DEFAULT_BRAND_COLOR } from '../brand'
 import { toCanvas } from 'html-to-image'
 import jsPDF from 'jspdf'
@@ -220,7 +221,7 @@ export default function ProposalView() {
       let viewUrl = null
       try {
         const pid = proposalIdRef.current ?? data.id ?? null
-        const snapshot = buildProposalSnapshot(data, branding)
+        const snapshot = await withSavedDesign(buildProposalSnapshot(data, branding), pid)
         const vr = await fetch('/api/sign/pcreate', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ proposalId: pid, snapshot }),
@@ -262,7 +263,7 @@ export default function ProposalView() {
     setGettingLink(true)
     try {
       const pid = proposalIdRef.current ?? data.id ?? null
-      const snapshot = buildProposalSnapshot(data, branding)
+      const snapshot = await withSavedDesign(buildProposalSnapshot(data, branding), pid)
       const r = await fetch('/api/sign/pcreate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proposalId: pid, snapshot }),

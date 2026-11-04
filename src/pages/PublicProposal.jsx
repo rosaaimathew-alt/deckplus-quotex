@@ -88,6 +88,24 @@ export default function PublicProposal() {
             </div>
           ) : null}
 
+          {/* Your design: the drawing saved in the design editor when this proposal was
+              sent, shown look-only (plan + 3D). It's in the URL hash, so it never
+              reaches a server log. */}
+          {Array.isArray(s.design?.els) && s.design.els.length > 0 && (() => {
+            const src = `/design-editor.html?view=customer#d=${encodeURIComponent(JSON.stringify(s.design))}`
+            return (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                  <p style={sectionLabel}>Your Design</p>
+                  <a href={src} target="_blank" rel="noopener" style={{ fontSize: 12, fontWeight: 600, color: accent }}>Open full screen</a>
+                </div>
+                <iframe title="Your design: floor plan and 3D view" src={src} loading="lazy"
+                  style={{ width: '100%', height: 460, border: `1px solid ${LINE}`, borderRadius: 10, display: 'block', background: '#f7f8f6' }} />
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: SOFT }}>Drag the 3D view to look around. Sizes and options follow this proposal.</p>
+              </div>
+            )
+          })()}
+
           {/* Scope of Work — names + descriptions (no prices in the list) */}
           {lines.length > 0 && (
             <div style={{ marginBottom: 24 }}>

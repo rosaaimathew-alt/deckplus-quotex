@@ -5,6 +5,7 @@ import { MenuChip, QuickPicks, SwitchChip, RepToggle } from '../components/Filte
 import { useScopedProposals } from '../lib/proposalScope'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { buildProposalSnapshot } from '../proposalSnapshot'
+import { withSavedDesign } from '../lib/designSnapshot'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
   contractNumberFor,
@@ -288,7 +289,7 @@ function ActivityLog({ proposal, groupProposals }) {
   const makeLink = async () => {
     setLinkBusy(true)
     try {
-      const snapshot = buildProposalSnapshot(proposal, branding)
+      const snapshot = await withSavedDesign(buildProposalSnapshot(proposal, branding), proposal.id)
       const r = await fetch('/api/sign/pcreate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proposalId: proposal.id, snapshot }),
@@ -707,7 +708,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
     try {
       const r = await fetch('/api/sign/pcreate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proposalId: p.id, snapshot: buildProposalSnapshot(p, branding) }),
+        body: JSON.stringify({ proposalId: p.id, snapshot: await withSavedDesign(buildProposalSnapshot(p, branding), p.id) }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok || !d.url) throw new Error(d.error || 'Could not create link')

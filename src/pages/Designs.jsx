@@ -3,9 +3,9 @@
 // 3D model and 2D floor plan one click away. The model is drawn from the
 // proposal's own builder inputs (see src/lib/designLink.js).
 import { useMemo, useState } from 'react'
-import { Box, Ruler, Search, PenTool } from 'lucide-react'
+import { Search, PenTool } from 'lucide-react'
 import { useStore } from '../store'
-import { designSummary, designUrl, hasDesign } from '../lib/designLink'
+import { designSummary, editorUrl, hasDesign } from '../lib/designLink'
 
 const STATUS_TONE = {
   won: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -27,7 +27,6 @@ export default function Designs() {
       .sort((a, b) => String(b.sentAt || b.createdAt || '').localeCompare(String(a.sentAt || a.createdAt || '')))
   }, [proposals, q])
 
-  const open = (p, mode) => window.open(designUrl(p, mode), '_blank', 'noopener')
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl space-y-4">
@@ -64,13 +63,10 @@ export default function Designs() {
                 <div className="text-sm text-gray-700 mt-0.5">{designSummary(p)}</div>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => open(p, '3d')}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)]">
-                  <Box size={15} /> 3D rendering
-                </button>
-                <button type="button" onClick={() => open(p, '2d')}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-[var(--brand-700)] border border-[var(--brand-200)] hover:bg-[var(--brand-50)]">
-                  <Ruler size={15} /> Floor plan
+                <button type="button" onClick={() => window.open(editorUrl(p), '_blank', 'noopener')}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)]"
+                  title="Floor plan and 3D in one place; saved on this proposal">
+                  <PenTool size={15} /> Open design
                 </button>
               </div>
             </li>
