@@ -38,6 +38,11 @@
     padding-block: 8px; padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
   .bar h1 { font: 700 19px/1 var(--font-display); margin: 0 10px 0 0; }
   .grp { display: flex; gap: 3px; align-items: center; padding: 3px; border: 1px solid var(--line); border-radius: 9px; }
+  .proj { font-size: 13px; color: var(--muted); }
+  .saveg { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .save-status { font-size: 12px; color: var(--muted); }
+  .save-btn { font: 600 13px var(--font-body); padding: 6px 12px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); cursor: pointer; }
+  .save-btn:disabled { opacity: .45; cursor: default; }
   .grp span { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 6px; }
   button, .btn { font: 600 13px/1 var(--font-body); padding: 8px 10px; border-radius: 7px; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
   button:hover { background: var(--accent-soft); }
@@ -90,6 +95,8 @@
   <header class="bar">
     <h1>Design Editor</h1>
     <div class="grp" role="group" aria-label="Decking color"><span>Decking</span><div class="swatches" id="swatches"></div></div>
+    <span class="proj" id="proj"></span>
+    <div class="saveg"><span class="save-status" id="save-status" role="status"></span><button type="button" class="save-btn" id="b-save" disabled>Save to proposal</button></div>
   </header>
   <div class="main">
   <nav class="rail" role="toolbar" aria-label="Tools" aria-orientation="vertical">
@@ -142,6 +149,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<!-- Loading and saving a proposal's layout with the rep's QuoteX sign-in -->
+<script src="/qx-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.6/dist/umd/supabase.js"></script>
+<script src="/qx-design-bridge.js"></script>
 <script>
 (function () {
   // ═══ Model ═══════════════════════════════════════════════════════════════
@@ -160,6 +171,48 @@
   };
   let sel = null;                 // selected element id
   const byId = (id) => S.els.find(e => e.id === id);
+
+  // ═══ From a proposal ═════════════════════════════════════════════════════
+  // ?design=<json> (src/lib/designLink.js) carries the proposal's decks (with the
+  // deck builder's stair runs and landings) and porches; ?pid=<proposal id> is
+  // where the drawing is saved, so it reopens as it was left. Without them the
+  // editor starts from the sample above.
+  const QS = new URLSearchParams(location.search);
+  const PID = QS.get('pid') || '';
+  let DESIGN = null; try { DESIGN = QS.get('design') ? JSON.parse(QS.get('design')) : null; } catch { DESIGN = null; }
+  function layoutFrom(d) {
+    const els = []; let id = 1;
+    const plats = [
+      ...(d.decks || []),
+      ...(d.porches || []).map(p => ({ width: p.width, depth: p.depth, height: p.floor === 'deck' ? (Number(p.deckHeightFt) || 3) : 0.5 })),
+    ];
+    const total = plats.reduce((a, p) => a + (Number(p.width) || 12), 0) + 2 * Math.max(0, plats.length - 1);
+    let x = -Math.round(total / 2);
+    plats.forEach(p => {
+      const W = Number(p.width) || 12, D = Number(p.depth) || 10, H = Number(p.height) || 3;
+      els.push({ id: id++, type: 'deck', h: H, pts: [[x, 0], [x + W, 0], [x + W, D], [x, D]] });
+      const runs = (p.stairs || []).filter(s => !s.from || s.from === 'deck');
+      runs.forEach((s, i) => {
+        const w = Math.max(3, Number(s.across) || 4), sx = snapV(x + W * (i + 1) / (runs.length + 1));
+        els.push({ id: id++, type: 'stairs', x: sx, z: D, rot: 0, w });
+        // Down to a landing (the foot of the run lands on it), then onward from its front edge.
+        let topH = H, z0 = D, cur = s; const seen = new Set();
+        while (cur && cur.to && cur.to !== 'grade' && !seen.has(String(cur.to))) {
+          seen.add(String(cur.to));
+          const L = (p.landings || []).find(l => String(l.id) === String(cur.to)); if (!L) break;
+          const lh = Number(L.height) > 0 ? Number(L.height) : Math.round(topH) / 2;
+          const n = Math.max(1, Math.ceil((topH - lh) / RISE_MAX)), lw = Number(L.width) || LANDING_DEF, ld = Number(L.depth) || LANDING_DEF;
+          const lz = z0 + (n - 1) * RUN + 0.1;
+          els.push({ id: id++, type: 'landing', h: lh, x: sx, z: lz + ld / 2, w: lw, d: ld, rot: 0 });
+          const next = (p.stairs || []).find(t => String(t.from) === String(L.id));
+          els.push({ id: id++, type: 'stairs', x: sx, z: lz + ld, rot: 0, w: next ? Math.max(3, Number(next.across) || w) : w });
+          topH = lh; z0 = lz + ld; cur = next;
+        }
+      });
+      x += W + 2;
+    });
+    return els;
+  }
   const $ = (id) => document.getElementById(id);
   const rad = (d) => d * Math.PI / 180;
   const fmt = (ft) => { const t = Math.round(ft * 12), f = Math.floor(t / 12), i = t - f * 12; return `${f}′-${i}″`; };
@@ -231,14 +284,24 @@
     return [[-hw, 0], [hw, 0], [hw, L], [-hw, L]].map(([u, v]) => [e.x + u * c + v * s, e.z - u * s + v * c]);
   }
 
+  // The proposal's layout replaces the sample before history starts.
+  if (DESIGN) {
+    const els = layoutFrom(DESIGN);
+    if (els.length) { S.els = els; nextId = els.length + 1; }
+    const coll = String((DESIGN.decks || [])[0]?.collKey || '').toLowerCase();
+    const named = COLORS.find(([n]) => coll.includes(n.toLowerCase()));
+    if (named) S.color = named[0]; else if (/\bpt\b|pressure/.test(coll)) S.color = 'PT';
+  }
+
   // ═══ History ═════════════════════════════════════════════════════════════
   const hist = [], fut = [];
   const snap = () => JSON.stringify({ els: S.els, color: S.color, nextId });
   let lastSaved = snap();
-  function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); }
+  let onChange = () => {};        // set once the saved design has loaded (see Save to the proposal)
+  function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); onChange(); }
   function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
-  function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); refreshButtons(); }
-  function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); refreshButtons(); }
+  function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); refreshButtons(); onChange(); }
+  function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); refreshButtons(); onChange(); }
 
   // ═══ 2D plan ═════════════════════════════════════════════════════════════
   const svg = $('plan'), NS = 'http://www.w3.org/2000/svg';
@@ -661,7 +724,40 @@
     const w = Math.max(x1 - x0, (z1 - z0) / asp, 20); vb = { x: (x0 + x1) / 2 - w / 2, z: z0 - ((w * asp) - (z1 - z0)) / 2 * 0.3, w }; drawPlan();
   }
   $('b-fit').addEventListener('click', fitPlan);
-  init3D(); frame3D(); sel = 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
+  init3D(); frame3D(); sel = DESIGN ? null : 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
+
+  // ═══ Save to the proposal ════════════════════════════════════════════════
+  // Saved in proposal_designs with the rep's QuoteX sign-in (qx-design-bridge.js):
+  // a moment after each change, and on Save / Ctrl+S. A saved drawing wins over
+  // the layout worked out from the quote.
+  const store = window.qxDesignStore, saveBtn = $('b-save');
+  const setStatus = (t) => { $('save-status').textContent = t; };
+  const syncSwatches = () => document.querySelectorAll('#swatches button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.c === S.color)));
+  if (DESIGN?.client) $('proj').textContent = [DESIGN.client, DESIGN.address].filter(Boolean).join(' · ');
+  let saveT = null, dirty = false;
+  async function saveNow() {
+    clearTimeout(saveT); if (!PID || !store) return;
+    try { setStatus('Saving…'); await store.save(PID, JSON.parse(snap())); dirty = false; setStatus('Saved ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })); }
+    catch (err) { setStatus(err.message); }
+  }
+  saveBtn.addEventListener('click', saveNow);
+  document.addEventListener('keydown', (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); saveNow(); } });
+  window.addEventListener('beforeunload', (ev) => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
+  if (!PID) setStatus('Open from Sales → Designs to save');
+  else if (!store) setStatus('Saving is unavailable here');
+  else {
+    setStatus('Loading…');
+    store.load(PID).then(saved => {
+      if (saved && Array.isArray(saved.els) && saved.els.length) {
+        restore(JSON.stringify(saved)); hist.length = 0; fut.length = 0; sel = null;
+        syncSwatches(); changed(); refreshButtons(); frame3D(); fitPlan();
+        setStatus('Saved design');
+      } else setStatus('Not saved yet');
+    }).catch(err => setStatus(err.message)).finally(() => {
+      saveBtn.disabled = false;
+      onChange = () => { dirty = true; setStatus('Unsaved changes'); clearTimeout(saveT); saveT = setTimeout(saveNow, 1500); };
+    });
+  }
   window.__ed = { S, stairInfo, load(els) { S.els = els; nextId = Math.max(...els.map(e => e.id)) + 1; sel = null; commit(); changed(); frame3D(); fitPlan(); } };
 })();
 </script>

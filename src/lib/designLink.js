@@ -23,7 +23,12 @@ export function designParts(lines = []) {
     }
     const st = l.builder?.state
     if (l.builder?.tool === 'deck' && st && n(st.width) > 0 && n(st.depth) > 0) {
-      decks.push({ name: l.name || '', width: n(st.width), depth: n(st.depth), height: n(st.height), collKey: st.collKey || '', rail: st.rail || '' })
+      decks.push({
+        name: l.name || '', width: n(st.width), depth: n(st.depth), height: n(st.height), collKey: st.collKey || '', rail: st.rail || '',
+        // Stair runs and landings as the deck builder links them (from 'deck' / a landing → to a landing / 'grade'), for the design editor
+        stairs: (st.stairs || []).map(s => ({ id: s.id, across: n(s.across) || 4, steps: n(s.steps), from: s.from || 'deck', to: s.to || 'grade' })),
+        landings: (st.landings || []).map(x => ({ id: x.id, width: n(x.width), depth: n(x.depth), height: n(x.height) })),
+      })
       continue
     }
     const patio = l.builder?.tool === 'hardscape' ? st?.inp?.patio : null
@@ -64,4 +69,13 @@ export function designUrl(p, mode = '3d') {
   const priceRange = p?.isAlaCarte ? null : priceRangeOf(total, p?.priceRange)
   const payload = { client: p?.client || '', address: p?.address || '', phone: p?.phone || '', email: p?.email || '', contractNum: p?.contractDraft?.contractNum || '', priceRange, total: priceRange || p?.isAlaCarte ? 0 : total, ...d }
   return `/porch-3d.html?design=${encodeURIComponent(JSON.stringify(payload))}${mode === '2d' ? '&mode=2d' : ''}`
+}
+
+// The design editor (public/design-editor.html) with this proposal's decks,
+// porches, stairs and landings; `pid` is where it saves the drawing
+// (proposal_designs), so it reopens where the rep left off.
+export function editorUrl(p) {
+  const d = designParts(p?.lines)
+  const payload = { client: p?.client || '', address: p?.address || '', decks: d.decks, porches: d.porches }
+  return `/design-editor.html?design=${encodeURIComponent(JSON.stringify(payload))}${p?.id != null ? `&pid=${encodeURIComponent(p.id)}` : ''}`
 }

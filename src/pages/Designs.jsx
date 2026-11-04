@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react'
 import { Box, Ruler, Search, PenTool } from 'lucide-react'
 import { useStore } from '../store'
-import { designSummary, designUrl, hasDesign } from '../lib/designLink'
+import { designSummary, designUrl, editorUrl, hasDesign } from '../lib/designLink'
 
 const STATUS_TONE = {
   won: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -71,6 +71,11 @@ export default function Designs() {
                 <button type="button" onClick={() => open(p, '2d')}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-[var(--brand-700)] border border-[var(--brand-200)] hover:bg-[var(--brand-50)]">
                   <Ruler size={15} /> Floor plan
+                </button>
+                <button type="button" onClick={() => window.open(editorUrl(p), '_blank', 'noopener')}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-[var(--brand-700)] border border-[var(--brand-200)] hover:bg-[var(--brand-50)]"
+                  title="Lay out the decks, stairs and landings; saved on this proposal">
+                  <PenTool size={15} /> Design
                 </button>
               </div>
             </li>
