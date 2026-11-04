@@ -721,6 +721,7 @@
     siding: () => S.house === 'brick' ? mat('brick', () => std({ color: '#ffffff', map: T.brick, bumpMap: T.brick, bumpScale: 0.04, roughness: 0.95 }))
       : mat('siding-' + S.house, () => std({ color: HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
     porchSiding: () => mat('psiding-' + S.house, () => std({ color: S.house === 'brick' ? '#c8b994' : HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
+    gableGlass: () => mat('gableGlass', () => noAO(std({ color: '#2a3a44', transparent: true, opacity: 0.32, roughness: 0.05, metalness: 0.2, envMapIntensity: 1.4, side: THREE.DoubleSide, depthWrite: false }))),
     ezeGlass: () => mat('ezeGlass', () => noAO(std({ color: '#1a2026', transparent: true, opacity: 0.55, roughness: 0.15, metalness: 0.6, side: THREE.DoubleSide, depthWrite: false }))),
     doorPanel2: () => mat('doorPanel2', () => std({ color: '#e9e8e2', roughness: 0.5 })),
     shingle: () => mat('shingle', () => std({ color: '#ffffff', map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95 })),
@@ -1148,11 +1149,26 @@
         const y0 = beamTop - gp, apex = span * gp, roofY = (x) => y0 + (span - Math.abs(x)) * gp;
         if (s.type === 'open') tri([[-span, 0], [span, 0], [0, apex]], 0.2, t, m => m.position.set(0, y0, zB - 0.22));
         else {
-          tri([[-span, 0], [span, 0], [0, apex]], 0.05, s.type === 'screen' ? M.screen() : M.glass(), m => m.position.set(0, y0, zB - 0.14));
-          const mx = W / 6;
-          [-mx, mx].forEach(x => { const h = roofY(x) - y0 - 0.1; B(0.3, h, 0.16, t, x, y0 + h / 2, zB - 0.06); });
-          const cy = y0 + apex - 0.75 - 0.25; if (cy > roofY(mx)) B(2 * (span - (cy - y0) / gp) - 0.2, 0.22, 0.16, t, 0, cy, zB - 0.06);
+          // Three panes like the job photos: two side triangles and a centre pane
+          // with clipped top corners, set in a trim frame (one extrusion with holes).
+          const f = 0.28, base = 0.42, mx = Math.min(W / 6, span * 0.42), m = 0.16;
+          const top = (x) => (span - Math.abs(x)) * gp - f;          // inner edge of the rake trim
+          const xEdge = span - (base + f) / gp;                        // where the rake meets the sill
+          const clipY = apex - f - 0.9;
+          const panes = [
+            [[-xEdge, base], [-mx - m, base], [-mx - m, top(mx + m)]],
+            [[mx + m, base], [xEdge, base], [mx + m, top(mx + m)]],
+            [[-mx + m, base], [mx - m, base], [mx - m, Math.min(top(mx - m), clipY)], ...(top(mx - m) > clipY ? [[span - (clipY + f) / gp, clipY], [-(span - (clipY + f) / gp), clipY]] : []), [-mx + m, Math.min(top(mx - m), clipY)]],
+          ].filter(pts => pts.length >= 3 && Math.abs(pts[1][0] - pts[0][0]) > 0.4);
+          const outer = new THREE.Shape(); outer.moveTo(-span, 0); outer.lineTo(span, 0); outer.lineTo(0, apex); outer.closePath();
+          panes.forEach(pts => { const h = new THREE.Path(); h.moveTo(...pts[0]); pts.slice(1).forEach(q => h.lineTo(...q)); h.closePath(); outer.holes.push(h); });
+          const frame = new THREE.Mesh(new THREE.ExtrudeGeometry(outer, { depth: 0.2, bevelEnabled: false }), t);
+          frame.position.set(0, y0, zB - 0.24); frame.castShadow = frame.receiveShadow = true; G.add(frame);
+          const infill = s.type === 'screen' ? M.screen() : M.gableGlass();
+          panes.forEach(pts => tri(pts, 0.02, infill, mm => { mm.position.set(0, y0, zB - 0.15); mm.userData.noAO = true; mm.castShadow = false; }));
         }
+        // Inside the vault the house wall continues up to the ceiling, hiding the old eave.
+        tri([[-hw + col, 0], [hw - col, 0], [0, (hw - col) * gp]], 0.1, M.siding(), m => m.position.set(0, beamTop - 0.04, 1.75));
         fan(0, D / 2, ridgeU - 0.65, fy + 8.1);
       }
 
