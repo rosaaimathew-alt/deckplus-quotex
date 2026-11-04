@@ -479,6 +479,19 @@
       if (edge === 'left' && Math.abs(q.x1 - r.x0) < 0.3) out.push([Math.max(r.z0, q.z0), Math.min(r.z1, q.z1)]);
       if (edge === 'right' && Math.abs(q.x0 - r.x1) < 0.3) out.push([Math.max(r.z0, q.z0), Math.min(r.z1, q.z1)]);
     });
+    // The design editor's free-form decks and landings at the porch's floor height count
+    // too: walk along the edge just outside the porch and keep the stretches that land on one.
+    const fp = (S.free?.plats || []).filter(pl => Math.abs(pl.h - S.H) < 0.3);
+    if (fp.length) {
+      const inPl = (x, z) => fp.some(pl => { let ins = false; const P = pl.pts; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) ins = !ins; } return ins; });
+      const [a0, a1] = edge === 'front' ? [r.x0, r.x1] : [r.z0, r.z1], pt = (t) => edge === 'front' ? [t, r.z1 + 0.4] : edge === 'left' ? [r.x0 - 0.4, t] : [r.x1 + 0.4, t];
+      let run = null;
+      for (let t = a0 + 0.125; t <= a1; t += 0.25) {
+        if (inPl(...pt(t))) { if (!run) run = [t - 0.125, t + 0.125]; else run[1] = t + 0.125; }
+        else if (run) { out.push(run); run = null; }
+      }
+      if (run) out.push([run[0], Math.min(run[1], a1)]);
+    }
     return out.filter(([a, b]) => b - a > 0.5);
   }
   function subtract(a, b, cuts) {
@@ -850,6 +863,7 @@
     });
     const neighbour = (x, side) => S.sections.some(o => o !== x && o.kind !== 'patio' && x.kind !== 'patio' && (side === 'left' ? Math.abs(rect(o).x1 - rect(x).x0) < 0.3 : Math.abs(rect(o).x0 - rect(x).x1) < 0.3));
 
+    const freeAt = out.length;           // the editor's decks go under the porches (door swings stay visible)
     S.sections.forEach(x => {
       const r = rect(x), sp = stairPlacement(x);
       if (x.kind === 'patio') {
@@ -974,6 +988,7 @@
     });
     if (att.length > 1) { const ax0 = Math.min(...att.map(a => rect(a).x0)), ax1 = Math.max(...att.map(a => rect(a).x1)); dim(ax0, ax1, -4.8, true, `${fmtFt(ax1 - ax0)} OVERALL`); }
     // The editor's free-form decks, landings and stairs
+    const freeLen = out.length;
     const poly = (pts, cls) => out.push(`<polygon class="${cls}" points="${pts.map(q => `${X(q[0])},${Z(q[1])}`).join(' ')}"/>`);
     (S.free?.plats || []).forEach((p, pi) => {
       poly(p.pts, 'floor');
@@ -990,6 +1005,7 @@
       const cx = xs.reduce((a, v) => a + v, 0) / xs.length, cz = zs.reduce((a, v) => a + v, 0) / zs.length;
       text(cx, cz - ft(2), p.kind === 'landing' ? 'LANDING' : 'NEW DECK', 'room'); text(cx, cz + ft(7), `${fmtFt(p.h)} high`, 'note');
     });
+    { const moved = out.splice(freeLen); out.splice(freeAt, 0, ...moved); }
     (S.free?.stairs || []).forEach(st => {
       if (st.top - st.bottom < 0.3) return;
       const pts = freeStairCorners(st), c = Math.cos(st.rot * Math.PI / 180), sn = Math.sin(st.rot * Math.PI / 180), W2 = (u, v) => [st.x + u * c + v * sn, st.z - u * sn + v * c];
