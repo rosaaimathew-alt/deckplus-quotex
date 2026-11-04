@@ -50,6 +50,6 @@ export function designSummary(p) {
 
 export function designUrl(p, mode = '3d') {
   const d = designParts(p?.lines)
-  const payload = { client: p?.client || '', address: p?.address || '', ...d }
+  const payload = { client: p?.client || '', address: p?.address || '', phone: p?.phone || '', email: p?.email || '', contractNum: p?.contractDraft?.contractNum || '', ...d }
   return `/porch-3d.html?design=${encodeURIComponent(JSON.stringify(payload))}${mode === '2d' ? '&mode=2d' : ''}`
 }
