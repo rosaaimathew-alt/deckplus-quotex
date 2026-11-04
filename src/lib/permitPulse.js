@@ -57,6 +57,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
             address: p.address,
             client: p.client,
             county: jobCounty(p),
+            jurisdiction: p.imported?.jurisdiction || '',
             pick: p.jobData?.countyPick || null,
             record: (String(p.imported?.permit || '').toUpperCase().match(/\b[A-Z]{1,5}-?(?:[A-Z]{2,5}-)?\d{2,4}-\d{3,7}\b/) || [])[0] || '',
             knownNotes: Object.keys(knownNotes(p.countyPermit)),

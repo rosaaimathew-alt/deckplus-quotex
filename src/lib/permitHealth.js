@@ -14,7 +14,8 @@ const DOWN_SHARE = 0.3
 const STALE_MS = 26 * 3600 * 1000   // checks run at 8 AM and 1 PM — a day+ without one is a problem
 const REALERT_MS = 12 * 3600 * 1000
 
-export const countyOf = (p) => p.imported?.county || locateAddress(p.address).county || 'Unknown'
+// A city that inspects its own jobs (Rock Hill) has its own connection
+export const countyOf = (p) => p.imported?.jurisdiction || p.imported?.county || locateAddress(p.address).county || 'Unknown'
 
 // stats: { [county]: { ok, failed, lastError } } from one run
 export function gradeRun(prevHealth = {}, stats = {}, now = new Date().toISOString()) {

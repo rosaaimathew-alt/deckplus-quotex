@@ -21,6 +21,7 @@ import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
 import { requireAuth, staffRole } from './_auth.js'
 import { sendPermitAlert } from './_permit-alert.js'
+import { EVOLVE_SITES, searchAddress as evolveSearch, permitDetails as evolveDetails } from './_evolve.js'
 import { SITES, searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, RECORD_RE } from './_accela.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
@@ -35,6 +36,76 @@ const MAX_NEW_NOTES = 12    // "View Details" pages read per job per pulse
 export const COUNTIES = {
   Mecklenburg: { site: SITES.Mecklenburg, building: /^RES-(ADD|ALT|NEW|ACC|DEM)-/i, trade: /^RES-(ELC|MEC|PLM)-/i, byName: true },
   Cabarrus:    { site: SITES.Cabarrus,    building: /^BU\d/i,                      trade: /^(EL|ME|MC|PL)\d/i,   byName: false },
+  // Evolve portals: one permit carries every trade's inspections
+  Union:       { evolve: EVOLVE_SITES.Union },
+  York:        { evolve: EVOLVE_SITES.York },
+  'Rock Hill': { evolve: EVOLVE_SITES.RockHill },
+  Lancaster:   { evolve: EVOLVE_SITES.Lancaster },
+}
+
+// Ours, on an Evolve permit: we file as Deck Plus, or our permit expediter
+// (Kent's Consulting Services) files for us.
+const OUR_CONTRACTOR = /deck\s*plus|kent'?s\s+consulting/i
+const NOT_BUILDING = /electric|mechanic|plumb|^gas$|^z$|fire|sign|pool/i
+const CLOSED = /complet|closed|expired|void|withdrawn|cancel|^co$|final/i
+
+// Street names one or two letters apart ("Kestrell" / "Kestrel", "Chacelot" /
+// "Chancelot") — safe because the house number has to match exactly.
+function closeStreet(a, b) {
+  a = a.split(' ')[0]; b = b.split(' ')[0]
+  if (!a || !b) return false
+  if (a.startsWith(b) || b.startsWith(a)) return true
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i])
+  for (let j = 1; j <= b.length; j++) d[0][j] = j
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+  }
+  return d[a.length][b.length] <= 2
+}
+
+async function checkEvolveJob(job, site) {
+  const addr = parseAddress(job.address)
+  if (!addr.number || !addr.name) return { error: 'The job has no street address to search the county by.' }
+  // Search by the house number and the street's first letters, then keep the
+  // results whose number matches exactly and whose street is close enough.
+  const ours = (sr) => sr.rows.filter(r => {
+    const c = parseAddress(r.address)
+    return c.number === addr.number && closeStreet(addr.name, c.name)
+  })
+  // Three letters first; two only if that found nothing (a typo in the third)
+  let search = await evolveSearch(site, `${addr.number} ${addr.name.slice(0, 3)}`)
+  let rows = ours(search)
+  if (!rows.length) { search = await evolveSearch(site, `${addr.number} ${addr.name.slice(0, 2)}`); rows = ours(search) }
+  const building = rows.filter(r => !NOT_BUILDING.test(r.type))
+  const sum = (r) => ({ record: r.record, type: r.type, description: '', projectName: r.contractor, address: r.address, status: r.status, date: r.date, capIds: [r.record], url: site.base })
+
+  let main = null
+  if (Array.isArray(job.pick) && job.pick.length === 1) {
+    main = building.find(r => r.record === job.pick[0]) || null
+    if (!main) return { error: 'The permit picked for this job is no longer listed at its address.', candidates: building.map(sum), needsPick: building.length > 0 }
+  } else if (job.record) {
+    main = building.find(r => r.record === job.record) || null
+  }
+  if (!main) {
+    const ours = building.filter(r => OUR_CONTRACTOR.test(r.contractor))
+    const open = ours.filter(r => !CLOSED.test(r.status))
+    const pool = open.length ? open : ours
+    if (pool.length === 1) main = pool[0]
+    else if (!building.length) return { error: 'No building permit found at this address on the county site.' }
+    else return { needsPick: true, candidates: (pool.length ? pool : building).map(sum) }
+  }
+
+  const d = await evolveDetails(search, main)
+  // Split the permit's inspections by trade, so electrical and mechanical land
+  // in their own columns like the other counties' separate trade permits.
+  const base = { ...sum(main), description: d.description, recordStatus: main.status, upcoming: [] }
+  const groups = { '': [], ELC: [], MEC: [], PLM: [] }
+  for (const i of d.inspections) (groups[i.trade] || groups['']).push(i)
+  const permits = [{ ...base, role: 'building', completed: groups[''] }]
+  for (const kind of ['ELC', 'MEC', 'PLM']) {
+    if (groups[kind].length) permits.push({ ...base, role: 'trade', kind, completed: groups[kind] })
+  }
+  return { permits, owner: d.owner }
 }
 
 // ── Address ──────────────────────────────────────────────────────────────────
@@ -89,8 +160,10 @@ const summary = (r, site) => ({
 
 // ── One job ──────────────────────────────────────────────────────────────────
 export async function checkJob(job) {
-  const rule = COUNTIES[job.county || 'Mecklenburg']
-  if (!rule) return { unsupported: true, error: `${job.county || 'This county'}'s permit site isn't connected yet. Record its results by hand.` }
+  // A city that inspects its own jobs (Rock Hill) is looked up before its county
+  const rule = (job.jurisdiction ? COUNTIES[job.jurisdiction] : COUNTIES[job.county || 'Mecklenburg'])
+  if (!rule) return { unsupported: true, error: `${job.jurisdiction || job.county || 'This county'}'s permit site isn't connected yet. Record its results by hand.` }
+  if (rule.evolve) return checkEvolveJob(job, rule.evolve)
   const { site } = rule
   const sum = (r) => summary(r, site)
   const addr = parseAddress(job.address)
@@ -177,6 +250,7 @@ export default async function handler(req, res) {
     address: String(j?.address || '').slice(0, 200),
     client: String(j?.client || '').slice(0, 120),
     county: Object.hasOwn(COUNTIES, String(j?.county || '')) ? String(j.county) : (j?.county ? String(j.county).slice(0, 40) : 'Mecklenburg'),
+    jurisdiction: String(j?.jurisdiction || '').slice(0, 40),
     pick: Array.isArray(j?.pick) ? j.pick.map(String).slice(0, 3) : null,
     record: RECORD_RE.test(String(j?.record || '').trim().toUpperCase()) ? String(j.record).trim().toUpperCase() : '',
     knownNotes: Array.isArray(j?.knownNotes) ? j.knownNotes.slice(0, 500) : [],
