@@ -278,6 +278,53 @@ async function book(req, res) {
   })
 }
 
+// ── Alerts: tell the office when the calendar breaks ────────────────────────
+// A failed booking emails the customer's details right away (it's a lead to
+// call back). A calendar that won't load alerts at most once an hour. Sent to
+// rr_settings.report_to; if the database itself is down, to ALERT_FALLBACK.
+const ALERT_FALLBACK = ['matt@deck.plus', 'marcelo@deck.plus']
+let lastLoadAlert = 0
+async function alertOffice({ subject, html, throttle }) {
+  try {
+    if (throttle && Date.now() - lastLoadAlert < 3_600_000) return
+    let to = ALERT_FALLBACK
+    try {
+      const sb = db()
+      if (throttle) {
+        const since = new Date(Date.now() - 3_600_000).toISOString()
+        const { data, error } = await sb.from('rr_settings').update({ alert_sent_at: new Date().toISOString() })
+          .eq('id', true).or(`alert_sent_at.is.null,alert_sent_at.lt.${since}`).select('report_to')
+        if (error) throw error
+        if (!data?.length) { lastLoadAlert = Date.now(); return }   // another instance already alerted this hour
+        if (data[0].report_to?.length) to = data[0].report_to
+      } else {
+        const { data } = await sb.from('rr_settings').select('report_to').eq('id', true).single()
+        if (data?.report_to?.length) to = data.report_to
+      }
+    } catch { /* database down: use the fallback list */ }
+    if (throttle) lastLoadAlert = Date.now()
+    const msg = { to, subject, html }
+    let ok = false
+    try { ok = await sendAsRep({ name: 'Booking Calendar', email: to[0] }, msg) } catch (err) { console.error('Alert via Gmail failed:', err.message) }
+    if (!ok) await sendMail({ ...msg, fromName: 'Deck Plus Booking Calendar' })
+  } catch (err) {
+    console.error('Alert failed:', err.message)
+  }
+}
+
+function failedBookingAlert(body, err) {
+  const b = body || {}
+  const row = (k, v) => v ? `<tr><td style="padding:3px 14px 3px 0;color:#6b7280">${k}</td><td><b>${esc(clean(v, 300))}</b></td></tr>` : ''
+  const when = Date.parse(b.start) ? new Date(b.start).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
+  return {
+    subject: `Booking failed: ${clean(b.firstName, 60)} ${clean(b.lastName, 60)} needs a call back`.trim(),
+    html: `<div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937">
+<p>Someone tried to book on the website calendar and it failed, so <b>no appointment was created</b>. Please call them back:</p>
+<table style="border-collapse:collapse">${row('Name', `${b.firstName || ''} ${b.lastName || ''}`.trim())}${row('Phone', b.phone)}${row('Email', b.email)}${row('Address', [b.street, b.city, b.state, b.zip].filter(Boolean).join(', '))}${row('Wanted', when)}${row('Notes', b.notes)}</table>
+<p style="color:#6b7280;font-size:12px">Error: ${esc(String(err?.message || err).slice(0, 300))}</p></div>`,
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -293,6 +340,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   } catch (err) {
     console.error('Booking error:', err)
+    if (req.method === 'POST' && !req.query?.step && !req.query?.track) await alertOffice(failedBookingAlert(req.body, err))
+    else if (req.method === 'GET' && !req.query?.check && !req.query?.report) {
+      await alertOffice({ throttle: true, subject: 'The website booking calendar is not loading',
+        html: `<p style="font-family:Arial,Helvetica,sans-serif">Visitors can't see any times on the website calendar right now, so nobody can book.</p><p style="font-family:Arial,Helvetica,sans-serif;color:#6b7280;font-size:12px">Error: ${esc(String(err?.message || err).slice(0, 300))}. You'll get at most one of these an hour.</p>` })
+    }
     return res.status(500).json({ error: 'Something went wrong — please try again.' })
   }
 }
