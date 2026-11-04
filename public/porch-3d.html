@@ -46,7 +46,7 @@
   .row-label output, .row-label .val { font: 500 13.5px/1 var(--font-mono); color: var(--fg); white-space: nowrap; }
   fieldset[disabled] { opacity: .45; }
 
-  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; margin-bottom: 4px; }
+  .seg { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; margin-bottom: 4px; }
   .seg input { position: absolute; opacity: 0; pointer-events: none; }
   .seg label { text-align: center; padding: 8px 4px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; line-height: 1.15; user-select: none; }
   .seg label small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; margin-top: 2px; }
@@ -55,12 +55,14 @@
   .seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   input[type=range] { width: 100%; accent-color: var(--accent); margin: 0 0 6px; }
-  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatches { position: relative; display: flex; gap: 8px; flex-wrap: wrap; }
   .swatches input { position: absolute; opacity: 0; pointer-events: none; }
   .swatches label { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
   .swatches input:checked + label { box-shadow: 0 0 0 2px var(--accent); }
   .swatches input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 3px; }
   .swatch-name { font-size: 13px; color: var(--muted); }
+  .select { font: 500 15px/1.2 var(--font-body); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; margin-bottom: 4px; }
+  .select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   .sec-list { display: flex; flex-direction: column; gap: 6px; }
   .sec-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: 100%; text-align: left;
@@ -139,12 +141,8 @@
       <legend>Whole build</legend>
       <div class="row-label"><label class="label" for="h">Deck &amp; floor height</label><output id="h-out" for="h">3′-0″</output></div>
       <input type="range" id="h" min="1" max="10" step="0.5" value="3">
-      <span class="label">Decking</span>
-      <div class="seg">
-        <input type="radio" name="decking" id="deck-pt" value="pt"><label for="deck-pt">PT<small>Pressure treated</small></label>
-        <input type="radio" name="decking" id="deck-enhance" value="enhance" checked><label for="deck-enhance">Trex Enhance<small>Composite</small></label>
-        <input type="radio" name="decking" id="deck-transcend" value="transcend"><label for="deck-transcend">Trex Transcend<small>Composite</small></label>
-      </div>
+      <label class="label" for="decking">Decking</label>
+      <select id="decking" class="select"></select>
       <div id="color-row">
         <div class="row-label"><span class="label">Decking color</span><span class="swatch-name" id="color-name">Sand</span></div>
         <div class="swatches" id="color-swatches"></div>
@@ -159,6 +157,8 @@
         <input type="radio" name="skirt" id="skirt-none" value="none" checked><label for="skirt-none">None<small>Open underneath</small></label>
         <input type="radio" name="skirt" id="skirt-horizontal" value="horizontal"><label for="skirt-horizontal">Composite<small>Horizontal boards</small></label>
       </div>
+      <div class="row-label"><span class="label">House exterior</span><span class="swatch-name" id="house-name">Almond siding</span></div>
+      <div class="swatches" id="house-swatches"></div>
       <div class="row-label"><span class="label">Porch trim &amp; columns</span><span class="swatch-name" id="trim-name">Almond</span></div>
       <div class="swatches" id="trim-swatches"></div>
     </fieldset>
@@ -187,6 +187,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/SSAOShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/SimplexNoise.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/SSAOPass.js"></script>
 <script>
 (function () {
   // ── Rates (sell price) from the QuoteX price lists ─────────────────────────
@@ -196,24 +203,43 @@
   };
   const SCREENEZE_SF = 3, DECK_OVER_8_SF = 5, GABLE_OVER_19 = 1000, STEP_FACTOR = 1.5;
   const DECKING = {                          // src/lib/deckPricing.js + porch floor upgrades
-    pt:        { label: 'PT',             deckSF: 33,   porchUp: 0,    rail: { label: '2×2 picket wood rail', lf: 17 } },
-    enhance:   { label: 'Trex Enhance',   deckSF: 48.4, porchUp: 7.7,  rail: { label: 'Hybrid rail, Trex cap', lf: 30.8 } },
-    transcend: { label: 'Trex Transcend', deckSF: 61.6, porchUp: 17.6, rail: { label: 'Hybrid rail, Trex cap', lf: 30.8 } },
+    pt:        { label: 'PT',                      deckSF: 33,    porchUp: 0 },
+    enhance:   { label: 'Trex Enhance',            deckSF: 48.4,  porchUp: 7.7 },
+    transcend: { label: 'Trex Transcend Tropicals', deckSF: 61.6, porchUp: 17.6 },
+    lineage:   { label: 'Trex Transcend Lineage',  deckSF: 61.6,  porchUp: 0 },
+    signature: { label: 'Trex Signature',          deckSF: 73.7,  porchUp: 0 },
+    terrain:   { label: 'TimberTech Terrain/+',    deckSF: 55.44, porchUp: 0 },
+    prime:     { label: 'TimberTech Prime/+',      deckSF: 50.82, porchUp: 0 },
+    reserve:   { label: 'TimberTech Reserve',      deckSF: 58.91, porchUp: 0 },
+    landmark:  { label: 'TimberTech Landmark PVC', deckSF: 65.84, porchUp: 0 },
   };
   const PATIO = {                            // src/hardscape.js
     pavers:   { label: 'Paver patio',    item: 'Techo Bloc pavers', sf: 27.5, smallAdd: 6 },
     concrete: { label: 'Concrete patio', item: 'Concrete 4″',       sf: 17,   smallSF: 30 },
   };
 
-  const COLORS = [
-    { key: 'sand', name: 'Sand', hex: '#a98a68' },
-    { key: 'driftwood', name: 'Driftwood gray', hex: '#8c877e' },
-    { key: 'walnut', name: 'Walnut', hex: '#6a4a35' },
-    { key: 'charcoal', name: 'Charcoal', hex: '#55565a' },
-  ];
+  // Decking collections the office sells, with each line's colors.
+  const LINES = {
+    pt:        { label: 'PT', brand: 'Wood', colors: [['PT', '#b09363']] },
+    enhance:   { label: 'Trex Enhance', brand: 'Trex', colors: [['Foggy Wharf', '#a3a4a2'], ['Rocky Harbor', '#8d8178'], ['Toasted Sand', '#a07c58'], ['Honey Grove', '#9a7a5e'], ['Golden Hour', '#b58358'], ['Cinnamon Cove', '#8c5a44'], ['Clam Shell', '#8f908b'], ['Saddle', '#8a5f42'], ['Tide Pool', '#9a918a'], ['Pebble Beach', '#8b8584']] },
+    transcend: { label: 'Trex Transcend Tropicals', brand: 'Trex', colors: [['Heron Gray', '#8e8f87'], ['Havana Gold', '#93703f'], ['Tiki Torch', '#a35f34'], ['Spiced Rum', '#6c4632'], ['Lava Rock', '#5a2a24']] },
+    lineage:   { label: 'Trex Transcend Lineage', brand: 'Trex', colors: [['Salt Flat', '#bcb0a2'], ['Carmel', '#c19a74'], ['Rainier', '#a9aaa6'], ['Biscayne', '#a08a72'], ['Island Mist', '#8f9087'], ['Jasper', '#a7795a'], ['Hatteras', '#8b4e3f']] },
+    signature: { label: 'Trex Signature', brand: 'Trex', colors: [['Ocracoke', '#b06f45'], ['Whidbey', '#8f8a82']] },
+    terrain:   { label: 'TimberTech Terrain/+', brand: 'TimberTech', colors: [['Brown Oak', '#7b4f36'], ['Rustic Elm', '#5a3528'], ['Sandy Birch', '#a98d75'], ['Silver Maple', '#6a6159'], ['Stone Ash', '#8f8d88'], ['Natural White Oak', '#c9a676'], ['Weathered Oak', '#9d9585'], ['Dark Oak', '#7e5f45']] },
+    prime:     { label: 'TimberTech Prime/+', brand: 'TimberTech', colors: [['Coastline', '#7d7068'], ['Weathered Teak', '#a9805a'], ['English Walnut', '#6b4c3a'], ['Dark Hickory', '#4f3c33'], ['Mahogany', '#7c4b31'], ['Slate Gray', '#857a70'], ['Brownstone', '#a8876a'], ['Kona', '#4e2b22']] },
+    reserve:   { label: 'TimberTech Reserve', brand: 'TimberTech', colors: [['Reclaimed Chestnut', '#cfc2ad'], ['Driftwood', '#6f6a64'], ['Dark Roast', '#6b4d36'], ['Antique Leather', '#8b6440']] },
+    landmark:  { label: 'TimberTech Landmark PVC', brand: 'TimberTech', colors: [['French White Oak', '#b9ad9c'], ['Castle Gate', '#56565a'], ['American Walnut', '#5c4434'], ['Boardwalk', '#c9c8c3']] },
+  };
+  const COLORS = Object.entries(LINES).flatMap(([lk, l]) => l.colors.map(([name, hex]) => ({ key: `${lk}-${name.toLowerCase().replace(/[^a-z]+/g, '-')}`, line: lk, name, hex })));
   const PT_HEX = '#b09363';
+  const HOUSES = [
+    { key: 'almond', name: 'Almond siding', hex: '#c8b994' },
+    { key: 'gray', name: 'Gray siding', hex: '#b8bdbf' },
+    { key: 'sage', name: 'Sage siding', hex: '#8e9879' },
+    { key: 'brick', name: 'Red brick', hex: '#9c4a36' },
+  ];
   const TRIMS = [
-    { key: 'almond', name: 'Almond', hex: '#c9b896' },
+    { key: 'almond', name: 'Almond', hex: '#b9a47c' },
     { key: 'white', name: 'White', hex: '#f2f1ec' },
     { key: 'black', name: 'Black', hex: '#2a2a2a' },
     { key: 'bronze', name: 'Bronze', hex: '#5a4836' },
@@ -221,13 +247,13 @@
 
   let nextId = 1;
   const DEFAULTS = {
-    porch: { w: 14, d: 14, x: 0, z: 0, type: 'screen', tie: 'wall', floor: 'deck' },
+    porch: { w: 14, d: 14, x: 0, z: 0, type: 'ezebreeze', tie: 'wall', floor: 'deck', wallH: 8 },
     deck:  { w: 14, d: 12, x: 0, z: 0, stairs: 'front' },
     patio: { w: 16, d: 12, x: 0, z: 14, mat: 'pavers' },
   };
   const mk = (kind, o) => Object.assign({ id: nextId++, kind }, DEFAULTS[kind], o);
   const S = {
-    H: 3, decking: 'enhance', color: 'sand', trim: 'almond', rail: 'hybrid', skirt: 'none',
+    H: 3, decking: 'enhance', color: 'enhance-toasted-sand', trim: 'almond', rail: 'hybrid', skirt: 'none', house: 'almond',
     sections: [
       mk('porch', { x: -7, w: 14, d: 14 }),
       mk('deck',  { x: 7, w: 14, d: 12, stairs: 'front' }),
@@ -245,8 +271,9 @@
   const risers = (h) => Math.max(1, Math.ceil(h * 12 / 7.5));
   const STAIR_W = 4, RUN = 11 / 12;
 
+  const PORCH_TYPES = { sunroom: 'Sunroom', ezebreeze: 'Eze-Breeze porch', screen: 'Screen porch', open: 'Open porch' };
   function title(s) {
-    if (s.kind === 'porch') return `${s.type === 'screen' ? 'Screen' : 'Open'} porch`;
+    if (s.kind === 'porch') return PORCH_TYPES[s.type];
     if (s.kind === 'deck') return 'Deck';
     return PATIO[s.mat].label;
   }
@@ -271,15 +298,98 @@
   }
   function stairEdge(s) {
     if (s.kind === 'deck') return s.stairs === 'none' ? null : s.stairs;
-    if (s.kind === 'porch' && s.floor === 'deck' && !covered(s, 'front').length) return 'front';
+    if (s.kind === 'porch') return porchDoors(s).stairs?.edge || null;
     return null;
+  }
+
+  // ── Porch geometry & window layouts (shared by pricing and the 3D model) ───
+  // Eze-Breeze rules match porchWall() in src/porchBuild.js: 5.5″ columns, units
+  // at most 54″ wide (49″ of open wall after the 2.5″ grab onto each column), 36″
+  // door openings, and a transom over any window on a wall taller than 100″.
+  const EZE = { maxW: 54, grab: 2.5, col: 5.5, maxH: 100, door: 36 };
+  // Sunroom rules match sunroomLayout(): 36″×60″ windows, 8.5″ between, 24″ of
+  // solid wall at outside corners, 30″ knee wall, 36″×80″ doors.
+  const SUN = { w: 36, h: 60, gap: 8.5, corner: 24, knee: 30, door: 36, doorH: 80 };
+  function porchGeom(s) {
+    const onDeck = s.floor === 'deck', fy = onDeck ? S.H : 0.33, P = s.wallH || 8, beamH = 0.95;
+    const col = s.type === 'open' ? 0.62 : s.type === 'sunroom' ? 0.5 : EZE.col / 12;
+    const shed = s.tie === 'wall', shedPitch = 3 / 12, gp = 6 / 12;
+    const zF = s.d - col / 2, beamTop = fy + P + beamH;
+    const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;   // underside of the rafters
+    const frontTop = beamTop - beamH;                                        // underside of the front header
+    const sideTop = (z) => shed ? roofAt(z) : beamTop - beamH;               // shed: side walls run up to the rafters
+    return { onDeck, fy, P, beamH, col, shed, shedPitch, gp, zF, beamTop, roofAt, frontTop, sideTop };
+  }
+  // Doors (local coords) and where the stairs land.
+  function porchDoors(s) {
+    const g = porchGeom(s), cvF = covered(s, 'front'), cvL = covered(s, 'left'), cvR = covered(s, 'right'), mid = ([a, b]) => (a + b) / 2;
+    if (s.type === 'open') return { front: [], left: [], right: [], stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
+    if (s.type === 'sunroom') {
+      const side = cvL.length ? 'left' : 'right', cv = side === 'left' ? cvL : cvR;
+      const z = cv.length ? Math.min(Math.max(mid(cv[0]), 2.2), s.d - 3.6) : 2.2;
+      return { front: [], left: side === 'left' ? [z] : [], right: side === 'right' ? [z] : [], stairs: g.onDeck && !cv.length ? { edge: side, c: z } : null };
+    }
+    return { front: cvF.length ? [] : [0], left: cvL.map(mid), right: cvR.map(mid), stairs: g.onDeck && !cvF.length ? { edge: 'front', c: 0 } : null };
+  }
+  // Columns and openings on one Eze-Breeze / ScreenEze wall from a to b (ft).
+  function ezeWall(a, b, doorCenters) {
+    const L = (b - a) * 12, nd = doorCenters.length, C = EZE.col;
+    const avail = L - EZE.door * nd - C * (nd + 1);
+    const windows = avail > 0 ? Math.ceil(avail / (EZE.maxW - 2 * EZE.grab + C)) : 0;
+    const total = windows + nd, winW = windows ? (L - EZE.door * nd - C * (total + 1)) / windows : 0;
+    const doorIdx = new Set();
+    doorCenters.forEach(c => { let i = Math.max(0, Math.min(total - 1, Math.round((c - a) / (b - a) * total - 0.5))); while (doorIdx.has(i) && i < total - 1) i++; doorIdx.add(i); });
+    const out = { cols: [], open: [] }; let p = 0;
+    for (let i = 0; i < total; i++) {
+      out.cols.push(a + (p + C / 2) / 12); p += C;
+      const w = doorIdx.has(i) ? EZE.door : winW; out.open.push({ a: a + p / 12, b: a + (p + w) / 12, door: doorIdx.has(i), wIn: w }); p += w;
+    }
+    out.cols.push(a + (p + C / 2) / 12);
+    return out;
+  }
+  // Window and door holes on one sunroom wall from a to b (ft).
+  function sunWall(a, b, bufA, bufB, doorCenter) {
+    const lo = a + bufA / 12, hi = b - bufB / 12, holes = [], gap = SUN.gap / 12;
+    let regions = [[lo, hi]];
+    if (doorCenter != null) {
+      const d0 = Math.max(a + 0.4, doorCenter - SUN.door / 24), d1 = d0 + SUN.door / 12;
+      holes.push({ a: d0, b: d1, door: true }); regions = [[lo, d0 - gap], [d1 + gap, hi]];
+    }
+    regions.forEach(([r0, r1]) => {
+      const len = (r1 - r0) * 12, n = Math.floor((len + SUN.gap) / (SUN.w + SUN.gap)); if (n < 1) return;
+      const group = n * SUN.w + (n - 1) * SUN.gap; let u = r0 + (len - group) / 24;
+      for (let i = 0; i < n; i++) { holes.push({ a: u, b: u + SUN.w / 12, door: false }); u += (SUN.w + SUN.gap) / 12; }
+    });
+    return holes;
+  }
+  function porchPlan(s) {
+    const g = porchGeom(s), dp = porchDoors(s), hw = s.w / 2, D = s.d;
+    if (s.type === 'sunroom') {
+      const walls = {
+        front: sunWall(-hw, hw, SUN.corner, SUN.corner, null),
+        left: sunWall(0, D, 0, SUN.corner, dp.left[0]), right: sunWall(0, D, 0, SUN.corner, dp.right[0]),
+      };
+      const all = [...walls.front, ...walls.left, ...walls.right];
+      const doors = all.filter(h => h.door).length;
+      const kneeLF = s.w + 2 * s.d - doors * SUN.door / 12;
+      return { g, dp, walls, windows: all.filter(h => !h.door).length, doors, kneeSF: Math.round(kneeLF * SUN.knee / 12), kneeLF: Math.round(kneeLF * 10) / 10 };
+    }
+    if (s.type === 'open') return { g, dp, windows: 0, doors: 0, transoms: 0 };
+    const walls = { front: ezeWall(-hw, hw, dp.front), left: ezeWall(0, D, dp.left), right: ezeWall(0, D, dp.right) };
+    let windows = 0, transoms = 0, doors = 0;
+    [['front', () => g.frontTop], ['left', g.sideTop], ['right', g.sideTop]].forEach(([k, top]) => walls[k].open.forEach(o => {
+      if (o.door) { doors++; return; }
+      windows++;
+      if (s.type === 'ezebreeze' && Math.max(top(o.a), top(o.b)) - g.fy > EZE.maxH / 12 + 0.01) { o.transom = true; transoms++; }
+    }));
+    return { g, dp, walls, windows, transoms, doors };
   }
 
   // ── Price ──────────────────────────────────────────────────────────────────
   const SKIRT_SF = 33;                       // Trex skirt, $/SF
   function railRate() {
-    if (S.rail === 'aluminum') return { label: 'Trex Select aluminum rail', lf: 112 };
-    return S.decking === 'pt' ? { label: 'Hybrid rail, wood cap', lf: 19 } : { label: 'Hybrid rail, Trex cap', lf: 30.8 };
+    if (S.rail === 'aluminum') return LINES[S.decking].brand === 'TimberTech' ? { label: 'TimberTech aluminum rail', lf: 152.46 } : { label: 'Trex Select aluminum rail', lf: 112 };
+    return S.decking === 'pt' ? { label: 'Hybrid rail, wood cap', lf: 19 } : { label: 'Hybrid rail, composite cap', lf: 30.8 };
   }
   // Exposed (not shared) edge length of a raised section: front + both sides.
   function exposedLF(s) {
@@ -299,9 +409,25 @@
     const sf = s.w * s.d, dk = DECKING[S.decking], lines = [];
     const steps = stairEdge(s) ? risers(S.H) : 0;
     if (s.kind === 'porch') {
-      const rate = PORCH_BASE[`${s.type}_${s.tie}_${s.floor}`];
-      lines.push([`${s.tie === 'wall' ? 'Wall' : 'Roof'} tie, ${s.floor === 'deck' ? 'on new PT deck' : 'on patio'} · ${sf} SF × $${rate}`, sf * rate]);
+      const baseType = s.type === 'ezebreeze' ? 'screen' : s.type === 'sunroom' ? 'open' : s.type;
+      const rate = PORCH_BASE[`${baseType}_${s.tie}_${s.floor}`], pl = porchPlan(s);
+      lines.push([`${s.tie === 'wall' ? 'Wall tie, shed roof' : 'Roof tie, gable roof'}, ${s.floor === 'deck' ? 'on new PT deck' : 'on patio'} · ${sf} SF × $${rate}`, sf * rate]);
+      if (s.tie === 'roof') { lines.push([`PT LVL framing · ${s.d} LF × $50`, s.d * 50]); lines.push(['Engineer letter (LVL)', 1800]); }
       if (s.type === 'screen') lines.push([`ScreenEze screens · ${sf} SF × $${SCREENEZE_SF}`, sf * SCREENEZE_SF]);
+      if (s.type === 'screen' || s.type === 'ezebreeze') lines.push(['6×6 laminated COX column package', 2000]);
+      if (s.type === 'ezebreeze') {
+        lines.push([`Eze-Breeze windows · ${pl.windows} × $530`, pl.windows * 530]);
+        if (pl.transoms) lines.push([`Eze-Breeze transoms (wall over 100″) · ${pl.transoms} × $130`, pl.transoms * 130]);
+      }
+      if ((s.type === 'screen' || s.type === 'ezebreeze') && pl.doors) lines.push([`Larsen Tradewinds door + lip · ${pl.doors} × $880`, pl.doors * 880]);
+      if (s.type === 'sunroom') {
+        lines.push([`Sunroom windows 36″×60″ · ${pl.windows} × $950`, pl.windows * 950]);
+        lines.push([`Knee wall · ${pl.kneeSF} SF × $29`, pl.kneeSF * 29]);
+        lines.push(['Sunroom insulation', 800]);
+        if (pl.doors) lines.push([`36″ Fullview glass door · ${pl.doors} × $1,500`, pl.doors * 1500]);
+      }
+      if (s.tie === 'roof' && (s.type === 'ezebreeze' || s.type === 'sunroom')) lines.push(['Glass in gable end', 975]);
+      if (s.floor === 'deck' && S.decking !== 'pt' && !dk.porchUp) lines.push([`${dk.label} porch floor upgrade · not on the price sheet yet`, 0]);
       if (s.floor === 'deck' && dk.porchUp) lines.push([`${dk.label} floor upgrade · ${sf} SF × $${dk.porchUp.toFixed(2)}`, sf * dk.porchUp]);
       if (s.tie === 'roof' && s.w > 19) lines.push(['Gable wider than 19′ add', GABLE_OVER_19]);
       if (s.floor === 'deck' && S.H > 8) lines.push([`Deck above 8′ high · ${sf} SF × $${DECK_OVER_8_SF}`, sf * DECK_OVER_8_SF]);
@@ -349,6 +475,7 @@
 
   const FMT = {
     w: v => `${v}′`, d: v => `${v}′`, z: v => `${v}′`,
+    wallH: v => `${ftIn(v)}${v * 12 > EZE.maxH ? ' · transoms' : ''}`,
     x: v => v === 0 ? 'Centered' : `${Math.abs(v)}′ ${v < 0 ? 'left' : 'right'}`,
   };
   function renderEditor() {
@@ -357,7 +484,8 @@
     const range = (key, label, min, max, step) => `<div class="row-label"><label class="label" for="e-${key}">${label}</label><output id="e-${key}-out" for="e-${key}">${FMT[key](s[key])}</output></div><input type="range" id="e-${key}" data-key="${key}" min="${min}" max="${max}" step="${step}" value="${s[key]}">`;
     let body = range('w', s.kind === 'patio' ? 'Width' : 'Width (along house)', 6, 30, 1) + range('d', s.kind === 'patio' ? 'Depth' : 'Depth (out from house)', 6, 24, 1) + range('x', 'Position along house', -30, 30, 0.5);
     if (s.kind === 'patio') body += range('z', 'Distance from house', 0, 30, 0.5) + `<span class="label">Surface</span>` + seg('mat', [['pavers', 'Pavers', 'Techo Bloc'], ['concrete', 'Concrete', '4″ slab']]);
-    if (s.kind === 'porch') body += `<span class="label">Porch type</span>` + seg('type', [['screen', 'Screen', 'ScreenEze'], ['open', 'Open', 'Railing']])
+    if (s.kind === 'porch') body += `<span class="label">Porch type</span>` + seg('type', [['sunroom', 'Sunroom', 'Glass'], ['ezebreeze', 'Eze-Breeze', 'Vinyl'], ['screen', 'Screen', 'ScreenEze'], ['open', 'Open', 'Rail']])
+      + range('wallH', 'Wall height', 8, 10, 0.5)
       + `<span class="label">Roof connection</span>` + seg('tie', [['wall', 'Wall tie', 'Shed roof'], ['roof', 'Roof tie', 'Gable roof']])
       + `<span class="label">Sits on</span>` + seg('floor', [['deck', 'New PT deck', 'At deck height'], ['patio', 'Patio', 'At grade']]);
     if (s.kind === 'deck') body += `<span class="label">Stairs</span>` + seg('stairs', [['front', 'Front'], ['left', 'Left'], ['right', 'Right'], ['none', 'None']]);
@@ -385,9 +513,19 @@
     el.innerHTML = list.map(c => `<input type="radio" name="${name}" id="${name}-${c.key}" value="${c.key}" aria-label="${c.name}"${c.key === S[key] ? ' checked' : ''}><label for="${name}-${c.key}" title="${c.name}" style="background:${c.hex}"></label>`).join('');
     el.addEventListener('change', (e) => { S[key] = e.target.value; nameEl.textContent = list.find(c => c.key === S[key]).name; update(); });
   }
-  swatches($('color-swatches'), COLORS, 'color', 'color', $('color-name'));
+  $('decking').innerHTML = ['Wood', 'Trex', 'TimberTech'].map(b => `<optgroup label="${b}">${Object.entries(LINES).filter(([, l]) => l.brand === b).map(([k, l]) => `<option value="${k}"${k === S.decking ? ' selected' : ''}>${l.label} · $${DECKING[k].deckSF}/SF deck</option>`).join('')}</optgroup>`).join('');
+  function colorSwatches() {
+    const list = COLORS.filter(c => c.line === S.decking);
+    if (!list.some(c => c.key === S.color)) S.color = list[0].key;
+    $('color-swatches').innerHTML = list.map(c => `<input type="radio" name="color" id="color-${c.key}" value="${c.key}" aria-label="${c.name}"${c.key === S.color ? ' checked' : ''}><label for="color-${c.key}" title="${c.name}" style="background:${c.hex}"></label>`).join('');
+    $('color-name').textContent = COLORS.find(c => c.key === S.color).name;
+  }
+  colorSwatches();
+  $('color-swatches').addEventListener('change', (e) => { S.color = e.target.value; $('color-name').textContent = COLORS.find(c => c.key === S.color).name; update(); });
+  $('decking').addEventListener('change', (e) => { S.decking = e.target.value; colorSwatches(); update(); });
   swatches($('trim-swatches'), TRIMS, 'trim', 'trim', $('trim-name'));
-  document.querySelectorAll('input[name=decking],input[name=rail],input[name=skirt]').forEach(r => r.addEventListener('change', () => { S[r.name] = r.value; update(); }));
+  swatches($('house-swatches'), HOUSES, 'house', 'house', $('house-name'));
+  document.querySelectorAll('input[name=rail],input[name=skirt]').forEach(r => r.addEventListener('change', () => { S[r.name] = r.value; update(); }));
   $('h').addEventListener('input', (e) => { S.H = +e.target.value; update(); });
 
   function updateUI() {
@@ -396,7 +534,7 @@
     renderList();
     const sf = S.sections.reduce((a, s) => a + s.w * s.d, 0);
     $('sum-title').textContent = S.sections.map(s => title(s)).join(' + ');
-    $('sum-sub').textContent = `${sf} SF total · ${DECKING[S.decking].label} decking · ${ftIn(S.H)} high`;
+    $('sum-sub').textContent = `${sf} SF total · ${DECKING[S.decking].label}${S.decking === 'pt' ? '' : ' ' + COLORS.find(c => c.key === S.color).name} · ${ftIn(S.H)} high`;
     price();
   }
 
@@ -419,14 +557,14 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 0.92;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   viewer.appendChild(renderer.domElement);
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(36, 1, 0.5, 2500);
+  const camera = new THREE.PerspectiveCamera(36, 1, 0.5, 800);
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.maxPolarAngle = Math.PI / 2 - 0.03; controls.minDistance = 6; controls.maxDistance = 220;
@@ -548,7 +686,20 @@
     return c;
   }
 
+  function brickCanvas() {
+    const R = rng(71), [c, x] = cnv(512, 512), pal = ['#9a4632', '#8a3d2c', '#a8553c', '#7f3a2b', '#b05e45', '#93503b'];
+    x.fillStyle = '#cfc5b4'; x.fillRect(0, 0, 512, 512);
+    const rows = 16, rh = 512 / rows, bw = 512 / 6;
+    for (let r = 0; r < rows; r++) for (let i = -1; i < 7; i++) {
+      const bx = i * bw + (r % 2 ? bw / 2 : 0), col = pal[Math.floor(R() * pal.length)];
+      x.fillStyle = col; x.fillRect(bx + 3, r * rh + 3, bw - 5, rh - 5);
+      for (let k = 0; k < 60; k++) { x.fillStyle = shade(col, (R() - .5) * .6, .3); x.fillRect(bx + 3 + R() * (bw - 6), r * rh + 3 + R() * (rh - 6), 2, 2); }
+    }
+    return c;
+  }
+
   const T = {
+    brick: tex(brickCanvas(), 4, 4),
     tg: tex(tgCanvas(), 4, 4),
     siding: tex(sidingCanvas(), 4, 4), shingle: tex(shingleCanvas(), 4, 4), grass: tex(grassCanvas(), 9, 9),
     concrete: tex(concreteCanvas(), 5, 5), pavers: tex(paverCanvas(), 4, 4), bead: tex(beadCanvas(), 2, 2),
@@ -565,8 +716,13 @@
   const mc = {};
   const mat = (key, make) => mc[key] || (mc[key] = make());
   const std = (o) => new THREE.MeshStandardMaterial(o);
+  const noAO = (m) => { m.userData.noAO = true; return m; };   // see-through: skip ambient occlusion
   const M = {
-    siding: () => mat('siding', () => std({ color: '#c9cfc6', map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
+    siding: () => S.house === 'brick' ? mat('brick', () => std({ color: '#ffffff', map: T.brick, bumpMap: T.brick, bumpScale: 0.04, roughness: 0.95 }))
+      : mat('siding-' + S.house, () => std({ color: HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
+    porchSiding: () => mat('psiding-' + S.house, () => std({ color: S.house === 'brick' ? '#c8b994' : HOUSES.find(h => h.key === S.house).hex, map: T.siding, bumpMap: T.siding, bumpScale: 0.03, roughness: 0.85 })),
+    ezeGlass: () => mat('ezeGlass', () => noAO(std({ color: '#1a2026', transparent: true, opacity: 0.55, roughness: 0.15, metalness: 0.6, side: THREE.DoubleSide, depthWrite: false }))),
+    doorPanel2: () => mat('doorPanel2', () => std({ color: '#e9e8e2', roughness: 0.5 })),
     shingle: () => mat('shingle', () => std({ color: '#ffffff', map: T.shingle, bumpMap: T.shingle, bumpScale: 0.04, roughness: 0.95 })),
     ridge: () => mat('ridge', () => std({ color: '#3e3f43', roughness: 0.95 })),
     concrete: () => mat('concrete', () => std({ color: '#ffffff', map: T.concrete, roughness: 0.95 })),
@@ -585,7 +741,7 @@
     brass: () => mat('brass', () => std({ color: '#b08a43', metalness: 0.9, roughness: 0.3 })),
     metal: () => mat('metal', () => std({ color: '#222326', metalness: 0.6, roughness: 0.4 })),
     bulb: () => mat('bulb', () => std({ color: '#fff4dc', emissive: '#ffd99a', emissiveIntensity: 0.6, roughness: 0.3 })),
-    screen: () => mat('screen', () => std({ color: '#15181a', transparent: true, opacity: 0.5, side: THREE.DoubleSide, roughness: 1, depthWrite: false })),
+    screen: () => mat('screen', () => noAO(std({ color: '#15181a', transparent: true, opacity: 0.5, side: THREE.DoubleSide, roughness: 1, depthWrite: false }))),
     footing: () => mat('footing', () => std({ color: '#a9a49a', map: T.concrete, roughness: 1 })),
     bark: () => mat('bark', () => std({ color: '#4a3a2c', roughness: 1 })),
     fanBlade: () => mat('fanBlade', () => std({ color: '#5a4030', roughness: 0.6 })),
@@ -601,9 +757,25 @@
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: { top: { value: new THREE.Color('#3f74b5') }, hor: { value: new THREE.Color('#d9e5ee') }, bot: { value: new THREE.Color('#8d9a7a') } },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: 'uniform vec3 top; uniform vec3 hor; uniform vec3 bot; varying vec3 vP; void main(){ float h = vP.y; vec3 c = h > 0.0 ? mix(hor, top, pow(h, 0.5)) : mix(hor, bot, pow(-h, 0.35)); gl_FragColor = vec4(c, 1.0); }',
+    fragmentShader: `uniform vec3 top; uniform vec3 hor; uniform vec3 bot; varying vec3 vP;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+      float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.03; a *= 0.5; } return v; }
+      void main(){
+        float h = vP.y;
+        vec3 c = h > 0.0 ? mix(hor, top, pow(h, 0.5)) : mix(hor, bot, pow(-h, 0.35));
+        if (h > 0.0) {
+          vec2 uv = vP.xz / (h + 0.12) * 1.6;
+          float n = fbm(uv + vec2(3.1, 7.7)), d = fbm(uv * 1.7 + vec2(9.2, 1.3));
+          float cl = smoothstep(0.52, 0.78, n) * smoothstep(0.02, 0.2, h);
+          vec3 cloud = mix(vec3(0.97, 0.98, 1.0), vec3(0.72, 0.76, 0.82), smoothstep(0.4, 0.8, d) * 0.7);
+          c = mix(c, cloud, cl * 0.92);
+        }
+        gl_FragColor = vec4(c, 1.0);
+      }`,
   });
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(1200, 32, 16), skyMat); scene.add(sky);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(700, 32, 16), skyMat); sky.userData.noAO = true; scene.add(sky);
   // Reflections: an equirectangular sky/ground gradient, prefiltered for PBR materials.
   (function () {
     const [c, x] = cnv(512, 256), g = x.createLinearGradient(0, 0, 0, 256);
@@ -615,7 +787,7 @@
     scene.environment = pmrem.fromEquirectangular(t).texture;
     t.dispose(); pmrem.dispose();
   })();
-  scene.fog = new THREE.Fog('#d9e5ee', 220, 1000);
+  scene.fog = new THREE.Fog('#d9e5ee', 200, 760);
 
   scene.add(new THREE.HemisphereLight(0xd6e6ff, 0x4d5a36, 0.35));
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.1);
@@ -723,7 +895,7 @@
     B(w + 0.75, 0.42, 0.14, t, 0, h / 2 + 0.21, 0.07); B(w + 0.95, 0.08, 0.22, t, 0, h / 2 + 0.46, 0.1);
     [-1, 1].forEach(s => B(0.36, h, 0.14, t, s * (w / 2 + 0.18), 0, 0.07));
     B(w + 0.95, 0.1, 0.34, t, 0, -h / 2 - 0.05, 0.15); B(w + 0.5, 0.26, 0.1, t, 0, -h / 2 - 0.23, 0.05);
-    B(w, h, 0.04, M.glass(), 0, 0, -0.02, { cast: false });
+    B(w, h, 0.02, M.glass(), 0, 0, 0.015, { cast: false });
     const f = 0.13;
     B(w, f, 0.08, t, 0, h / 2 - f / 2, 0.03); B(w, f, 0.08, t, 0, -h / 2 + f / 2, 0.03); B(w, 0.14, 0.1, t, 0, 0, 0.05);
     [-1, 1].forEach(s => B(f, h, 0.08, t, s * (w / 2 - f / 2), 0, 0.03));
@@ -733,7 +905,7 @@
   function entryDoor(g) { withG(g, () => {
     const t = M.trim();
     B(3.75, 0.42, 0.14, t, 0, 7.0, 0.07); [-1, 1].forEach(s => B(0.36, 6.8, 0.14, t, s * 1.68, 3.4, 0.07));
-    B(3, 6.8, 0.15, M.door(), 0, 3.4, -0.02);
+    B(3, 6.8, 0.06, M.door(), 0, 3.4, 0.03);
     B(1.9, 2.6, 0.04, M.glass(), 0, 4.95, 0.07, { cast: false });
     [-0.32, 0.32].forEach(x => B(0.05, 2.6, 0.04, M.door(), x, 4.95, 0.09)); [4.52, 5.38].forEach(y => B(1.9, 0.05, 0.04, M.door(), 0, y, 0.09));
     [-0.55, 0.55].forEach(x => B(0.8, 2.3, 0.05, M.doorPanel(), x, 1.65, 0.07));
@@ -744,7 +916,7 @@
   function sliderDoor(g) { withG(g, () => {
     const t = M.trim(), w = 6, h = 6.8;
     B(w + 0.75, 0.42, 0.14, t, 0, h + 0.21, 0.07); [-1, 1].forEach(s => B(0.36, h, 0.14, t, s * (w / 2 + 0.18), h / 2, 0.07));
-    B(w, h, 0.04, M.glass(), 0, h / 2, -0.03, { cast: false });
+    B(w, h, 0.02, M.glass(), 0, h / 2, 0.015, { cast: false });
     [[-w / 4, 0.06], [w / 4, 0.0]].forEach(([x, z]) => {
       B(w / 2, 0.22, 0.1, t, x, h - 0.11, z); B(w / 2, 0.35, 0.1, t, x, 0.18, z);
       [-1, 1].forEach(s => B(0.2, h, 0.1, t, x + s * (w / 4 - 0.1), h / 2, z));
@@ -774,6 +946,32 @@
     [[0, 15, 0, 6], [-3.5, 13, 1.5, 4.6], [3.5, 13.5, -1, 4.8], [0.5, 18.5, 0.5, 4.2], [1, 12, 3.5, 4]].forEach(([dx, y, dz, r]) => {
       const m = shrub(x + dx * s, z + dz * s, r * s); m.position.y = y * s; m.scale.y = r * s * 0.9;
     });
+  }
+
+  // A ring of woods around the lot so the horizon isn't empty (instanced crowns + trunks).
+  const crownGeo = (() => {
+    const geo = new THREE.IcosahedronGeometry(1, 2), p = geo.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); const k = 0.85 + 0.2 * Math.sin(v.x * 4.7 + v.y * 3.1) * Math.sin(v.z * 5.3 + v.y * 2.2); geo.attributes.normal.setXYZ(i, v.x, v.y, v.z); v.multiplyScalar(k); p.setXYZ(i, v.x, v.y, v.z); }
+    return geo;
+  })();
+  const trunkGeo = new THREE.CylinderGeometry(0.35, 0.6, 1, 6);
+  function treeline(cx, cz) {
+    const TR = rng(91), n = 90, crowns = new THREE.InstancedMesh(crownGeo, mat('crown', () => std({ color: '#ffffff', roughness: 1 })), n * 4);
+    const trunks = new THREE.InstancedMesh(trunkGeo, M.bark(), n), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color();
+    const greens = ['#2d4a1e', '#365526', '#24401a', '#3f5e2a', '#2f4d27'];
+    let ci = 0;
+    for (let i = 0; i < n; i++) {
+      const ang = TR() * Math.PI * 2, rad = 120 + TR() * 110, x = cx + Math.cos(ang) * rad, z = cz + Math.sin(ang) * rad * 0.9 - 30;
+      const hgt = 28 + TR() * 30, r = 9 + TR() * 8;
+      p.set(x, hgt * 0.35, z); sc.set(1.6, hgt * 0.7, 1.6); m4.compose(p, q, sc); trunks.setMatrixAt(i, m4);
+      for (let k = 0; k < 4; k++) {
+        p.set(x + (TR() - 0.5) * r, hgt * (0.6 + TR() * 0.4), z + (TR() - 0.5) * r); const rr = r * (0.55 + TR() * 0.5);
+        sc.set(rr, rr * (0.8 + TR() * 0.4), rr); m4.compose(p, q, sc); crowns.setMatrixAt(ci, m4);
+        col.set(greens[Math.floor(TR() * greens.length)]); crowns.setColorAt(ci, col); ci++;
+      }
+    }
+    crowns.castShadow = trunks.castShadow = false; crowns.receiveShadow = true;
+    G.add(crowns); G.add(trunks);
   }
 
   // Raised floor: boards, fascia, framing, posts, footings.
@@ -815,7 +1013,18 @@
       }
       const lastH = Math.max(0.05, fy - (n - 1) * rise - t);
       B(STAIR_W, lastH, 0.06, M.fascia(), 0, lastH / 2, end + 0.03);
-      [-STAIR_W / 2 + 0.05, 0, STAIR_W / 2 - 0.05].forEach((x, i) => beamYZ(x, fy - 0.55, 0.1, 0.35, end + 0.4, i === 1 ? 0.125 : 0.08, 0.9, i === 1 ? M.pt() : M.fascia()));
+      // Cut stringers: sawtooth top under each tread and riser, straight bottom edge.
+      if (n > 1) {
+        const pts = [[0, fy - t]];
+        for (let i = 1; i < n; i++) { const yt = fy - i * rise - t; pts.push([(i - 1) * RUN, yt], [i * RUN, yt]); }
+        pts.push([end, 0], [Math.max(0.2, end - 1.3), 0], [0, Math.max(0.15, fy - t - 1.05)]);
+        [-STAIR_W / 2 + 0.06, 0, STAIR_W / 2 - 0.06].forEach((x, i) => {
+          const sh = new THREE.Shape(); sh.moveTo(...pts[0]); pts.slice(1).forEach(p => sh.lineTo(...p)); sh.closePath();
+          const th = i === 1 ? 0.125 : 0.1;
+          const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false }), i === 1 ? M.pt() : M.fascia());
+          mesh.rotation.y = -Math.PI / 2; mesh.position.set(x + th / 2, 0, 0); mesh.castShadow = mesh.receiveShadow = true; G.add(mesh);
+        });
+      }
       if (railed) [-1, 1].forEach(s => railRun(s * STAIR_RAIL_X, railStart, s * STAIR_RAIL_X, end + 0.3, fy, rise, { postA: false, postB: true }));
     });
     const foot = new THREE.Vector3(0, 0, end + 1.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry).add(new THREE.Vector3(cx, 0, cz));
@@ -826,6 +1035,11 @@
 
   function stairPlacement(s) {
     const r = rect(s), e = stairEdge(s); if (!e) return null;
+    if (s.kind === 'porch') {
+      const st = porchDoors(s).stairs;
+      if (st.edge === 'front') return { edge: 'front', c: s.x + st.c, x: s.x + st.c, z: r.z1, ry: 0 };
+      return st.edge === 'left' ? { edge: 'left', c: st.c, x: r.x0, z: st.c, ry: -Math.PI / 2 } : { edge: 'right', c: st.c, x: r.x1, z: st.c, ry: Math.PI / 2 };
+    }
     if (e === 'front') return { edge: e, c: s.x, x: s.x, z: r.z1, ry: 0 };
     const zc = Math.min(Math.max(r.z1 - 3.5, r.z0 + STAIR_W / 2 + 0.5), r.z1 - STAIR_W / 2 - 0.3);
     return e === 'left' ? { edge: e, c: zc, x: r.x0, z: zc, ry: -Math.PI / 2 } : { edge: e, c: zc, x: r.x1, z: zc, ry: Math.PI / 2 };
@@ -864,15 +1078,8 @@
 
   function buildPorch(s, E) {
     const { w: W, d: D } = s, hw = W / 2, cx = s.x;
-    const onDeck = s.floor === 'deck', fy = onDeck ? S.H : 0.33;
-    const P = 8, beamH = 0.95, col = 0.62, rz = 0.55;
-    const shed = s.tie === 'wall', shedPitch = 3 / 12, gp = 6 / 12;
-    const zF = D - col / 2, beamTop = fy + P + beamH;
-    const roofAt = (z) => shed ? beamTop + (zF - z) * shedPitch : beamTop;
-    const t = M.trim(), doorW = 3.2;
-    // Neighbour coverage is computed in world x; convert to the porch's local x.
-    const front = !covered(s, 'front').length;
-    const sideDoors = { left: covered(s, 'left').map(([a, b]) => (a + b) / 2), right: covered(s, 'right').map(([a, b]) => (a + b) / 2) };
+    const pl = porchPlan(s), { onDeck, fy, beamH, col, shed, shedPitch, gp, zF, beamTop, roofAt, frontTop, sideTop } = pl.g;
+    const rz = 0.55, t = M.trim(), dp = pl.dp;
     const g = group(cx, 0, 0);
     withG(g, () => {
       if (onDeck) {
@@ -880,49 +1087,50 @@
         skirting(-hw, hw, 0, D, fy, { front: covered(s, 'front').map(([a, b]) => [a - cx, b - cx]), left: covered(s, 'left'), right: covered(s, 'right') });
       } else B(W + 1, 0.33, D + 1, M.concrete(), 0, 0.165, (D + 1) / 2);
 
-      const withDoors = (a, b, doors, maxGap) => {
-        let ps = spread(a, b, maxGap);
-        doors.forEach(c => { ps = ps.filter(p => Math.abs(p - c) > doorW / 2 + 1.3 || p === a || p === b).concat([c - doorW / 2 - col / 2, c + doorW / 2 + col / 2]); });
-        return [...new Set(ps)].sort((p, q) => p - q);
-      };
-      const frontXs = withDoors(-hw + col / 2, hw - col / 2, s.type === 'screen' && front ? [0] : [], 9);
-      const backPost = !(s.type === 'open' && shed);
-      const sideZs = {
-        left: withDoors(backPost ? col / 2 : 0, zF, s.type === 'screen' ? sideDoors.left : [], 9),
-        right: withDoors(backPost ? col / 2 : 0, zF, s.type === 'screen' ? sideDoors.right : [], 9),
-      };
-      const postTop = (z) => roofAt(z) - beamH;
-      const column = (x, z) => {
-        const h = postTop(z) - fy;
+      // ── Columns ─────────────────────────────────────────────────────────
+      const xL = -hw + col / 2, xR = hw - col / 2;
+      const openCol = (x, z, top) => {
+        const h = top - fy;
         B(col, h, col, t, x, fy + h / 2, z); B(col + 0.2, 0.7, col + 0.2, t, x, fy + 0.35, z);
-        B(col + 0.16, 0.12, col + 0.16, t, x, fy + 0.76, z); B(col + 0.18, 0.28, col + 0.18, t, x, postTop(z) - 0.14, z);
+        B(col + 0.16, 0.12, col + 0.16, t, x, fy + 0.76, z); B(col + 0.18, 0.28, col + 0.18, t, x, top - 0.14, z);
       };
-      frontXs.forEach(x => column(x, zF));
-      [['left', -hw + col / 2], ['right', hw - col / 2]].forEach(([k, x]) => sideZs[k].slice(0, -1).forEach(z => { if (z > 0.05) column(x, z); }));
+      const lamCol = (x, z, top) => { const h = top - fy; B(col, h, col, t, x, fy + h / 2, z); };
+      let frontXs = [], sideZs = { left: [], right: [] };
+      const backPost = !(s.type === 'open' && shed);
+      if (s.type === 'open') {
+        frontXs = spread(xL, xR, 9);
+        sideZs.left = sideZs.right = spread(backPost ? col / 2 : 0, zF, 9);
+        frontXs.forEach(x => openCol(x, zF, frontTop));
+        [xL, xR].forEach(x => sideZs.left.slice(0, -1).forEach(z => { if (z > 0.05) openCol(x, z, sideTop(z)); }));
+      } else if (s.type !== 'sunroom') {
+        pl.walls.front.cols.forEach(x => lamCol(x, zF, frontTop));
+        [['left', xL], ['right', xR]].forEach(([k, x]) => pl.walls[k].cols.slice(0, -1).forEach(z => lamCol(x, Math.max(z, col / 2), sideTop(z))));
+      }
 
-      // Beams
+      // ── Header across the front; gable roofs also carry level side plates.
+      // Shed roofs: rafters run from the house ledger down onto the front header.
       B(W, beamH, col, t, 0, beamTop - beamH / 2, zF);
-      [-1, 1].forEach(sd => beamYZ(sd * (hw - col / 2), roofAt(0) - beamH / 2, 0, roofAt(zF) - beamH / 2, zF, col, beamH, t));
-      B(W, beamH, 0.25, t, 0, roofAt(0) - beamH / 2, 0.13);
+      if (!shed) { [xL, xR].forEach(x => B(col, beamH, zF, t, x, beamTop - beamH / 2, zF / 2)); B(W, beamH, 0.25, t, 0, beamTop - beamH / 2, 0.13); }
 
-      // Roof
+      // ── Roof ───────────────────────────────────────────────────────────
+      let ridgeU = 0, span = 0, zB = D + 1;
       if (shed) {
         const k = 1 / Math.cos(Math.atan(shedPitch)), z2 = D + 1.0, y1 = roofAt(0), y2 = roofAt(z2);
         beamYZ(0, y1 + rz / 2 * k, 0, y2 + rz / 2 * k, z2, W + 2, rz, t);
         beamYZ(0, y1 + (rz + 0.05) * k, 0, y2 + (rz + 0.05) * k, z2 + 0.08, W + 2.15, 0.1, M.shingle());
-        beamYZ(0, y1 - 0.02, 0, roofAt(zF) - 0.02, zF, W - 0.1, 0.03, M.tg(), { cast: false });
+        beamYZ(0, y1 - 0.02, 0, roofAt(zF) - 0.02, zF, W - 0.05, 0.03, M.tg(), { cast: false });
         const gy = y2 + rz * k - 0.22;
         B(W + 2.15, 0.38, 0.4, M.gutter(), 0, gy, z2 + 0.25);
         const dsx = covered(s, 'right').length ? -(hw + 0.75) : hw + 0.75;
         B(0.22, gy - 0.4, 0.18, M.gutter(), dsx, (gy + 0.4) / 2, z2 + 0.2); B(0.22, 0.2, 0.9, M.gutter(), dsx, 0.2, z2 + 0.6);
         B(W + 2.2, 0.3, 0.06, M.metal(), 0, y1 + rz * k + 0.2, 0.03);
-        fan(0, D / 2, roofAt(D / 2) - 0.02, fy + 8.1);
+        fan(0, D / 2, roofAt(D / 2) - 0.02, fy + Math.min(8.1, roofAt(D / 2) - fy - 0.6));
       } else {
-        const a = Math.atan(gp), k = 1 / Math.cos(a), span = hw + 1, len = span * k;
-        const ridgeU = beamTop + hw * gp;
+        const a = Math.atan(gp), k = 1 / Math.cos(a), len = (hw + 1) * k;
+        span = hw + 1; ridgeU = beamTop + hw * gp;
         const houseTop = (depth) => E - 0.6 + (depth + 1.2) * 0.5 + rz * 1.118;
         let back = 2; while (houseTop(back) < ridgeU + (rz + 0.2) * k + 0.3 && back < 12) back += 0.5;
-        const zA = -back, zB = D + 1, zc = (zA + zB) / 2, L = zB - zA;
+        const zA = -back, zc = (zA + zB) / 2, L = zB - zA;
         [-1, 1].forEach(sd => {
           const p = B(len, rz, L, t, sd * span / 2, beamTop + (hw - span / 2) * gp + rz / 2 * k, zc); p.rotation.z = -sd * a;
           const sh = B(len + 0.12, 0.1, L + 0.1, M.shingle(), sd * span / 2, beamTop + (hw - span / 2) * gp + (rz + 0.05) * k, zc + 0.05, { swap: true }); sh.rotation.z = -sd * a;
@@ -932,62 +1140,107 @@
           B(0.22, gy - 0.4, 0.18, M.gutter(), sd * (span + 0.2), (gy + 0.4) / 2, zB - 0.3); B(0.22, 0.2, 0.9, M.gutter(), sd * (span + 0.2), 0.2, zB + 0.1);
         });
         B(0.9, 0.14, L, M.ridge(), 0, ridgeU + (rz + 0.1) * k + 0.03, zc);
-        if (s.type === 'screen') {
-          tri([[-span, 0], [span, 0], [0, span * gp]], 0.05, M.glass(), m => m.position.set(0, beamTop - gp, zB - 0.12));
-          B(0.28, span * gp - 0.2, 0.14, t, 0, beamTop - gp + (span * gp - 0.2) / 2, zB - 0.05);
-          [-1, 1].forEach(sd => B(0.22, span * gp * 0.5 - 0.1, 0.14, t, sd * span / 2, beamTop - gp + (span * gp * 0.5 - 0.1) / 2, zB - 0.05));
-        } else tri([[-span, 0], [span, 0], [0, span * gp]], 0.2, M.siding(), m => m.position.set(0, beamTop - gp, zB - 0.22));
+        B(0.46, 0.7, zF, M.tg(), 0, ridgeU - 0.3, zF / 2);                  // ridge beam inside the vault
         [-1, 1].forEach(sd => beamXY(zB + 0.02, 0, ridgeU + 0.05, sd * (span + 0.05), beamTop - gp - 0.02, 0.14, 0.55, t));
         B(2 * span, 0.4, 0.16, t, 0, beamTop - gp + 0.2, zB + 0.02);
         B(2 * span, 0.05, zB - zF, t, 0, beamTop - gp, (zB + zF) / 2, { cast: false });
-        fan(0, D / 2, ridgeU - 0.05, fy + 8.1);
+        // Gable end: three panes split by mullions (glass, screen) or a closed pediment.
+        const y0 = beamTop - gp, apex = span * gp, roofY = (x) => y0 + (span - Math.abs(x)) * gp;
+        if (s.type === 'open') tri([[-span, 0], [span, 0], [0, apex]], 0.2, t, m => m.position.set(0, y0, zB - 0.22));
+        else {
+          tri([[-span, 0], [span, 0], [0, apex]], 0.05, s.type === 'screen' ? M.screen() : M.glass(), m => m.position.set(0, y0, zB - 0.14));
+          const mx = W / 6;
+          [-mx, mx].forEach(x => { const h = roofY(x) - y0 - 0.1; B(0.3, h, 0.16, t, x, y0 + h / 2, zB - 0.06); });
+          const cy = y0 + apex - 0.75 - 0.25; if (cy > roofY(mx)) B(2 * (span - (cy - y0) / gp) - 0.2, 0.22, 0.16, t, 0, cy, zB - 0.06);
+        }
+        fan(0, D / 2, ridgeU - 0.65, fy + 8.1);
       }
 
-      // Enclosure
-      const top = (z) => postTop(z);
-      if (s.type === 'screen') {
-        const scr = M.screen();
-        const panel = (pts) => {
-          const gg = new THREE.BufferGeometry(); const p = pts.flat();
-          gg.setAttribute('position', new THREE.Float32BufferAttribute([...p.slice(0, 9), ...p.slice(0, 3), ...p.slice(6, 12)], 3)); gg.computeVertexNormals();
-          G.add(new THREE.Mesh(gg, scr));
-        };
-        const doorMids = { x: front ? [0] : [], left: sideDoors.left, right: sideDoors.right };
-        const run = (axis, fixed, ps, doorList) => {
-          for (let i = 0; i < ps.length - 1; i++) {
-            const a = ps[i] + (i === 0 && axis === 'z' && ps[0] < 0.2 ? 0.01 : col / 2), b = ps[i + 1] - col / 2, mid = (a + b) / 2, len = b - a;
-            if (len < 0.2) continue;
-            const P3 = (u, y) => axis === 'x' ? [u, y, fixed] : [fixed, y, u];
-            const yt = (u) => axis === 'x' ? top(zF) : top(u);
-            panel([P3(a, fy), P3(b, fy), P3(b, yt(b)), P3(a, yt(a))]);
-            const isDoor = Math.abs(len - doorW) < 0.05 && doorList.some(c => Math.abs(c - mid) < 0.1);
-            const bx = (w, h, d, y, off = 0) => axis === 'x' ? B(w, h, d, t, mid, y, fixed + off) : B(d, h, w, t, fixed + off, y, mid);
-            if (isDoor) {
-              bx(len, 0.22, 0.14, fy + 6.9); bx(len - 0.3, 1.1, 0.08, fy + 0.6, 0.02); bx(len - 0.3, 0.14, 0.08, fy + 3.2, 0.02);
-              [a + 0.09, b - 0.09].forEach(u => axis === 'x' ? B(0.18, 6.8, 0.14, t, u, fy + 3.4, fixed) : B(0.14, 6.8, 0.18, t, fixed, fy + 3.4, u));
-            } else {
-              bx(len, 0.3, 0.14, fy + 0.15); bx(len, 0.16, 0.14, fy + 3);
-              const yTop = Math.min(yt(a), yt(b));
-              [fy + 4.8, fy + 6.5].forEach(y => { if (y < yTop - 0.3) bx(len, 0.05, 0.06, y, 0.03); });
-              if (len > 2.6) { const h = yTop - fy - 3.1; axis === 'x' ? B(0.05, h, 0.06, t, mid, fy + 3.08 + h / 2, fixed + 0.03) : B(0.06, h, 0.05, t, fixed + 0.03, fy + 3.08 + h / 2, mid); }
-              if (onDeck) {
-                const off = axis === 'x' ? -0.3 : (fixed < 0 ? 0.3 : -0.3);
-                axis === 'x' ? railRun(a, fixed + off, b, fixed + off, fy, fy, { postA: false, postB: false, style: 'aluminum', H: 2.9 })
-                             : railRun(fixed + off, a, fixed + off, b, fy, fy, { postA: false, postB: false, style: 'aluminum', H: 2.9 });
-              }
+      // ── Walls ──────────────────────────────────────────────────────────
+      const quad = (pts, m) => {
+        const gg = new THREE.BufferGeometry(), p = pts.flat();
+        gg.setAttribute('position', new THREE.Float32BufferAttribute([...p.slice(0, 9), ...p.slice(0, 3), ...p.slice(6, 12)], 3)); gg.computeVertexNormals();
+        const qm = new THREE.Mesh(gg, m); qm.userData.noAO = true; G.add(qm);
+      };
+      const walls = [['front', 'x', zF, 1, () => frontTop], ['left', 'z', xL, -1, sideTop], ['right', 'z', xR, 1, sideTop]];
+      // put(u, y, w, h, off, depth, m): a box on a wall, u along it, off = outward offset
+      const putter = (axis, fixed, n) => (u, y, w, h, off, d, m) => axis === 'x' ? B(w, h, d, m, u, y, fixed + n * off) : B(d, h, w, m, fixed + n * off, y, u);
+
+      if (s.type === 'screen' || s.type === 'ezebreeze') {
+        const eze = s.type === 'ezebreeze', infill = eze ? M.ezeGlass() : M.screen();
+        walls.forEach(([k, axis, fixed, n, topAt]) => {
+          const put = putter(axis, fixed, n), P3 = (u, y) => axis === 'x' ? [u, y, fixed] : [fixed, y, u];
+          pl.walls[k].open.forEach(o => {
+            const a = Math.max(o.a, axis === 'z' ? 0.02 : -1e9), b = o.b, mid = (a + b) / 2, len = b - a;
+            const ta = topAt(a), tb = topAt(b), yTop = Math.min(ta, tb);
+            if (o.door) {
+              const dh = 6.75;
+              quad([P3(a, fy + dh + 0.2), P3(b, fy + dh + 0.2), P3(b, tb), P3(a, ta)], infill);
+              put(mid, fy + dh + 0.1, len, 0.2, 0, 0.16, t);
+              const dm = M.railWhite();
+              put(mid, fy + dh / 2, len - 0.06, dh, 0.02, 0.12, dm);
+              put(mid, fy + 4.6, len - 0.6, 3.4, 0.06, 0.04, M.glass());
+              put(mid, fy + 1.55, len - 0.6, 2.3, 0.07, 0.04, M.doorPanel2());
+              put(b - 0.4, fy + 3.2, 0.06, 0.4, 0.12, 0.06, M.brass());
+              return;
             }
-          }
-        };
-        run('x', zF, frontXs, doorMids.x);
-        run('z', -hw + col / 2, [0, ...sideZs.left.filter(z => z > 0.05)], doorMids.left);
-        run('z', hw - col / 2, [0, ...sideZs.right.filter(z => z > 0.05)], doorMids.right);
+            quad([P3(a, fy), P3(b, fy), P3(b, tb), P3(a, ta)], infill);
+            put(mid, fy + 0.14, len, 0.28, 0, 0.16, t);                        // sill
+            const tr = o.transom ? fy + EZE.maxH / 12 : null, winTop = tr ?? yTop;
+            if (tr) put(mid, tr, len, 0.22, 0, 0.16, t);                       // transom bar at 100″
+            if (eze) {
+              // vinyl frame + vertical 4-track vents with a centre stile
+              put(mid, winTop - 0.06, len, 0.12, 0.04, 0.08, t);
+              [a + 0.06, b - 0.06].forEach(u => put(u, (fy + winTop) / 2, 0.12, winTop - fy, 0.04, 0.08, t));
+              const vh = (winTop - fy - 0.3) / 4;
+              for (let i = 1; i < 4; i++) put(mid, fy + 0.28 + vh * i, len - 0.1, 0.05, 0.05, 0.05, t);
+              if (len > 2.2) put(mid, (fy + winTop) / 2, 0.05, winTop - fy - 0.3, 0.05, 0.05, t);
+            } else put(mid, fy + 3, len, 0.14, 0, 0.14, t);                    // ScreenEze chair rail
+            if (onDeck) {
+              const off = -0.32;
+              axis === 'x' ? railRun(a, fixed + n * off, b, fixed + n * off, fy, fy, { postA: false, postB: false, style: 'aluminum', H: 2.9 })
+                           : railRun(fixed + n * off, a, fixed + n * off, b, fy, fy, { postA: false, postB: false, style: 'aluminum', H: 2.9 });
+            }
+          });
+        });
+      } else if (s.type === 'sunroom') {
+        // Framed walls with siding, cut for 36″×60″ windows on a 30″ knee wall.
+        const th = 0.5, wy0 = fy + SUN.knee / 12, wy1 = wy0 + SUN.h / 12;
+        const wallTop = { front: () => beamTop, left: shed ? roofAt : () => beamTop, right: shed ? roofAt : () => beamTop };
+        [['front', 'x', D - th / 2, 1, -hw, hw], ['left', 'z', -hw + th / 2, -1, 0, D], ['right', 'z', hw - th / 2, 1, 0, D]].forEach(([k, axis, fixed, n, a, b]) => {
+          const top = wallTop[k], sh = new THREE.Shape();
+          sh.moveTo(a, fy); sh.lineTo(b, fy); sh.lineTo(b, top(b)); sh.lineTo(a, top(a)); sh.closePath();
+          pl.walls[k].forEach(h => {
+            const y0 = h.door ? fy : wy0, y1 = h.door ? fy + SUN.doorH / 12 : wy1, path = new THREE.Path();
+            path.moveTo(h.a, y0); path.lineTo(h.b, y0); path.lineTo(h.b, y1); path.lineTo(h.a, y1); path.closePath(); sh.holes.push(path);
+          });
+          const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false }), M.porchSiding());
+          mesh.castShadow = mesh.receiveShadow = true;
+          if (axis === 'x') mesh.position.set(0, 0, fixed - th / 2); else { mesh.rotation.y = -Math.PI / 2; mesh.position.set(fixed + th / 2, 0, 0); }
+          G.add(mesh);
+          const put = putter(axis, fixed, n), out = th / 2;
+          // corner boards and a frieze under the roof
+          if (k === 'front') [a + 0.2, b - 0.2].forEach(u => put(u, (fy + beamTop) / 2, 0.42, beamTop - fy, out + 0.04, 0.08, t));
+          pl.walls[k].forEach(h => {
+            const mid = (h.a + h.b) / 2, w = h.b - h.a, y0 = h.door ? fy : wy0, y1 = h.door ? fy + SUN.doorH / 12 : wy1, yc = (y0 + y1) / 2, hh = y1 - y0;
+            put(mid, yc, w, hh, 0, 0.04, M.glass());
+            put(mid, y1 - 0.08, w, 0.16, 0.05, 0.12, M.railWhite()); put(mid, y0 + 0.08, w, 0.16, 0.05, 0.12, M.railWhite());
+            [h.a + 0.08, h.b - 0.08].forEach(u => put(u, yc, 0.16, hh, 0.05, 0.12, M.railWhite()));
+            if (!h.door) put(mid, yc, w, 0.12, 0.07, 0.1, M.railWhite());
+            else put(h.b - 0.35, fy + 3.1, 0.06, 0.45, 0.14, 0.06, M.brass());
+            put(mid, y1 + 0.18, w + 0.7, 0.36, out + 0.04, 0.08, t);
+            [h.a - 0.17, h.b + 0.17].forEach(u => put(u, yc, 0.34, hh, out + 0.04, 0.08, t));
+            if (!h.door) put(mid, y0 - 0.06, w + 0.8, 0.12, out + 0.1, 0.24, t);
+          });
+        });
       } else if (onDeck) {
+        const front = !covered(s, 'front').length;
         const gaps = front ? [[-STAIR_RAIL_X, STAIR_RAIL_X]] : [];
         const atGap = (v) => front && Math.abs(Math.abs(v) - STAIR_RAIL_X) < 0.01;
         for (let i = 0; i < frontXs.length - 1; i++) {
           subtract(frontXs[i] + col / 2, frontXs[i + 1] - col / 2, gaps).forEach(([a, b]) => railRun(a, zF, b, zF, fy, fy, { postA: atGap(a), postB: atGap(b) }));
         }
-        [['left', -hw + col / 2], ['right', hw - col / 2]].forEach(([k, x]) => {
+        [['left', xL], ['right', xR]].forEach(([k, x]) => {
           const zs = [backPost ? col / 2 : 0, ...sideZs[k].filter(z => z > 0.05)];
           for (let i = 0; i < zs.length - 1; i++) {
             const a0 = zs[i] + (i || backPost ? col / 2 : 0.25), b0 = zs[i + 1] - col / 2;
@@ -1040,6 +1293,7 @@
       for (let x = a + 1.8; x < b - 1.2; x += 3.4) shrub(x + (R() - 0.5) * 0.6, 2 + (R() - 0.5) * 0.5, 1.0 + R() * 0.45);
     });
     tree(hx - HW / 2 - 16, -6, 1.1); tree(hx + HW / 2 + 14, -22, 1.25); tree(hx - 6, -HD - 18, 1.3);
+    treeline(hx, 0);
     return E;
   }
 
@@ -1049,12 +1303,12 @@
   const target = new THREE.Vector3();
   let bbox = { cx: 0, cz: 8, size: 30 };
   const outline = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#2fd17f', dashSize: 0.8, gapSize: 0.5, depthTest: false, transparent: true }));
-  outline.renderOrder = 10; scene.add(outline);
+  outline.renderOrder = 10; outline.userData.noAO = true; scene.add(outline);
   const dimAnchors = { w: new THREE.Vector3(), d: new THREE.Vector3() };
 
   function build() {
     scene.remove(model);
-    model.traverse(o => { if (o.geometry && o.geometry !== balGeo && o.geometry !== balGeoSq) o.geometry.dispose(); });
+    model.traverse(o => { if (o.geometry && ![balGeo, balGeoSq, crownGeo, trunkGeo].includes(o.geometry)) o.geometry.dispose(); });
     model = new THREE.Group(); scene.add(model); secGroups.length = 0;
     R = rng(1); G = model;
     const att = S.sections.filter(s => s.kind !== 'patio');
@@ -1117,10 +1371,34 @@
     if (o && o.userData.sec !== S.sel) select(o.userData.sec);
   });
 
+  // ── Ambient occlusion (contact shadows in corners and joints) + FXAA ────────
+  let composer = null, ssao = null, fxaa = null;
+  try {
+    if (THREE.EffectComposer && THREE.SSAOPass && THREE.FXAAShader && !matchMedia('(max-width: 820px)').matches) {
+      composer = new THREE.EffectComposer(renderer);
+      ssao = new THREE.SSAOPass(scene, camera, 16, 16);
+      ssao.kernelRadius = 1.1; ssao.minDistance = 0.00002; ssao.maxDistance = 0.004;
+      ssao.output = THREE.SSAOPass.OUTPUT.Default;
+      ssao.beautyRenderTarget.texture.encoding = THREE.sRGBEncoding;   // keep colors in sRGB through the chain
+      const baseOverride = ssao.renderOverride.bind(ssao);
+      ssao.renderOverride = (...args) => {
+        const hidden = []; scene.traverse(o => { if ((o.userData.noAO || (o.material && o.material.userData && o.material.userData.noAO)) && o.visible) { o.visible = false; hidden.push(o); } });
+        baseOverride(...args); hidden.forEach(o => { o.visible = true; });
+      };
+      fxaa = new THREE.ShaderPass(THREE.FXAAShader);
+      composer.addPass(ssao); composer.addPass(fxaa);
+    }
+  } catch (e) { composer = null; }
+
   // ── Loop ───────────────────────────────────────────────────────────────────
   function resize() {
     const w = viewer.clientWidth, h = viewer.clientHeight; if (!w || !h) return;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    if (composer) {
+      const pr = renderer.getPixelRatio();
+      composer.setPixelRatio(pr); composer.setSize(w, h); ssao.setSize(w * pr, h * pr);
+      fxaa.material.uniforms.resolution.value.set(1 / (w * pr), 1 / (h * pr));
+    }
   }
   new ResizeObserver(resize).observe(viewer);
 
@@ -1140,7 +1418,7 @@
     }
     controls.update();
     sky.position.copy(camera.position);
-    renderer.render(scene, camera);
+    if (composer) composer.render(); else renderer.render(scene, camera);
     placeDim($('dim-w'), dimAnchors.w); placeDim($('dim-d'), dimAnchors.d);
     requestAnimationFrame(frame);
   }
