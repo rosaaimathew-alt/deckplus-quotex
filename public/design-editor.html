@@ -39,7 +39,12 @@
   .bar h1 { font: 700 19px/1 var(--font-display); margin: 0 10px 0 0; }
   .grp { display: flex; gap: 3px; align-items: center; padding: 3px; border: 1px solid var(--line); border-radius: 9px; }
   .proj { font-size: 13px; color: var(--muted); }
-  .saveg { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .sheetg { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .sheetg select { font: 500 13px var(--font-body); padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
+  .ghost-btn { font: 600 13px var(--font-body); padding: 7px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+  .ghost-btn:hover { border-color: var(--accent); }
+  body.customer .sheetg { display: none !important; }
+  .saveg { display: flex; align-items: center; gap: 8px; }
   .save-status { font-size: 12px; color: var(--muted); }
   .save-btn { font: 600 13px var(--font-body); padding: 6px 12px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); cursor: pointer; }
   .save-btn:disabled { opacity: .45; cursor: default; }
@@ -68,6 +73,8 @@
   .props[hidden] { display: none; }
   .props b { font: 700 15px/1.1 var(--font-display); align-self: center; }
   .props label { display: flex; flex-direction: column; gap: 4px; font: 600 11px/1 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .props select { font: 500 13.5px/1.2 var(--font-body); padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); max-width: 220px; }
+  .props { max-height: 46%; overflow-y: auto; }
   .props input { font: 500 14px/1 var(--font-mono); width: 76px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   .props .ro { font: 500 13px/1.3 var(--font-mono); color: var(--fg); text-transform: none; letter-spacing: 0; }
   kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border-radius: 4px; border: 1px solid currentColor; opacity: .7; margin-left: 3px; }
@@ -98,8 +105,9 @@
 <div class="app">
   <header class="bar">
     <h1>Design Editor</h1>
-    <div class="grp" role="group" aria-label="Decking color"><span>Decking</span><div class="swatches" id="swatches"></div></div>
     <span class="proj" id="proj"></span>
+    <div class="sheetg"><select id="sheet" aria-label="Design sheet"><option value="auto">Sheet: auto</option><option value="s11">11×17</option><option value="s24">18×24</option></select>
+      <button type="button" class="ghost-btn" id="b-print">Print plan</button><button type="button" class="ghost-btn" id="b-svg">Export SVG</button></div>
     <div class="saveg"><span class="save-status" id="save-status" role="status"></span><button type="button" class="save-btn" id="b-save" disabled>Save to proposal</button></div>
   </header>
   <div class="main">
@@ -109,6 +117,8 @@
     <hr>
     <button type="button" data-add="deck" title="Add deck" aria-label="Add deck"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 9h16M4 13h16M4 17h16"/></svg></button>
     <button type="button" data-add="stairs" title="Add stairs" aria-label="Add stairs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4v-4h4v-4h4V8h4"/><path d="M4 20V4"/></svg></button>
+    <button type="button" data-add="porch" title="Add porch / sunroom" aria-label="Add porch or sunroom"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-6 9 6"/><path d="M5 10v10M19 10v10M9 20v-6h6v6M3 20h18"/></svg></button>
+    <button type="button" data-add="patio" title="Add patio" aria-label="Add patio"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="1"/><path d="M3 11h18M3 15h18M9 7v4M15 11v4M9 15v4"/></svg></button>
     <button type="button" data-add="landing" title="Add landing" aria-label="Add landing"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M12 18v3M9 21h6"/></svg></button>
     <hr>
     <button type="button" id="b-rotl" title="Rotate −15° (Shift+R)" aria-label="Rotate −15° (Shift+R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 3v4h4"/></svg></button>
@@ -151,8 +161,6 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <!-- Loading and saving a proposal's layout with the rep's QuoteX sign-in -->
 <script src="/qx-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.6/dist/umd/supabase.js"></script>
@@ -165,12 +173,17 @@
   const RISE_MAX = 7.75 / 12, RUN = 11 / 12, LANDING_DEF = 4, RAIL_H = 3, RAIL_SECTION = 8;
   const COLORS = [['Toasted Sand', '#a07c58'], ['Foggy Wharf', '#a3a4a2'], ['Saddle', '#8a5f42'], ['Spiced Rum', '#6c4632'], ['Island Mist', '#8f9087'], ['PT', '#b09363']];
   let nextId = 1;
+  // Whole-build finishes (same choices as the 3D builder): decking line + color, railing,
+  // skirting, house exterior, porch trim.
+  const BUILD_DEF = { decking: 'enhance', color: 'enhance-toasted-sand', rail: 'hybrid', skirt: 'none', house: 'almond', trim: 'almond' };
+  const PORCH_DEF = { ptype: 'ezebreeze', tie: 'wall', roof: 'shed', floor: 'deck', h: 3, wallH: 8, enclose: 'front2', cornerSide: 'right', sideGable: 'open', gableEnd: null };
   const S = {
-    color: 'Toasted Sand',
+    color: 'Toasted Sand', build: { ...BUILD_DEF },
     els: [
-      { id: nextId++, type: 'deck', h: 3, pts: [[-8, 0], [8, 0], [8, 12], [-8, 12]] },
-      { id: nextId++, type: 'landing', h: 3, x: 11, z: 9, w: 6, d: 6, rot: 0 },
-      { id: nextId++, type: 'stairs', x: 13.1, z: 12, rot: 45, w: 4, manual: true },
+      { id: nextId++, type: 'porch', x: -7, z: 0, w: 14, d: 14, ...PORCH_DEF },
+      { id: nextId++, type: 'deck', h: 3, pts: [[0, 0], [14, 0], [14, 12], [0, 12]] },
+      { id: nextId++, type: 'stairs', x: 9, z: 12, rot: 0, w: 4 },
+      { id: nextId++, type: 'patio', x: 9, z: 16, w: 16, d: 12, mat: 'pavers', wallH: 0, wallLen: 0 },
     ],
   };
   let sel = null;                 // selected element id
@@ -191,12 +204,21 @@
   let DESIGN = null; try { DESIGN = QS.get('design') ? JSON.parse(QS.get('design')) : null; } catch { DESIGN = null; }
   function layoutFrom(d) {
     const els = []; let id = 1;
-    const plats = [
-      ...(d.decks || []),
-      ...(d.porches || []).map(p => ({ width: p.width, depth: p.depth, height: p.floor === 'deck' ? (Number(p.deckHeightFt) || 3) : 0.5 })),
-    ];
+    const plats = [...(d.decks || [])];
+    const porchEls = (d.porches || []).map(p => {
+      const tie = ['wall', 'roof', 'free'].includes(p.tie) ? p.tie : 'wall';
+      let roof = ['shed', 'gable', 'semivault', 'hip'].includes(p.roof) ? p.roof : 'shed';
+      if (tie === 'free') roof = roof === 'semivault' ? 'semivault' : 'gable';
+      const type = ['open', 'screen', 'ezebreeze', 'sunroom'].includes(p.type) ? p.type : 'screen';
+      return { type: 'porch', w: Math.round(Number(p.width) || 16), d: Math.round(Number(p.depth) || 14), z: tie === 'free' ? 6 : 0, ...PORCH_DEF, ptype: type, tie, roof,
+        floor: p.floor === 'patio' ? 'patio' : 'deck', h: Number(p.deckHeightFt) || 3, wallH: Math.min(10, Math.max(8, (Number(p.wallHeightIn) || 96) / 12)),
+        enclose: /front only/i.test(p.sides || '') ? 'front0' : /1 side/i.test(p.sides || '') ? 'front1' : 'front2',
+        gableEnd: (Number(p.glassEnds) || 0) > 0 ? 'glass' : (type === 'screen' ? 'screen' : 'siding') };
+    });
+    const allW = porchEls.reduce((a, q) => a + q.w + 2, 0);
     const total = plats.reduce((a, p) => a + (Number(p.width) || 12), 0) + 2 * Math.max(0, plats.length - 1);
-    let x = -Math.round(total / 2);
+    let x = -Math.round((total + allW) / 2);
+    porchEls.forEach(q => { q.id = id++; q.x = x + q.w / 2; els.push(q); x += q.w + 2; });
     plats.forEach(p => {
       const W = Number(p.width) || 12, D = Number(p.depth) || 10, H = Number(p.height) || 3;
       els.push({ id: id++, type: 'deck', h: H, pts: [[x, 0], [x + W, 0], [x + W, D], [x, D]] });
@@ -220,6 +242,11 @@
       });
       x += W + 2;
     });
+    // Patios: in front of everything, centred under the first deck (or porch).
+    const zMax = Math.max(0, ...els.filter(e => e.pts).flatMap(e => e.pts.map(q => q[1])), ...porchEls.map(q => q.z + q.d));
+    const first = els.find(e => e.type === 'deck'), fx = first ? (Math.min(...first.pts.map(q => q[0])) + Math.max(...first.pts.map(q => q[0]))) / 2 : 0;
+    (d.patios || []).forEach((q, i) => els.push({ id: id++, type: 'patio', x: fx + i * 2, z: Math.round(zMax + 6), w: Math.round(Number(q.width) || 16), d: Math.round(Number(q.depth) || 12),
+      mat: /concrete/i.test(q.surface || '') ? 'concrete' : 'pavers', wallH: Number(q.wall?.height) || 0, wallLen: Number(q.wall?.length) || 0 }));
     return els;
   }
   const $ = (id) => document.getElementById(id);
@@ -232,7 +259,14 @@
     const c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), hw = e.w / 2, hd = e.d / 2;
     return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([u, v]) => [e.x + u * c + v * s, e.z - u * s + v * c]);
   }
-  const polyOf = (e) => e.type === 'deck' ? e.pts : e.type === 'landing' ? rectPts(e) : stairFootprint(e);
+  const boxPts = (e) => [[e.x - e.w / 2, e.z], [e.x + e.w / 2, e.z], [e.x + e.w / 2, e.z + e.d], [e.x - e.w / 2, e.z + e.d]];
+  const polyOf = (e) => e.type === 'deck' ? e.pts : e.type === 'landing' ? rectPts(e) : (e.type === 'porch' || e.type === 'patio') ? boxPts(e) : stairFootprint(e);
+  // Walkable height of a piece (patios on a retaining wall are raised).
+  const elH = (e) => e.type === 'patio' ? (Number(e.wallH) > 0 ? Number(e.wallH) + 0.25 : 0.25) : e.type === 'porch' ? (e.floor === 'deck' ? e.h : 0.33) : (e.h || 0);
+  const stairHost = (e) => e.type === 'deck' || e.type === 'landing' || (e.type === 'patio' && Number(e.wallH) > 0);
+  const PORCH_NAMES = { sunroom: 'Sunroom', ezebreeze: 'Eze-Breeze porch', screen: 'Screen porch', open: 'Open porch' };
+  const ROOF_NAMES = { shed: 'Shed', gable: 'Gable', semivault: 'Semi-vault', hip: 'Hip' };
+  const TIE_NAMES = { wall: 'Wall tie', roof: 'Roof tie', free: 'Freestanding' };
   const centroid = (pts) => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
   function inPoly(x, z, pts) {
     let inside = false;
@@ -262,28 +296,28 @@
   // the foot, else grade. Treads are worked out from the drop (7¾″ max rise, 11″ run).
   function platformAt(x, z, notId) {
     let best = null;
-    S.els.forEach(e => { if (e.type === 'stairs' || e.id === notId) return; if (inPoly(x, z, polyOf(e)) && (!best || e.h > best.h)) best = e; });
+    S.els.forEach(e => { if (e.type === 'stairs' || e.type === 'porch' || e.id === notId) return; if (inPoly(x, z, polyOf(e)) && (!best || elH(e) > elH(best))) best = e; });
     return best;
   }
   function edgeHost(e) {
     let best = null;
     S.els.forEach(o => {
-      if (o.type === 'stairs') return;
+      if (!stairHost(o)) return;
       edges(polyOf(o)).forEach(([a, b]) => { const p = projSeg(e.x, e.z, a, b); if (p.d < 0.35 && (!best || p.d < best.d)) best = { el: o, a, b, ...p }; });
     });
     return best;
   }
   function stairInfo(e) {
-    const host = edgeHost(e), top = host ? host.el.h : 3;
+    const host = edgeHost(e), top = host ? elH(host.el) : 3;
     const dx = Math.sin(rad(e.rot)), dz = Math.cos(rad(e.rot));
     // For each lower deck/landing, work out where a stair reaching its height would end;
     // if that foot lands on it, stop there (highest one wins). Otherwise run to grade.
     let foot = null, bottom = 0;
     S.els.forEach(o => {
-      if (o.type === 'stairs' || o.id === host?.el.id || !(o.h < top - 0.2)) return;
-      const n2 = Math.max(1, Math.ceil((top - o.h) / RISE_MAX)), L2 = (n2 - 1) * RUN;
+      if (o.type === 'stairs' || o.type === 'porch' || o.id === host?.el.id || !(elH(o) < top - 0.2)) return;
+      const n2 = Math.max(1, Math.ceil((top - elH(o)) / RISE_MAX)), L2 = (n2 - 1) * RUN;
       const fx = e.x + dx * (L2 + 0.45), fz = e.z + dz * (L2 + 0.45);
-      if (inPoly(fx, fz, polyOf(o)) && (!foot || o.h > foot.h)) { foot = o; bottom = o.h; }
+      if (inPoly(fx, fz, polyOf(o)) && (!foot || elH(o) > elH(foot))) { foot = o; bottom = elH(o); }
     });
     const n = Math.max(1, Math.ceil((top - bottom) / RISE_MAX)), len = (n - 1) * RUN;
     return { host, top, bottom, n, rise: (top - bottom) / n, len, foot };
@@ -300,15 +334,19 @@
     const coll = String((DESIGN.decks || [])[0]?.collKey || '').toLowerCase();
     const named = COLORS.find(([n]) => coll.includes(n.toLowerCase()));
     if (named) S.color = named[0]; else if (/\bpt\b|pressure/.test(coll)) S.color = 'PT';
+    // Decking line from the quote (Trex / TimberTech collection names), first color of that line.
+    const LINE_OF = [['enhance', 'enhance'], ['transcend', 'transcend'], ['lineage', 'lineage'], ['signature', 'signature'], ['prime', 'prime'], ['terrain', 'terrain'], ['reserve', 'reserve'], ['landmark', 'landmark']];
+    const ln = LINE_OF.find(([k]) => coll.includes(k));
+    if (ln) { S.build.decking = ln[1]; S.build.color = null; } else if (/\bpt\b|pressure/.test(coll)) { S.build.decking = 'pt'; S.build.color = 'pt-pt'; }
   }
 
   // ═══ History ═════════════════════════════════════════════════════════════
   const hist = [], fut = [];
-  const snap = () => JSON.stringify({ els: S.els, color: S.color, nextId });
+  const snap = () => JSON.stringify({ els: S.els, color: S.color, build: S.build, nextId });
   let lastSaved = snap();
   let onChange = () => {};        // set once the saved design has loaded (see Save to the proposal)
   function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); onChange(); }
-  function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
+  function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; S.build = { ...BUILD_DEF, ...(o.build || legacyBuild(o.color)) }; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
   function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); refreshButtons(); onChange(); }
   function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); refreshButtons(); onChange(); }
 
@@ -337,9 +375,35 @@
     const ht = el('text', { x: vb.x + P * 12, y: -P * 10, 'font-size': P * 12, fill: '#8e8c86', 'font-family': 'Barlow, sans-serif', 'font-weight': 700, 'letter-spacing': P * 2 }); ht.textContent = 'EXISTING HOUSE';
     // elements, lowest first
     const order = [...S.els].sort((a, b) => (a.type === 'stairs') - (b.type === 'stairs') || (a.h || 0) - (b.h || 0));
+    const edgeLabels = (pts, grp) => edges(pts).forEach(([a, b]) => {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1.5) return;
+      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, ang = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+      const [ccx, ccz] = centroid(pts); let nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L; if (nx * (mx - ccx) + nz * (mz - ccz) < 0) { nx = -nx; nz = -nz; }
+      const tx = mx + nx * P * 12, tz = mz + nz * P * 12, up = ang > 90 || ang < -90 ? ang + 180 : ang;
+      const t = el('text', { x: tx, y: tz, 'font-size': P * 11, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#b03a2e', 'font-family': 'JetBrains Mono, monospace', transform: `rotate(${up} ${tx} ${tz})` }, grp);
+      t.textContent = fmt(L);
+    });
     order.forEach(e => {
       const grp = el('g', { 'data-id': e.id, style: 'cursor:move' });
-      if (e.type === 'deck' || e.type === 'landing') {
+      if (e.type === 'porch' || e.type === 'patio') {
+        const pts = polyOf(e), [cx, cz] = centroid(pts);
+        if (e.type === 'porch') {
+          const ov = 1, z0 = e.tie === 'free' ? e.z - ov : e.z;
+          el('rect', { x: e.x - e.w / 2 - ov, y: z0, width: e.w + 2 * ov, height: e.z + e.d + ov - z0, fill: 'none', stroke: '#7a7a7a', 'stroke-width': P * 1.2, 'stroke-dasharray': `${P * 6} ${P * 4}` }, grp);
+          if (e.roof !== 'shed') el('line', { x1: e.x, y1: z0, x2: e.x, y2: e.z + e.d + ov, stroke: '#7a7a7a', 'stroke-width': P, 'stroke-dasharray': `${P * 3} ${P * 3}` }, grp);
+        }
+        el('polygon', { points: ptsAttr(pts), fill: e.type === 'porch' ? '#e6e1d6' : (e.mat === 'concrete' ? '#eceae6' : '#e9e7e1'), stroke: '#1a1c38', 'stroke-width': P * (e.type === 'patio' && Number(e.wallH) > 0 ? 4 : 2) }, grp);
+        if (e.type === 'patio' && e.mat !== 'concrete') {
+          const clip = `clip${e.id}`; const cp = el('clipPath', { id: clip }, grp); el('polygon', { points: ptsAttr(pts) }, cp);
+          const bl = el('g', { 'clip-path': `url(#${clip})` }, grp);
+          for (let z = e.z + 1; z < e.z + e.d; z += 1) el('line', { x1: e.x - e.w / 2, y1: z, x2: e.x + e.w / 2, y2: z, stroke: '#cfccc4', 'stroke-width': P * 0.8 }, bl);
+        }
+        const t1 = el('text', { x: cx, y: cz - P * 4, 'font-size': P * 13, 'text-anchor': 'middle', fill: '#1a1c38', 'font-family': 'Barlow, sans-serif', 'font-weight': 700 }, grp);
+        t1.textContent = e.type === 'porch' ? PORCH_NAMES[e.ptype].toUpperCase() : (e.mat === 'concrete' ? 'CONCRETE PATIO' : 'PAVER PATIO');
+        const t2 = el('text', { x: cx, y: cz + P * 12, 'font-size': P * 11, 'text-anchor': 'middle', fill: '#4a4c5e', 'font-family': 'Barlow, sans-serif' }, grp);
+        t2.textContent = e.type === 'porch' ? `${ROOF_NAMES[e.roof]} roof · ${TIE_NAMES[e.tie].toLowerCase()}` : (Number(e.wallH) > 0 ? `Raised ${fmt(e.wallH)} on retaining wall` : 'At grade');
+        edgeLabels(pts, grp);
+      } else if (e.type === 'deck' || e.type === 'landing') {
         const pts = polyOf(e);
         el('polygon', { points: ptsAttr(pts), fill: e.type === 'deck' ? '#f6efe2' : '#efe6d4', stroke: '#1a1c38', 'stroke-width': P * 2, 'stroke-linejoin': 'round' }, grp);
         // board lines parallel to the house
@@ -388,12 +452,17 @@
         const [, b, c2] = rectPts(e);
         el('rect', { x: c2[0] - hs / 2, y: c2[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2, 'data-h': 'size', style: 'cursor:nwse-resize' });
       }
+      if (e.type === 'porch' || e.type === 'patio') {
+        el('rect', { x: e.x + e.w / 2 - hs / 2, y: e.z + e.d - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2, 'data-h': 'box', style: 'cursor:nwse-resize' });
+      }
       // rotation handle: beyond the element in its facing direction
       const [cx, cz] = e.type === 'stairs' ? [e.x, e.z] : centroid(pts);
+      if (e.type !== 'porch' && e.type !== 'patio') {
       const ang = e.type === 'deck' ? 180 : (e.rot || 0), reach = e.type === 'stairs' ? -2.2 : Math.max(...pts.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + 1.6;
       const hx = cx + Math.sin(rad(ang)) * reach, hz = cz + Math.cos(rad(ang)) * reach;
       el('line', { x1: cx, y1: cz, x2: hx, y2: hz, stroke: '#2c6a4d', 'stroke-width': P * 1.2, 'pointer-events': 'none' });
       el('circle', { cx: hx, cy: hz, r: hs * 0.75, fill: '#2c6a4d', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'rot', style: 'cursor:grab' });
+      }
     }
     if (draft) {
       el('polyline', { points: ptsAttr(draft.pts.concat(draft.hover ? [draft.hover] : [])), fill: 'rgba(44,106,77,.08)', stroke: '#2c6a4d', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}` });
@@ -406,13 +475,14 @@
   function hitElement(x, z) {
     const st = S.els.filter(e => e.type === 'stairs' && inPoly(x, z, stairFootprint(e)));
     if (st.length) return st[st.length - 1];
-    const pl = S.els.filter(e => e.type !== 'stairs' && inPoly(x, z, polyOf(e))).sort((a, b) => b.h - a.h || (a.type === 'landing' ? -1 : 1));
+    const rank = { landing: 0, deck: 1, porch: 2, patio: 3 };
+    const pl = S.els.filter(e => e.type !== 'stairs' && inPoly(x, z, polyOf(e))).sort((a, b) => rank[a.type] - rank[b.type] || elH(b) - elH(a));
     return pl[0] || null;
   }
   // Snap a stair's top onto the nearest deck/landing edge; unless rotated by hand, face it straight out.
   function snapStairs(e) {
     let best = null;
-    S.els.forEach(o => { if (o.type === 'stairs') return; const pts = polyOf(o); edges(pts).forEach(([a, b]) => { const p = projSeg(e.x, e.z, a, b); if (p.d < 1.6 && p.z > -0.01 && !(Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05) && (!best || p.d < best.d)) best = { ...p, a, b, pts }; }); });
+    S.els.forEach(o => { if (!stairHost(o)) return; const pts = polyOf(o); edges(pts).forEach(([a, b]) => { const p = projSeg(e.x, e.z, a, b); if (p.d < 1.6 && p.z > -0.01 && !(Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05) && (!best || p.d < best.d)) best = { ...p, a, b, pts }; }); });
     if (!best) return;
     e.x = best.x; e.z = best.z;
     if (!e.manual) e.rot = Math.round(outwardAngle(best.a, best.b, best.pts));
@@ -435,6 +505,7 @@
       const h = hEl.dataset.h;
       if (h === 'rot') drag = { kind: 'rot', e, c: e.type === 'stairs' ? [e.x, e.z] : centroid(polyOf(e)), pts0: e.pts ? e.pts.map(p => [...p]) : null, rot0: e.rot || 0, a0: null };
       else if (h === 'size') drag = { kind: 'size', e };
+      else if (h === 'box') drag = { kind: 'box', e, x0: e.x - e.w / 2 };
       else if (h[0] === 'v') drag = { kind: 'vertex', e, i: +h.slice(1) };
       else if (h[0] === 'm') { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, [snapV((a[0] + b[0]) / 2), snapV((a[1] + b[1]) / 2)]); drag = { kind: 'vertex', e, i: i + 1 }; }
     } else {
@@ -456,9 +527,12 @@
       if (ev.shiftKey) { if (Math.abs(dx) > Math.abs(dz)) dz = 0; else dx = 0; }   // constrain to one axis
       if (e.type === 'deck') { const ddx = snapV(dx), ddz = snapV(dz); e.pts = o.pts.map(p => [p[0] + ddx, Math.max(0, p[1] + ddz) === 0 && p[1] + ddz < 0 ? 0 : p[1] + ddz]); }
       else if (e.type === 'landing') { e.x = snapV(o.x + dx); e.z = snapV(o.z + dz); }
+      else if (e.type === 'porch') { e.x = snapV(o.x + dx); e.z = e.tie === 'free' ? Math.max(2, snapV(o.z + dz)) : 0; }
+      else if (e.type === 'patio') { e.x = snapV(o.x + dx); e.z = Math.max(0, snapV(o.z + dz)); }
       else { e.x = o.x + dx; e.z = o.z + dz; snapStairs(e); }
     }
     if (drag.kind === 'vertex') { e.pts[drag.i] = [snapV(x), Math.max(0, snapV(z))]; }
+    if (drag.kind === 'box') { e.w = Math.max(6, Math.round(x - drag.x0)); e.x = drag.x0 + e.w / 2; e.d = Math.max(4, Math.round(z - e.z)); }
     if (drag.kind === 'size') {
       const c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), [cx, cz] = [e.x, e.z];
       // keep the opposite corner fixed
@@ -491,7 +565,8 @@
       const [cx, cz] = ctx.c, c = Math.cos(rad(d)), s = Math.sin(rad(d));
       e.pts = ctx.pts0.map(([px2, pz]) => { const u = px2 - cx, v = pz - cz; return [cx + u * c + v * s, cz - u * s + v * c]; });
       if (Math.abs(d % 90) < 0.01) e.pts = e.pts.map(p => [snapV(p[0]), snapV(p[1])]);
-    } else { e.rot = ((ctx.rot0 + d) % 360 + 540) % 360 - 180; if (e.type === 'stairs') e.manual = true; }
+    } else if (e.type === 'porch' || e.type === 'patio') { /* square to the house */ }
+    else { e.rot = ((ctx.rot0 + d) % 360 + 540) % 360 - 180; if (e.type === 'stairs') e.manual = true; }
   }
 
   // ── Toolbar & keys ───────────────────────────────────────────────────────
@@ -503,6 +578,8 @@
     if (t === 'deck') e = { id: nextId++, type: 'deck', h: 3, pts: [[cx - 6, cz - 5], [cx + 6, cz - 5], [cx + 6, cz + 5], [cx - 6, cz + 5]] };
     if (t === 'landing') e = { id: nextId++, type: 'landing', h: 1.5, x: cx, z: cz, w: LANDING_DEF, d: LANDING_DEF, rot: 0 };
     if (t === 'stairs') { e = { id: nextId++, type: 'stairs', x: cx, z: cz, rot: 0, w: 4 }; snapStairs(e); }
+    if (t === 'porch') e = { id: nextId++, type: 'porch', x: cx, z: 0, w: 14, d: 12, ...PORCH_DEF };
+    if (t === 'patio') e = { id: nextId++, type: 'patio', x: cx, z: Math.max(2, cz - 6), w: 16, d: 12, mat: 'pavers', wallH: 0, wallLen: 0 };
     S.els.push(e); sel = e.id; setTool('select'); commit(); changed();
   }));
   function copySel() { const e = byId(sel); if (!e) return; const c = JSON.parse(JSON.stringify(e)); c.id = nextId++; if (c.pts) c.pts = c.pts.map(p => [p[0] + 2, p[1] + 2]); else { c.x += 2; c.z += 2; } S.els.push(c); sel = c.id; commit(); changed(); }
@@ -548,26 +625,70 @@
     if (k === 'p') { setTool('poly'); return; }
     if (k === 'f') { fitPlan(); return; }
     const st = ev.shiftKey ? 5 : 0.5, mv = { arrowleft: [-st, 0], arrowright: [st, 0], arrowup: [0, -st], arrowdown: [0, st] }[k];
-    if (mv && e) { ev.preventDefault(); if (e.pts) e.pts = e.pts.map(p => [p[0] + mv[0], Math.max(0, p[1] + mv[1])]); else { e.x += mv[0]; e.z += mv[1]; if (e.type === 'stairs') snapStairs(e); } commit(); changed(); }
+    if (mv && e) { ev.preventDefault(); if (e.pts) e.pts = e.pts.map(p => [p[0] + mv[0], Math.max(0, p[1] + mv[1])]); else { e.x += mv[0]; e.z += mv[1]; if (e.type === 'stairs') snapStairs(e); if (e.type === 'porch' && e.tie !== 'free') e.z = 0; if (e.z < 0) e.z = 0; } commit(); changed(); }
   });
   function refreshButtons() { $('b-undo').disabled = !hist.length; $('b-redo').disabled = !fut.length; ['b-copy', 'b-del', 'b-rotl', 'b-rotr'].forEach(i => { $(i).disabled = !sel; }); }
 
   // ── Properties of the selected element (exact numbers) ───────────────────
   function renderProps() {
     const p = $('props'), e = byId(sel);
-    if (!e) { p.hidden = true; return; }
     const num = (k, label, v, step = 0.5, min = 0) => `<label>${label}<input type="number" data-k="${k}" step="${step}" min="${min}" value="${+(+v).toFixed(2)}"></label>`;
+    const pick = (k, label, opts, v) => `<label>${label}<select data-k="${k}">${opts.map(([val, txt, off]) => `<option value="${val}"${String(val) === String(v) ? ' selected' : ''}${off ? ' disabled' : ''}>${txt}</option>`).join('')}</select></label>`;
+    if (CUSTOMER) { p.hidden = true; return; }
     let h = '';
-    if (e.type === 'deck') {
+    if (!e) {
+      // Whole build: the finishes that apply to everything
+      const b = S.build, line = OPTS?.lines.find(l => l.key === b.decking);
+      h = `<b>Whole build</b><span class="ro" style="align-self:center">Select a piece to edit it</span>`
+        + (OPTS ? pick('b:decking', 'Decking', OPTS.lines.map(l => [l.key, l.label]), b.decking)
+          + (line && line.colors.length > 1 ? pick('b:color', 'Color', line.colors.map(c => [c.key, c.name]), b.color) : '')
+          + pick('b:rail', 'Railing', [['hybrid', 'Hybrid (white, black balusters)'], ['aluminum', 'Aluminum (all black)']], b.rail)
+          + pick('b:skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal']], b.skirt)
+          + pick('b:house', 'House', OPTS.houses.map(x => [x.key, x.name]), b.house)
+          + pick('b:trim', 'Porch trim', OPTS.trims.map(x => [x.key, x.name]), b.trim)
+          : '<span class="ro" style="align-self:center">Loading options…</span>');
+    } else if (e.type === 'porch') {
+      const free = e.tie === 'free', gab = e.roof === 'gable' || e.roof === 'semivault';
+      h = `<b>${PORCH_NAMES[e.ptype]}</b>`
+        + pick('ptype', 'Type', [['sunroom', 'Sunroom'], ['ezebreeze', 'Eze-Breeze'], ['screen', 'Screen (ScreenEze)'], ['open', 'Open']], e.ptype)
+        + num('w', 'Width', e.w, 1, 6) + num('d', 'Depth', e.d, 1, 4)
+        + pick('tie', 'Roof connection', [['wall', 'Wall tie'], ['roof', 'Roof tie'], ['free', 'Freestanding']], e.tie)
+        + pick('roof', 'Roof style', [['shed', 'Shed', free], ['gable', 'Gable'], ['semivault', 'Semi-vault'], ['hip', 'Hip', free]], e.roof)
+        + (free ? '' : pick('enclose', 'Enclosed walls', [['front2', 'Front + 2 sides'], ['front1', 'Front + 1 side (corner)'], ['front0', 'Front only (inset)']], e.enclose))
+        + (!free && e.enclose === 'front1' ? pick('cornerSide', 'House wall on', [['left', 'Left'], ['right', 'Right']], e.cornerSide) : '')
+        + pick('floor', 'Sits on', [['deck', 'New PT deck'], ['patio', 'Patio / slab']], e.floor)
+        + (e.floor === 'deck' ? num('h', 'Floor height', e.h, 0.5, 1) : '')
+        + num('wallH', 'Wall height', e.wallH, 0.5, 8)
+        + (e.roof === 'shed' && !free ? pick('sideGable', 'Above side headers', [['open', e.ptype === 'screen' ? 'Screen' : e.ptype === 'open' ? 'Open' : 'Glass'], ['closed', 'Closed']], e.sideGable) : '')
+        + (gab ? pick('gableEnd', 'Gable end', [['glass', 'Glass'], ...(e.ptype === 'screen' ? [['screen', 'Screen']] : []), ['siding', 'Siding']], e.gableEnd || (e.ptype === 'screen' ? 'screen' : e.ptype === 'open' ? 'siding' : 'glass')) : '')
+        + (free ? num('z', 'From house', e.z, 0.5, 2) : '');
+    } else if (e.type === 'patio') {
+      h = `<b>Patio</b>${pick('mat', 'Surface', [['pavers', 'Pavers (Techo Bloc)'], ['concrete', 'Concrete 4″']], e.mat)}${num('w', 'Width', e.w, 1, 4)}${num('d', 'Depth', e.d, 1, 4)}${num('wallH', 'Retaining wall height', e.wallH, 0.5, 0)}${Number(e.wallH) > 0 ? num('wallLen', 'Wall length (0 = all edges)', e.wallLen, 1, 0) : ''}`;
+    } else if (e.type === 'deck') {
       const pts = e.pts, area = Math.abs(pts.reduce((a, q, i) => { const r = pts[(i + 1) % pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2);
       h = `<b>Deck</b>${num('h', 'Height (ft)', e.h, 0.25)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`;
     } else if (e.type === 'landing') {
       h = `<b>Landing</b>${num('h', 'Height (ft)', e.h, 0.25)}${num('w', 'Width', e.w, 0.5, 3)}${num('d', 'Depth', e.d, 0.5, 3)}${num('rot', 'Angle°', e.rot, 1, -180)}`;
     } else {
       const i = stairInfo(e);
-      h = `<b>Stairs</b>${num('rot', 'Angle°', e.rot, 1, -180)}${num('w', 'Width', e.w, 0.5, 3)}<label>From → to<span class="ro">${fmt(i.top)} → ${i.foot ? 'landing ' + fmt(i.bottom) : 'grade'}</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label>${e.manual ? '<button type="button" id="b-square">Square to edge</button>' : ''}`;
+      h = `<b>Stairs</b>${num('rot', 'Angle°', e.rot, 1, -180)}${num('w', 'Width', e.w, 0.5, 3)}${pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '')}<label>From → to<span class="ro">${fmt(i.top)} → ${i.foot ? 'landing ' + fmt(i.bottom) : 'grade'}</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label>${e.manual ? '<button type="button" id="b-square">Square to edge</button>' : ''}`;
     }
     p.innerHTML = h; p.hidden = false;
+    p.querySelectorAll('select').forEach(sl => sl.addEventListener('change', () => {
+      const k = sl.dataset.k, v = sl.value;
+      if (k.startsWith('b:')) {
+        const bk = k.slice(2); S.build[bk] = v;
+        if (bk === 'decking') { const l = OPTS.lines.find(x => x.key === v); S.build.color = l?.colors[0]?.key || v; }
+      } else if (k === 'boxed') e.boxed = !!v;
+      else {
+        e[k] = v;
+        if (e.type === 'porch') {
+          if (k === 'tie') { if (v === 'free') { if (e.roof === 'shed' || e.roof === 'hip') e.roof = 'gable'; e.z = Math.max(e.z || 0, 6); e.enclose = 'front2'; } else e.z = 0; }
+          if (k === 'ptype') e.gableEnd = null;
+        }
+      }
+      commit(); changed();
+    }));
     p.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
       const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
       if (inp.dataset.k === 'rot') { e.rot = ((v % 360) + 540) % 360 - 180; if (e.type === 'stairs') e.manual = true; } else e[inp.dataset.k] = v;
@@ -576,157 +697,100 @@
     $('b-square')?.addEventListener('click', () => { e.manual = false; snapStairs(e); commit(); changed(); });
   }
 
-  // ═══ 3D ══════════════════════════════════════════════════════════════════
-  let three = null;
-  function init3D() {
-    if (!window.THREE || !THREE.OrbitControls) { $('view').innerHTML = '<p style="padding:20px;color:#333">The 3D library did not load. The plan still works.</p>'; return; }
-    const host = $('view'), renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    host.appendChild(renderer.domElement);
-    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(38, 1, 0.3, 900);
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 - 0.03; controls.minDistance = 5; controls.maxDistance = 160;
-    camera.position.set(26, 18, 40); controls.target.set(0, 3, 8);
-    scene.background = new THREE.Color('#cfe0ec'); scene.fog = new THREE.Fog('#cfe0ec', 160, 500);
-    scene.add(new THREE.HemisphereLight(0xdbe8ff, 0x55623c, 0.55));
-    const sun = new THREE.DirectionalLight(0xfff1dc, 1.9); sun.position.set(-30, 60, 45); sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 200 });
-    sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.08; scene.add(sun);
-
-    // procedural textures (feet-based tiling)
-    const cnv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
-    const rng = (s) => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-    const tex = (c, u, v, color = true) => { const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / u, 1 / v); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); if (color) t.encoding = THREE.sRGBEncoding; return t; };
-    const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = n >> 8 & 255, b = n & 255, m = v => Math.max(0, Math.min(255, Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f)))); return `rgb(${m(r)},${m(g)},${m(b)})`; };
-    function boardsCanvas(hex) {     // two 5½″ boards with gaps, 8′ long
-      const R = rng(9), [c, x] = cnv(1024, 128); x.fillStyle = '#2b2219'; x.fillRect(0, 0, 1024, 128);
-      [[2, 60], [66, 60]].forEach(([y0, h]) => { x.fillStyle = hex; x.fillRect(0, y0, 1024, h);
-        for (let i = 0; i < 160; i++) { x.strokeStyle = shade(hex, (R() - .55) * .35); x.globalAlpha = .25 + R() * .3; x.lineWidth = .6 + R() * 1.4; const yy = y0 + R() * h, x0 = R() * 1024; x.beginPath(); x.moveTo(x0, yy); x.bezierCurveTo(x0 + 200, yy + (R() - .5) * 4, x0 + 400, yy + (R() - .5) * 4, x0 + 600, yy); x.stroke(); }
-        x.globalAlpha = 1; });
-      return c;
-    }
-    function sidingCanvas() { const [c, x] = cnv(256, 256); for (let i = 0; i < 4; i++) { const g = x.createLinearGradient(0, i * 64, 0, i * 64 + 64); g.addColorStop(0, '#fff'); g.addColorStop(.85, '#eaeaea'); g.addColorStop(1, '#cfcfcf'); x.fillStyle = g; x.fillRect(0, i * 64, 256, 64); x.fillStyle = 'rgba(0,0,0,.4)'; x.fillRect(0, i * 64 + 61, 256, 3); } return c; }
-    function shingleCanvas() { const R = rng(11), [c, x] = cnv(256, 256); x.fillStyle = '#202125'; x.fillRect(0, 0, 256, 256); for (let r = 0; r < 8; r++) { let xx = -R() * 30; while (xx < 256) { const w = 14 + R() * 36, t = (R() - .5) * 24; x.fillStyle = `rgb(${66 + t},${68 + t},${72 + t})`; x.fillRect(xx + 1, r * 32, w - 1, 30); xx += w; } } return c; }
-    function grassCanvas() { const R = rng(21), [c, x] = cnv(256, 256); x.fillStyle = '#4b6a2b'; x.fillRect(0, 0, 256, 256); for (let i = 0; i < 9000; i++) { x.fillStyle = shade('#4b6a2b', (R() - .5) * .6); x.fillRect(R() * 256, R() * 256, 1, 3); } return c; }
-    const T = { siding: tex(sidingCanvas(), 2, 2), shingle: tex(shingleCanvas(), 3.2, 3.2), grass: tex(grassCanvas(), 8, 8) };
-    const deckTex = {}; const deckT = (hex) => deckTex[hex] || (deckTex[hex] = tex(boardsCanvas(hex), 8, 11.5 / 12));
-    const std = (o) => new THREE.MeshStandardMaterial(o);
-    const M = {
-      siding: std({ color: '#d4cdb6', map: T.siding, roughness: .85 }), shingle: std({ color: '#fff', map: T.shingle, roughness: .95 }),
-      trim: std({ color: '#f1efe9', roughness: .5 }), black: std({ color: '#1d1e20', roughness: .35, metalness: .4 }),
-      pt: std({ color: '#a7895d', roughness: .9 }), concrete: std({ color: '#b8b4ab', roughness: 1 }), glass: std({ color: '#1d2a33', roughness: .05, metalness: .9 }),
-    };
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), std({ color: '#fff', map: T.grass, roughness: 1 }));
-    T.grass.repeat.set(100, 100); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-    three = { renderer, scene, camera, controls, sun, M, deckT, std, group: new THREE.Group(), dirty: true };
-    scene.add(three.group);
-    new ResizeObserver(() => { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }).observe(host);
-    (function loop() { if (three.dirty) { build3D(); three.dirty = false; } controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+  // ═══ 3D: the 3D builder's engine (porch-3d.html?embed=1) in a frame ══════
+  // It draws porches (every type, roof and connection), patios with retaining
+  // walls, the house, finishes, and this editor's free-form decks, landings and
+  // stairs, so everything the 3D builder could do shows here.
+  let OPTS = null, frame = null, sendT = null, firstSend = true;
+  function legacyBuild(colorName) {
+    if (!colorName || !OPTS) return {};
+    if (colorName === 'PT') return { decking: 'pt', color: 'pt-pt' };
+    for (const l of OPTS.lines) { const c = l.colors.find(x => x.name === colorName); if (c) return { decking: l.key, color: c.key }; }
+    return {};
   }
-
-  function build3D() {
-    const { scene, M, deckT, std } = three;
-    scene.remove(three.group); three.group.traverse(o => o.geometry?.dispose()); three.group = new THREE.Group(); scene.add(three.group);
-    const G = three.group, hex = COLORS.find(c => c[0] === S.color)[1];
-    const deckM = std({ color: '#fff', map: deckT(hex), roughness: .75 }), fasciaM = std({ color: hex, roughness: .7 });
-    const add = (geo, m, x, y, z, ry = 0) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); mesh.rotation.y = ry; mesh.castShadow = mesh.receiveShadow = true; G.add(mesh); return mesh; };
-    const box = (w, h, d, m, x, y, z, ry = 0) => add(new THREE.BoxGeometry(w, h, d), m, x, y, z, ry);
-    // a bar between two 3D points (rails, stringers)
-    const bar = (a, b, w, h, m) => { const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz), mesh = box(w, h, L, m, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); mesh.rotation.order = 'YXZ'; mesh.rotation.y = Math.atan2(dx, dz); mesh.rotation.x = -Math.atan2(dy, Math.hypot(dx, dz)); return mesh; };
-    const balGeo = new THREE.CylinderGeometry(.032, .032, 1, 8);
-    // Hybrid rail: white posts and rails, composite cap, black balusters; equal sections ≤ 8′.
-    function rail(a, b, { postA = true, postB = true } = {}) {
-      const L = Math.hypot(b[0] - a[0], b[2] - a[2]); if (L < .4) return;
-      const level = Math.abs(a[1] - b[1]) < .01, n = level ? Math.max(1, Math.ceil(L / RAIL_SECTION)) : 1, at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-      for (let k = 0; k <= n; k++) { if ((k === 0 && !postA) || (k === n && !postB)) continue; const p = at(k / n); box(.42, RAIL_H, .42, M.trim, p[0], p[1] + RAIL_H / 2, p[2]); box(.52, .08, .52, fasciaM, p[0], p[1] + RAIL_H + .04, p[2]); }
-      const up = (p, dy) => [p[0], p[1] + dy, p[2]];
-      bar(up(a, RAIL_H - .17), up(b, RAIL_H - .17), .29, .26, M.trim); bar(up(a, RAIL_H + .04), up(b, RAIL_H + .04), .46, .08, fasciaM); bar(up(a, .36), up(b, .36), .29, .2, M.trim);
-      const cnt = Math.floor(L / .375), im = new THREE.InstancedMesh(balGeo, M.black, Math.max(1, cnt)), mx = new THREE.Matrix4(); let k2 = 0;
-      for (let i = 1; i < cnt; i++) { const p = at(i / cnt); mx.compose(new THREE.Vector3(p[0], p[1] + .46 + (RAIL_H - .76) / 2, p[2]), new THREE.Quaternion(), new THREE.Vector3(1, RAIL_H - .76, 1)); im.setMatrixAt(k2++, mx); }
-      im.count = k2; im.castShadow = true; G.add(im);
-    }
-    const subtract = (a, b, cuts) => { let parts = [[a, b]]; cuts.forEach(([c, d]) => { parts = parts.flatMap(([p, q]) => (d <= p || c >= q) ? [[p, q]] : [[p, Math.max(p, c)], [Math.min(q, d), q]]); }); return parts.filter(([p, q]) => q - p > .3); };
-    // where stairs leave or arrive along an edge: cut the rail there
-    const stairsCuts = (a, b) => {
+  const subtract = (a, b, cuts) => { let parts = [[a, b]]; cuts.forEach(([c, d]) => { parts = parts.flatMap(([p, q]) => (d <= p || c >= q) ? [[p, q]] : [[p, Math.max(p, c)], [Math.min(q, d), q]]); }); return parts.filter(([p, q]) => q - p > .3); };
+  function renderModel() {
+    const plats = [], stairs = [];
+    const stairCuts = (a, b) => {
       const cuts = [];
-      S.els.filter(s => s.type === 'stairs').forEach(s => {
-        const p = projSeg(s.x, s.z, a, b); if (p.d < .35) cuts.push([p.t * p.len - s.w / 2 + .1, p.t * p.len + s.w / 2 - .1]);
-        const i = stairInfo(s); if (i.foot) { const fx = s.x + Math.sin(rad(s.rot)) * i.len, fz = s.z + Math.cos(rad(s.rot)) * i.len, q = projSeg(fx, fz, a, b); if (q.d < 1.6) cuts.push([q.t * q.len - s.w / 2 - .4, q.t * q.len + s.w / 2 + .4]); }
+      S.els.filter(x => x.type === 'stairs').forEach(st => {
+        const p = projSeg(st.x, st.z, a, b); if (p.d < .35) cuts.push([p.t * p.len - st.w / 2 + .1, p.t * p.len + st.w / 2 - .1]);
+        const i = stairInfo(st); if (i.foot) { const fx = st.x + Math.sin(rad(st.rot)) * i.len, fz = st.z + Math.cos(rad(st.rot)) * i.len, q = projSeg(fx, fz, a, b); if (q.d < 1.6) cuts.push([q.t * q.len - st.w / 2 - .4, q.t * q.len + st.w / 2 + .4]); }
       });
       return cuts;
     };
-    // edges shared with another platform at the same height get no rail
     const sharedCuts = (a, b, self) => {
       const cuts = [], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      S.els.forEach(o => { if (o === self || o.type === 'stairs' || Math.abs(o.h - self.h) > .05) return;
+      S.els.forEach(o => { if (o === self || o.type === 'stairs' || Math.abs(elH(o) - self.h) > .05) return;
         for (let t = .25; t < L; t += .5) { const x = a[0] + (b[0] - a[0]) * t / L, z = a[1] + (b[1] - a[1]) * t / L, nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L;
           if (inPoly(x + nx * .3, z + nz * .3, polyOf(o)) || inPoly(x - nx * .3, z - nz * .3, polyOf(o))) cuts.push([t - .25, t + .25]); } });
       return cuts;
     };
-    function platform(e) {
-      const pts = polyOf(e), h = e.h, sh = new THREE.Shape();
-      sh.moveTo(pts[0][0], -pts[0][1]); pts.slice(1).forEach(p => sh.lineTo(p[0], -p[1])); sh.closePath();
-      const top = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: .09, bevelEnabled: false }), deckM); top.rotation.x = -Math.PI / 2; top.position.y = h - .09; top.castShadow = top.receiveShadow = true; G.add(top);
-      const frame = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: .75, bevelEnabled: false }), M.pt); frame.rotation.x = -Math.PI / 2; frame.position.y = h - .9; frame.castShadow = true; G.add(frame);
-      const [cx, cz] = centroid(pts);
+    S.els.filter(e => e.type === 'deck' || e.type === 'landing').forEach(e => {
+      const pts = polyOf(e), h = e.h, [cx, cz] = centroid(pts), eds = [], posts = [];
+      let houseSpan = null;
       edges(pts).forEach(([a, b]) => {
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]), onHouse = Math.abs(a[1]) < .05 && Math.abs(b[1]) < .05, ang = Math.atan2(b[0] - a[0], b[1] - a[1]);
-        if (!onHouse) box(.08, .95, L + .08, fasciaM, (a[0] + b[0]) / 2, h - .5, (a[1] + b[1]) / 2, ang);
-        // posts + footings along the edge (8′ max), set in 1′
-        const n = Math.max(1, Math.ceil(L / 8));
-        for (let k = 0; k <= n; k++) { if (onHouse) break; let x = a[0] + (b[0] - a[0]) * k / n, z = a[1] + (b[1] - a[1]) * k / n; const d = Math.hypot(cx - x, cz - z) || 1; x += (cx - x) / d * .9; z += (cz - z) / d * .9;
-          if (h - .9 > .2) box(.46, h - .9, .46, M.pt, x, (h - .9) / 2, z); const f = add(new THREE.CylinderGeometry(.6, .6, .3, 14), M.concrete, x, .08, z); f.castShadow = false; }
-        if (onHouse || h < 2) return;
-        subtract(0, L, [...stairsCuts(a, b), ...sharedCuts(a, b, e)]).forEach(([p, q]) => {
-          const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, inx = (cx - (a[0] + b[0]) / 2), inz = (cz - (a[1] + b[1]) / 2), il = Math.hypot(inx, inz) || 1;
-          const ox = inx / il * .2, oz = inz / il * .2;
-          rail([a[0] + ux * p + ox, h, a[1] + uz * p + oz], [a[0] + ux * q + ox, h, a[1] + uz * q + oz]);
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]), house = Math.abs(a[1]) < .05 && Math.abs(b[1]) < .05;
+        if (house) houseSpan = [Math.min(a[0], b[0]), Math.max(a[0], b[0])];
+        const rails = [];
+        if (!house && h >= 2) subtract(0, L, [...stairCuts(a, b), ...sharedCuts(a, b, e)]).forEach(([p, q]) => {
+          const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, inx = cx - (a[0] + b[0]) / 2, inz = cz - (a[1] + b[1]) / 2, il = Math.hypot(inx, inz) || 1, ox = inx / il * .2, oz = inz / il * .2;
+          rails.push([a[0] + ux * p + ox, a[1] + uz * p + oz, a[0] + ux * q + ox, a[1] + uz * q + oz]);
         });
+        if (!house) { const n = Math.max(1, Math.ceil(L / 8)); for (let k = 0; k <= n; k++) { let x = a[0] + (b[0] - a[0]) * k / n, z = a[1] + (b[1] - a[1]) * k / n; const d = Math.hypot(cx - x, cz - z) || 1; posts.push([x + (cx - x) / d * .9, z + (cz - z) / d * .9]); } }
+        eds.push({ a, b, house, rails });
       });
-    }
-    function stairs(e) {
-      const i = stairInfo(e); if (i.top - i.bottom < .3) return;
-      const g = new THREE.Group(); g.position.set(e.x, 0, e.z); g.rotation.y = rad(e.rot); G.add(g);
-      const prev = three.group; three.group = g;   // build in the stair's own frame
-      const t = 1 / 12, W2 = e.w;
-      for (let k = 1; k < i.n; k++) { const yt = i.top - k * i.rise, za = (k - 1) * RUN;
-        const tr = new THREE.Mesh(new THREE.BoxGeometry(W2 + .1, t, RUN - .02), deckM); tr.position.set(0, yt - t / 2, za + RUN / 2 + .02); tr.castShadow = tr.receiveShadow = true; g.add(tr);
-        const rs = new THREE.Mesh(new THREE.BoxGeometry(W2, i.rise - t, .06), fasciaM); rs.position.set(0, yt + (i.rise - t) / 2, za + .03); g.add(rs); }
-      [-W2 / 2 + .06, W2 / 2 - .06].forEach(x => { const s2 = new THREE.Mesh(new THREE.BoxGeometry(.1, .95, Math.hypot(i.len + .3, i.top - i.bottom)), fasciaM);
-        s2.position.set(x, (i.top + i.bottom) / 2 - .4, (i.len + .3) / 2); s2.rotation.x = Math.atan2(i.top - i.bottom, i.len + .3); s2.castShadow = true; g.add(s2); });
-      three.group = prev;
-      if (i.n >= 4) [-1, 1].forEach(sd => { const c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), u = sd * (W2 / 2 - .2), P2 = (v, y) => [e.x + u * c + v * s, y, e.z - u * s + v * c];
-        rail(P2(-.1, i.top), P2(i.len + .2, i.bottom + i.rise), { postA: false, postB: true }); });
-      if (!i.foot) { const fx = e.x + Math.sin(rad(e.rot)) * (i.len + 1.6), fz = e.z + Math.cos(rad(e.rot)) * (i.len + 1.6); box(W2 + 1.4, .2, 3, M.concrete, fx, .1, fz, rad(e.rot)); }
-    }
-    // house: fixed back wall at z = 0
-    const maxH = Math.max(3, ...S.els.filter(e => e.h != null).map(e => e.h)), E = maxH + 8.8, HW = 60, HD = 28;
-    box(HW, E, HD, M.siding, 0, E / 2, -HD / 2);
-    const k = Math.hypot(1, .5);
-    [-1, 1].forEach(sd => { const p = box(HW + 2, .5, (HD / 2 + 1) * k, M.shingle, 0, E + (HD / 4 - .5) * .5 + .25, sd > 0 ? -HD / 4 + .5 : -3 * HD / 4 - .5); p.rotation.x = sd * Math.atan(.5); });
-    box(HW + 2, .4, .4, M.trim, 0, E - .25, 1.0);
-    // a slider behind the first deck, windows elsewhere
-    const d0 = S.els.find(e => e.type === 'deck'); const dx0 = d0 ? centroid(d0.pts)[0] : 0, ff = d0 ? d0.h : 1;
-    box(6.6, 7, .1, M.trim, dx0, ff + 3.5, .03); box(6, 6.7, .12, M.glass, dx0, ff + 3.4, .05);
-    [-20, -12, 12, 20].forEach(x => { if (Math.abs(x - dx0) < 6) return; box(3.6, 5, .1, M.trim, x, ff + 5, .03); box(3, 4.4, .12, M.glass, x, ff + 5, .05); });
-    S.els.filter(e => e.type === 'deck' || e.type === 'landing').forEach(platform);
-    S.els.filter(e => e.type === 'stairs').forEach(stairs);
-    // selected element glow ring on the ground
-    const e = byId(sel);
-    if (e) { const pts = polyOf(e), geo = new THREE.BufferGeometry().setFromPoints([...pts, pts[0]].map(p => new THREE.Vector3(p[0], (e.h || 0) + .12, p[1]))); const ln = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#2fd17f', depthTest: false })); ln.renderOrder = 10; G.add(ln); }
+      plats.push({ pts, h, edges: eds, posts, houseSpan });
+    });
+    S.els.filter(e => e.type === 'stairs').forEach(e => { const i = stairInfo(e); stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
+    const sections = [];
+    S.els.forEach(e => {
+      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd });
+      if (e.type === 'patio') sections.push({ id: e.id, kind: 'patio', x: e.x, z: e.z, w: e.w, d: e.d, mat: e.mat, wallH: Number(e.wallH) || 0, wallLen: Number(e.wallLen) || 0 });
+    });
+    const porchOnDeck = S.els.find(e => e.type === 'porch' && e.floor === 'deck');
+    const H = porchOnDeck ? porchOnDeck.h : Math.max(3, ...plats.filter(q => q.houseSpan).map(q => q.h));
+    plats.forEach((q, i) => { q.kind = S.els.filter(e => e.type === 'deck' || e.type === 'landing')[i].type; });
+    const meta = DESIGN ? { client: DESIGN.client || '', address: DESIGN.address || '', phone: DESIGN.phone || '', email: DESIGN.email || '', contract: DESIGN.contractNum || '' } : null;
+    return { type: 'qx-design-3d', sections, free: { plats, stairs }, H, build: S.build, meta };
   }
+  function send3D(force) {
+    clearTimeout(sendT);
+    sendT = setTimeout(() => { if (!frame?.contentWindow || !OPTS) return; const m = renderModel(); if (firstSend || force) m.frame = true; firstSend = false; frame.contentWindow.postMessage(m, '*'); }, force ? 0 : 120);
+  }
+  function init3D() {
+    frame = document.createElement('iframe');
+    frame.src = 'porch-3d.html?embed=1'; frame.title = '3D view'; frame.setAttribute('allow', 'fullscreen');
+    frame.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;display:block';
+    $('view').appendChild(frame);
+    window.addEventListener('message', (ev) => {
+      if (ev.source !== frame.contentWindow || ev.data?.type !== 'qx-3d-ready') return;
+      OPTS = { lines: ev.data.lines, trims: ev.data.trims, houses: ev.data.houses };
+      if (S.pendingLegacy) { Object.assign(S.build, legacyBuild(S.pendingLegacy)); S.pendingLegacy = null; }
+      if (!S.build.color) { const l = OPTS.lines.find(x => x.key === S.build.decking); S.build.color = l?.colors[0]?.key || 'enhance-toasted-sand'; }
+      renderProps(); send3D(true);
+    });
+    // Floor plan on the design sheet, drawn from this same design
+    window.addEventListener('message', (ev) => {
+      if (ev.source !== frame.contentWindow || ev.data?.type !== 'qx-plan') return;
+      const { svg: sv, w, h, label, action } = ev.data, fname = `deckplus-plan-${new Date().toISOString().slice(0, 10)}.svg`;
+      if (action === 'svg') {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + sv], { type: 'image/svg+xml' })); a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+        return;
+      }
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Deck Plus plan</title><style>@page{size:${w}in ${h}in;margin:0}html,body{margin:0}svg{display:block;width:${w}in;height:${h}in}</style></head><body>${sv}<script>onload=()=>{print()}<\/script></body></html>`;
+      const win = window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
+      if (!win) alert(`Allow pop-ups to print. Print at 100% (Actual size) on ${label} to keep the scale.`);
+    });
+    const askPlan = (action) => { clearTimeout(sendT); if (!frame?.contentWindow || !OPTS) return; frame.contentWindow.postMessage(renderModel(), '*'); frame.contentWindow.postMessage({ type: 'qx-plan-request', sheet: $('sheet').value, action }, '*'); };
+    $('b-print').addEventListener('click', () => askPlan('print'));
+    $('b-svg').addEventListener('click', () => askPlan('svg'));
+  }
+  const frame3D = () => send3D(true);
 
   // ═══ Glue ════════════════════════════════════════════════════════════════
-  function changed(full = true) { drawPlan(); renderProps(); refreshButtons(); if (three) three.dirty = true; }
-  $('swatches').innerHTML = COLORS.map(([n, h]) => `<button type="button" title="${n}" aria-label="${n}" aria-pressed="${n === S.color}" data-c="${n}" style="background:${h}"></button>`).join('');
-  $('swatches').addEventListener('click', (ev) => { const b = ev.target.closest('[data-c]'); if (!b) return; S.color = b.dataset.c; document.querySelectorAll('#swatches button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); commit(); changed(); });
+  function changed(full = true) { drawPlan(); renderProps(); refreshButtons(); send3D(); }
   new ResizeObserver(() => drawPlan()).observe(svg);
-  // Frame the 3D camera on the project
-  function frame3D() { if (!three) return; const all = S.els.flatMap(polyOf), xs = all.map(p => p[0]), zs = all.map(p => p[1]);
-    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2, size = Math.max(16, Math.max(...xs) - Math.min(...xs), Math.max(...zs));
-    three.controls.target.set(cx, 3, cz); three.camera.position.set(cx + size * .9 + 8, size * .7 + 8, cz + size * 1.25 + 10); three.controls.update(); }
   // Zoom the plan to the whole project (plus a strip of the house)
   function fitPlan() {
     const r = svg.getBoundingClientRect(), all = S.els.flatMap(polyOf); if (!all.length || !r.width) return;
@@ -735,7 +799,7 @@
     const w = Math.max(x1 - x0, (z1 - z0) / asp, 20); vb = { x: (x0 + x1) / 2 - w / 2, z: z0 - ((w * asp) - (z1 - z0)) / 2 * 0.3, w }; drawPlan();
   }
   $('b-fit').addEventListener('click', fitPlan);
-  if (CUSTOMER && SENT && Array.isArray(SENT.els) && SENT.els.length) { S.els = SENT.els; if (SENT.color) S.color = SENT.color; nextId = SENT.nextId || SENT.els.length + 1; lastSaved = snap(); }
+  if (CUSTOMER && SENT && Array.isArray(SENT.els) && SENT.els.length) { S.els = SENT.els; if (SENT.color) S.color = SENT.color; S.build = { ...BUILD_DEF, ...(SENT.build || {}) }; if (!SENT.build && SENT.color) S.pendingLegacy = SENT.color; nextId = SENT.nextId || SENT.els.length + 1; lastSaved = snap(); }
   init3D(); frame3D(); sel = DESIGN || CUSTOMER ? null : 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
   if (CUSTOMER) { $('tip').textContent = 'Drag to move around · scroll or pinch to zoom · drag the 3D view to look around'; const h = document.querySelector('.bar h1'); if (h) h.textContent = 'Your Deck Plus Design'; }
 
@@ -745,7 +809,6 @@
   // the layout worked out from the quote.
   const store = CUSTOMER ? null : window.qxDesignStore, saveBtn = $('b-save');
   const setStatus = (t) => { $('save-status').textContent = t; };
-  const syncSwatches = () => document.querySelectorAll('#swatches button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.c === S.color)));
   if (DESIGN?.client) $('proj').textContent = [DESIGN.client, DESIGN.address].filter(Boolean).join(' · ');
   let saveT = null, dirty = false;
   async function saveNow() {
@@ -764,7 +827,8 @@
     store.load(PID).then(saved => {
       if (saved && Array.isArray(saved.els) && saved.els.length) {
         restore(JSON.stringify(saved)); hist.length = 0; fut.length = 0; sel = null;
-        syncSwatches(); changed(); refreshButtons(); frame3D(); fitPlan();
+        if (!saved.build && saved.color) { if (OPTS) Object.assign(S.build, legacyBuild(saved.color)); else S.pendingLegacy = saved.color; }
+        changed(); refreshButtons(); frame3D(); fitPlan();
         setStatus('Saved design');
       } else setStatus('Not saved yet');
     }).catch(err => setStatus(err.message)).finally(() => {
