@@ -2295,9 +2295,9 @@
     // its ends, so moving a porch or deck slides it along the back wall.
     const reach = Math.max(...xs.map(Math.abs)), hx = 0;
     const hs = HS(), STORY = 9.5, stories = hs ? hs.stories : 1, pitch = hs ? hs.roofPitch / 12 : 0.5;
-    // A house matched from a photo keeps its measured width (a porch can sit flush on its corner);
-    // the stock house grows past whatever is built against it.
-    const HW = hs ? Math.round(hs.wallWidthFt * 2) / 2 : Math.max(44, Math.ceil((reach + 6) / 2) * 4), HD = hs && Number(hs.depthFt) > 0 ? Math.min(60, Math.max(16, Number(hs.depthFt))) : 28, rz = 0.55, k = Math.hypot(1, pitch);
+    // A house matched from a photo keeps its measured width; the stock house is 44′ and only grows
+    // to end flush with a part that reaches past it. Either way a porch can sit on its corner.
+    const HW = hs ? Math.round(hs.wallWidthFt * 2) / 2 : Math.max(44, Math.ceil(reach * 2 * 2) / 2), /* stock: 44′, or exactly to the farthest part */ HD = hs && Number(hs.depthFt) > 0 ? Math.min(60, Math.max(16, Number(hs.depthFt))) : 28, rz = 0.55, k = Math.hypot(1, pitch);
     const roofStyle = hs?.roofStyle || 'gable-side';
     // Hip roof over X0..X1 × Z0..Z1 from eave height yb at pitch pp (ridge along the longer side).
     const hipMesh = (X0, X1, Z0, Z1, yb, pp) => {
@@ -2431,6 +2431,20 @@
         B(w + 2, 0.05, 1.0, M.trim(), cx, top - 0.03, out + 0.5, { cast: false });
       }
     });
+    // Cross gables rising from the back wall into the main roof (side-gable or hip main roof).
+    const CG = roofStyle === 'gable-front' || !hs ? [] : (hs.crossGables || []).map(c => ({ cx: hx + (c.center - 0.5) * wallWs, w: Math.min(c.widthFt, wallWs - 2) }));
+    CG.forEach(({ cx, w }) => {
+      const half = w / 2, apex = E + half * pitch, ov = 0.8;
+      // the gable wall, set 1′ proud of the wall so it carries over the eave
+      tri([[cx - half, E - 0.7], [cx + half, E - 0.7], [cx + half, E], [cx, apex], [cx - half, E]], 1.0, M.siding(), m => m.position.set(0, 0, 0));
+      const back = -half, zc = (1.6 + back) / 2, dz = 1.6 - back;
+      [-1, 1].forEach(sd => {
+        beamXY(zc, cx, apex + rz / 2 * k, cx + sd * (half + ov), apex - (half + ov) * pitch + rz / 2 * k, dz, rz, M.trim());
+        beamXY(zc + 0.04, cx, apex + (rz + 0.05) * k, cx + sd * (half + ov + 0.08), apex - (half + ov + 0.08) * pitch + (rz + 0.05) * k, dz + 0.08, 0.1, M.shingle());
+        beamXY(1.62, cx, apex + 0.05, cx + sd * (half + ov + 0.05), apex - (half + ov + 0.05) * pitch - 0.02, 0.14, 0.55, M.trim());
+      });
+      B(1.1, 0.16, dz, M.ridge(), cx, apex + (rz + 0.1) * k + 0.04, zc);
+    });
     // Chimney: on an end wall, on the back wall, or up through the roof; capped above the ridge.
     if (hs && hs.chimney && hs.chimney !== 'none') {
       const cm = hs.chimneyMaterial === 'siding' ? M.siding() : specSiding({ siding: hs.chimneyMaterial === 'stone' ? 'stone' : 'brick', sidingColor: hs.chimneyColor || '#9c4a36' });
@@ -2466,7 +2480,19 @@
       // real, so they stay put; the editor slides the porch off them (it gets their spans).
       const wallW = Math.min(HW, hs.wallWidthFt);
       hs.windows.forEach(w => {
-        const x = hx + (w.center - 0.5) * wallW, y = WIN_Y + (w.story - 1) * STORY + (4.6 - w.heightFt) / 2;
+        const x = hx + (w.center - 0.5) * wallW;
+        if (w.story === 0) {                                   // walkout / basement level, under the main floor
+          if (!hs.walkout || FF < 5.5) return;
+          const yb = Math.max(2.4, Math.min(FF - 1.5, 2.6 + w.heightFt / 2));
+          if (!bumpDepthAt(x)) windowAt(group(x, yb, 0), w.widthFt, Math.min(w.heightFt, (FF - 1.2) - 1.2));
+          return;
+        }
+        const y = WIN_Y + (w.story - 1) * STORY + (4.6 - w.heightFt) / 2;
+        const cg = CG.find(c => Math.abs(x - c.cx) < c.w / 2 - 0.5);
+        if (cg && y + w.heightFt / 2 > E - 0.9) {               // up in a cross gable: on its face
+          if (y + w.heightFt / 2 > E + (cg.w / 2 - Math.abs(x - cg.cx)) * pitch - 0.8) return;
+          windowAt(group(x, y, 1.02), w.widthFt, w.heightFt); return;
+        }
         if (w.story === 1 && !(bumpDepthAt(x) > 0.5)) HOUSE_WIN.push([x - w.widthFt / 2 - 0.5, x + w.widthFt / 2 + 0.5]);
         const wallTop = roofStyle === 'gable-front' ? E + Math.max(0, HW / 2 - Math.abs(x - hx) - 1) * pitch : E;
         if (y + w.heightFt / 2 > wallTop - 0.8) return;

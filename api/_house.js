@@ -25,13 +25,14 @@ const COLOR = { type: 'string', description: 'Hex color like #c8b994, as the sur
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['usable', 'reason', 'stories', 'walkout', 'siding', 'sidingColor', 'trimColor', 'roofColor', 'roofPitch', 'roofStyle', 'wallWidthFt',
-    'lower', 'lowerHeightFt', 'lowerColor', 'chimney', 'chimneyAt', 'chimneyMaterial', 'chimneyColor', 'shutters', 'shutterColor', 'segments', 'windows', 'doors', 'notes'],
+  required: ['observations', 'usable', 'reason', 'stories', 'walkout', 'siding', 'sidingColor', 'trimColor', 'roofColor', 'roofPitch', 'roofStyle', 'wallWidthFt',
+    'lower', 'lowerHeightFt', 'lowerColor', 'chimney', 'chimneyAt', 'chimneyMaterial', 'chimneyColor', 'shutters', 'shutterColor', 'segments', 'crossGables', 'windows', 'doors', 'notes'],
   properties: {
+    observations: { type: 'string', description: 'Look first, then answer. From the ground up, list every level you can see on the wall facing the camera (walkout/basement level, 1st floor, 2nd floor, ...) and what shows each (rows of windows, doors, floor lines). Then list every roof plane or gable facing the camera: the main roof, any cross gable rising from this wall, lower roofs over bump-outs or bays, dormers. A few short lines.' },
     usable: { type: 'boolean', description: 'false if the photo does not show a house wall clearly enough to describe' },
     reason: { type: 'string', description: 'If not usable, why, in one short sentence for the salesperson. Otherwise empty.' },
-    stories: { type: 'integer', enum: [1, 2, 3], description: 'Stories above grade on the wall facing the camera' },
-    walkout: { type: 'boolean', description: 'true if a basement level is exposed at grade on this wall (walkout / raised foundation)' },
+    stories: { type: 'integer', enum: [1, 2, 3], description: 'Full stories ABOVE any walkout/basement level (a ranch over a walkout basement is 1; a two-story over a walkout is 2). Count rows of windows above the main floor.' },
+    walkout: { type: 'boolean', description: 'true if a basement level is exposed above grade on this wall (walkout basement, daylight windows, doors at ground level under the main floor)' },
     siding: { type: 'string', enum: ['vinyl', 'brick', 'stone', 'stucco', 'wood'], description: 'Main wall material' },
     sidingColor: COLOR,
     trimColor: COLOR,
@@ -62,14 +63,22 @@ const SCHEMA = {
         },
       },
     },
+    crossGables: {
+      type: 'array',
+      description: 'Gables that rise from the wall facing the camera into the main roof (a triangular wall section above the eave with its own small roof running back into the main roof). Empty if none.',
+      items: {
+        type: 'object', additionalProperties: false, required: ['center', 'widthFt'],
+        properties: { center: { type: 'number', description: '0 = left end, 1 = right end' }, widthFt: { type: 'number', description: 'Width of the gable at its base' } },
+      },
+    },
     windows: {
       type: 'array',
-      description: 'Windows on the wall facing the camera (including on bump-out faces), left to right as seen in the photo',
+      description: 'Windows on the wall facing the camera (including on bump-out faces and inside cross gables), left to right as seen in the photo',
       items: {
         type: 'object', additionalProperties: false, required: ['center', 'story', 'widthFt', 'heightFt'],
         properties: {
           center: { type: 'number', description: 'Window centre along the wall: 0 = left end, 1 = right end, as seen in the photo' },
-          story: { type: 'integer', description: '1 = first floor above grade (or main floor over a walkout), 2 = second floor' },
+          story: { type: 'integer', description: '0 = walkout/basement level, 1 = main floor, 2 = second floor, 3 = third' },
           widthFt: { type: 'number' },
           heightFt: { type: 'number' },
         },
@@ -179,8 +188,9 @@ function clean(h) {
     shutterColor: hex(h.shutterColor, '#2a2a2a'),
     wallWidthFt: clamp(h.wallWidthFt, 16, 120, 44),
     segments: segs(h),
+    crossGables: (Array.isArray(h.crossGables) ? h.crossGables : []).slice(0, 4).map(c => ({ center: clamp(c.center, 0, 1, 0.5), widthFt: clamp(c.widthFt, 4, 40, 12) })),
     windows: (Array.isArray(h.windows) ? h.windows : []).slice(0, 24).map(w => ({
-      center: clamp(w.center, 0, 1, 0.5), story: clamp(w.story, 1, 3, 1) | 0, widthFt: clamp(w.widthFt, 1.5, 12, 3), heightFt: clamp(w.heightFt, 1.5, 8, 4.5),
+      center: clamp(w.center, 0, 1, 0.5), story: clamp(w.story, 0, 3, 1) | 0, widthFt: clamp(w.widthFt, 1.5, 12, 3), heightFt: clamp(w.heightFt, 1.5, 8, 4.5),
     })),
     doors: (Array.isArray(h.doors) ? h.doors : []).slice(0, 6).map(d => ({ center: clamp(d.center, 0, 1, 0.5), kind: d.kind === 'entry' ? 'entry' : 'slider' })),
     notes: String(h.notes || '').slice(0, 300),
