@@ -2194,6 +2194,7 @@
     if (sp) stairs(s, fy, -col / 2);
   }
 
+  const HOUSE_WIN = [];      // first-floor back-wall windows of a photo-matched house, [x0, x1] with trim
   function buildHouse(att) {
     const FF = S.H;
     const freeAt = (S.free?.plats || []).filter(p => p.houseSpan);
@@ -2244,19 +2245,34 @@
       ...freeAt.filter(p => !att.some(s => rect(s).x0 < (p.houseSpan[0] + p.houseSpan[1]) / 2 && rect(s).x1 > (p.houseSpan[0] + p.houseSpan[1]) / 2))
         .map(p => ({ x: (p.houseSpan[0] + p.houseSpan[1]) / 2, w: 6, y: p.h, kind: 'deck' }))];
     doors.forEach(d => { const g = group(d.x, d.y, 0); d.kind === 'deck' ? sliderDoor(g) : entryDoor(g); });
+    // A porch (walls + 1′ roof overhang) never cuts through a window: the window is either
+    // clear of the overhang or wholly inside the porch walls.
+    const porchSpans = att.filter(s => s.kind === 'porch').map(s => { const r = rect(s); return { a: r.x0, b: r.x1 }; });
+    const winClear = (x, w) => { const a = x - w / 2 - 0.5, b = x + w / 2 + 0.5; return porchSpans.every(p => b <= p.a - 1.1 || a >= p.b + 1.1 || (a >= p.a + 0.3 && b <= p.b - 0.3)); };
+    HOUSE_WIN.length = 0;
     if (hs && hs.windows.length) {
-      // Windows where they are in the photo (0 = left end of the wall, 1 = right end).
+      // Windows where they are in the photo (0 = left end of the wall, 1 = right end). These are
+      // real, so they stay put; the editor slides the porch off them (it gets their spans).
       const wallW = Math.min(HW, hs.wallWidthFt);
       hs.windows.forEach(w => {
         const x = hx + (w.center - 0.5) * wallW, y = WIN_Y + (w.story - 1) * STORY + (4.6 - w.heightFt) / 2;
+        if (w.story === 1) HOUSE_WIN.push([x - w.widthFt / 2 - 0.5, x + w.widthFt / 2 + 0.5]);
         if (y + w.heightFt / 2 > E - 0.8) return;
         if (w.story === 1 && doors.some(d => Math.abs(x - d.x) < d.w / 2 + w.widthFt / 2 + 0.6)) return;
         windowAt(group(x, y, 0), w.widthFt, w.heightFt);
       });
     } else {
-      for (let x = hx - HW / 2 + 4.5; x <= hx + HW / 2 - 4.5; x += 7.5) {
+      // Stock house: its windows are made up, so they make room for the porch (nudged up to
+      // 3′ to clear it or sit wholly inside it, else left out).
+      for (let x0 = hx - HW / 2 + 4.5; x0 <= hx + HW / 2 - 4.5; x0 += 7.5) {
         for (let st = 1; st <= stories; st++) {
-          if (st === 1 && doors.some(d => Math.abs(x - d.x) < d.w / 2 + 3.6)) continue;
+          let x = x0;
+          if (st === 1) {
+            const nudge = [0, -0.5, 0.5, -1, 1, -1.5, 1.5, -2, 2, -2.5, 2.5, -3, 3].map(d => x0 + d)
+              .find(v => winClear(v, 3) && !doors.some(d => Math.abs(v - d.x) < d.w / 2 + 3.6) && Math.abs(v) <= HW / 2 - 2.5);
+            if (nudge == null) continue;
+            x = nudge;
+          }
           windowAt(group(x, WIN_Y + (st - 1) * STORY, 0), 3, 4.6);
         }
       }
@@ -2606,7 +2622,7 @@
         if (x.kind === 'porch') { const sp = stairPlacement(x); if (sp) att.push({ id: x.id, x: sp.x, z: sp.z, rot: sp.ry * 180 / Math.PI, w: sw(x), n: risers(S.H), run: RUN, landing: x.landing || 'none' }); }
         if (x.kind === 'patio') { const pw = patioWall(x); if (pw?.steps) att.push({ id: x.id, x: x.x, z: rect(x).z1, rot: 0, w: STAIR_W + 1, n: pw.steps + 1, run: pw.run }); }
       });
-      window.parent.postMessage({ type: 'qx-attached', list: att, doors }, '*');
+      window.parent.postMessage({ type: 'qx-attached', list: att, doors, windows: HOUSE_WIN.slice() }, '*');
     });
     // The editor asks for the floor plan on the design sheet (to print or export).
     window.addEventListener('message', (ev) => {
