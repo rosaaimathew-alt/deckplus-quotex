@@ -389,3 +389,7 @@ html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
   background-size: 1rem;
   padding-right: 2rem !important;
 }
+
+/* Contract payment schedule: the % column the office sees in the contract
+   editor (screen only — .no-print keeps it off prints and PDFs). */
+.dp-grid th.dp-office-only, .dp-grid td.dp-office-only { background: #fffbeb; color: #92400e; }
