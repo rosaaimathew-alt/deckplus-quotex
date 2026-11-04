@@ -42,7 +42,11 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   button:disabled { opacity: .4; cursor: default; background: transparent; }
   .danger { color: var(--danger); }
-  .main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
+  .rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }
+  .rail button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 8px; }
+  .rail svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .rail hr { width: 28px; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  .main { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
   .plan-wrap { position: relative; min-width: 0; background: var(--plan-bg); border-right: 1px solid var(--line); }
   #plan { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; }
   .view-wrap { position: relative; min-width: 0; background: #cddfe8; }
@@ -55,6 +59,14 @@
   .props label { display: flex; flex-direction: column; gap: 4px; font: 600 11px/1 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .props input { font: 500 14px/1 var(--font-mono); width: 76px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   .props .ro { font: 500 13px/1.3 var(--font-mono); color: var(--fg); text-transform: none; letter-spacing: 0; }
+  kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border-radius: 4px; border: 1px solid currentColor; opacity: .7; margin-left: 3px; }
+  .keys { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: 52px; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.18); z-index: 5; max-width: calc(100% - 24px); font-size: 13px; }
+  .keys[hidden] { display: none; }
+  .keys .muted { color: var(--muted); font-size: 12px; }
+  .keys dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 10px 0 0; }
+  .keys dt { font: 500 12px/1.4 var(--font-mono); white-space: nowrap; }
+  .keys dd { margin: 0; line-height: 1.4; }
   .tip { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: 10px; font-size: 12.5px; color: #3c4740; background: rgba(255,255,255,.9); border-radius: 6px; padding: 6px 9px; max-width: 60%; }
   .swatches { display: flex; gap: 4px; }
   .swatches button { width: 24px; height: 24px; border-radius: 50%; padding: 0; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
@@ -63,6 +75,8 @@
     html, body { height: auto; }
     .app { height: auto; }
     .main { grid-template-columns: 1fr; }
+    .rail { flex-direction: row; flex-wrap: wrap; justify-content: center; border-right: 0; border-bottom: 1px solid var(--line); }
+    .rail hr { width: 1px; height: 28px; border-top: 0; border-left: 1px solid var(--line); margin: 0 4px; }
     .plan-wrap, .view-wrap { height: 52vh; min-height: 320px; }
     .plan-wrap { border-right: 0; border-bottom: 1px solid var(--line); }
     .tip { display: none; }
@@ -70,34 +84,54 @@
 </style>
 
 <div class="app">
-  <div class="bar" role="toolbar" aria-label="Design tools">
+  <header class="bar">
     <h1>Design Editor</h1>
-    <div class="grp" role="group" aria-label="Tool">
-      <button type="button" data-tool="select" aria-pressed="true" title="Select, move, rotate (V)">Select</button>
-      <button type="button" data-tool="poly" aria-pressed="false" title="Click corners, click the first corner to finish (D)">Draw deck</button>
-    </div>
-    <div class="grp" role="group" aria-label="Add">
-      <span>Add</span>
-      <button type="button" data-add="deck">Deck</button>
-      <button type="button" data-add="stairs">Stairs</button>
-      <button type="button" data-add="landing">Landing</button>
-    </div>
-    <div class="grp" role="group" aria-label="Edit">
-      <button type="button" id="b-rotl" title="Rotate −15° (Shift+R)">⟲ 15°</button>
-      <button type="button" id="b-rotr" title="Rotate +15° (R)">⟳ 15°</button>
-      <button type="button" id="b-copy" title="Copy (Ctrl+D)">Copy</button>
-      <button type="button" id="b-del" class="danger" title="Delete (Del)">Delete</button>
-      <button type="button" id="b-undo" title="Undo (Ctrl+Z)">Undo</button>
-      <button type="button" id="b-redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
-      <button type="button" id="b-fit" title="Zoom to the project (F)">Fit</button>
-    </div>
     <div class="grp" role="group" aria-label="Decking color"><span>Decking</span><div class="swatches" id="swatches"></div></div>
-  </div>
+  </header>
   <div class="main">
+  <nav class="rail" role="toolbar" aria-label="Tools" aria-orientation="vertical">
+    <button type="button" data-tool="select" aria-pressed="true" title="Select (V)" aria-label="Select (V)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg></button>
+    <button type="button" data-tool="poly" aria-pressed="false" title="Draw deck (P)" aria-label="Draw deck (P)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l3-1 11-11-2-2L5 17z"/><path d="M14 6l2 2"/><circle cx="4" cy="20" r="0.5"/></svg></button>
+    <hr>
+    <button type="button" data-add="deck" title="Add deck" aria-label="Add deck"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 9h16M4 13h16M4 17h16"/></svg></button>
+    <button type="button" data-add="stairs" title="Add stairs" aria-label="Add stairs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4v-4h4v-4h4V8h4"/><path d="M4 20V4"/></svg></button>
+    <button type="button" data-add="landing" title="Add landing" aria-label="Add landing"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M12 18v3M9 21h6"/></svg></button>
+    <hr>
+    <button type="button" id="b-rotl" title="Rotate −15° (Shift+R)" aria-label="Rotate −15° (Shift+R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 3v4h4"/></svg></button>
+    <button type="button" id="b-rotr" title="Rotate +15° (R)" aria-label="Rotate +15° (R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 3v4h-4"/></svg></button>
+    <button type="button" id="b-copy" title="Duplicate (Ctrl/⌘+D)" aria-label="Duplicate (Ctrl/⌘+D)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>
+    <button type="button" id="b-del" class="danger" title="Delete (Del)" aria-label="Delete (Del)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+    <hr>
+    <button type="button" id="b-undo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo (Ctrl/⌘+Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-5-5 5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+    <button type="button" id="b-redo" title="Redo (Shift+Ctrl/⌘+Z)" aria-label="Redo (Shift+Ctrl/⌘+Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+    <button type="button" id="b-fit" title="Fit in window (Ctrl/⌘+0)" aria-label="Fit in window (Ctrl/⌘+0)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+    <button type="button" id="b-keys" aria-expanded="false" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts (?)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
+  </nav>
     <div class="plan-wrap">
       <svg id="plan" aria-label="Plan view" role="img"></svg>
-      <div class="tip" id="tip">Drag to move · round handle rotates · square handles resize · scroll to zoom · drag empty space to pan</div>
+      <div class="tip" id="tip">Drag to move · Alt-drag copies · round handle rotates (Shift = 45°) · scroll to zoom · Space-drag pans · ? for shortcuts</div>
       <div class="props" id="props" hidden></div>
+      <div class="keys" id="keys" hidden role="dialog" aria-label="Keyboard shortcuts">
+        <b>Keyboard shortcuts</b> <span class="muted">⌘ on Mac = Ctrl on Windows</span>
+        <dl>
+          <dt>V</dt><dd>Selection tool</dd>
+          <dt>P</dt><dd>Draw deck (pen): Enter finishes, Esc cancels</dd>
+          <dt>⌘Z / ⇧⌘Z</dt><dd>Undo / Redo (also ⌘Y)</dd>
+          <dt>⌘C ⌘X ⌘V</dt><dd>Copy, Cut, Paste (pastes 2′ offset)</dd>
+          <dt>⌘D</dt><dd>Duplicate</dd>
+          <dt>Alt / ⌥ + drag</dt><dd>Drag a copy</dd>
+          <dt>Shift + drag</dt><dd>Move straight across or out only</dd>
+          <dt>Rotate handle</dt><dd>Free angle; hold Shift for 45° steps</dd>
+          <dt>R / ⇧R</dt><dd>Rotate +15° / −15°</dd>
+          <dt>Arrows / ⇧Arrows</dt><dd>Nudge 6″ / 5′</dd>
+          <dt>Delete / Backspace</dt><dd>Delete</dd>
+          <dt>Esc</dt><dd>Deselect / cancel drawing</dd>
+          <dt>Space + drag</dt><dd>Pan (hand tool)</dd>
+          <dt>⌘+ / ⌘− / ⌘0</dt><dd>Zoom in / out / fit</dd>
+          <dt>Tab</dt><dd>Select the next piece</dd>
+          <dt>?</dt><dd>Show this list</dd>
+        </dl>
+      </div>
     </div>
     <div class="view-wrap"><div id="view"></div></div>
   </div>
@@ -320,6 +354,7 @@
       drawPlan(); return;
     }
     const e = byId(sel);
+    if (spaceDown) { drag = { kind: 'pan', s0: [ev.clientX, ev.clientY], vb0: { ...vb } }; svg.setPointerCapture(ev.pointerId); return; }
     if (hEl && e) {
       const h = hEl.dataset.h;
       if (h === 'rot') drag = { kind: 'rot', e, c: e.type === 'stairs' ? [e.x, e.z] : centroid(polyOf(e)), pts0: e.pts ? e.pts.map(p => [...p]) : null, rot0: e.rot || 0, a0: null };
@@ -327,8 +362,10 @@
       else if (h[0] === 'v') drag = { kind: 'vertex', e, i: +h.slice(1) };
       else if (h[0] === 'm') { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, [snapV((a[0] + b[0]) / 2), snapV((a[1] + b[1]) / 2)]); drag = { kind: 'vertex', e, i: i + 1 }; }
     } else {
-      const hit = hitElement(x, z);
-      if (hit) { sel = hit.id; drag = { kind: 'move', e: hit, f0: [x, z], snap0: JSON.stringify(hit) }; }
+      const hit = spaceDown ? null : hitElement(x, z);
+      if (hit && ev.altKey) {                         // Alt/Option-drag: drag a copy, leave the original
+        const c = JSON.parse(JSON.stringify(hit)); c.id = nextId++; S.els.push(c); sel = c.id; drag = { kind: 'move', e: c, f0: [x, z], snap0: JSON.stringify(c) };
+      } else if (hit) { sel = hit.id; drag = { kind: 'move', e: hit, f0: [x, z], snap0: JSON.stringify(hit) }; }
       else { sel = null; drag = { kind: 'pan', s0: [ev.clientX, ev.clientY], vb0: { ...vb } }; }
     }
     svg.setPointerCapture(ev.pointerId); changed(false);
@@ -339,7 +376,8 @@
     const [x, z] = toFt(ev), e = drag.e;
     if (drag.kind === 'pan') { const r = svg.getBoundingClientRect(), k = vb.w / r.width; vb.x = drag.vb0.x - (ev.clientX - drag.s0[0]) * k; vb.z = drag.vb0.z - (ev.clientY - drag.s0[1]) * k; drawPlan(); return; }
     if (drag.kind === 'move') {
-      const o = JSON.parse(drag.snap0), dx = x - drag.f0[0], dz = z - drag.f0[1];
+      const o = JSON.parse(drag.snap0); let dx = x - drag.f0[0], dz = z - drag.f0[1];
+      if (ev.shiftKey) { if (Math.abs(dx) > Math.abs(dz)) dz = 0; else dx = 0; }   // constrain to one axis
       if (e.type === 'deck') { const ddx = snapV(dx), ddz = snapV(dz); e.pts = o.pts.map(p => [p[0] + ddx, Math.max(0, p[1] + ddz) === 0 && p[1] + ddz < 0 ? 0 : p[1] + ddz]); }
       else if (e.type === 'landing') { e.x = snapV(o.x + dx); e.z = snapV(o.z + dz); }
       else { e.x = o.x + dx; e.z = o.z + dz; snapStairs(e); }
@@ -356,7 +394,7 @@
     if (drag.kind === 'rot') {
       const a = Math.atan2(x - drag.c[0], z - drag.c[1]) * 180 / Math.PI;
       if (drag.a0 == null) drag.a0 = a;
-      let d = a - drag.a0; if (!ev.shiftKey) d = Math.round(d / 5) * 5;       // 5° steps; hold Shift for free
+      let d = a - drag.a0; d = ev.shiftKey ? Math.round(d / 45) * 45 : Math.round(d);   // free (1°); Shift = 45° steps
       rotateBy(e, d, drag);
     }
     changed(false);
@@ -381,7 +419,7 @@
   }
 
   // ── Toolbar & keys ───────────────────────────────────────────────────────
-  function setTool(t) { tool = t; draft = null; document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); svg.style.cursor = t === 'poly' ? 'crosshair' : ''; $('tip').textContent = t === 'poly' ? 'Click each corner · click the first corner (or double-click) to finish · Esc cancels' : 'Drag to move · round handle rotates (Shift = free angle) · square handles resize · green dots add a corner · scroll to zoom'; drawPlan(); }
+  function setTool(t) { tool = t; draft = null; document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); svg.style.cursor = t === 'poly' ? 'crosshair' : ''; $('tip').textContent = t === 'poly' ? 'Click each corner · click the first corner (or double-click) to finish · Esc cancels' : 'Drag to move · Alt-drag copies · round handle rotates (Shift = 45°) · square handles resize · green dots add a corner · ? for shortcuts'; drawPlan(); }
   document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
   function viewCentre() { return [snapV(vb.x + vb.w / 2, 1), Math.max(2, snapV(vb.z + vbH() / 2, 1))]; }
   document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
@@ -397,17 +435,42 @@
   $('b-copy').addEventListener('click', copySel); $('b-del').addEventListener('click', delSel);
   $('b-rotl').addEventListener('click', () => rotSel(-15)); $('b-rotr').addEventListener('click', () => rotSel(15));
   $('b-undo').addEventListener('click', undo); $('b-redo').addEventListener('click', redo);
+  let clip = null, spaceDown = false;
+  function pasteClip() {
+    if (!clip) return; const c = JSON.parse(clip); c.id = nextId++;
+    if (c.pts) c.pts = c.pts.map(p => [p[0] + 2, p[1] + 2]); else { c.x += 2; c.z += 2; }
+    clip = JSON.stringify(c); S.els.push(c); sel = c.id; commit(); changed();
+  }
+  function zoomBy(f) { const cx = vb.x + vb.w / 2, cz = vb.z + vbH() / 2, w = Math.min(160, Math.max(10, vb.w * f)); vb = { x: cx - w / 2, z: cz - (vbH() * w / vb.w) / 2, w }; drawPlan(); }
+  function toggleKeys(show) { const k = $('keys'); k.hidden = show == null ? !k.hidden : !show; $('b-keys').setAttribute('aria-expanded', String(!k.hidden)); }
+  $('b-keys').addEventListener('click', () => toggleKeys());
+  document.addEventListener('keyup', (ev) => { if (ev.code === 'Space') { spaceDown = false; svg.style.cursor = tool === 'poly' ? 'crosshair' : ''; } });
   document.addEventListener('keydown', (ev) => {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
-    const k = ev.key.toLowerCase(), mod = ev.ctrlKey || ev.metaKey;
-    if (mod && k === 'z') { ev.preventDefault(); ev.shiftKey ? redo() : undo(); return; }
-    if (mod && k === 'y') { ev.preventDefault(); redo(); return; }
-    if (mod && k === 'd') { ev.preventDefault(); copySel(); return; }
-    if (k === 'escape') { if (draft) { draft = null; drawPlan(); } else { sel = null; changed(false); } return; }
+    const k = ev.key.toLowerCase(), mod = ev.ctrlKey || ev.metaKey, e = byId(sel);
+    if (ev.code === 'Space') { ev.preventDefault(); if (!spaceDown) { spaceDown = true; svg.style.cursor = 'grab'; } return; }
+    if (mod) {
+      if (k === 'z') { ev.preventDefault(); ev.shiftKey ? redo() : undo(); }
+      else if (k === 'y') { ev.preventDefault(); redo(); }
+      else if (k === 'c' && e) { ev.preventDefault(); clip = JSON.stringify(e); }
+      else if (k === 'x' && e) { ev.preventDefault(); clip = JSON.stringify(e); delSel(); }
+      else if (k === 'v') { ev.preventDefault(); pasteClip(); }
+      else if (k === 'd') { ev.preventDefault(); copySel(); }
+      else if (k === '0') { ev.preventDefault(); fitPlan(); }
+      else if (k === '=' || k === '+') { ev.preventDefault(); zoomBy(1 / 1.25); }
+      else if (k === '-') { ev.preventDefault(); zoomBy(1.25); }
+      return;
+    }
+    if (k === 'escape') { if (!$('keys').hidden) toggleKeys(false); else if (draft) { draft = null; drawPlan(); } else { sel = null; changed(false); } return; }
+    if (k === 'enter' && draft && draft.pts.length >= 3) { const d = { id: nextId++, type: 'deck', h: 3, pts: draft.pts }; S.els.push(d); sel = d.id; draft = null; setTool('select'); commit(); changed(); return; }
     if (k === 'delete' || k === 'backspace') { ev.preventDefault(); delSel(); return; }
+    if (k === '?' || (k === '/' && ev.shiftKey)) { toggleKeys(); return; }
+    if (k === 'tab' && S.els.length) { ev.preventDefault(); const i2 = S.els.findIndex(o => o.id === sel); sel = S.els[(i2 + (ev.shiftKey ? -1 : 1) + S.els.length) % S.els.length].id; changed(false); return; }
     if (k === 'r') { rotSel(ev.shiftKey ? -15 : 15); return; }
-    if (k === 'v') setTool('select'); if (k === 'd') setTool('poly');
-    const mv = { arrowleft: [-0.5, 0], arrowright: [0.5, 0], arrowup: [0, -0.5], arrowdown: [0, 0.5] }[k], e = byId(sel);
+    if (k === 'v') { setTool('select'); return; }
+    if (k === 'p') { setTool('poly'); return; }
+    if (k === 'f') { fitPlan(); return; }
+    const st = ev.shiftKey ? 5 : 0.5, mv = { arrowleft: [-st, 0], arrowright: [st, 0], arrowup: [0, -st], arrowdown: [0, st] }[k];
     if (mv && e) { ev.preventDefault(); if (e.pts) e.pts = e.pts.map(p => [p[0] + mv[0], Math.max(0, p[1] + mv[1])]); else { e.x += mv[0]; e.z += mv[1]; if (e.type === 'stairs') snapStairs(e); } commit(); changed(); }
   });
   function refreshButtons() { $('b-undo').disabled = !hist.length; $('b-redo').disabled = !fut.length; ['b-copy', 'b-del', 'b-rotl', 'b-rotr'].forEach(i => { $(i).disabled = !sel; }); }
@@ -595,7 +658,6 @@
     const w = Math.max(x1 - x0, (z1 - z0) / asp, 20); vb = { x: (x0 + x1) / 2 - w / 2, z: z0 - ((w * asp) - (z1 - z0)) / 2 * 0.3, w }; drawPlan();
   }
   $('b-fit').addEventListener('click', fitPlan);
-  document.addEventListener('keydown', (ev) => { if (ev.key.toLowerCase() === 'f' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') && !ev.ctrlKey && !ev.metaKey) fitPlan(); });
   init3D(); frame3D(); sel = 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
   window.__ed = { S, stairInfo, load(els) { S.els = els; nextId = Math.max(...els.map(e => e.id)) + 1; sel = null; commit(); changed(); frame3D(); fitPlan(); } };
 })();
