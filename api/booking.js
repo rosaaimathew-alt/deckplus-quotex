@@ -335,6 +335,13 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && (req.query?.step || req.query?.track)) return await trackEvent(req, res)
     if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
     if (req.method === 'GET' && req.query?.report)             return await sendDueReport(res)
+    if (req.method === 'GET' && req.query?.check === 'alert') {
+      // Sends a sample "booking failed" alert through the real path; at most once an hour.
+      await alertOffice({ throttle: true, ...failedBookingAlert({ firstName: 'TEST', lastName: 'Customer', phone: '(704) 555-0100',
+        email: 'test@example.com', street: '123 Sample St', city: 'Charlotte', state: 'NC', zip: '28202',
+        start: new Date(Date.now() + 86_400_000).toISOString(), notes: 'This is a test alert. No action needed.' }, new Error('test alert')) })
+      return res.status(200).json({ ok: true, note: 'test alert sent (at most once an hour)' })
+    }
     if (req.method === 'GET')  return await getSlots(res)
     if (req.method === 'POST') return await book(req, res)
     return res.status(405).json({ error: 'Method not allowed' })
