@@ -50,6 +50,9 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   button:disabled { opacity: .4; cursor: default; background: transparent; }
   .danger { color: var(--danger); }
+  body.customer .rail, body.customer .saveg, body.customer .props, body.customer .bar .grp { display: none !important; }
+  body.customer .main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  body.customer #plan { cursor: grab; }
   .rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }
   .rail button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 8px; }
   .rail svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -83,6 +86,7 @@
     html, body { height: auto; }
     .app { height: auto; }
     .main { grid-template-columns: 1fr; }
+    body.customer .main { grid-template-columns: 1fr; }
     .rail { flex-direction: row; flex-wrap: wrap; justify-content: center; border-right: 0; border-bottom: 1px solid var(--line); }
     .rail hr { width: 1px; height: 28px; border-top: 0; border-left: 1px solid var(--line); margin: 0 4px; }
     .plan-wrap, .view-wrap { height: 52vh; min-height: 320px; }
@@ -179,6 +183,11 @@
   // editor starts from the sample above.
   const QS = new URLSearchParams(location.search);
   const PID = QS.get('pid') || '';
+  // ?view=customer#d=<design>: the customer's look-only copy (from the proposal they
+  // were sent). No tools, no saving; they can pan, zoom and look around in 3D.
+  const CUSTOMER = QS.get('view') === 'customer';
+  let SENT = null; try { const m = location.hash.match(/[#&]d=([^&]+)/); SENT = m ? JSON.parse(decodeURIComponent(m[1])) : null; } catch { SENT = null; }
+  if (CUSTOMER) document.body.classList.add('customer');
   let DESIGN = null; try { DESIGN = QS.get('design') ? JSON.parse(QS.get('design')) : null; } catch { DESIGN = null; }
   function layoutFrom(d) {
     const els = []; let id = 1;
@@ -409,6 +418,7 @@
     if (!e.manual) e.rot = Math.round(outwardAngle(best.a, best.b, best.pts));
   }
   svg.addEventListener('pointerdown', (ev) => {
+    if (CUSTOMER) { if (ev.button > 0) return; drag = { kind: 'pan', s0: [ev.clientX, ev.clientY], vb0: { ...vb } }; svg.setPointerCapture(ev.pointerId); return; }
     if (ev.button > 0) return;
     const [x, z] = toFt(ev), hEl = ev.target.closest('[data-h]');
     if (tool === 'poly') {
@@ -513,6 +523,7 @@
   document.addEventListener('keyup', (ev) => { if (ev.code === 'Space') { spaceDown = false; svg.style.cursor = tool === 'poly' ? 'crosshair' : ''; } });
   document.addEventListener('keydown', (ev) => {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+    if (CUSTOMER) return;
     const k = ev.key.toLowerCase(), mod = ev.ctrlKey || ev.metaKey, e = byId(sel);
     if (ev.code === 'Space') { ev.preventDefault(); if (!spaceDown) { spaceDown = true; svg.style.cursor = 'grab'; } return; }
     if (mod) {
@@ -724,13 +735,15 @@
     const w = Math.max(x1 - x0, (z1 - z0) / asp, 20); vb = { x: (x0 + x1) / 2 - w / 2, z: z0 - ((w * asp) - (z1 - z0)) / 2 * 0.3, w }; drawPlan();
   }
   $('b-fit').addEventListener('click', fitPlan);
-  init3D(); frame3D(); sel = DESIGN ? null : 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
+  if (CUSTOMER && SENT && Array.isArray(SENT.els) && SENT.els.length) { S.els = SENT.els; if (SENT.color) S.color = SENT.color; nextId = SENT.nextId || SENT.els.length + 1; lastSaved = snap(); }
+  init3D(); frame3D(); sel = DESIGN || CUSTOMER ? null : 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
+  if (CUSTOMER) { $('tip').textContent = 'Drag to move around · scroll or pinch to zoom · drag the 3D view to look around'; const h = document.querySelector('.bar h1'); if (h) h.textContent = 'Your Deck Plus Design'; }
 
   // ═══ Save to the proposal ════════════════════════════════════════════════
   // Saved in proposal_designs with the rep's QuoteX sign-in (qx-design-bridge.js):
   // a moment after each change, and on Save / Ctrl+S. A saved drawing wins over
   // the layout worked out from the quote.
-  const store = window.qxDesignStore, saveBtn = $('b-save');
+  const store = CUSTOMER ? null : window.qxDesignStore, saveBtn = $('b-save');
   const setStatus = (t) => { $('save-status').textContent = t; };
   const syncSwatches = () => document.querySelectorAll('#swatches button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.c === S.color)));
   if (DESIGN?.client) $('proj').textContent = [DESIGN.client, DESIGN.address].filter(Boolean).join(' · ');
@@ -743,7 +756,8 @@
   saveBtn.addEventListener('click', saveNow);
   document.addEventListener('keydown', (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); saveNow(); } });
   window.addEventListener('beforeunload', (ev) => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
-  if (!PID) setStatus('Open from Sales → Designs to save');
+  if (CUSTOMER) setStatus('');
+  else if (!PID) setStatus('Open from Sales → Designs to save');
   else if (!store) setStatus('Saving is unavailable here');
   else {
     setStatus('Loading…');
