@@ -1621,17 +1621,17 @@
     }
     return c;
   }
-  const skirtMat = () => S.skirt === 'pt' || S.skirt === 'lattice'
+  const skirtMat = (st = S.skirt) => st === 'pt' || st === 'lattice'
     ? mat('skirt-stain', () => std({ color: '#ffffff', map: tex(woodCanvas(STAIN, 'pt', 21), 8, 1), roughness: 0.85 }))
     : M.fascia();
   // One straight run of skirting from (ax, az) to (bx, bz), up to `top`, faced toward (nx, nz).
-  function skirtRun(ax, az, bx, bz, top, nx, nz) {
+  function skirtRun(ax, az, bx, bz, top, nx, nz, st = S.skirt) {
     const L = Math.hypot(bx - ax, bz - az); if (L < 0.3) return;
     const th = Math.atan2(-(bz - az), bx - ax), lzx = Math.sin(th), lzz = Math.cos(th);
-    const out = Math.sign(lzx * nx + lzz * nz) || 1, m = skirtMat();
+    const out = Math.sign(lzx * nx + lzz * nz) || 1, m = skirtMat(st);
     const g = group((ax + bx) / 2, 0, (az + bz) / 2, th);
     withG(g, () => {
-      if (S.skirt === 'lattice') {
+      if (st === 'lattice') {
         const h = top - 0.55;
         latticeTex = latticeTex || (() => { const t = new THREE.CanvasTexture(latticeCanvas()); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = maxAniso; return t; })();
         if (h > 0.2) {
@@ -1650,12 +1650,12 @@
       [-L / 2, L / 2].forEach(u => B(0.3, top - 0.05, 0.08, m, u, top / 2, out * 0.08));
     });
   }
-  function skirting(x0, x1, z0, z1, fy, cuts) {
-    if (!S.skirt || S.skirt === 'none') return;
+  function skirting(x0, x1, z0, z1, fy, cuts, st = S.skirt) {
+    if (!st || st === 'none') return;
     const top = fy - 0.975; if (top < 0.6) return;            // underside of the fascia
-    subtract(x0, x1, cuts.front).forEach(([a, b]) => skirtRun(a, z1, b, z1, top, 0, 1));
-    subtract(z0, z1, cuts.left).forEach(([a, b]) => skirtRun(x0, a, x0, b, top, -1, 0));
-    subtract(z0, z1, cuts.right).forEach(([a, b]) => skirtRun(x1, a, x1, b, top, 1, 0));
+    subtract(x0, x1, cuts.front).forEach(([a, b]) => skirtRun(a, z1, b, z1, top, 0, 1, st));
+    subtract(z0, z1, cuts.left).forEach(([a, b]) => skirtRun(x0, a, x0, b, top, -1, 0, st));
+    subtract(z0, z1, cuts.right).forEach(([a, b]) => skirtRun(x1, a, x1, b, top, 1, 0, st));
   }
 
   // ── Building pieces ────────────────────────────────────────────────────────
@@ -2000,7 +2000,8 @@
         let px = colXs || spread(-hw + 0.5, hw - 0.5, 8);
         if (s.type === 'open' || s.type === 'sunroom') px = [...new Set([...spread(-hw + col / 2, hw - col / 2, 8)])];
         deckFloor(-hw, hw, 0, D, fy, { frontZ: zF, postXs: px, ledger: !free, backZ: free ? col / 2 : null });
-        // Porches are not skirted (the porch builder has no skirting option); decks and landings are.
+        // Porch skirting: the porch's own setting (none unless one is picked for it).
+        if (s.skirt && s.skirt !== 'none') skirting(-hw, hw, 0, D, fy, { front: covered(s, 'front').map(([a, b]) => [a - cx, b - cx]), left: [...covered(s, 'left'), [0, sideStart(s, 'left')]], right: [...covered(s, 'right'), [0, sideStart(s, 'right')]] }, s.skirt);
       } else B(W + 1, 0.33, D + 1, M.concrete(), 0, 0.165, (D + 1) / 2);
 
       // ── Columns ─────────────────────────────────────────────────────────
@@ -2586,10 +2587,11 @@
       const ccx = p.pts.reduce((u, q) => u + q[0], 0) / p.pts.length, ccz = p.pts.reduce((u, q) => u + q[1], 0) / p.pts.length;
       (p.edges || []).forEach(ed => {
         const [a, b] = [ed.a, ed.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-        if (!ed.house && S.skirt && S.skirt !== 'none' && h - 0.975 >= 0.6) {
+        const pst = p.skirt || S.skirt;
+        if (!ed.house && pst && pst !== 'none' && h - 0.975 >= 0.6) {
           const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
           let nx = -uz, nz = ux; if (nx * (mx - ccx) + nz * (mz - ccz) < 0) { nx = -nx; nz = -nz; }
-          (ed.skirt || [[0, L]]).forEach(([t0, t1]) => skirtRun(a[0] + ux * t0, a[1] + uz * t0, a[0] + ux * t1, a[1] + uz * t1, h - 0.975, nx, nz));
+          (ed.skirt || [[0, L]]).forEach(([t0, t1]) => skirtRun(a[0] + ux * t0, a[1] + uz * t0, a[0] + ux * t1, a[1] + uz * t1, h - 0.975, nx, nz, pst));
         }
         if (!ed.house) { const f = B(L + 0.08, 0.95, 0.08, M.fascia(), (a[0] + b[0]) / 2, h - 0.5, (a[1] + b[1]) / 2); f.rotation.y = Math.atan2(-(b[1] - a[1]), b[0] - a[0]); }
         (ed.rails || []).forEach(([ax, az, bx, bz]) => railRun(ax, az, bx, bz, h, h));

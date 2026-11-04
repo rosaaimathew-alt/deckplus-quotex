@@ -76,6 +76,14 @@
   .props select { font: 500 13.5px/1.2 var(--font-body); padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); max-width: 220px; }
   .props { max-height: 46%; overflow-y: auto; }
   .props input { font: 500 14px/1 var(--font-mono); width: 76px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+  .props .ptabs { flex-basis: 100%; display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+  .props .ptabs button { font: 600 13px var(--font-body); padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); cursor: pointer; margin-bottom: -1px; }
+  .props .ptabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+  .props .phint { flex-basis: 100%; font-size: 12px; }
+  .props .ptitle { flex-basis: 100%; }
+  .props .pgrp { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding-top: 8px; border-top: 1px solid var(--line); }
+  .props .pgrp h4 { flex-basis: 100%; margin: 0; font: 700 12px/1.2 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--fg); }
+  .props .pgrp h4 span { margin-left: 8px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
   .props .htable { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
   .props .hgrid { display: grid; grid-template-columns: repeat(4, minmax(64px, 110px)) 36px; gap: 6px; align-items: center; }
   .props .hgrid.cg { grid-template-columns: repeat(2, minmax(64px, 110px)) 36px; }
@@ -791,7 +799,7 @@
   // The photo goes to our server once (/api/ai-chat?task=house, Claude reads it); what
   // comes back (stories, roof pitch, siding, colors, wall width, windows) is saved with
   // the design and the 3D view builds that house. The photo itself is not stored.
-  let houseBusy = false, houseMsg = '', houseKnownW = 0;
+  let houseBusy = false, houseMsg = '', houseKnownW = 0, propTab = 'deck';
   const SIDING = [['vinyl', 'Vinyl siding'], ['wood', 'Wood siding'], ['brick', 'Brick'], ['stone', 'Stone'], ['stucco', 'Stucco']];
   function houseProps() {
     const h = S.house, n = (k, label, v, step, min) => `<label>${label}<input type="number" data-hk="${k}" step="${step}" min="${min}" value="${+(+v).toFixed(1)}"></label>`;
@@ -977,47 +985,55 @@
     const num = (k, label, v, step = 0.5, min = 0) => `<label>${label}<input type="number" data-k="${k}" step="${step}" min="${min}" value="${+(+v).toFixed(2)}"></label>`;
     const pick = (k, label, opts, v) => `<label>${label}<select data-k="${k}">${opts.map(([val, txt, off]) => `<option value="${val}"${String(val) === String(v) ? ' selected' : ''}${off ? ' disabled' : ''}>${txt}</option>`).join('')}</select></label>`;
     if (CUSTOMER) { p.hidden = true; return; }
+    // Options are grouped under headings so porch, deck and house settings never mix.
+    const grp = (title, inner, note = '') => inner ? `<div class="pgrp"><h4>${title}${note ? `<span>${note}</span>` : ''}</h4>${inner}</div>` : '';
     let h = '';
     if (!e) {
-      // Whole build: the finishes that apply to everything
+      // Nothing selected: the finishes for everything of a kind, one tab each
       const b = S.build, line = OPTS?.lines.find(l => l.key === b.decking);
-      h = `<b>Whole build</b><span class="ro" style="align-self:center">Select a piece to edit it</span>`
-        + (OPTS ? pick('b:decking', 'Decking', OPTS.lines.map(l => [l.key, l.label]), b.decking)
+      const tabs = [['deck', 'Deck'], ['porch', 'Porch'], ['house', 'House']];
+      h = `<div class="ptabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" aria-selected="${propTab === k}" data-ptab="${k}">${t}</button>`).join('')}</div>`
+        + `<span class="ro phint">Click a piece on the plan to edit just that piece</span>`;
+      if (!OPTS) h += '<span class="ro" style="align-self:center">Loading options…</span>';
+      else if (propTab === 'deck') h += grp('Decking & railing', pick('b:decking', 'Decking', OPTS.lines.map(l => [l.key, l.label]), b.decking)
           + (line && line.colors.length > 1 ? pick('b:color', 'Color', line.colors.map(c => [c.key, c.name]), b.color) : '')
-          + pick('b:rail', 'Railing', [['hybrid', 'Hybrid (white, black balusters)'], ['aluminum', 'Aluminum (all black)']], b.rail)
-          + pick('b:skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']], b.skirt)
-          + (S.house ? '' : pick('b:house', 'House', OPTS.houses.map(x => [x.key, x.name]), b.house))
-          + pick('b:trim', 'Porch trim', OPTS.trims.map(x => [x.key, x.name]), b.trim)
-          : '<span class="ro" style="align-self:center">Loading options…</span>')
+          + pick('b:rail', 'Railing', [['hybrid', 'Hybrid (white, black balusters)'], ['aluminum', 'Aluminum (all black)']], b.rail), 'all decks, stairs and landings')
+        + grp('Skirting', pick('b:skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']], b.skirt), 'decks and landings, unless one has its own');
+      else if (propTab === 'porch') h += grp('Porch finishes', pick('b:trim', 'Trim color', OPTS.trims.map(x => [x.key, x.name]), b.trim), 'all porches')
+        + `<span class="ro phint">Select a porch on the plan for its size, roof, walls, door, steps and skirting</span>`;
+      else h += (S.house ? '' : grp('Stock house', pick('b:house', 'Siding', OPTS.houses.map(x => [x.key, x.name]), b.house), 'used until a photo is matched'))
         + houseProps();
     } else if (e.type === 'porch') {
       const free = e.tie === 'free', gab = e.roof === 'gable' || e.roof === 'semivault';
-      h = `<b>${PORCH_NAMES[e.ptype]}</b>`
-        + pick('ptype', 'Type', [['sunroom', 'Sunroom'], ['ezebreeze', 'Eze-Breeze'], ['screen', 'Screen (ScreenEze)'], ['open', 'Open']], e.ptype)
+      h = `<b class="ptitle">${PORCH_NAMES[e.ptype]}</b>`
+        + grp('Porch', pick('ptype', 'Type', [['sunroom', 'Sunroom'], ['ezebreeze', 'Eze-Breeze'], ['screen', 'Screen (ScreenEze)'], ['open', 'Open']], e.ptype)
         + num('w', 'Width', e.w, 1, 6) + num('d', 'Depth', e.d, 1, 4)
-        + pick('tie', 'Roof connection', [['wall', 'Wall tie'], ['roof', 'Roof tie'], ['free', 'Freestanding']], e.tie)
-        + pick('roof', 'Roof style', [['shed', 'Shed', free], ['gable', 'Gable'], ['semivault', 'Semi-vault'], ['hip', 'Hip', free]], e.roof)
-        + pick('pitch', 'Roof pitch', [['', `Standard (${e.roof === 'shed' ? (e.tie === 'roof' ? 'fits the tie-in' : '3/12') : '6/12'})`], ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map(v => [v, `${v}/12`])], Number(e.pitch) > 0 ? Number(e.pitch) : '')
-        + (free ? '' : pick('enclose', 'Enclosed walls', [['front2', 'Front + 2 sides'], ['front1', 'Front + 1 side (corner)'], ['front0', 'Front only (inset)']], e.enclose))
-        + (!free && e.enclose === 'front1' ? pick('cornerSide', 'House wall on', [['left', 'Left'], ['right', 'Right']], e.cornerSide) : '')
         + pick('floor', 'Sits on', [['deck', 'New PT deck'], ['patio', 'Patio / slab']], e.floor)
         + (e.floor === 'deck' ? num('h', 'Floor height', e.h, 0.5, 1) : '')
-        + num('wallH', 'Wall height', e.wallH, 0.5, 8)
+        + num('wallH', 'Wall height', e.wallH, 0.5, 8))
+        + grp('Roof', pick('tie', 'Roof connection', [['wall', 'Wall tie'], ['roof', 'Roof tie'], ['free', 'Freestanding']], e.tie)
+        + pick('roof', 'Roof style', [['shed', 'Shed', free], ['gable', 'Gable'], ['semivault', 'Semi-vault'], ['hip', 'Hip', free]], e.roof)
+        + pick('pitch', 'Roof pitch', [['', `Standard (${e.roof === 'shed' ? (e.tie === 'roof' ? 'fits the tie-in' : '3/12') : '6/12'})`], ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map(v => [v, `${v}/12`])], Number(e.pitch) > 0 ? Number(e.pitch) : '')
+        + (free ? num('z', 'From house', e.z, 0.5, 2) : '')
         + (e.roof === 'shed' && !free ? pick('sideGable', 'Above side headers', [['open', e.ptype === 'screen' ? 'Screen' : e.ptype === 'open' ? 'Open' : 'Glass'], ['closed', 'Closed']], e.sideGable) : '')
         + (gab ? pick('gableEnd', 'Gable end', [['glass', 'Glass'], ...(e.ptype === 'screen' ? [['screen', 'Screen']] : []), ['siding', 'Siding']], e.gableEnd || (e.ptype === 'screen' ? 'screen' : e.ptype === 'open' ? 'siding' : 'glass')) : '')
-        + `<span class="ro" style="align-self:center">Drag the red dot on the plan to slide the ${e.ptype === 'open' ? 'steps' : 'door'}</span>`
+        )
+        + grp('Walls & door', (free ? '' : pick('enclose', 'Enclosed walls', [['front2', 'Front + 2 sides'], ['front1', 'Front + 1 side (corner)'], ['front0', 'Front only (inset)']], e.enclose))
+        + (!free && e.enclose === 'front1' ? pick('cornerSide', 'House wall on', [['left', 'Left'], ['right', 'Right']], e.cornerSide) : '')
         + (e.ptype !== 'open' ? pick('doorWall', 'Door on', [['front', 'Front'], ['left', 'Left side', !free && (e.enclose === 'front0' || (e.enclose === 'front1' && (e.cornerSide || 'right') === 'left'))], ['right', 'Right side', !free && (e.enclose === 'front0' || (e.enclose === 'front1' && (e.cornerSide || 'right') === 'right'))]], e.doorWall || 'front') : '')
-        + (e.floor === 'deck' ? pick('steps', 'Steps at the door', [['1', 'Yes'], ['', 'None']], e.steps === false ? '' : '1') : '')
-        + (e.floor === 'deck' && e.steps !== false ? num('stairW', 'Step width', e.stairW || 4, 0.5, 3) + pick('landing', 'Step landing', [['none', 'None'], ['straight', 'Straight'], ['left', 'Turn left'], ['right', 'Turn right']], e.landing || 'none') : '')
-        + (free ? num('z', 'From house', e.z, 0.5, 2) : '');
+        , `drag the red dot on the plan to slide the ${e.ptype === 'open' ? 'steps' : 'door'}`)
+        + (e.floor === 'deck' ? grp('Steps & skirting', pick('steps', 'Steps at the door', [['1', 'Yes'], ['', 'None']], e.steps === false ? '' : '1')
+          + (e.steps !== false ? num('stairW', 'Step width', e.stairW || 4, 0.5, 3) + pick('landing', 'Step landing', [['none', 'None'], ['straight', 'Straight'], ['left', 'Turn left'], ['right', 'Turn right']], e.landing || 'none') : '')
+          + pick('skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']], e.skirt || 'none'), 'this porch only') : '');
     } else if (e.type === 'patio') {
       h = `<b>Patio</b>${pick('mat', 'Surface', [['pavers', 'Pavers (Techo Bloc)'], ['concrete', 'Concrete 4″']], e.mat)}${num('w', 'Width', e.w, 1, 4)}${num('d', 'Depth', e.d, 1, 4)}${num('wallH', 'Retaining wall height', e.wallH, 0.5, 0)}${Number(e.wallH) > 0 ? num('wallLen', 'Wall length (0 = all edges)', e.wallLen, 1, 0) + pick('steps', 'Block steps', [['1', 'Yes'], ['', 'None']], e.steps === false ? '' : '1') : ''}`;
     } else if (e.type === 'deck') {
       const pts = e.pts, area = Math.abs(pts.reduce((a, q, i) => { const r = pts[(i + 1) % pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2);
       const xs = pts.map(q => q[0]), zs = pts.map(q => q[1]);
-      h = `<b>Deck</b>${num('h', 'Height (ft)', e.h, 0.25)}${num('dw', 'Width', Math.max(...xs) - Math.min(...xs), 0.5, 3)}${num('dd', 'Depth', Math.max(...zs) - Math.min(...zs), 0.5, 3)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`;
+      h = `<b class="ptitle">Deck</b>` + grp('Size', `${num('h', 'Height (ft)', e.h, 0.25)}${num('dw', 'Width', Math.max(...xs) - Math.min(...xs), 0.5, 3)}${num('dd', 'Depth', Math.max(...zs) - Math.min(...zs), 0.5, 3)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`, 'drag a side or corner on the plan to reshape')
+        + grp('Skirting', pick('skirt', 'Skirting', [['', 'Same as all decks'], ...[['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']]], e.skirt || ''));
     } else if (e.type === 'landing') {
-      h = `<b>Landing</b>${num('h', 'Height (ft)', e.h, 0.25)}${num('w', 'Width', e.w, 0.5, 3)}${num('d', 'Depth', e.d, 0.5, 3)}${num('rot', 'Angle°', e.rot, 1, -180)}`;
+      h = `<b class="ptitle">Landing</b>${pick('skirt', 'Skirting', [['', 'Same as all decks'], ...[['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']]], e.skirt || '')}${num('h', 'Height (ft)', e.h, 0.25)}${num('w', 'Width', e.w, 0.5, 3)}${num('d', 'Depth', e.d, 0.5, 3)}${num('rot', 'Angle°', e.rot, 1, -180)}`;
     } else if (e.of != null) {
       const i = stairInfo(e), o = byId(e.of);
       h = `<b>${o?.type === 'patio' ? 'Patio block steps' : 'Porch steps'}</b>${o?.type === 'porch' ? pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '') : ''}<label>Steps<span class="ro">${i.n - 1} treads · from ${fmt(i.top)}</span></label><span class="ro" style="align-self:center">Sits at the ${o?.type === 'patio' ? 'patio front' : 'porch door'} · Delete removes it</span>`;
@@ -1028,6 +1044,7 @@
         + `<span class="hrow"><span class="ro">Landing partway down, then</span><button type="button" class="ghost-btn" data-st="land:straight">Straight</button><button type="button" class="ghost-btn" data-st="land:left">Turn left</button><button type="button" class="ghost-btn" data-st="land:right">Turn right</button></span>`;
     }
     p.innerHTML = h; p.hidden = false; bindHouse(p);
+    p.querySelectorAll('[data-ptab]').forEach(b => b.addEventListener('click', () => { propTab = b.dataset.ptab; renderProps(); }));
     p.querySelectorAll('select:not([data-hk]):not([data-seg]):not([data-win]):not([data-cg])').forEach(sl => sl.addEventListener('change', () => {
       const k = sl.dataset.k, v = sl.value;
       if (k.startsWith('b:')) {
@@ -1107,12 +1124,12 @@
         // Skirting runs along the open part of the edge (not where another piece at this height joins it).
         eds.push({ a, b, house, rails, skirt: house ? [] : subtract(0, L, sharedCuts(a, b, e)) });
       });
-      plats.push({ pts, h, edges: eds, posts, houseSpan });
+      plats.push({ pts, h, edges: eds, posts, houseSpan, skirt: e.skirt || null });
     });
     S.els.filter(e => e.type === 'stairs' && e.of == null).forEach(e => { const i = stairInfo(e); stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
     const sections = [];
     S.els.forEach(e => {
-      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, pitch: Number(e.pitch) > 0 ? Number(e.pitch) : null, doorWall: e.doorWall || 'front', doorPos: e.doorPos ?? null, stairW: e.stairW || 4, landing: e.landing || 'none', steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
+      if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, pitch: Number(e.pitch) > 0 ? Number(e.pitch) : null, skirt: e.skirt || 'none', doorWall: e.doorWall || 'front', doorPos: e.doorPos ?? null, stairW: e.stairW || 4, landing: e.landing || 'none', steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
       if (e.type === 'patio') sections.push({ id: e.id, kind: 'patio', x: e.x, z: e.z, w: e.w, d: e.d, mat: e.mat, wallH: Number(e.wallH) || 0, wallLen: Number(e.wallLen) || 0, steps: e.steps !== false });
     });
     const porchOnDeck = S.els.find(e => e.type === 'porch' && e.floor === 'deck');
