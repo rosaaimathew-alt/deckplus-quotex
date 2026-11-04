@@ -13,6 +13,7 @@
  */
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireAuth } from './_auth.js'
+import { houseHandler } from './_house.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -52,6 +53,9 @@ function toOpenAIMessages(system, messages) {
 }
 
 export default async function handler(req, res) {
+  // Design editor: match the customer's house from a photo (api/_house.js). Lives here because
+  // Vercel's Hobby plan is at its 12-function limit.
+  if (req.query?.task === 'house') return houseHandler(req, res)
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!(await requireAuth(req, res))) return
 

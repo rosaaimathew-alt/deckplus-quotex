@@ -4,7 +4,7 @@
     "api/inbound-email.js":             { "maxDuration": 10 },
     "api/email.js":                     { "maxDuration": 15 },
     "api/messages.js":                  { "maxDuration": 10 },
-    "api/ai-chat.js":                   { "maxDuration": 30 },
+    "api/ai-chat.js":                   { "maxDuration": 60 },
     "api/google-auth/[action].js":      { "maxDuration": 25 },
     "api/drive/upload.js":              { "maxDuration": 60 },
     "api/drive/backup.js":              { "maxDuration": 30 },
