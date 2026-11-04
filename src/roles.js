@@ -49,3 +49,7 @@ export function canRoleAccess(role, path) {
 export function roleLanding() {
   return '/'
 }
+
+// Team membership role (org_members.role) → the app role above.
+const MEMBER_ROLE = { rep: 'sales', pm: 'pm', paint: 'paint', office: 'manager', admin: 'manager' }
+export const appRoleOf = (memberRole) => MEMBER_ROLE[memberRole] || 'manager'
