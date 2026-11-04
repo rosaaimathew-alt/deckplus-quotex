@@ -311,7 +311,7 @@
   // solid wall at outside corners, 30″ knee wall, 36″×80″ doors.
   const SUN = { w: 36, h: 60, gap: 8.5, corner: 24, knee: 30, door: 36, doorH: 80 };
   function porchGeom(s) {
-    const onDeck = s.floor === 'deck', fy = onDeck ? S.H : 0.33, P = s.wallH || 8, beamH = 0.95;
+    const onDeck = s.floor === 'deck', fy = onDeck ? S.H : 0.33, P = s.wallH || 8, beamH = s.type === 'open' ? 1.2 : 0.95;
     const col = s.type === 'open' ? 0.62 : s.type === 'sunroom' ? 0.5 : EZE.col / 12;
     const shed = s.tie === 'wall', shedPitch = 3 / 12, gp = 6 / 12;
     const zF = s.d - col / 2, beamTop = fy + P + beamH;
@@ -1005,7 +1005,7 @@
   }
 
   // Stairs going out from an edge. Built in a local group (stairs run toward +z).
-  const STAIR_RAIL_X = STAIR_W / 2 - 0.2;
+  const STAIR_RAIL_X = STAIR_W / 2 - 0.2, LVL_SPAN = 24;
   function stairs(cx, cz, ry, fy, railed, railStart = -0.2) {
     const g = group(cx, 0, cz, ry);
     const n = risers(fy), rise = fy / n, t = 1 / 12;
@@ -1042,7 +1042,11 @@
   function stairPlacement(s) {
     const r = rect(s), e = stairEdge(s); if (!e) return null;
     if (s.kind === 'porch') {
-      const st = porchDoors(s).stairs;
+      const st = { ...porchDoors(s).stairs };
+      if (s.type !== 'open') {
+        const pl = porchPlan(s), list = s.type === 'sunroom' ? pl.walls[st.edge] : pl.walls[st.edge].open;
+        const d = list.find(o => o.door); if (d) st.c = (d.a + d.b) / 2;
+      }
       if (st.edge === 'front') return { edge: 'front', c: s.x + st.c, x: s.x + st.c, z: r.z1, ry: 0 };
       return st.edge === 'left' ? { edge: 'left', c: st.c, x: r.x0, z: st.c, ry: -Math.PI / 2 } : { edge: 'right', c: st.c, x: r.x1, z: st.c, ry: Math.PI / 2 };
     }
@@ -1104,8 +1108,13 @@
       let frontXs = [], sideZs = { left: [], right: [] };
       const backPost = !(s.type === 'open' && shed);
       if (s.type === 'open') {
-        frontXs = spread(xL, xR, 9);
-        sideZs.left = sideZs.right = spread(backPost ? col / 2 : 0, zF, 9);
+        // LVL headers clear-span up to 24′: corner posts only. Wider spans get the fewest extra posts.
+        frontXs = spread(xL, xR, LVL_SPAN);
+        if (dp.stairs) {
+          const clear = STAIR_RAIL_X + col / 2 + 0.05, flank = STAIR_RAIL_X + col / 2 + 0.15;
+          if (frontXs.some(x => Math.abs(x) < clear)) frontXs = [...frontXs.filter(x => Math.abs(x) >= clear + 1.2 || x === xL || x === xR), -flank, flank].filter(x => x >= xL && x <= xR).sort((a, b) => a - b);
+        }
+        sideZs.left = sideZs.right = spread(backPost ? col / 2 : 0, zF, LVL_SPAN);
         frontXs.forEach(x => openCol(x, zF, frontTop));
         [xL, xR].forEach(x => sideZs.left.slice(0, -1).forEach(z => { if (z > 0.05) openCol(x, z, sideTop(z)); }));
       } else if (s.type !== 'sunroom') {
