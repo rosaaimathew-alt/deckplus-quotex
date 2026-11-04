@@ -78,6 +78,7 @@
   .props input { font: 500 14px/1 var(--font-mono); width: 76px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
   .props .htable { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
   .props .hgrid { display: grid; grid-template-columns: repeat(4, minmax(64px, 110px)) 36px; gap: 6px; align-items: center; }
+  .props .hgrid.cg { grid-template-columns: repeat(2, minmax(64px, 110px)) 36px; }
   .props .hgrid.sec { grid-template-columns: repeat(5, minmax(60px, 104px)) 36px; }
   .props .hgrid > span { font: 600 11px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6d6b66); }
   .props .hgrid input, .props .hgrid select { width: 100%; }
@@ -450,6 +451,7 @@
     // house
     el('rect', { x: vb.x, y: Math.min(vb.z, -40), width: vb.w, height: Math.max(0, -Math.min(vb.z, -40)), fill: '#e4e2dc' });
     el('line', { x1: vb.x, y1: 0, x2: vb.x + vb.w, y2: 0, stroke: '#1a1c38', 'stroke-width': P * 4 });
+    if (!S.house) [-1, 1].forEach(sd => el('line', { x1: sd * 22, y1: -40, x2: sd * 22, y2: 0, stroke: '#8e8c86', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}` }));   // stock house corners
     if (S.house) {
       const H = S.house, W = H.wallWidthFt || 44;
       [-1, 1].forEach(sd => el('line', { x1: sd * W / 2, y1: -40, x2: sd * W / 2, y2: 0, stroke: '#8e8c86', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}` }));
@@ -690,9 +692,9 @@
   });
   // A porch dragged near a bump-out's side or a bay's outer corner snaps to it (its side wall then starts there).
   function snapToBump(e) {
-    if (!e || e.type !== 'porch' || e.tie === 'free' || !S.house) return;
-    const W = S.house.wallWidthFt || 44; let x0 = -W / 2; const cands = [-W / 2 + e.w / 2, W / 2 - e.w / 2];   // flush on a house corner
-    (S.house.segments || []).forEach(g => {
+    if (!e || e.type !== 'porch' || e.tie === 'free') return;
+    const W = S.house?.wallWidthFt || 44; let x0 = -W / 2; const cands = [-W / 2 + e.w / 2, W / 2 - e.w / 2];   // flush on a house corner
+    (S.house?.segments || []).forEach(g => {
       const w = Number(g.widthFt) || 0, out = Number(g.outFt) || 0, x1 = x0 + w;
       if (out > 0.5) { const o = g.shape === 'bay' ? Math.max(0.5, Math.min(out, w / 2 - 1)) : 0; cands.push(x1 - o + e.w / 2, x0 + o - e.w / 2); }
       x0 = x1;
@@ -800,7 +802,7 @@
       ${h ? '<button type="button" class="ghost-btn" id="h-clear">Use stock house</button>' : ''}
       <label class="mw">Measured width (ft)<input type="number" id="h-known" step="0.5" min="0" placeholder="optional" value="${houseKnownW || ''}"></label>
       <span class="ro">${houseMsg || (h ? (h.notes || 'Matched from photo. Adjust below if needed.') : 'Upload a photo of the back of the house (or a Google Earth screenshot). Enter the measured width first for true scale.')}</span></span>`;
-    if (h) out += `<label>Stories<select data-hk="stories">${[1, 2, 3].map(v => `<option value="${v}"${h.stories === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>`
+    if (h) out += `<label>Stories above walkout<select data-hk="stories">${[1, 2, 3].map(v => `<option value="${v}"${h.stories === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>`
       + `<label>Walkout<select data-hk="walkout"><option value=""${h.walkout ? '' : ' selected'}>No</option><option value="1"${h.walkout ? ' selected' : ''}>Yes</option></select></label>`
       + `<label>Siding<select data-hk="siding">${SIDING.map(([v, t]) => `<option value="${v}"${h.siding === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`
       + col('sidingColor', 'Siding color') + col('roofColor', 'Roof color')
@@ -824,8 +826,12 @@
       out += `<div class="htable"><b>Windows on the back</b><span class="ro">Centre measured from the left end of the house</span>`
         + `<div class="hgrid win"><span>Centre (ft)</span><span>Width (ft)</span><span>Height (ft)</span><span>Floor</span><span></span>`
         + (h.windows || []).map((w, i) => ni(`data-win="${i}:at"`, w.center * W) + ni(`data-win="${i}:widthFt"`, w.widthFt) + ni(`data-win="${i}:heightFt"`, w.heightFt)
-          + si(`data-win="${i}:story"`, [[1, '1st'], [2, '2nd'], [3, '3rd']], w.story || 1) + `<button type="button" class="ghost-btn" data-windel="${i}">✕</button>`).join('')
+          + si(`data-win="${i}:story"`, [[0, 'Walkout'], [1, '1st'], [2, '2nd'], [3, '3rd']], w.story ?? 1) + `<button type="button" class="ghost-btn" data-windel="${i}">✕</button>`).join('')
         + `</div><button type="button" class="ghost-btn" id="win-add">Add a window</button></div>`;
+      out += `<div class="htable"><b>Gables rising from the back wall</b><span class="ro">A gable over part of the wall, with its own roof running back into the main roof</span>`
+        + `<div class="hgrid cg"><span>Centre (ft)</span><span>Width (ft)</span><span></span>`
+        + (h.crossGables || []).map((c, i) => ni(`data-cg="${i}:at"`, c.center * W) + ni(`data-cg="${i}:widthFt"`, c.widthFt) + `<button type="button" class="ghost-btn" data-cgdel="${i}">✕</button>`).join('')
+        + `</div><button type="button" class="ghost-btn" id="cg-add">Add a gable</button></div>`;
     }
     return out;
   }
@@ -900,9 +906,16 @@
     p.querySelectorAll('[data-win]').forEach(inp => inp.addEventListener('change', () => {
       const [i, k] = inp.dataset.win.split(':'), w = h0.windows[+i], v = parseFloat(inp.value); if (!w || !Number.isFinite(v)) return;
       if (k === 'at') w.center = Math.max(0, Math.min(1, v / (h0.wallWidthFt || 44)));
-      else if (k === 'story') w.story = v | 0; else w[k] = Math.max(1, Math.min(12, v));
+      else if (k === 'story') w.story = Math.max(0, Math.min(3, v | 0)); else w[k] = Math.max(1, Math.min(12, v));
       commit(); changed();
     }));
+    p.querySelectorAll('[data-cg]').forEach(inp => inp.addEventListener('change', () => {
+      const [i, k] = inp.dataset.cg.split(':'), c = h0.crossGables[+i], v = parseFloat(inp.value); if (!c || !Number.isFinite(v)) return;
+      if (k === 'at') c.center = Math.max(0, Math.min(1, v / (h0.wallWidthFt || 44))); else c.widthFt = Math.max(4, Math.min(40, v));
+      commit(); changed();
+    }));
+    p.querySelectorAll('[data-cgdel]').forEach(b => b.addEventListener('click', () => { h0.crossGables.splice(+b.dataset.cgdel, 1); commit(); changed(); }));
+    $('cg-add')?.addEventListener('click', () => { (h0.crossGables = h0.crossGables || []).push({ center: 0.5, widthFt: 12 }); commit(); changed(); });
     p.querySelectorAll('[data-windel]').forEach(b => b.addEventListener('click', () => { h0.windows.splice(+b.dataset.windel, 1); commit(); changed(); }));
     $('win-add')?.addEventListener('click', () => { (h0.windows = h0.windows || []).push({ center: 0.5, story: 1, widthFt: 3, heightFt: 5 }); commit(); changed(); });
     $('h-photo')?.addEventListener('click', () => $('h-file').click());
@@ -1014,7 +1027,7 @@
         + `<span class="hrow"><span class="ro">Landing partway down, then</span><button type="button" class="ghost-btn" data-st="land:straight">Straight</button><button type="button" class="ghost-btn" data-st="land:left">Turn left</button><button type="button" class="ghost-btn" data-st="land:right">Turn right</button></span>`;
     }
     p.innerHTML = h; p.hidden = false; bindHouse(p);
-    p.querySelectorAll('select:not([data-hk]):not([data-seg]):not([data-win])').forEach(sl => sl.addEventListener('change', () => {
+    p.querySelectorAll('select:not([data-hk]):not([data-seg]):not([data-win]):not([data-cg])').forEach(sl => sl.addEventListener('change', () => {
       const k = sl.dataset.k, v = sl.value;
       if (k.startsWith('b:')) {
         const bk = k.slice(2); S.build[bk] = v;
@@ -1031,7 +1044,7 @@
       }
       commit(); changed();
     }));
-    p.querySelectorAll('input:not([data-hk]):not([type=file]):not(#h-known):not([data-seg]):not([data-win])').forEach(inp => inp.addEventListener('change', () => {
+    p.querySelectorAll('input:not([data-hk]):not([type=file]):not(#h-known):not([data-seg]):not([data-win]):not([data-cg])').forEach(inp => inp.addEventListener('change', () => {
       const v = parseFloat(inp.value); if (!Number.isFinite(v)) return;
       if (inp.dataset.k === 'dw' || inp.dataset.k === 'dd') {     // stretch the deck: house side and left side stay put
         const i = inp.dataset.k === 'dw' ? 0 : 1, vs = e.pts.map(q => q[i]), lo = Math.min(...vs), span = Math.max(...vs) - lo;
