@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { openProposal as showProposal } from '../lib/openProposal'
-import { useStore } from '../store'
+import { useScopedProposals } from '../lib/proposalScope'
+import { RepToggle } from '../components/FilterBar'
 import { wonRevenueOf } from '../contractTotal'
 import {
   Users, Search, ChevronDown, ChevronRight, Phone, Mail, MapPin,
@@ -23,7 +24,9 @@ const STATUS_PRIORITY = { Won: 0, Negotiating: 1, 'Followed Up': 2, Sent: 3, Dra
 
 export default function ClientList({ initialQuery = '' } = {}) {
   const navigate  = useNavigate()
-  const proposals = useStore(s => s.proposals)
+  // Office / admin pick whose clients: one sales rep, or All (same choice as
+  // Proposals / Pipeline / Opens). A rep's store only holds their own deals.
+  const { proposals, canChoose, reps, repId, setRep } = useScopedProposals({ includeImported: true })
   const [expanded, setExpanded] = useState({})
   const [search, setSearch] = useState(initialQuery)
 
@@ -85,6 +88,8 @@ export default function ClientList({ initialQuery = '' } = {}) {
           <Plus size={15} /> New Quote
         </button>
       </div>
+
+      {canChoose && <div className="mb-3"><RepToggle reps={reps} repId={repId} setRep={setRep} /></div>}
 
       {/* Search */}
       <div className="relative mb-5">

@@ -4,7 +4,8 @@
 // proposal's own builder inputs (see src/lib/designLink.js).
 import { useMemo, useState } from 'react'
 import { Search, PenTool } from 'lucide-react'
-import { useStore } from '../store'
+import { useScopedProposals } from '../lib/proposalScope'
+import { RepToggle } from '../components/FilterBar'
 import { designSummary, editorUrl, hasDesign } from '../lib/designLink'
 
 const STATUS_TONE = {
@@ -14,7 +15,9 @@ const STATUS_TONE = {
 }
 
 export default function Designs() {
-  const proposals = useStore(s => s.proposals)
+  // Office / admin pick whose designs: one sales rep, or All (same choice as
+  // the other Sales tabs).
+  const { proposals, canChoose, reps, repId, setRep } = useScopedProposals({ includeImported: true })
   const [q, setQ] = useState('')
 
   const rows = useMemo(() => {
@@ -33,6 +36,7 @@ export default function Designs() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-gray-500">3D renderings and floor plans for every porch, deck and patio quoted in QuoteX.</p>
         <div className="flex items-center gap-2 flex-wrap">
+          {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           <label className="relative">
             <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search client or address"

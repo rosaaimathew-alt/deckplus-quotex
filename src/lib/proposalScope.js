@@ -4,7 +4,9 @@ import { useStore } from '../store'
 // A rep's store only ever holds their own deals (the database decides). Office
 // and admin see everyone's, and pick here whose deals the dashboard and
 // pipeline show: one rep's (their own by default) or everyone's ('everyone').
-export function useScopedProposals() {
+// includeImported: keep jobs imported from the office's sheet (no sales rep);
+// they show under All only, since no rep owns them.
+export function useScopedProposals({ includeImported = false } = {}) {
   const all        = useStore(s => s.proposals)
   const role       = useStore(s => s.role || 'manager')
   const me         = useStore(s => s.me)
@@ -23,7 +25,7 @@ export function useScopedProposals() {
   const repId  = !canChoose || wanted === 'everyone' ? null : (reps.some(r => r.id === wanted) || wanted === me?.id ? wanted : null)
   return {
     // Jobs imported from the office's sheet aren't proposals — keep them out of sales views
-    proposals: (repId ? all.filter(p => p.ownerId === repId) : all).filter(p => p.status !== 'Imported'),
+    proposals: (repId ? all.filter(p => p.ownerId === repId) : all).filter(p => includeImported || p.status !== 'Imported'),
     canChoose, reps, repId, me,
     mineOnly: !!repId && repId === me?.id,
     repName: repId ? (reps.find(r => r.id === repId)?.name || '') : '',
