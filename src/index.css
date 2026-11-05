@@ -132,8 +132,9 @@
   .qx-ground            { background-color: #ebe5d8; }
   html.dark .qx-ground  { background-color: #1c1c20; }
 
-  /* Serif display headings — the signature of the look */
-  h1, h2 {
+  /* Serif display font for page titles only (.qx-title: the section titles
+     — Sales, Projects…). Card and panel titles stay in the app's sans. */
+  .qx-title {
     font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
     letter-spacing: -0.01em;
   }

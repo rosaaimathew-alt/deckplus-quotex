@@ -676,7 +676,7 @@ export default function ContractView() {
             <div className="flex gap-2 flex-wrap">
               {['Hardscapes', 'Porch Conversion', 'Porch', 'Porch with Deck', 'Deck'].map(tag => (
                 <button key={tag} onClick={() => { const next = projectTag === tag ? null : tag; setProjectTag(next); if (paymentScheduleOverride === 'auto') setMilestoneLabels(getMilestoneSet('auto', next, total).map(m => m.label)) }}
-                  className={btn(projectTag === tag, 'bg-gray-900 text-white border-gray-900')}>{tag}</button>
+                  className={btn(projectTag === tag, 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]')}>{tag}</button>
               ))}
             </div>
           </div>
@@ -692,7 +692,7 @@ export default function ContractView() {
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Job Location <span className="font-normal text-gray-400 normal-case">(state from the address; county picks the permit forms)</span></label>
             <div className="flex gap-2 flex-wrap items-center mb-4">
-              {STATES.map(st => <button key={st} onClick={() => setValue('jobState', st)} className={btn(values.jobState === st, 'bg-gray-900 text-white border-gray-900')}>{st}</button>)}
+              {STATES.map(st => <button key={st} onClick={() => setValue('jobState', st)} className={btn(values.jobState === st, 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]')}>{st}</button>)}
               <select className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs" value={values.county || ''}
                 onChange={e => {
                   const c = e.target.value
@@ -1013,7 +1013,7 @@ export default function ContractView() {
                       <div key={role} className={`border rounded-xl p-3 ${color}`}>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold uppercase tracking-wider text-gray-600">{label}</span>
-                          <button onClick={() => { navigator.clipboard.writeText(signingLinks[role]); setCopiedRole(role); setTimeout(() => setCopiedRole(''), 2000) }} className="px-2.5 py-1 bg-gray-900 text-white rounded-md text-[11px] font-semibold hover:bg-gray-700">{copiedRole === role ? 'Copied!' : 'Copy Link'}</button>
+                          <button onClick={() => { navigator.clipboard.writeText(signingLinks[role]); setCopiedRole(role); setTimeout(() => setCopiedRole(''), 2000) }} className="px-2.5 py-1 bg-[var(--brand-600)] text-white rounded-md text-[11px] font-semibold hover:bg-[var(--brand-700)]">{copiedRole === role ? 'Copied!' : 'Copy Link'}</button>
                         </div>
                         <div className="text-[11px] text-gray-600 break-all bg-white/50 rounded px-2 py-1 select-all">{signingLinks[role]}</div>
                       </div>
@@ -1026,7 +1026,7 @@ export default function ContractView() {
                     <p className="text-xs text-gray-400">IP address + timestamp recorded for the audit trail.</p>
                     {companySignature?.enabled && companySignature?.signatureDataUrl && <p className="text-xs text-emerald-700">Deck Plus's part will be signed automatically with the company signature on file ({companySignature.printedName}).</p>}
                     {signError && <p className="text-sm text-red-600">{signError}</p>}
-                    <button onClick={handleGetSigningLink} disabled={linkLoading} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-700 disabled:opacity-50">
+                    <button onClick={handleGetSigningLink} disabled={linkLoading} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--brand-600)] text-white rounded-xl text-sm font-semibold hover:bg-[var(--brand-700)] disabled:opacity-50">
                       {linkLoading ? <><Loader2 size={15} className="animate-spin" /> Creating links…</> : 'Generate Signing Links'}
                     </button>
                   </>

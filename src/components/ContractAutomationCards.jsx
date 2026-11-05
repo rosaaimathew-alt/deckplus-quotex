@@ -78,7 +78,7 @@ export function CompanySignatureCard() {
           </label>
           {err && <p className="text-xs text-red-600">{err}</p>}
           <div className="flex gap-2">
-            <button onClick={adopt} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700"><CheckCircle size={14} /> Adopt signature</button>
+            <button onClick={adopt} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--brand-600)] text-white text-sm font-medium hover:bg-[var(--brand-700)]"><CheckCircle size={14} /> Adopt signature</button>
             {sig?.signatureDataUrl && <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>}
           </div>
         </div>
@@ -113,7 +113,7 @@ export function WelcomeEmailCard() {
         <textarea value={body} onChange={e => setBody(e.target.value)} rows={12} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 leading-relaxed" /></label>
       <p className="text-[11px] text-gray-400 mt-1">Fill-ins: {WELCOME_PLACEHOLDERS.join(' ')}</p>
       <div className="flex items-center gap-2 mt-3">
-        <button disabled={!dirty} onClick={() => { setSaved({ ...cur, subject, body }); setNote('Saved.') }} className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-40">Save</button>
+        <button disabled={!dirty} onClick={() => { setSaved({ ...cur, subject, body }); setNote('Saved.') }} className="px-4 py-2 rounded-lg bg-[var(--brand-600)] text-white text-sm font-medium hover:bg-[var(--brand-700)] disabled:opacity-40">Save</button>
         <button onClick={() => { setSubject(WELCOME_EMAIL_DEFAULT.subject); setBody(WELCOME_EMAIL_DEFAULT.body); setNote('') }} className="px-3 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-100">Reset to the default wording</button>
         {note && !dirty && <span className="text-xs text-green-700">{note}</span>}
       </div>

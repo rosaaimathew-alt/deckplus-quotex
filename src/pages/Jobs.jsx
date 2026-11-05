@@ -1984,7 +1984,7 @@ export default function Jobs() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="qx-hide-embedded flex items-center justify-between mb-5 gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Job Management</h1>
+          <h1 className="qx-title text-xl sm:text-2xl font-bold text-gray-900">Job Management</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Stages · Change orders · Daily logs · Warranty</p>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { QuickPicks } from '../components/FilterBar'
 import { useStore } from '../store'
 import { Plus, X, Mail, Wrench, Star, Edit2, AlertTriangle, ShieldCheck, Upload, Download, FileText, Package, Calendar } from 'lucide-react'
 import { dataUrlToBytes, downloadZip } from '../lib/zip'
@@ -364,16 +365,7 @@ export default function Subcontractors() {
       {/* Filters */}
       {subcontractors.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="flex gap-1 overflow-x-auto pb-1">
-            {trades.map(t => (
-              <button key={t} onClick={() => setTradeFilter(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                  tradeFilter === t ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}>
-                {t}
-              </button>
-            ))}
-          </div>
+          <QuickPicks value={tradeFilter} onChange={setTradeFilter} options={trades.map(t => ({ value: t, label: t }))} />
           <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-52">
             <Wrench size={13} className="text-gray-400 shrink-0" />
             <input className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"

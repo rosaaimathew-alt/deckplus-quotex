@@ -53,7 +53,7 @@ export function MenuChip({ label, value, options, onChange, placeholder, active,
 //   <QuickPicks value={v} options={[{ value, label, count? }]} onChange={setV} />
 export function QuickPicks({ value, options, onChange }) {
   return (
-    <div className="inline-flex items-center gap-5" role="radiogroup">
+    <div className="inline-flex flex-wrap items-center gap-x-5" role="radiogroup">
       {options.map(o => {
         const on = o.value === value
         return (

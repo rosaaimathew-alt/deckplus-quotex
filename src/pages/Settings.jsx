@@ -184,7 +184,7 @@ function EmailConnectCard() {
           )}
           <div className="flex gap-2">
             <button onClick={connect} disabled={!!busy || !f.email || !f.password}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-40">
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--brand-600)] text-white text-sm font-medium hover:bg-[var(--brand-700)] disabled:opacity-40">
               <Mail size={15} /> {busy === 'connect' ? 'Testing the login…' : mine ? 'Save & test' : 'Connect & test'}
             </button>
             {editing && <button onClick={() => { setEditing(false); setError('') }} className="px-4 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>}

@@ -77,7 +77,7 @@ function SignaturesModal({ recordId, onClose }) {
           <h2 className="text-base font-bold text-gray-900">Signatures & Audit Trail</h2>
           <div className="flex items-center gap-3">
             <a href={`/view/${recordId}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-700 transition-colors">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--brand-600)] text-white rounded-lg text-xs font-medium hover:bg-[var(--brand-700)] transition-colors">
               <ExternalLink size={11} /> View Full Document
             </a>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
@@ -178,7 +178,7 @@ function LinksModal({ links, onClose }) {
                 <span className="text-xs font-bold uppercase tracking-wider text-gray-600">{label}</span>
                 <button
                   onClick={() => { navigator.clipboard.writeText(links[role]); setCopied(role); setTimeout(() => setCopied(''), 2000) }}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-gray-900 text-white rounded-md text-[11px] font-semibold hover:bg-gray-700"
+                  className="flex items-center gap-1 px-2.5 py-1 bg-[var(--brand-600)] text-white rounded-md text-[11px] font-semibold hover:bg-[var(--brand-700)]"
                 >
                   <Copy size={10} /> {copied === role ? 'Copied!' : 'Copy'}
                 </button>
@@ -379,7 +379,7 @@ export default function ContractsList({ initialFilter } = {}) {
 
       {/* Header */}
       <div className="qx-hide-embedded mb-5">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Contracts</h1>
+        <h1 className="qx-title text-xl sm:text-2xl font-bold text-gray-900">Contracts</h1>
       </div>
 
       {/* Filter tabs + search */}

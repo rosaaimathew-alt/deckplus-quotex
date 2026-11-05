@@ -151,7 +151,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
             {insights && <span className="hidden sm:block"><LinkBtn onClick={() => navigate('/insights')}>All insights</LinkBtn></span>}
-            <MenuChip value={periodKey} onChange={setPeriodKey} align="right" options={PERIODS.map(({ value, label }) => ({ value, label }))} />
+            <MenuChip label="Period" value={periodKey} onChange={setPeriodKey} align="right" options={PERIODS.map(({ value, label }) => ({ value, label }))} />
           </div>
         </div>
         <div className="mt-2 grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border-t border-gray-100">

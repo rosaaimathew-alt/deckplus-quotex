@@ -115,7 +115,7 @@ export default function COSignPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center">
           <CheckCircle2 size={48} className="text-green-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Change Order Signed!</h2>
+          <h2 className="qx-title text-xl font-bold text-gray-900 mb-2">Change Order Signed!</h2>
           <p className="text-sm text-gray-500">Thank you, {printedName}. Your signature has been recorded.</p>
           <p className="text-xs text-gray-400 mt-4">Contract #{contractNum} · {coNumber}</p>
           <button onClick={() => window.location.reload()} className="mt-5 text-sm text-blue-600 font-medium hover:underline">View signed copy →</button>

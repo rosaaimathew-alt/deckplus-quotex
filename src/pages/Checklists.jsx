@@ -26,7 +26,7 @@ export default function Checklists() {
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       <div className="qx-hide-embedded mb-5">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Checklists</h1>
+        <h1 className="qx-title text-xl sm:text-2xl font-bold text-gray-900">Checklists</h1>
       </div>
 
       {/* New checklist */}
@@ -151,7 +151,7 @@ function ChecklistCard({ list, me, onRename, onDelete, onAddItem, onToggle, onDe
           className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
         <button onClick={add} disabled={!itemText.trim()}
-          className="flex items-center gap-1 px-3 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors shrink-0">
+          className="flex items-center gap-1 px-3 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors shrink-0">
           <Check size={14} /> Add
         </button>
       </div>

@@ -1,4 +1,5 @@
 import { Fragment, useState, useMemo } from 'react'
+import StatCard from '../components/StatCard'
 import { useNavigate } from 'react-router-dom'
 import {
   DollarSign, TrendingUp, TrendingDown, Target, ChevronDown, ChevronUp, ChevronRight,
@@ -346,47 +347,14 @@ export default function ProfitabilityTracker() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><DollarSign size={16} /></span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Won Revenue</span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{fmtSh(stats.totalRev)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{stats.jobCount} won job{stats.jobCount !== 1 ? 's' : ''} · {periodLabel}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><TrendingDown size={16} /></span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Costs</span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{stats.withCosts > 0 ? fmtSh(stats.totalCost) : '—'}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{stats.withCosts} job{stats.withCosts !== 1 ? 's' : ''} with costs</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><TrendingUp size={16} /></span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Gross Profit</span>
-          </div>
-          <p className={`text-2xl font-bold ${stats.withCosts > 0 ? (stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-900'}`}>
-            {stats.withCosts > 0 ? fmtSh(stats.totalProfit) : '—'}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {stats.withCosts > 0 && stats.totalRev > 0
-              ? `${pct((stats.totalProfit / stats.totalRev) * 100)} overall margin`
-              : 'enter costs to see margin'}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><Target size={16} /></span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Avg Margin</span>
-          </div>
-          <p className={`text-2xl font-bold ${stats.avgMargin !== null ? MARGIN_COLOR(stats.avgMargin) : 'text-gray-900'}`}>
-            {stats.avgMargin !== null ? pct(stats.avgMargin) : '—'}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">per-job average</p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Won revenue" value={fmtSh(stats.totalRev)} sub={`${stats.jobCount} won job${stats.jobCount !== 1 ? 's' : ''} · ${periodLabel}`} />
+        <StatCard label="Total costs" value={stats.withCosts > 0 ? fmtSh(stats.totalCost) : '—'} sub={`${stats.withCosts} job${stats.withCosts !== 1 ? 's' : ''} with costs`} />
+        <StatCard label="Gross profit" value={stats.withCosts > 0 ? fmtSh(stats.totalProfit) : '—'}
+          tone={stats.withCosts > 0 ? (stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-900'}
+          sub={stats.withCosts > 0 && stats.totalRev > 0 ? `${pct((stats.totalProfit / stats.totalRev) * 100)} overall margin` : 'enter costs to see margin'} />
+        <StatCard label="Average margin" value={stats.avgMargin !== null ? pct(stats.avgMargin) : '—'}
+          tone={stats.avgMargin !== null ? MARGIN_COLOR(stats.avgMargin) : 'text-gray-900'} sub="per-job average" />
       </div>
 
       {/* Monthly Revenue vs Profit — collapsible */}

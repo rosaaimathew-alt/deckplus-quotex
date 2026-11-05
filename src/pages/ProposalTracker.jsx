@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import StatCard from '../components/StatCard'
 import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
 import { MenuChip, QuickPicks, SwitchChip, RepToggle } from '../components/FilterBar'
@@ -14,10 +15,10 @@ import {
   Bell, Trash2, X, CheckCircle, AlertCircle, Clock, TrendingUp,
   DollarSign, FileText, Plus, ChevronDown, ChevronUp, MessageSquare,
   Phone, Mail, Send, Users, BarChart2, Columns, List, Award, ThumbsDown,
-  Eye, Copy, GitBranch, FileSignature, ChevronLeft, ChevronRight, ShoppingCart,
+  Eye, Copy, GitBranch, FileSignature, ShoppingCart,
   GitMerge, Unlink, Search, MoreHorizontal, Link2, UserCheck,
 } from 'lucide-react'
-import { getPeriodRange, shiftPeriod, isCurrentPeriod } from '../periodUtils'
+import { getPeriodRange, shiftPeriod } from '../periodUtils'
 import { wonRevenueOf } from '../contractTotal'
 
 // Group proposals into root → revisions trees
@@ -1021,11 +1022,16 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
 }
 
 // ── Analytics View ─────────────────────────────────────────────────────────
+// Same "Period ▾" picker as the rest of the app.
+const WL_PERIODS = [
+  ['this-month', 'This Month'], ['last-month', 'Last Month'], ['this-quarter', 'This Quarter'],
+  ['last-quarter', 'Last Quarter'], ['this-year', 'This Year'], ['last-year', 'Last Year'],
+]
 function AnalyticsView({ proposals: allProposals }) {
-  const [period,  setPeriod]  = useState('year')
-  const [refDate, setRefDate] = useState(new Date())
+  const [periodKey, setPeriodKey] = useState('this-year')
+  const [which, period] = periodKey.split('-')
+  const refDate = which === 'last' ? shiftPeriod(period, new Date(), -1) : new Date()
   const { start: pStart, end: pEnd, label: pLabel } = getPeriodRange(period, refDate)
-  const isCurrent = isCurrentPeriod(period, refDate)
 
   const proposals = allProposals.filter(p => {
     if (!p.createdAt) return false
@@ -1088,56 +1094,18 @@ function AnalyticsView({ proposals: allProposals }) {
   return (
     <div className="space-y-6">
       {/* Period picker */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
-          {['month', 'quarter', 'year'].map(p => (
-            <button key={p} onClick={() => { setPeriod(p); setRefDate(new Date()) }}
-              className={`px-3 py-1.5 capitalize transition-colors ${period === p ? 'bg-[var(--brand-600)] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-              {p === 'month' ? 'Month' : p === 'quarter' ? 'Quarter' : 'Year'}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => setRefDate(shiftPeriod(period, refDate, -1))}
-            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
-            <ChevronLeft size={15} />
-          </button>
-          <span className="text-sm font-semibold text-gray-700 px-1 min-w-[120px] text-center">{pLabel}</span>
-          <button onClick={() => setRefDate(shiftPeriod(period, refDate, 1))}
-            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
-            <ChevronRight size={15} />
-          </button>
-        </div>
-        {!isCurrent && (
-          <button onClick={() => setRefDate(new Date())}
-            className="text-xs text-[var(--brand-600)] hover:underline">
-            Back to current
-          </button>
-        )}
+      <div className="flex items-center justify-between gap-3 border-b border-gray-200">
+        <p className="text-sm font-semibold text-gray-700">{pLabel}</p>
+        <MenuChip label="Period" value={periodKey} onChange={setPeriodKey} align="right"
+          options={WL_PERIODS.map(([value, label]) => ({ value, label }))} />
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Win Rate</p>
-          <p className="text-3xl font-bold text-gray-900">{winRate !== null ? `${winRate}%` : '—'}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{wonClients.length}W / {notWonClients.length} not won · {uniqueClients} clients</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Avg Deal (Won)</p>
-          <p className="text-3xl font-bold text-gray-900">{avgWon !== null ? fmtShort(avgWon) : '—'}</p>
-          <p className="text-xs text-gray-400 mt-0.5">vs {avgLost !== null ? fmtShort(avgLost) : '—'} avg lost</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Avg Days to Close</p>
-          <p className="text-3xl font-bold text-gray-900">{avgDaysToClose !== null ? avgDaysToClose : '—'}</p>
-          <p className="text-xs text-gray-400 mt-0.5">from sent → won</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Won Revenue</p>
-          <p className="text-3xl font-bold text-green-600">${fmt(wonRevenue)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">${fmt(pipelineValue)} open pipeline</p>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Win rate" value={winRate !== null ? `${winRate}%` : '—'} sub={`${wonClients.length} won / ${notWonClients.length} not won · ${uniqueClients} clients`} />
+        <StatCard label="Average won job" value={avgWon !== null ? fmtShort(avgWon) : '—'} sub={`vs ${avgLost !== null ? fmtShort(avgLost) : '—'} average lost`} />
+        <StatCard label="Days to close" value={avgDaysToClose !== null ? avgDaysToClose : '—'} sub="sent → won, on average" />
+        <StatCard label="Won revenue" value={`$${fmt(wonRevenue)}`} sub={`$${fmt(pipelineValue)} open pipeline`} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -1434,31 +1402,15 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
         // Open pipeline: each client's latest version only, not every revision
         const pipeline    = latestIterations(proposals).filter(p => ['Sent','Followed Up','Negotiating'].includes(p.status)).reduce((s, p) => s + (p.total || 0), 0)
         const stats = [
-          { label: 'Won Revenue', value: `$${fmt(wonRevenue)}`, icon: DollarSign, color: 'text-green-500' },
-          { label: 'Open Pipeline', value: `$${fmt(pipeline)}`, icon: TrendingUp, color: 'text-green-600' },
-          { label: 'Jobs Won', value: wonInPeriod.length, icon: CheckCircle, color: 'text-[var(--brand-400)]' },
+          { label: 'Won revenue', value: `$${fmt(wonRevenue)}` },
+          { label: 'Open pipeline', value: `$${fmt(pipeline)}` },
+          { label: 'Jobs won', value: wonInPeriod.length },
         ]
         return (
           <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            {/* Total Proposals — shows unique clients, total proposals as sub */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-1.5 mb-1">
-                <FileText size={14} className="text-[var(--brand-500)]" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Proposals</span>
-              </div>
-              <p className="text-xl font-bold text-gray-900">{rootsInPeriod.length}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{inPeriodAll.length} incl. revisions · {periodLabel}</p>
-            </div>
-            {stats.map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Icon size={14} className={color} />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">{label}</span>
-                </div>
-                <p className="text-xl font-bold text-gray-900">{value}</p>
-              </div>
-            ))}
+            <StatCard label="Total proposals" value={rootsInPeriod.length} sub={`${inPeriodAll.length} incl. revisions · ${periodLabel}`} />
+            {stats.map(({ label, value }) => <StatCard key={label} label={label} value={value} />)}
           </div>
           </>
         )
@@ -1545,7 +1497,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
                     setALaCarteProposal(null)
                     launchContract(aLaCarteProposal, selected, true)
                   }}
-                  className="flex-1 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                  className="flex-1 py-2 rounded-xl bg-[var(--brand-600)] text-white text-sm font-semibold hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors"
                 >
                   Build Contract →
                 </button>

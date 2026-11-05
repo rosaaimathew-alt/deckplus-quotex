@@ -324,7 +324,7 @@ export function PasswordCard() {
         {msg && <p className="text-xs text-emerald-700">{msg}</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
         <button type="submit" disabled={!ok || busy}
-          className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors">
+          className="px-4 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
           {busy ? 'Saving…' : 'Change password'}
         </button>
       </div>

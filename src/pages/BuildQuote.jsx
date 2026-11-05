@@ -1207,16 +1207,16 @@ export default function BuildQuote() {
             {isAlaCarte ? (
               <p className="text-xs text-gray-400 flex items-center gap-1.5"><Tag size={13} /> Discounts apply to a project total — not available on à la carte proposals.</p>
             ) : !discount ? (
-              <button onClick={() => setDiscount({ mode: 'amount', value: '', label: '' })} className="flex items-center gap-1.5 text-sm text-green-700 hover:underline">
+              <button onClick={() => setDiscount({ mode: 'amount', value: '', label: '' })} className="flex items-center gap-1.5 text-sm font-medium text-[var(--brand-700)] hover:underline">
                 <Tag size={14} /> Add a discount
               </button>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700"><Tag size={14} className="text-green-700" /> Discount</span>
+                <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700"><Tag size={14} className="text-[var(--brand-600)]" /> Discount</span>
                 <div className="inline-flex rounded-lg border border-gray-200 p-0.5" role="group" aria-label="Discount type">
                   {[['amount', '$ off'], ['percent', '% off']].map(([m, label]) => (
                     <button key={m} type="button" onClick={() => setDiscount(d => ({ ...d, mode: m }))}
-                      className={`px-2.5 py-1 text-xs rounded-md ${discount.mode === m ? 'bg-green-700 text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>{label}</button>
+                      className={`px-2.5 py-1 text-xs rounded-md ${discount.mode === m ? 'bg-[var(--brand-600)] text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>{label}</button>
                   ))}
                 </div>
                 <input type="number" min="0" step={discount.mode === 'percent' ? '0.5' : '50'} aria-label="Discount amount" autoFocus

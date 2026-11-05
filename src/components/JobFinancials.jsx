@@ -139,7 +139,7 @@ export default function JobFinancials({ proposal }) {
             <select aria-label="Payment method" value={pay.method} onChange={e => setPay(p => ({ ...p, method: e.target.value }))} className={inputCls}>
               {['Check', 'ACH', 'Card', 'Cash', 'Financing', 'Other'].map(m => <option key={m}>{m}</option>)}
             </select>
-            <button type="button" onClick={savePay} disabled={!(Number(pay.amount) > 0)} className="p-2 rounded-lg bg-gray-900 text-white disabled:opacity-40" aria-label="Add payment"><Plus size={15} /></button>
+            <button type="button" onClick={savePay} disabled={!(Number(pay.amount) > 0)} className="p-2 rounded-lg bg-[var(--brand-600)] text-white disabled:opacity-40" aria-label="Add payment"><Plus size={15} /></button>
           </div>
           {received.length > 0 && (
             <div className="mt-3 divide-y divide-gray-50 border-t border-gray-100">
@@ -182,7 +182,7 @@ export default function JobFinancials({ proposal }) {
           <input aria-label="Inventory used description" value={use.description} onChange={e => setUse(u => ({ ...u, description: e.target.value }))} placeholder="What was used" className={inputCls} />
           <div className="flex gap-2">
             <input type="number" aria-label="Inventory used amount" value={use.amount} onChange={e => setUse(u => ({ ...u, amount: e.target.value }))} placeholder="Value $" className={inputCls} />
-            <button type="button" onClick={saveUse} disabled={!(Number(use.amount) > 0)} className="px-3 rounded-lg bg-gray-900 text-white text-sm disabled:opacity-40">Use</button>
+            <button type="button" onClick={saveUse} disabled={!(Number(use.amount) > 0)} className="px-3 rounded-lg bg-[var(--brand-600)] text-white text-sm disabled:opacity-40">Use</button>
           </div>
         </div>
       </div>

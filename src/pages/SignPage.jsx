@@ -159,7 +159,7 @@ export default function SignPage() {
           <div className="max-w-4xl mx-auto flex items-center gap-4 flex-wrap">
             <div className="text-3xl text-green-700">✓</div>
             <div className="flex-1 min-w-[200px]">
-              <h1 className="text-lg font-bold text-green-800">{done ? 'Signed Successfully' : 'Already Signed'}</h1>
+              <h1 className="qx-title text-lg font-bold text-green-800">{done ? 'Signed Successfully' : 'Already Signed'}</h1>
               <p className="text-sm text-gray-600">
                 {done ? `Thank you ${printedName}. Your signature has been recorded.` : 'This party has already signed this contract.'}
                 {isContract && (bothSigned ? ' Both parties have signed — this is the final copy.' : ' Waiting on the other party to sign.')}
@@ -217,7 +217,7 @@ export default function SignPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">{companyName}</p>
-                <h1 className="text-2xl font-bold">Change Order</h1>
+                <h1 className="qx-title text-2xl font-bold">Change Order</h1>
                 <p className="text-sm text-gray-300 mt-1">{d.coNumber}</p>
               </div>
               <div className="text-right text-sm text-gray-300">

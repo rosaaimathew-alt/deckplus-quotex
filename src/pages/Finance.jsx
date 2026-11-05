@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
+import StatCard from '../components/StatCard'
 import { loadPdfjs } from '../lib/pdfjs'
 import { useStore } from '../store'
 import {
@@ -105,7 +106,7 @@ function CardModal({ card, onClose }) {
         </div>
         <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100">Cancel</button>
-          <button onClick={save} disabled={!label.trim()} className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40">Save</button>
+          <button onClick={save} disabled={!label.trim()} className="px-5 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40">Save</button>
         </div>
       </div>
     </div>
@@ -244,7 +245,7 @@ function ImportModal({ cards, jobs, subscriptions, onClose }) {
             </div>
             <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 shrink-0">
               <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100">Cancel</button>
-              <button onClick={importAll} className="flex items-center gap-1.5 px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700"><Check size={14} /> Import {chosen.length}</button>
+              <button onClick={importAll} className="flex items-center gap-1.5 px-5 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)]"><Check size={14} /> Import {chosen.length}</button>
             </div>
           </>
         )}
@@ -295,22 +296,14 @@ function ExpenseModal({ cards, jobs, subscriptions, initial, onClose }) {
         </div>
         <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100">Cancel</button>
-          <button onClick={save} className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700">Save</button>
+          <button onClick={save} className="px-5 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)]">Save</button>
         </div>
       </div>
     </div>
   )
 }
 
-function Kpi({ label, value, sub, tone = 'text-gray-900' }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-1">{label}</p>
-      <p className={`text-xl font-bold ${tone}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
-    </div>
-  )
-}
+function Kpi(props) { return <StatCard {...props} /> }
 
 // ── Overview ─────────────────────────────────────────────────────────────────
 function Overview({ sum, period, onReviewUnaccounted }) {
@@ -392,7 +385,7 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
         <div className="flex flex-wrap gap-1">
           {[{ key: 'all', label: 'All' }, ...BUCKETS.map(b => ({ key: b.key, label: b.key === 'misc' ? 'Unaccounted' : b.label }))].map(b => (
             <button key={b.key} onClick={() => setBucketFilter(b.key)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium border ${bucketFilter === b.key ? (b.key === 'misc' ? 'bg-red-600 text-white border-red-600' : 'bg-gray-900 text-white border-gray-900') : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>{b.label}</button>
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border ${bucketFilter === b.key ? (b.key === 'misc' ? 'bg-red-600 text-white border-red-600' : 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]') : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>{b.label}</button>
           ))}
         </div>
         <select value={cardFilter} onChange={e => setCardFilter(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 ml-auto">
@@ -552,7 +545,7 @@ function SubscriptionsTab({ subscriptions, expenses, cards, period, onLogCharge 
           <select aria-label="Billing cycle" value={f.cycle} onChange={e => setF(p => ({ ...p, cycle: e.target.value }))} className={inputCls}><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
           <input type="date" aria-label="Start date" value={f.startDate} onChange={e => setF(p => ({ ...p, startDate: e.target.value }))} className={inputCls} />
           <select aria-label="Subscription category" value={f.category} onChange={e => setF(p => ({ ...p, category: e.target.value }))} className={inputCls}>{CATEGORIES.subscription.map(c => <option key={c}>{c}</option>)}</select>
-          <button onClick={save} disabled={!f.name.trim() || !(Number(f.amount) > 0)} className="px-3 py-2 rounded-lg bg-gray-900 text-white disabled:opacity-40" aria-label="Add subscription"><Plus size={15} /></button>
+          <button onClick={save} disabled={!f.name.trim() || !(Number(f.amount) > 0)} className="px-3 py-2 rounded-lg bg-[var(--brand-600)] text-white disabled:opacity-40" aria-label="Add subscription"><Plus size={15} /></button>
         </div>
         <p className="text-[11px] text-gray-400 mt-2">Statement lines that mention the name or the "shows on statement as" text are filed under Subscriptions automatically when you import.</p>
       </div>
@@ -626,7 +619,7 @@ function InventoryTab({ expenses, jobs, period, onAddPurchase }) {
           <JobPicker jobs={jobs} value={u.jobId} onChange={id => setU(p => ({ ...p, jobId: id }))} />
           <input aria-label="What was used" value={u.description} onChange={e => setU(p => ({ ...p, description: e.target.value }))} placeholder="What was used (e.g. 40 Trex boards)" className={inputCls} />
           <input type="number" aria-label="Value used" value={u.amount} onChange={e => setU(p => ({ ...p, amount: e.target.value }))} placeholder="Value $" className={inputCls} />
-          <button onClick={saveUse} disabled={!u.jobId || !(Number(u.amount) > 0)} className="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm disabled:opacity-40">Use</button>
+          <button onClick={saveUse} disabled={!u.jobId || !(Number(u.amount) > 0)} className="px-3 py-2 rounded-lg bg-[var(--brand-600)] text-white text-sm disabled:opacity-40">Use</button>
         </div>
         <p className="text-[11px] text-gray-400">Moves the cost onto that job and lowers stock on hand. It isn't new spending — the purchase was already counted.</p>
       </div>
@@ -734,7 +727,7 @@ export default function Finance() {
             {PERIODS.map(k => <option key={k} value={k}>{periodFor(k).label}</option>)}
           </select>
           <button onClick={() => setImporting(true)} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"><Upload size={14} /> Import statement</button>
-          <button onClick={() => setAdding({})} className="flex items-center gap-1.5 px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700"><Plus size={14} /> Add expense</button>
+          <button onClick={() => setAdding({})} className="flex items-center gap-1.5 px-3 py-2 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)]"><Plus size={14} /> Add expense</button>
         </div>
       </div>
 

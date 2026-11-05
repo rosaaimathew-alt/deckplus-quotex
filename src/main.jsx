@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 import { initAuth, getAccessToken } from './supabase'
+import { applyCachedBrand } from './brand'
+
+// Company colors from the last visit, before anything paints (login page too).
+applyCachedBrand()
 
 // Attach the Supabase session token to every same-origin /api/ request. Doing
 // it once here means no fetch call site can forget it, and public signing

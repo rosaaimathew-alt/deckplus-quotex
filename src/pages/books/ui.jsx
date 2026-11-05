@@ -157,7 +157,7 @@ export function viewReport(title, cols, rows, moneyCols = []) {
   w.document.close()
 }
 
-export function XlsButton({ onClick, label = 'Export to XLS' }) {
+export function XlsButton({ onClick, label = 'Export to Excel' }) {
   return <button type="button" onClick={onClick} className={`${btnHead} h-[42px] py-0 font-medium`}><FileSpreadsheet size={17} /> {label}</button>
 }
 

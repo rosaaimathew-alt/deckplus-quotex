@@ -126,7 +126,7 @@ export default function JobPriceList({ proposal }) {
           <p className="text-xs text-gray-500">What each item was priced at in the calculators — every line, quantity and rate, plus the JIC built in.</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={downloadPdf} disabled={!!busy} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-50">
+          <button onClick={downloadPdf} disabled={!!busy} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--brand-600)] text-white text-sm font-medium hover:bg-[var(--brand-700)] disabled:opacity-50">
             {busy === 'pdf' ? <Loader size={14} className="animate-spin" /> : <FileDown size={14} />} Download PDF
           </button>
           <button onClick={downloadExcel} disabled={!!busy} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">

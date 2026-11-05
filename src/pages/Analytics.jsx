@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
+import StatCard from '../components/StatCard'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { MenuChip } from '../components/FilterBar'
@@ -656,7 +657,7 @@ function RemapProjectsModal({ onClose }) {
           )}
         </div>
         <div className="px-5 py-3 border-t border-gray-100 shrink-0">
-          <button onClick={onClose} className="w-full py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">Done</button>
+          <button onClick={onClose} className="w-full py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-xl hover:bg-[var(--brand-700)] transition-colors">Done</button>
         </div>
       </div>
     </div>
@@ -717,18 +718,6 @@ const TYPE_LIGHT = {
   'Other':              'bg-gray-100 text-gray-600',
 }
 
-function StatCard({ icon: Icon, label, value, sub, color = 'blue' }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-2xl font-bold text-gray-900 leading-tight">{value}</p>
-        <div className="p-2 rounded-lg bg-gray-100 text-gray-500 shrink-0"><Icon size={16} /></div>
-      </div>
-      <p className="text-xs text-gray-500 font-semibold mt-2">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5 leading-snug">{sub}</p>}
-    </div>
-  )
-}
 
 // Reusable collapsible card — used for secondary analytics kept off the calm default view
 function Collapsible({ icon: Icon, title, subtitle, badge, open, onToggle, children }) {
@@ -1107,10 +1096,10 @@ export default function Analytics() {
           options={statsPeriods.map(p => ({ value: p.id, label: p.label }))} />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <StatCard icon={DollarSign} label="Total Revenue"  value={`$${fmt(stats.totalRevenue)}`} sub={`${stats.won.length} jobs won · ${periodLabel}`} color="green" />
-        <StatCard icon={Target}     label="Win Rate"       value={`${stats.winRate.toFixed(0)}%`} sub={`${stats.wonAppts} won / ${stats.apptCount} appointment${stats.apptCount !== 1 ? 's' : ''} · ${periodLabel}`} color="blue" />
-        <StatCard icon={Award}      label="Avg Deal Size"  value={`$${fmt(stats.avgDeal)}`}       sub={`per won job · ${periodLabel}`} color="amber" />
-        <StatCard icon={TrendingUp} label="Pipeline"       value={`$${fmt(stats.pipelineValue)}`} sub={`open proposals · ${periodLabel}`} color="blue" />
+        <StatCard label="Won revenue"  value={`$${fmt(stats.totalRevenue)}`} sub={`${stats.won.length} jobs won · ${periodLabel}`} />
+        <StatCard label="Win rate"       value={`${stats.winRate.toFixed(0)}%`} sub={`${stats.wonAppts} won / ${stats.apptCount} appointment${stats.apptCount !== 1 ? 's' : ''} · ${periodLabel}`} />
+        <StatCard label="Average job"  value={`$${fmt(stats.avgDeal)}`}       sub={`per won job · ${periodLabel}`} />
+        <StatCard label="Open pipeline"       value={`$${fmt(stats.pipelineValue)}`} sub={`open proposals · ${periodLabel}`} />
       </div>
 
       {/* Revenue Trend */}

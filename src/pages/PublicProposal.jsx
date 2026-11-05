@@ -66,7 +66,7 @@ export default function PublicProposal() {
       <div style={{ ...card, background: '#fff', color: INK }}>
         <div style={{ background: '#fff', padding: '28px 32px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: accent, letterSpacing: '-0.02em' }}>PROPOSAL</h1>
+            <h1 className="qx-title" style={{ margin: 0, fontSize: 24, fontWeight: 700, color: accent, letterSpacing: '-0.02em' }}>PROPOSAL</h1>
             {estimateDate && <p style={{ margin: '6px 0 0', fontSize: 13, color: INK }}>{estimateDate}</p>}
             {expiry && <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 600, color: INK }}>Valid Until: {expiry}</p>}
             {s.contractNum ? <p style={{ margin: '2px 0 0', fontSize: 12, color: INK }}>{s.contractNum}</p> : null}

@@ -1,4 +1,5 @@
 import { useState, useRef, Fragment } from 'react'
+import { QuickPicks } from '../components/FilterBar'
 import {
   Search, Edit2, Eye, Trash2, Plus, Check, X, GripVertical,
   ChevronDown, ChevronRight, LayoutList, Rows3,
@@ -816,7 +817,7 @@ export default function ItemCatalog({ mode: forcedMode } = {}) {
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
           <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-0.5">Item Catalog</h2>
-          <p className="text-sm text-gray-500">{catalog.length} items · AI-learned pricing from your estimates</p>
+          <p className="text-sm text-gray-500">{catalog.length} items</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* View toggle */}
@@ -883,8 +884,8 @@ export default function ItemCatalog({ mode: forcedMode } = {}) {
 
       {/* Filters (table view) */}
       {view === 'table' && (
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <div className="relative flex-1 min-w-40">
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="relative w-full sm:max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)]"
@@ -893,14 +894,7 @@ export default function ItemCatalog({ mode: forcedMode } = {}) {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex gap-1 flex-wrap">
-            {cats.map(c => (
-              <button key={c} onClick={() => setCatFilter(c)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${catFilter === c ? 'bg-[var(--brand-600)] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                {c}
-              </button>
-            ))}
-          </div>
+          <QuickPicks value={catFilter} onChange={setCatFilter} options={cats.map(c => ({ value: c, label: c }))} />
         </div>
       )}
 

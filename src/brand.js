@@ -88,7 +88,18 @@ export const brandOptions = (b = {}) => ({
   background: b.backgroundColor || null, backgroundDark: b.backgroundDark || null, badge: b.badgeColor || null,
 })
 
-export function applyBrandStyles(primaryHex, opts = {}) {
+// The last brand applied is remembered on this device, so the login page and
+// the first paint use the company colors instead of a default blue.
+const BRAND_CACHE = 'qx_brand_cache'
+export function applyCachedBrand() {
+  try {
+    const c = JSON.parse(localStorage.getItem(BRAND_CACHE) || 'null')
+    if (c && c.primary) applyBrandStyles(c.primary, c.opts || {}, { remember: false })
+  } catch { /* nothing cached / private mode */ }
+}
+
+export function applyBrandStyles(primaryHex, opts = {}, { remember = true } = {}) {
+  if (remember) { try { localStorage.setItem(BRAND_CACHE, JSON.stringify({ primary: primaryHex, opts })) } catch { /* private mode */ } }
   const p = generatePalette(primaryHex || FREE_PRIMARY_COLOR)
   const badge         = opts.badge || DP_ORANGE
   const badgeText     = isLight(badge) ? '#1f1300' : '#ffffff'
