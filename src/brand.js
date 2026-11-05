@@ -122,7 +122,13 @@ export function applyBrandStyles(primaryHex, opts = {}) {
     .qx-badge { background-color: var(--badge); color: var(--badge-text); }
     /* Page background, editable in Settings › Branding (screen only) */
     @media screen {
-      ${opts.background ? `.qx-ground { background-color: ${opts.background}; }` : ''}
+      ${opts.background ? `.qx-ground { background-color: ${opts.background}; }
+      :root {
+        --qx-soft:      color-mix(in srgb, ${opts.background} 96%, #000);
+        --qx-soft-2:    color-mix(in srgb, ${opts.background} 92%, #000);
+        --qx-line:      color-mix(in srgb, ${opts.background} 86%, #000);
+        --qx-line-soft: color-mix(in srgb, ${opts.background} 91%, #000);
+      }` : ''}
       ${opts.backgroundDark ? `html.dark .qx-ground, html.dark body { background-color: ${opts.backgroundDark}; }` : ''}
     }
     .brand-nav-inactive        { color: ${navText}; }
