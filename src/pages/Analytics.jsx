@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react'
 import StatCard from '../components/StatCard'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
-import { MenuChip } from '../components/FilterBar'
+import { MenuChip, QuickPicks } from '../components/FilterBar'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from '../historicalData'
 import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
@@ -359,15 +359,9 @@ function PastJobPanel() {
           )}
 
           {/* Tabs */}
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4 w-fit">
-            <button onClick={() => { setTab('won'); setError('') }}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === 'won' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              Won Jobs
-            </button>
-            <button onClick={() => { setTab('nonwon'); setError('') }}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === 'nonwon' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              Non-Wins (Bulk)
-            </button>
+          <div className="border-b border-gray-200 mb-4">
+            <QuickPicks value={tab} onChange={v => { setTab(v); setError('') }}
+              options={[{ value: 'won', label: 'Won jobs' }, { value: 'nonwon', label: 'Not won (bulk)' }]} />
           </div>
 
           {tab === 'won' && (
@@ -1090,8 +1084,7 @@ export default function Analytics() {
       </div>
 
       {/* Summary cards — scoped to the selected period (defaults to this year) */}
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Performance · {periodLabel}</p>
+      <div className="flex items-center justify-end border-b border-gray-200 mb-4">
         <MenuChip label="Period" value={statsPeriod} onChange={setStatsPeriod} align="right"
           options={statsPeriods.map(p => ({ value: p.id, label: p.label }))} />
       </div>

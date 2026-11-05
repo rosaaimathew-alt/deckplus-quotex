@@ -1,4 +1,5 @@
 import { useState, useRef, lazy, Suspense } from 'react'
+import { QuickPicks } from '../components/FilterBar'
 import { loadPdfjs } from '../lib/pdfjs'
 import { getAnalyzeModel } from '../gemini'
 import { Upload, FileText, Image, File, Trash2, CheckCircle, AlertCircle, Save, RefreshCw } from 'lucide-react'
@@ -327,8 +328,8 @@ function AnalyzeTab() {
 
 // ── Combined Page ─────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'analyze', label: 'Analyze Estimate', description: 'AI extracts line items from a PDF, photo, or pasted text' },
-  { id: 'import',  label: 'Import Spreadsheet', description: 'Map columns from an Excel or CSV pricing sheet' },
+  { id: 'analyze', label: 'Analyze estimate' },
+  { id: 'import',  label: 'Import spreadsheet' },
 ]
 
 export default function Analyze() {
@@ -342,25 +343,9 @@ export default function Analyze() {
         <p className="text-sm text-gray-500 mt-0.5">Extract pricing from estimates and spreadsheets, then save directly to your catalog.</p>
       </div>
 
-      {/* Tab switcher */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="border-b border-gray-200 mb-6">
+        <QuickPicks value={tab} onChange={setTab} options={TABS.map(t => ({ value: t.id, label: t.label }))} />
       </div>
-
-      {/* Description */}
-      <p className="text-xs text-gray-400 mb-4 -mt-3">
-        {TABS.find(t => t.id === tab)?.description}
-      </p>
 
       {/* Tab content */}
       {tab === 'analyze' && <AnalyzeTab />}

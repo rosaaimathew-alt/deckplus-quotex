@@ -1027,11 +1027,10 @@ const WL_PERIODS = [
   ['this-month', 'This Month'], ['last-month', 'Last Month'], ['this-quarter', 'This Quarter'],
   ['last-quarter', 'Last Quarter'], ['this-year', 'This Year'], ['last-year', 'Last Year'],
 ]
-function AnalyticsView({ proposals: allProposals }) {
-  const [periodKey, setPeriodKey] = useState('this-year')
+function AnalyticsView({ proposals: allProposals, periodKey = 'this-year' }) {
   const [which, period] = periodKey.split('-')
   const refDate = which === 'last' ? shiftPeriod(period, new Date(), -1) : new Date()
-  const { start: pStart, end: pEnd, label: pLabel } = getPeriodRange(period, refDate)
+  const { start: pStart, end: pEnd } = getPeriodRange(period, refDate)
 
   const proposals = allProposals.filter(p => {
     if (!p.createdAt) return false
@@ -1093,13 +1092,6 @@ function AnalyticsView({ proposals: allProposals }) {
 
   return (
     <div className="space-y-6">
-      {/* Period picker */}
-      <div className="flex items-center justify-between gap-3 border-b border-gray-200">
-        <p className="text-sm font-semibold text-gray-700">{pLabel}</p>
-        <MenuChip label="Period" value={periodKey} onChange={setPeriodKey} align="right"
-          options={WL_PERIODS.map(([value, label]) => ({ value, label }))} />
-      </div>
-
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Win rate" value={winRate !== null ? `${winRate}%` : '—'} sub={`${wonClients.length} won / ${notWonClients.length} not won · ${uniqueClients} clients`} />
@@ -1212,6 +1204,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
     return n
   })
   const [winLossTarget, setWinLossTarget] = useState(null)
+  const [wlPeriod, setWlPeriod] = useState('this-year')
   const [reminderProposalId, setReminderProposalId] = useState(null)
   const [reminderDate, setReminderDate] = useState('')
   const [reminderFreq, setReminderFreq] = useState('once')
@@ -1372,6 +1365,10 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
             <MenuChip label="Period" value={periodFilter} onChange={setPeriodFilter} align="right"
               options={STATS_PERIODS.map(({ id, label }) => ({ value: id, label }))} />
           )}
+          {tab === 'analytics' && (
+            <MenuChip label="Period" value={wlPeriod} onChange={setWlPeriod} align="right"
+              options={WL_PERIODS.map(([value, label]) => ({ value, label }))} />
+          )}
         </div>
       </div>
       {/* Stats strip */}
@@ -1440,7 +1437,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
         <ActivityView proposals={proposals} />
       )}
       {tab === 'analytics' && (
-        <AnalyticsView proposals={proposals} />
+        <AnalyticsView proposals={proposals} periodKey={wlPeriod} />
       )}
 
       {/* A la Carte Item Selection Modal */}
