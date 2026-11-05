@@ -1490,7 +1490,7 @@
     gutter: () => mat('gutter-' + S.trim, () => std({ color: S.trim === 'white' ? '#f4f4f1' : TRIMS.find(t => t.key === S.trim).hex, roughness: 0.35, metalness: 0.2 })),
     deck: (v) => mat(`deck-${S.decking}-${S.color}-${v}`, () => std({ color: new THREE.Color(1, 1, 1).multiplyScalar([1, 0.93, 1.06][v]), map: deckTex(), bumpMap: deckTex(), bumpScale: 0.006, roughness: 0.75 })),
     fascia: () => mat(`fascia-${S.decking}-${S.color}`, () => std({ color: new THREE.Color(0.88, 0.88, 0.88), map: deckTex(), roughness: 0.7 })),
-    leaf: (v) => mat('leaf' + v, () => std({ color: ['#1c3112', '#223a14', '#1a2f10', '#29401a'][v], roughness: 1 })),
+    leaf: (v) => mat('leaf' + v, () => std({ color: ['#2c4a1c', '#36561f', '#27421a', '#41612a'][v], roughness: 1 })),
   };
 
   // ── Sky, environment, lights, ground ───────────────────────────────────────
@@ -1715,51 +1715,6 @@
     B(w + 0.3, 0.05, 0.4, M.metal(), 0, 0.02, 0.18);
     B(0.42, 0.7, 0.36, M.metal(), w / 2 + 1, 5.9, 0.2); B(0.3, 0.5, 0.3, M.bulb(), w / 2 + 1, 5.9, 0.2, { cast: false });
   }); }
-  // Leaf cards: small alpha-cut clusters of leaves scattered over each crown and shrub, so
-  // foliage reads as leaves with a broken silhouette instead of a smooth blob.
-  function leafCanvas() {
-    const R2 = rng(77), [c, x] = cnv(256, 256), greens = ['#2f5220', '#3b6326', '#2a4a1c', '#4a7330', '#567d36', '#25421a', '#3f5f28'];
-    x.clearRect(0, 0, 256, 256);
-    for (let i = 0; i < 950; i++) {
-      const px = 20 + R2() * 216, py = 20 + R2() * 216, a = R2() * Math.PI, l = 6 + R2() * 7, w = 2.5 + R2() * 3;
-      x.save(); x.translate(px, py); x.rotate(a);
-      x.fillStyle = greens[Math.floor(R2() * greens.length)]; x.beginPath(); x.ellipse(0, 0, l, w, 0, 0, 7); x.fill();
-      x.fillStyle = 'rgba(255,255,210,0.10)'; x.beginPath(); x.ellipse(-l * 0.2, -w * 0.3, l * 0.5, w * 0.35, 0, 0, 7); x.fill();
-      x.restore();
-    }
-    x.globalCompositeOperation = 'destination-in';
-    const g = x.createRadialGradient(128, 128, 60, 128, 128, 128); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.75, 'rgba(0,0,0,0.85)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
-    return c;
-  }
-  let leafTex = null;
-  const FOL = [];                 // crowns to dress: { x, y, z, sx, sy, sz, n }
-  const foliage = (m, n) => FOL.push({ x: m.position.x, y: m.position.y, z: m.position.z, sx: m.scale.x, sy: m.scale.y, sz: m.scale.z, n, ref: m });
-  function flushFoliage() {
-    if (!FOL.length) return;
-    leafTex = leafTex || (() => { const t = new THREE.CanvasTexture(leafCanvas()); t.encoding = THREE.sRGBEncoding; t.anisotropy = maxAniso; return t; })();
-    const lm = mat('leafCard', () => std({ color: '#ffffff', map: leafTex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.82 }));
-    const total = FOL.reduce((a, f) => a + f.n, 0), im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), lm, total);
-    im.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: leafTex, alphaTest: 0.45 });
-    const FR = rng(5), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
-    let i = 0;
-    FOL.forEach(f => {
-      // a blob moved after it was made (tree crowns) is read at its final spot
-      const fx = f.ref ? f.ref.position.x : f.x, fy = f.ref ? f.ref.position.y : f.y, fz = f.ref ? f.ref.position.z : f.z;
-      const sx = f.ref ? f.ref.scale.x : f.sx, sy = f.ref ? f.ref.scale.y : f.sy, sz = f.ref ? f.ref.scale.z : f.sz;
-      for (let k = 0; k < f.n; k++) {
-        const u = FR() * 2 - 1, th = FR() * Math.PI * 2, rr = Math.sqrt(1 - u * u), up = Math.abs(u) * 0.6 + 0.4;
-        const dx = rr * Math.cos(th), dy = u > -0.35 ? u : -0.35, dz = rr * Math.sin(th), rad = 0.82 + FR() * 0.22;
-        p.set(fx + dx * sx * rad, fy + dy * sy * rad, fz + dz * sz * rad);
-        e.set(FR() * Math.PI, FR() * Math.PI, FR() * Math.PI); q.setFromEuler(e);
-        const cs = (sx + sy + sz) / 3 * (0.75 + FR() * 0.45) * up; sc.set(cs, cs, cs);
-        m4.compose(p, q, sc); im.setMatrixAt(i, m4);
-        const v = 0.95 + FR() * 0.4; col.setRGB(v, v * (0.98 + FR() * 0.06), v * 0.88); im.setColorAt(i, col); i++;
-      }
-    });
-    im.castShadow = true; im.receiveShadow = true; im.userData.noAO = true; G.add(im);
-    FOL.length = 0;
-  }
   function shrub(x, z, s) {
     const geo = new THREE.IcosahedronGeometry(1, 3), p = geo.attributes.position, v = new THREE.Vector3();
     const seed = R() * 100;
@@ -1773,7 +1728,6 @@
     }
     const m = new THREE.Mesh(geo, M.leaf(Math.floor(R() * 4)));
     m.scale.set(s, s * 0.78, s); m.position.set(x, s * 0.62, z); m.castShadow = m.receiveShadow = true; G.add(m);
-    foliage(m, Math.round(Math.min(140, 24 + s * s * 9)));
     return m;
   }
   function tree(x, z, s) {
@@ -1794,7 +1748,7 @@
   function treeline(cx, cz) {
     const TR = rng(91), n = 90, crowns = new THREE.InstancedMesh(crownGeo, mat('crown', () => std({ color: '#ffffff', roughness: 1 })), n * 4);
     const trunks = new THREE.InstancedMesh(trunkGeo, M.bark(), n), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color();
-    const greens = ['#1d3313', '#223b17', '#1a2f11', '#28421b', '#1f3615'];
+    const greens = ['#2d4a1e', '#365526', '#24401a', '#3f5e2a', '#2f4d27'];
     let ci = 0;
     for (let i = 0; i < n; i++) {
       const ang = TR() * Math.PI * 2, rad = 120 + TR() * 110, x = cx + Math.cos(ang) * rad, z = cz + Math.sin(ang) * rad * 0.9 - 30;
@@ -1803,7 +1757,6 @@
       for (let k = 0; k < 4; k++) {
         p.set(x + (TR() - 0.5) * r, hgt * (0.6 + TR() * 0.4), z + (TR() - 0.5) * r); const rr = r * (0.55 + TR() * 0.5);
         sc.set(rr, rr * (0.8 + TR() * 0.4), rr); m4.compose(p, q, sc); crowns.setMatrixAt(ci, m4);
-        FOL.push({ x: p.x, y: p.y, z: p.z, sx: sc.x, sy: sc.y, sz: sc.z, n: 26 });
         col.set(greens[Math.floor(TR() * greens.length)]); crowns.setColorAt(ci, col); ci++;
       }
     }
@@ -2642,7 +2595,6 @@
     }));
     tree(hx - HW / 2 - 16, -6, 1.1); tree(hx + HW / 2 + 14, -22, 1.25); tree(hx - 6, -HD - 18, 1.3);
     treeline(hx, 0);
-    flushFoliage();
     return E;
   }
 
@@ -2883,7 +2835,97 @@
     const rail = S.rail === 'aluminum' ? 'black aluminum railing' : 'white railing with a composite cap and black round balusters';
     return `${[...parts, ...extra].join(', ')}; ${deck}; ${rail}; ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()} trim and columns; ${house}; floor ${ftIn(S.H)} above grade`;
   }
-  const promptText = () => `Turn this 3D model screenshot into a photorealistic exterior photograph of the same scene, as if taken with a professional camera on a sunny afternoon. Keep exactly the same camera angle, framing, house and every built element (posts, headers, roof shape, windows, doors, screens, railings, stairs, deck boards, patio) in the same positions, sizes and proportions. Do not add, remove or move any structural element. Keep every window and door on the house exactly where it is in the screenshot: do not remove, merge, resize or add windows, even where the new porch or deck partly hides them. Keep each roof's shape and ceiling exactly as described below. Keep the same colors and materials. Make it look real: true wood-grain composite decking, crisp painted trim, real siding or brick, architectural shingles, a natural lawn, realistic shrubs and trees, soft natural sunlight with accurate shadows. No people, no text. Project: ${describe()}.`;
+  // ── The ChatGPT prompt: an exact, countable inventory of what is built ──────────────
+  // An image model repaints the screenshot; anything vague it "fixes" to what is typical. So
+  // every built element is listed with counts and positions, roofs and gable ends in plain
+  // words, colours in words, and the model is told to check its counts before answering.
+  function colorWord(hex) {
+    const c = new THREE.Color(hex || '#888888'), h = {}; c.getHSL(h);
+    const L = h.l, S2 = h.s, H = h.h * 360, tone = L > 0.7 ? 'light ' : L < 0.3 ? 'dark ' : '';
+    if (L > 0.88) return S2 < 0.25 ? 'white' : 'off-white';
+    if (S2 < 0.22) return L > 0.62 ? 'light gray' : L > 0.4 ? 'gray' : L > 0.2 ? 'charcoal gray' : 'black';
+    if (H < 18 || H >= 340) return tone + 'red';
+    if (H < 45) return L > 0.6 ? 'tan' : L < 0.3 ? 'dark brown' : 'brown';
+    if (H < 70) return L > 0.6 ? 'beige' : 'khaki';
+    if (H < 170) return tone + 'green';
+    if (H < 260) return tone + 'blue';
+    return tone + 'purple';
+  }
+  const posWord = (f) => f < 0.13 ? 'far left' : f < 0.33 ? 'left' : f < 0.45 ? 'left of centre' : f <= 0.55 ? 'centre' : f < 0.67 ? 'right of centre' : f < 0.87 ? 'right' : 'far right';
+  const nWord = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  function gableEndWords(x) {
+    const infill = gableEndOf(x), mat = infill === 'siding' ? 'siding' : infill === 'screen' ? 'screen' : 'glass';
+    if (x.roof === 'shed') return 'single-slope SHED roof: it slopes down from the house wall to the front header; there is NO gable and NO triangle on the front';
+    if (x.roof === 'hip') return 'HIP roof: it slopes down to the front and to both sides; there is NO gable and NO triangle on the front';
+    if (x.roof === 'semivault') return mat === 'siding'
+      ? 'front-facing GABLE roof; the triangular gable end above the front header is solid siding with white trim, no glass'
+      : `front-facing GABLE roof with a SEMI-VAULTED ceiling. The triangular gable end above the front header has ${mat} ONLY in a LOW band (two small side triangles and one short centre pane, all below the flat-ceiling line); ABOVE that line the upper triangle up to the peak is SOLID siding with a horizontal white trim band between them. There is NO ${mat} in the upper part of the triangle. Do not draw a full-height glass triangle`;
+    return mat === 'siding'
+      ? 'front-facing GABLE roof with a cathedral ceiling; the triangular gable end above the front header is solid siding with white trim'
+      : `front-facing GABLE roof with a cathedral ceiling; the triangular gable end above the front header is filled with ${mat} in three panes up to the peak`;
+  }
+  function inventory() {
+    const L = [], hs = HS();
+    // house
+    if (hs) {
+      const W = hs.wallWidthFt;
+      L.push(`HOUSE (keep exactly as in the screenshot): ${hs.stories}-story${hs.walkout ? ' over a walkout basement (3 levels showing on the back)' : ''}, about ${W} ft wide, ${colorWord(hs.sidingColor)} ${hs.siding}${hs.lower && hs.lower !== 'none' && hs.lower !== hs.siding ? ` with ${colorWord(hs.lowerColor)} ${hs.lower} on the lower ${hs.lowerHeightFt} ft` : ''}, ${colorWord(hs.trimColor)} trim, ${colorWord(hs.roofColor)} asphalt shingles, ${hs.roofStyle === 'hip' ? 'hip main roof' : hs.roofStyle === 'gable-front' ? 'main roof with its gable facing the camera' : 'main roof with its ridge running along the back wall'}.`);
+      (hs.crossGables || []).forEach(c => L.push(`- A cross gable (${c.widthFt} ft wide triangular gable rising from the back wall into the main roof) at the ${posWord(c.center)}.`));
+      (hs.segments || []).filter(g => Number(g.outFt) > 0.5).forEach(g => L.push(`- A ${g.stories}-story ${g.shape === 'bay' ? 'angled bay window (45-degree sides)' : 'square bump-out'} ${g.widthFt} ft wide projecting ${g.outFt} ft, with a ${g.roof} roof.`));
+      if (hs.chimney && hs.chimney !== 'none') L.push(`- A ${hs.chimneyMaterial} chimney on the ${hs.chimney === 'roof' ? 'roof' : hs.chimney === 'back' ? 'back wall' : hs.chimney + ' end wall'}.`);
+      const fl = [[0, 'walkout level'], [1, 'main floor'], [2, 'second floor'], [3, 'third floor']];
+      fl.forEach(([k, nm]) => {
+        const ws = (hs.windows || []).filter(w => (w.story ?? 1) === k).sort((a, b) => a.center - b.center);
+        if (ws.length) L.push(`- Back wall, ${nm}: EXACTLY ${nWord(ws.length, 'window', 'windows')} (${ws.map(w => posWord(w.center)).join(', ')}), each ${ws[0].widthFt <= 3.2 ? 'a standard single window' : 'a wide window'}${hs.shutters ? ' with shutters' : ', no shutters'}. Some may be hidden behind the new porch or deck; keep hidden ones hidden.`);
+      });
+      (hs.doors || []).forEach(d => L.push(`- A ${d.kind === 'slider' ? 'sliding glass door' : 'single entry door'} on the main floor at the ${posWord(d.center)}.`));
+    } else L.push(`HOUSE: the house exactly as shown in the screenshot (${HOUSES.find(h => h.key === S.house).name.toLowerCase()}), same windows and doors, same roof.`);
+    // porches
+    S.sections.filter(x => x.kind === 'porch').forEach(x => {
+      const pl = porchPlan(x), parts = [];
+      ['front', 'left', 'right'].forEach(k => {
+        if (isHouseSide(x, k)) return;
+        if (x.type === 'open') return;
+        const list = x.type === 'sunroom' ? (pl.walls?.[k] || []) : (pl.walls?.[k]?.open || []), doors = list.filter(o => o.door).length, panes = list.filter(o => !o.door).length, tr = list.filter(o => o.transom).length;
+        if (doors + panes) parts.push(`${k} wall: ${nWord(panes, x.type === 'screen' ? 'screen panel' : 'glass panel', x.type === 'screen' ? 'screen panels' : 'glass panels')}${doors ? ` and ${nWord(doors, 'door', 'doors')}` : ''}${tr ? `, with transoms above` : ''}`);
+      });
+      const posts = x.type === 'open' ? openFrontXs(x, porchGeom(x)).length : 0, sg = stairGeom(x);
+      L.push(`NEW PORCH: ${x.w} ft wide × ${x.d} ft deep ${PORCH_TYPES[x.type].toLowerCase()}, ${x.floor === 'deck' ? `on a raised deck ${ftIn(S.H)} above grade` : 'on a concrete slab at grade'}, ${x.tie === 'free' ? 'freestanding' : 'built against the house'}.`);
+      L.push(`- Roof: ${pitchOf(x)} ${gableEndWords(x)}.`);
+      if (x.type === 'open') L.push(`- Open porch: EXACTLY ${nWord(posts, 'post', 'posts')} across the front, railing between posts, no screens or glass.`);
+      else if (parts.length) L.push(`- Walls (count exactly): ${parts.join('; ')}. White frames between panels.`);
+      if (sg) L.push(`- Steps from the porch door: ${nWord(sg.n - 1, 'tread', 'treads')}, ${sw(x)} ft wide, going ${sg.sp.edge === 'front' ? 'straight out toward the camera side' : 'out the ' + sg.sp.edge + ' side'}${sg.bottom > 0.15 ? ' down onto the patio' : ' down to the lawn'}.`);
+      if (x.skirt && x.skirt !== 'none') L.push(`- Under the porch floor: ${x.skirt === 'lattice' ? 'stained square-grid lattice' : x.skirt === 'pt' ? 'stained wood boards' : 'horizontal composite boards'} skirting.`);
+    });
+    // decks, landings, stairs drawn in the editor
+    (S.free?.plats || []).forEach(q => {
+      const xs = q.pts.map(v => v[0]), zs = q.pts.map(v => v[1]), w = Math.round(Math.max(...xs) - Math.min(...xs)), d = Math.round(Math.max(...zs) - Math.min(...zs)), sk = q.skirt || S.skirt;
+      L.push(`NEW ${q.kind === 'landing' ? 'STAIR LANDING' : 'DECK'}: ${w} ft × ${d} ft, ${ftIn(q.h)} above grade, on square wood posts with concrete footings${sk && sk !== 'none' ? `, ${sk === 'lattice' ? 'stained square-grid lattice' : sk === 'pt' ? 'stained wood board' : 'horizontal composite board'} skirting` : ''}.`);
+    });
+    (S.free?.stairs || []).filter(st => st.top - st.bottom > 0.3).forEach(st => L.push(`NEW STAIRS: ${nWord(st.n - 1, 'tread', 'treads')}, ${st.w} ft wide${st.boxed ? ', boxed sides' : ', open stringers'}${st.n >= 4 ? ', railing on both sides' : ''}, landing on ${st.foot ? 'a landing' : 'a small concrete pad'}.`));
+    S.sections.filter(x => x.kind === 'patio').forEach(x => { const pw = patioWall(x); L.push(`NEW PATIO: ${x.w} × ${x.d} ft ${x.mat === 'concrete' ? 'concrete' : 'paver'} patio${pw ? `, raised ${ftIn(pw.H)} on a block retaining wall${pw.steps ? ` with ${pw.steps} block steps down` : ''}` : ''}.`); });
+    // finishes
+    const deck = S.decking === 'pt' ? 'pressure-treated wood (natural tan)' : `${DECKING[S.decking].label} composite in ${COLORS.find(c => c.key === S.color).name} (${colorWord(COLORS.find(c => c.key === S.color).hex)})`;
+    L.push(`FINISHES: decking and stair treads ${deck}; railing ${S.rail === 'aluminum' ? 'black aluminum with black square balusters' : 'white posts and rails with a composite top cap and black round balusters'}; porch trim, columns and frames ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()}; deck framing and posts natural pressure-treated wood.`);
+    return L;
+  }
+  const RULES = `HARD RULES
+1. Treat the screenshot as an exact blueprint. Same camera position, lens, angle and framing. Change ONLY how things look (real materials, real light, real lawn and trees), NEVER what is built.
+2. Do not add, remove, move, resize, merge, reshape or re-style anything built: walls, roofs, roof shapes, gable ends, windows, doors, posts, railings, stairs, panels, decks, patios.
+3. Count everything in the list below and match it exactly. Keep anything hidden behind the porch or deck hidden.
+4. Add nothing new: no extra windows, dormers, skylights, shutters, lights, fans, furniture, people, pets, cars, text, logos or watermarks.`;
+  const STYLE = `PHOTO STYLE: a real professional photograph of the finished job, late-afternoon sun, soft natural shadows, true-to-life colours (no HDR or oversaturation), crisp focus, healthy green lawn, mulch beds with a few shrubs, mature trees behind the house.`;
+  const CHECK = `BEFORE YOU ANSWER: count the windows on each floor, the porch panels and doors on each wall, the stair treads and the posts, and look at the porch gable end; compare with the list above and fix anything that differs. Output one photo only.`;
+  const promptText = () => `Turn the attached 3D model screenshot into a photorealistic photograph of exactly the same scene.
+
+${RULES}
+
+WHAT IS BUILT (left to right as seen in the image)
+${inventory().join('\n')}
+
+${STYLE}
+
+${CHECK}`;
   function snapshot(maxW = 1600) {
     const outline0 = outline.visible; outline.visible = false;
     const dims = [$('dim-w'), $('dim-d')]; dims.forEach(d => d.style.visibility = 'hidden');
@@ -2905,7 +2947,19 @@
   // Optional photo of the customer's house (phone photo or a Google Earth screenshot).
   // It's combined side by side with the 3D view so ChatGPT gets one image to paste.
   let housePhoto = null;   // HTMLImageElement
-  const housePrompt = () => `This image has two halves. LEFT: a real photo of a customer's house. RIGHT: a 3D design of the new porch/deck we are building. Create ONE photorealistic photograph of the house on the LEFT, from the same camera angle, with the new construction from the RIGHT built onto the back of it. Keep the left photo's house, siding, roof, windows, yard, trees and lighting exactly as they are. Attach the new construction to the house wall in the most logical spot (centered on the back door if one is visible). Match the RIGHT design exactly: same structure type, roof style, posts, headers, screens or windows, railings, stairs, decking color and trim color, and the same proportions relative to the house (a standard door is 3 ft wide by 6 ft 8 in tall). Output only the finished single photo, no split screen, no text. Project: ${describe()}.`;
+  const housePrompt = () => `This image has two halves. LEFT: a real photo of the customer's house. RIGHT: a 3D model of the new work we are building on the back of it. Create ONE photorealistic photograph of the LEFT house, from the LEFT photo's camera angle, with the new work from the RIGHT built onto it exactly as designed.
+
+HARD RULES
+1. Keep the LEFT photo's house exactly as it is: walls, roof, windows, doors, colours, yard, trees and lighting.
+2. Build the RIGHT design exactly: same structure, size, roof shape and gable end, panels, doors, posts, railings, stairs, decking and trim colours, in the same proportions (a standard door is 3 ft wide by 6 ft 8 in tall). Do not simplify or restyle it.
+3. Count everything in the list below and match it exactly. Add nothing that is not listed.
+
+WHAT IS BUILT
+${inventory().join('\n')}
+
+${STYLE}
+
+${CHECK} No split screen and no text.`;
   function composite(view) {
     return new Promise(res => {
       const v = new Image(); v.onload = () => {
