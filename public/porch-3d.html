@@ -2165,10 +2165,15 @@
           // Three panes like the job photos: two side triangles and a centre pane with clipped top corners.
           const f = 0.28, base = 0.42, mx = Math.min(W / 6, span * 0.42), m = 0.16;
           const top = (x) => (span - Math.abs(x)) * gp - f;
-          const xEdge = span - (base + f) / gp, clipY = apex - f - 0.9;
+          // A semi-vault has a flat ceiling across the middle: glass only up to that line, siding above it.
+          const semiTop = semi ? (hw - hw * 0.42) * gp : null;
+          const xEdge = span - (base + f) / gp, clipY = semi ? semiTop - f : apex - f - 0.9;
+          const xAt = (yy) => span - (yy + f) / gp;                     // where the clip line meets the rake
+          const side = (sd) => top(mx + m) > clipY
+            ? [[sd * (mx + m), base], [sd * xEdge, base], [sd * xAt(clipY), clipY], [sd * (mx + m), clipY]]
+            : [[sd * (mx + m), base], [sd * xEdge, base], [sd * (mx + m), top(mx + m)]];
           const panes = [
-            [[-xEdge, base], [-mx - m, base], [-mx - m, top(mx + m)]],
-            [[mx + m, base], [xEdge, base], [mx + m, top(mx + m)]],
+            side(-1).reverse(), side(1),
             [[-mx + m, base], [mx - m, base], [mx - m, Math.min(top(mx - m), clipY)], ...(top(mx - m) > clipY ? [[span - (clipY + f) / gp, clipY], [-(span - (clipY + f) / gp), clipY]] : []), [-mx + m, Math.min(top(mx - m), clipY)]],
           ].filter(pts => pts.length >= 3 && Math.abs(pts[1][0] - pts[0][0]) > 0.4);
           const outer = new THREE.Shape(); outer.moveTo(-span, 0); outer.lineTo(span, 0); outer.lineTo(0, apex); outer.closePath();
@@ -2177,6 +2182,11 @@
           frame.position.set(0, y0, dir > 0 ? zFace - 0.24 : zFace + 0.04); frame.castShadow = frame.receiveShadow = true; G.add(frame);
           const infill = end === 'screen' ? M.screen() : M.gableGlass();
           panes.forEach(pts => tri(pts, 0.02, infill, mm => { mm.position.set(0, y0, zFace - dir * 0.15); mm.userData.noAO = true; mm.castShadow = false; }));
+          if (semi) {
+            const xc = span - semiTop / gp;
+            tri([[-xc, semiTop], [xc, semiTop], [0, apex]], 0.22, M.porchSiding(), mm => mm.position.set(0, y0, zFace - (dir > 0 ? 0.23 : -0.01)));
+            B(2 * xc + 0.3, 0.3, 0.12, t, 0, y0 + semiTop, zFace + dir * 0.0);
+          }
         };
         // Eave returns: the short flat piece at each front corner, under the rake.
         [-1, 1].forEach(sd => B(1.0, 0.05, zB - zF - col / 2, t, sd * (hw + 0.5), beamTop - gp, (zB + zF + col / 2) / 2, { cast: false }));
@@ -2473,7 +2483,16 @@
     const doors = [...att.map(s => ({ x: s.x, w: s.kind === 'deck' ? 6 : 3, y: s.kind === 'porch' && s.floor === 'patio' ? 0.33 : FF, kind: s.kind })),
       ...freeAt.filter(p => !att.some(s => rect(s).x0 < (p.houseSpan[0] + p.houseSpan[1]) / 2 && rect(s).x1 > (p.houseSpan[0] + p.houseSpan[1]) / 2))
         .map(p => ({ x: (p.houseSpan[0] + p.houseSpan[1]) / 2, w: 6, y: p.h, kind: 'deck' }))];
-    doors.forEach(d => { const g = group(d.x, d.y, 0); d.kind === 'deck' ? sliderDoor(g) : entryDoor(g); });
+    // A house matched from a photo has its own doors where the photo shows them (not made-up ones).
+    if (hs && Array.isArray(hs.doors) && hs.doors.length) {
+      const wW = Math.min(HW, hs.wallWidthFt);
+      doors.length = 0;
+      hs.doors.forEach(d => {
+        const x = hx + (d.center - 0.5) * wW, onPatioPorch = att.some(a => a.kind === 'porch' && a.floor === 'patio' && x > rect(a).x0 && x < rect(a).x1);
+        doors.push({ x, w: d.kind === 'slider' ? 6 : 3, y: onPatioPorch ? 0.33 : FF, kind: d.kind === 'slider' ? 'deck' : 'porch' });
+      });
+    }
+    doors.forEach(d => { const g = group(d.x, d.y, bumpDepthAt(d.x)); d.kind === 'deck' ? sliderDoor(g) : entryDoor(g); });
     // A porch (walls + 1′ roof overhang) never cuts through a window: the window is either
     // clear of the overhang or wholly inside the porch walls.
     const porchSpans = att.filter(s => s.kind === 'porch').map(s => { const r = rect(s); return { a: r.x0, b: r.x1 }; });
@@ -2758,6 +2777,14 @@
   }
 
   // ── Photo render ─────────────────────────────────────────────────────────
+  // Roof words an image model can't misread (it doesn't know what a "semi-vault" is).
+  const roofWords = (s) => {
+    const p = pitchOf(s);
+    if (s.roof === 'semivault') return `${p} gable roof with a SEMI-VAULTED ceiling (from outside a normal gable with its gable end facing the yard; inside, the ceiling slopes up from each side wall and then runs FLAT across the middle, NOT a full cathedral vault)`;
+    if (s.roof === 'gable') return `${p} gable roof with its gable end facing the yard and a full cathedral (vaulted) ceiling inside`;
+    if (s.roof === 'hip') return `${p} hip roof sloping on all three open sides, flat ceiling inside`;
+    return `${p} shed roof sloping down away from the house, flat-looking from the side`;
+  };
   function describe() {
     const SK = { horizontal: 'horizontal composite board skirting', pt: 'stained pressure-treated board skirting', lattice: 'stained square-grid lattice skirting' };
     const free = S.free || {}, plats = free.plats || [];
@@ -2774,9 +2801,11 @@
       ...(hs.crossGables || []).map(c => `cross gable ${c.widthFt} ft wide on the back wall`),
       hs.chimney && hs.chimney !== 'none' ? `${hs.chimneyMaterial} chimney` : '',
       hs.shutters ? 'shutters on the windows' : '',
+      (() => { const c = [0, 1, 2, 3].map(k => (hs.windows || []).filter(w => (w.story ?? 1) === k).length), nm = ['on the walkout level', 'on the main floor', 'on the second floor', 'on the third floor'];
+        const t = c.map((n, k) => n ? `${n} ${nm[k]}` : '').filter(Boolean); return t.length ? `back-wall windows: ${t.join(', ')} (keep every one, same size and spacing)` : ''; })(),
     ].filter(Boolean).join(', ') : `house in ${HOUSES.find(h => h.key === S.house).name.toLowerCase()}`;
     const parts = S.sections.map(s => {
-      if (s.kind === 'porch') return `${s.w}×${s.d} ft ${PORCH_TYPES[s.type].toLowerCase()} with a ${pitchOf(s)} ${ROOF_LABEL[s.roof].toLowerCase()}${s.skirt && s.skirt !== 'none' ? `, ${SK[s.skirt]} under its floor` : ''} (${s.tie === 'wall' ? 'tied to the house wall' : s.tie === 'roof' ? 'tied into the house roof' : 'freestanding, detached from the house'})${hasGableEnd(s) ? `, ${gableEndOf(s)} gable end` : ''}`;
+      if (s.kind === 'porch') return `${s.w}×${s.d} ft ${PORCH_TYPES[s.type].toLowerCase()} with a ${roofWords(s)}${s.skirt && s.skirt !== 'none' ? `, ${SK[s.skirt]} under its floor` : ''} (${s.tie === 'wall' ? 'tied to the house wall' : s.tie === 'roof' ? 'tied into the house roof' : 'freestanding, detached from the house'})${hasGableEnd(s) ? `, ${gableEndOf(s)} gable end` : ''}`;
       if (s.kind === 'deck') return `${s.w}×${s.d} ft raised deck with stairs`;
       return `${s.w}×${s.d} ft ${s.mat === 'concrete' ? 'concrete' : 'paver'} patio`;
     });
@@ -2784,7 +2813,7 @@
     const rail = S.rail === 'aluminum' ? 'black aluminum railing' : 'white railing with a composite cap and black round balusters';
     return `${[...parts, ...extra].join(', ')}; ${deck}; ${rail}; ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()} trim and columns; ${house}; floor ${ftIn(S.H)} above grade`;
   }
-  const promptText = () => `Turn this 3D model screenshot into a photorealistic exterior photograph of the same scene, as if taken with a professional camera on a sunny afternoon. Keep exactly the same camera angle, framing, house and every built element (posts, headers, roof shape, windows, doors, screens, railings, stairs, deck boards, patio) in the same positions, sizes and proportions. Do not add, remove or move any structural element. Keep the same colors and materials. Make it look real: true wood-grain composite decking, crisp painted trim, real siding or brick, architectural shingles, a natural lawn, realistic shrubs and trees, soft natural sunlight with accurate shadows. No people, no text. Project: ${describe()}.`;
+  const promptText = () => `Turn this 3D model screenshot into a photorealistic exterior photograph of the same scene, as if taken with a professional camera on a sunny afternoon. Keep exactly the same camera angle, framing, house and every built element (posts, headers, roof shape, windows, doors, screens, railings, stairs, deck boards, patio) in the same positions, sizes and proportions. Do not add, remove or move any structural element. Keep every window and door on the house exactly where it is in the screenshot: do not remove, merge, resize or add windows, even where the new porch or deck partly hides them. Keep each roof's shape and ceiling exactly as described below. Keep the same colors and materials. Make it look real: true wood-grain composite decking, crisp painted trim, real siding or brick, architectural shingles, a natural lawn, realistic shrubs and trees, soft natural sunlight with accurate shadows. No people, no text. Project: ${describe()}.`;
   function snapshot(maxW = 1600) {
     const outline0 = outline.visible; outline.visible = false;
     const dims = [$('dim-w'), $('dim-d')]; dims.forEach(d => d.style.visibility = 'hidden');
