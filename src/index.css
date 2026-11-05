@@ -132,10 +132,10 @@
   .qx-ground            { background-color: #ebe5d8; }
   html.dark .qx-ground  { background-color: #1c1c20; }
 
-  /* Serif display font for page titles only (.qx-title: the section titles
-     — Sales, Projects…). Card and panel titles stay in the app's sans. */
+  /* Page titles (.qx-title: Sales, Projects…) use the same sans as the rest
+     of the app — no serif anywhere on screen. */
   .qx-title {
-    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    font-family: inherit;
     letter-spacing: -0.01em;
   }
   /* The home page greeting ("Good morning, Matt") stays in the app's sans */

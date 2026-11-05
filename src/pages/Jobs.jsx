@@ -1659,6 +1659,12 @@ function JobMoneyTab({ proposal, books, costCount }) {
 function JobCard({ proposal, jobMoney = null, focus = false }) {
   const { toggleJobStage, updateJobData } = useStore()
   const allExpenses = useStore(s => s.expenses)
+  const setProposalPm = useStore(s => s.setProposalPm)
+  const members = useStore(s => s.members)
+  const canAssignPm = useStore(s => s.role === 'manager')
+  const pmOptions = (members || []).filter(m => m.role === 'pm' || m.id === proposal.pmId)
+  const pmName = (members || []).find(m => m.id === proposal.pmId)
+  const pmLabel = pmName ? (pmName.displayName || pmName.email || '').split(' ')[0] : ''
   const { tabsOf } = useNav()
   const money = useJobMoney()   // off: no Budget / Price list / Costs / Receipts (Settings › Team › Access)
   // Invoices, POs and bills: office / admin with the Money pages and job money on.
@@ -1736,6 +1742,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
             {proposal.imported
               ? <>{proposal.address}{proposal.imported.permit ? <> · <span className="font-mono">{proposal.imported.permit}</span></> : null}</>
               : <>{projectTypes} · ${fmt(contractTotalOf(proposal))} · <span className="font-mono">{contractNum}</span></>}
+            {pmLabel && <> · PM {pmLabel}</>}
           </p>
         </div>
 
@@ -1814,6 +1821,17 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
               <input type="date" value={jobData.targetDate || ''}
                 onChange={e => updateJobData(proposal.id, { targetDate: e.target.value })}
                 className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+            {/* Who runs the job: that PM sees it in their jobs and Field mode.
+                The office assigns; a PM sees it but can't change it. */}
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Project Manager</label>
+              <select value={proposal.pmId || ''} disabled={!canAssignPm} aria-label="Project manager"
+                onChange={e => setProposalPm(proposal.id, e.target.value || null)}
+                className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white min-w-[11rem] focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-gray-50 disabled:text-gray-600">
+                <option value="">Not assigned</option>
+                {pmOptions.map(m => <option key={m.id} value={m.id}>{m.displayName || m.email}</option>)}
+              </select>
             </div>
           </div>
 
