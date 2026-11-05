@@ -61,7 +61,7 @@ export const VENDOR_TYPES = [
 ]
 export const vendorTypeLabel = (k) => VENDOR_TYPES.find(t => t.key === k)?.label || 'Services / other'
 
-// Company spend that isn't a job (same buckets as Money › Expenses).
+// Company spend that isn't a job (same buckets as Insights › Expenses).
 export const OVERHEAD_BUCKETS = [
   { key: 'operating',    label: 'Operating / fixed cost' },
   { key: 'subscription', label: 'Subscription' },

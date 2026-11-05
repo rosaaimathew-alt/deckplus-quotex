@@ -210,7 +210,7 @@ function AppShell() {
   const actions = useMemo(() => {
     const a = []
     if (canQuote) a.push({ label: 'New quote', hint: 'Build a proposal from your catalog', keywords: 'create estimate proposal build', icon: Plus, to: '/quote' })
-    if (can('/finance')) a.push({ label: 'Add an expense', hint: 'Money › Expenses', keywords: 'card spend receipt statement', icon: Wallet, to: '/money?tab=expenses' })
+    if (can('/finance')) a.push({ label: 'Add an expense', hint: 'Insights › Expenses', keywords: 'card spend receipt statement', icon: Wallet, to: '/insights?tab=expenses' })
     if (can('/jobs')) a.push({ label: 'Log a daily report', hint: 'Projects › Jobs — open a job, then Daily Log', keywords: 'daily log crew weather', icon: ClipboardList, to: '/projects?tab=jobs' })
     if (can('/subs')) a.push({ label: 'Add a subcontractor', hint: 'Projects › Subcontractors', keywords: 'sub crew coi', icon: Wrench, to: '/projects?tab=crews' })
     a.push({ label: isDark ? 'Switch to light mode' : 'Switch to dark mode', keywords: 'theme dark light', icon: isDark ? Sun : Moon, run: () => setTheme(isDark ? 'light' : 'dark') })

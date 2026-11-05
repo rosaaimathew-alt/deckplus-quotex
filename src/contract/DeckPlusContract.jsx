@@ -386,8 +386,10 @@ function renderScopeLines(allLines = [], renderBold = (t) => t) {
   })
 }
 // Below the scope: the payment schedule only (no itemized prices). The % column
-// is for the office (showPaymentPct, set by the contract editor); the customer's
-// signing page and signed copy show each payment and its amount.
+// is for the office (showPaymentPct, set by the contract editor) and is
+// screen-only (no-print): it never reaches a print, a PDF (Drive upload) or
+// the customer's signing page / signed copy, which show each payment and its
+// amount only.
 function ScopePages({ values, scopeLines, projectSummary, total, payments, scopeSlot, renderBold, showPaymentPct }) {
   return (
     <section className="dp-page dp-scope">
@@ -415,10 +417,10 @@ function ScopePages({ values, scopeLines, projectSummary, total, payments, scope
       </div>
       {payments.length > 0 && (
         <table className="dp-grid dp-pricing dp-scope-prices dp-mt-lg">
-          <thead><tr><th>PAYMENT SCHEDULE</th>{showPaymentPct && <th className="dp-price">%</th>}<th className="dp-price">AMOUNT</th></tr></thead>
+          <thead><tr><th>PAYMENT SCHEDULE</th>{showPaymentPct && <th className="dp-price dp-office-only no-print" title="Office only — not on the customer's copy, prints or PDFs">% · OFFICE ONLY</th>}<th className="dp-price">AMOUNT</th></tr></thead>
           <tbody>
-            {payments.map((p, i) => <tr key={i}><td>{p.label}</td>{showPaymentPct && <td className="dp-price">{Math.round(p.pct * 100)}%</td>}<td className="dp-price">${fmt(p.amount)}</td></tr>)}
-            <tr className="dp-total"><td>TOTAL</td>{showPaymentPct && <td className="dp-price">100%</td>}<td className="dp-price">${fmt(total)}</td></tr>
+            {payments.map((p, i) => <tr key={i}><td>{p.label}</td>{showPaymentPct && <td className="dp-price dp-office-only no-print">{Math.round(p.pct * 100)}%</td>}<td className="dp-price">${fmt(p.amount)}</td></tr>)}
+            <tr className="dp-total"><td>TOTAL</td>{showPaymentPct && <td className="dp-price dp-office-only no-print">100%</td>}<td className="dp-price">${fmt(total)}</td></tr>
           </tbody>
         </table>
       )}

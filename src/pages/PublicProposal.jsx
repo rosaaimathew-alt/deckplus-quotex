@@ -99,8 +99,8 @@ export default function PublicProposal() {
                   <p style={sectionLabel}>Your Design</p>
                   <a href={src} target="_blank" rel="noopener" style={{ fontSize: 12, fontWeight: 600, color: accent }}>Open full screen</a>
                 </div>
-                <iframe title="Your design: floor plan and 3D view" src={src} loading="lazy"
-                  style={{ width: '100%', height: 460, border: `1px solid ${LINE}`, borderRadius: 10, display: 'block', background: '#f7f8f6' }} />
+                <iframe title="Your design: 3D view and floor plan" src={src} loading="lazy"
+                  style={{ width: '100%', height: 920, border: `1px solid ${LINE}`, borderRadius: 10, display: 'block', background: '#f7f8f6' }} />
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: SOFT }}>Drag the 3D view to look around. Sizes and options follow this proposal.</p>
               </div>
             )

@@ -15,6 +15,7 @@ import {
 import { useStore } from './store'
 import { canAccessRoute } from './plans'
 import { canRoleAccess } from './roles'
+import { isOff, PATH_KEYS, JOB_MONEY } from './permissions'
 
 export const DESTINATIONS = [
   { key: 'home', to: '/', label: 'Home', icon: House, access: ['/'],
@@ -50,11 +51,12 @@ export const DESTINATIONS = [
     ] },
 
   { key: 'insights', to: '/insights', label: 'Insights', icon: ChartColumn,
-    hint: 'Revenue, win rate and profit', keywords: 'reports analytics numbers metrics',
+    hint: 'Revenue, win rate, profit and spend', keywords: 'reports analytics numbers metrics',
     tabs: [
       { key: 'overview', label: 'Overview',   icon: TrendingUp, access: '/analytics', hint: 'Revenue trend, win rate, project types, map', keywords: 'analytics revenue seasonality heat map past jobs' },
       { key: 'winloss',  label: 'Win / loss', icon: Target, access: ['/analytics', '/tracker'], hint: 'Pipeline by status, reasons, days to close', keywords: 'reasons funnel close rate' },
       { key: 'profit',   label: 'Profit',     icon: Calculator, access: '/profitability', hint: 'Actual job costs and margins', keywords: 'profitability margin job costs' },
+      { key: 'expenses', label: 'Expenses',   icon: Wallet, access: '/finance', hint: 'Card spend, fixed costs, subscriptions and inventory', keywords: 'finance cards statement spend fixed operating inventory subscriptions' },
     ] },
 
   // The office's money: what we bill, what we owe, what we've committed to
@@ -66,7 +68,6 @@ export const DESTINATIONS = [
       { key: 'bills',     label: 'Bills',     icon: Receipt, access: '/finance', hint: 'What we owe vendors', keywords: 'bill payable vendor owe pay' },
       { key: 'purchases', label: 'Purchases', icon: ShoppingCart, access: '/finance', hint: 'Purchase orders and commissions', keywords: 'po purchase order commission materials committed cost' },
       { key: 'vendors',   label: 'Vendors',   icon: Truck, access: '/finance', hint: 'Suppliers, subs and their paperwork', keywords: 'vendor supplier w9 gl insurance workers comp' },
-      { key: 'expenses',  label: 'Expenses',  icon: Wallet, access: '/finance', hint: 'Card spend, fixed costs, subscriptions and inventory', keywords: 'finance cards statement spend fixed operating inventory subscriptions' },
     ] },
 
   { key: 'catalog', to: '/catalog', label: 'Catalog', icon: Package,
@@ -90,7 +91,7 @@ export const LEGACY_REDIRECTS = {
   '/checklists':    '/projects?tab=checklists',
   '/analytics':     '/insights?tab=overview',
   '/profitability': '/insights?tab=profit',
-  '/finance':       '/money?tab=expenses',
+  '/finance':       '/insights?tab=expenses',
   '/analyze':       '/catalog?tab=import',
   '/ai':            '/catalog?tab=assistant',
 }
@@ -103,13 +104,15 @@ export function makeAccess(plan, role) {
 
 // Destinations (with only their allowed tabs) for the signed-in role and plan.
 // The paint PM has no sidebar at all: they only ever get Field mode (App.jsx).
-export function visibleDestinations(plan, role) {
+// permissions: the person's own switches (permissions.js) — a tab the admin
+// switched off for them is left out like one their department doesn't have.
+export function visibleDestinations(plan, role, permissions = {}) {
   if (role === 'paint') return []
   const can = makeAccess(plan, role)
   const out = []
   for (const d of DESTINATIONS) {
     if (d.tabs) {
-      const tabs = d.tabs.filter(t => can(t.access))
+      const tabs = d.tabs.filter(t => can(t.access) && !isOff(permissions, `${d.key}.${t.key}`))
       if (tabs.length) out.push({ ...d, tabs })
     } else if (can(d.access)) {
       out.push(d)
@@ -118,13 +121,24 @@ export function visibleDestinations(plan, role) {
   return out
 }
 
+const NO_PERMS = {}
+
 export function useNav() {
   const plan = useStore(s => s.branding?.plan || 'enterprise')
   const role = useStore(s => s.role || 'manager')
+  const permissions = useStore(s => s.me?.permissions) || NO_PERMS
   return useMemo(() => {
-    const destinations = visibleDestinations(plan, role)
-    const can = makeAccess(plan, role)
+    const destinations = visibleDestinations(plan, role, permissions)
+    const base = makeAccess(plan, role)
+    const can = (paths) => base(paths) && asList(paths).every(p => !isOff(permissions, PATH_KEYS[p]))
     const tabsOf = (key) => destinations.find(d => d.key === key)?.tabs || []
-    return { plan, role, can, destinations, tabsOf }
-  }, [plan, role])
+    // allowed('projects.inspections'), allowed('job.money'): this person's switch
+    const allowed = (key) => !isOff(permissions, key)
+    return { plan, role, can, destinations, tabsOf, allowed, money: allowed(JOB_MONEY) }
+  }, [plan, role, permissions])
+}
+
+// The money inside a job (Budget, Costs, Receipts, payments, profit, quote margin).
+export function useJobMoney() {
+  return useStore(s => !isOff(s.me?.permissions, JOB_MONEY))
 }

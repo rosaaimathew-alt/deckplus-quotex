@@ -125,6 +125,7 @@ export function InsightsHub() {
     overview: () => <Analytics />,
     winloss:  () => <ProposalTracker view="analytics" />,
     profit:   () => <ProfitabilityTracker />,
+    expenses: () => <Finance />,
   }, { profit: { count: pendingCosts } })
 
   return <Hub title="Insights" subtitle="How the business is doing — revenue, wins, margins and spend." tabs={tabs} rememberKey="insights" />
@@ -148,14 +149,13 @@ export function MoneyHub() {
     bills:     () => <Bills />,
     purchases: () => <Purchases />,
     vendors:   () => <Vendors />,
-    expenses:  () => <Finance />,
   }, counts)
   const booksMissing = useStore(s => s.booksMissing)
   return (
     <>
       {booksMissing && (
         <div role="alert" className="bg-red-600 text-white text-sm px-4 py-2 text-center">
-          The database isn't set up for invoices, bills, purchases and vendors yet (supabase/books.sql) — anything entered here won't be saved. Expenses still save.
+          The database isn't set up for invoices, bills, purchases and vendors yet (supabase/books.sql) — anything entered here won't be saved.
         </div>
       )}
       <Hub title="Money" subtitle="What customers owe, what we owe, what we've committed to spend — and who we buy from." tabs={tabs} rememberKey="money" />

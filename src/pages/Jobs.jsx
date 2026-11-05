@@ -9,7 +9,7 @@ import PermitsTab from '../components/PermitsTab'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
-import { useNav } from '../nav'
+import { useNav, useJobMoney } from '../nav'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
 import { JobSummary, JobTransactions, JobDocuments, ProfitRing, jobDocuments } from './books/JobBooks'
 import {
@@ -1460,6 +1460,7 @@ function PaymentReminderModal({ proposal, onClose }) {
 // ── Close-Out Modal ──────────────────────────────────────────────────────────
 function CloseOutModal({ proposal, onClose }) {
   const { toggleJobStage, updateJobData, saveJobCosts } = useStore()
+  const money = useJobMoney()   // off: no profit entry at close-out
   const draft = proposal.contractDraft || {}
   const contractNum = draft.contractNum || contractNumberFor(proposal.id)
   const projectTypes = (draft.projectTypes || []).join(', ') || ''
@@ -1537,6 +1538,7 @@ function CloseOutModal({ proposal, onClose }) {
           </div>
 
           {/* Profit achieved — optional, feeds the Profitability tracker */}
+          {money && (
           <div className="border border-gray-200 rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-gray-700">Profit on this job <span className="font-normal text-gray-400">(optional)</span></label>
@@ -1556,6 +1558,7 @@ function CloseOutModal({ proposal, onClose }) {
             </div>
             <p className="text-[11px] text-gray-400 mt-1.5">Enter either one — it logs to your Profitability metrics. Leave blank to skip.</p>
           </div>
+          )}
 
           <label className="flex items-center gap-3 cursor-pointer">
             <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)}
@@ -1624,8 +1627,10 @@ function buildCloseOutHtml({ client, contractNum, address, projectType, completi
 function JobCard({ proposal, jobMoney = null, focus = false }) {
   const { toggleJobStage, updateJobData } = useStore()
   const allExpenses = useStore(s => s.expenses)
-  const { can } = useNav()
-  const books = can('/finance')   // office / admin: invoices, POs, bills
+  const { tabsOf } = useNav()
+  const money = useJobMoney()   // off: no Budget / Price list / Costs / Receipts (Settings › Team › Access)
+  // Invoices, POs and bills: office / admin with the Money pages and job money on.
+  const books = money && tabsOf('money').length > 0
   const [expanded, setExpanded] = useState(focus)
   const [tab, setTab] = useState(focus && books ? 'summary' : 'stages')
   const cardRef = useRef(null)
@@ -1651,7 +1656,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const coCount       = (jobData.changeOrders || []).length
   const openWarranty  = (jobData.warrantyItems || []).filter(w => w.status === 'Open').length
   const logCount      = (jobData.dailyLogs || []).length
-  const docCount      = jobDocuments(proposal).length
+  const docCount      = jobDocuments(proposal, money).length
   const costCount     = (allExpenses || []).filter(e => e.jobId === proposal.id).length
   const showPermits   = !!permitAccess && permitTracked(proposal)
   const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0, needsPick: false }
@@ -1663,9 +1668,11 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
     ...(books ? [{ key: 'summary', label: 'Summary' }] : []),
     { key: 'stages',  label: 'Stages' },
     ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0) ? ` (${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0)})` : ''}` }] : []),
-    { key: 'budget',  label: 'Budget' },
-    { key: 'pricelist', label: 'Price list' },
-    { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
+    ...(money ? [
+      { key: 'budget',  label: 'Budget' },
+      { key: 'pricelist', label: 'Price list' },
+      { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
+    ] : []),
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
     { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
@@ -1879,15 +1886,15 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
               </div>
             )}
             {tab === 'permits' && showPermits && <PermitsTab proposal={proposal} stages={stages} readOnly={permitAccess !== 'edit'} />}
-            {tab === 'budget'  && <BudgetTab proposal={proposal} />}
-            {tab === 'pricelist' && <JobPriceList proposal={proposal} />}
-            {tab === 'costs'   && <JobFinancials proposal={proposal} />}
+            {tab === 'budget'  && money && <BudgetTab proposal={proposal} />}
+            {tab === 'pricelist' && money && <JobPriceList proposal={proposal} />}
+            {tab === 'costs'   && money && <JobFinancials proposal={proposal} />}
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}
             {tab === 'summary' && books && <JobSummary proposal={proposal} />}
             {tab === 'transactions' && books && <JobTransactions proposal={proposal} />}
-            {tab === 'documents' && <JobDocuments proposal={proposal} />}
+            {tab === 'documents' && <JobDocuments proposal={proposal} showReceipts={money} />}
           </div>
         </div>
       )}
@@ -1902,8 +1909,8 @@ export default function Jobs() {
   const invoices  = useStore(s => s.invoices)
   const purchases = useStore(s => s.purchases)
   const bills     = useStore(s => s.bills)
-  const { can } = useNav()
-  const showMoney = can('/finance')
+  const { tabsOf } = useNav()
+  const showMoney = useJobMoney() && tabsOf('money').length > 0
   const moneyIdx  = useMemo(() => (showMoney ? booksIndex({ invoices, purchases, bills }) : null), [showMoney, invoices, purchases, bills])
   const [params] = useSearchParams()
   const focusId = params.get('job')

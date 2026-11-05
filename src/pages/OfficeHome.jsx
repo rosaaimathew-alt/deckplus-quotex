@@ -24,7 +24,7 @@ function Tile({ icon, label, note, tone = 'amber', onClick }) {
 
 export default function OfficeHome() {
   const navigate = useNavigate()
-  const { can } = useNav()
+  const { can, tabsOf } = useNav()
   const me = useStore(s => s.me)
   const branding = useStore(s => s.branding)
   const proposals = useStore(s => s.proposals)
@@ -38,21 +38,23 @@ export default function OfficeHome() {
   const paperwork = useMemo(() => allVendors(vendors || [], subs || []).filter(v => v.active && vendorDocProblems(v).length).length, [vendors, subs])
   const pendingCos = useMemo(() => proposals.reduce((n, p) => n + (p.jobData?.changeOrders || []).filter(c => c.status === 'Pending' || c.status === 'Sent for Signature').length, 0), [proposals])
   const first = (me?.displayName || '').split(' ')[0] || 'there'
-  const books = can('/finance')
+  // Each Money tab can be switched off per person (Settings › Team › Access).
+  const mt = new Set(tabsOf('money').map(t => t.key))
+  const books = mt.size > 0
 
   const sections = [
     { title: 'Core', tiles: [
       can('/jobs') && { icon: Hammer, label: 'Contract jobs', note: o.activeJobs ? `${o.activeJobs} active` : '', to: '/projects?tab=jobs' },
       can('/contracts') && { icon: FileSignature, label: 'Contracts', to: '/contracts' },
     ] },
-    { title: 'Transactions', tiles: books ? [
-      { icon: ShoppingCart, label: 'Purchases', note: o.openPos ? `${o.openPos} open POs` : '', to: '/money?tab=purchases' },
-      { icon: Receipt, label: 'Bills', note: o.overdueBills ? `${o.overdueBills} overdue` : '', tone: 'red', to: '/money?tab=bills' },
-      { icon: FileText, label: 'Invoices', note: o.overdueInvoices ? `${o.overdueInvoices} overdue` : '', tone: 'red', to: '/money?tab=invoices' },
-    ] : [] },
+    { title: 'Transactions', tiles: [
+      mt.has('purchases') && { icon: ShoppingCart, label: 'Purchases', note: o.openPos ? `${o.openPos} open POs` : '', to: '/money?tab=purchases' },
+      mt.has('bills') && { icon: Receipt, label: 'Bills', note: o.overdueBills ? `${o.overdueBills} overdue` : '', tone: 'red', to: '/money?tab=bills' },
+      mt.has('invoices') && { icon: FileText, label: 'Invoices', note: o.overdueInvoices ? `${o.overdueInvoices} overdue` : '', tone: 'red', to: '/money?tab=invoices' },
+    ] },
     { title: 'Activity', tiles: [
       can('/scheduler') && { icon: CalendarDays, label: 'Scheduling', to: '/projects?tab=calendar' },
-      can('/jobs') && { icon: FilePen, label: 'Change orders', note: pendingCos ? `${pendingCos} waiting on signature` : '', to: '/projects?tab=changeorders' },
+      tabsOf('projects').some(t => t.key === 'changeorders') && { icon: FilePen, label: 'Change orders', note: pendingCos ? `${pendingCos} waiting on signature` : '', to: '/projects?tab=changeorders' },
       can('/checklists') && { icon: ClipboardCheck, label: 'Tasks', to: '/projects?tab=checklists' },
     ] },
     { title: 'Insights', tiles: [
@@ -61,16 +63,16 @@ export default function OfficeHome() {
     ] },
     { title: 'Company', tiles: [
       can('/clients') && { icon: Users, label: 'Clients', to: '/sales?tab=clients' },
-      books && { icon: Truck, label: 'Vendors', note: paperwork ? `${paperwork} paperwork problem${paperwork === 1 ? '' : 's'}` : '', tone: 'red', to: '/money?tab=vendors' },
+      mt.has('vendors') && { icon: Truck, label: 'Vendors', note: paperwork ? `${paperwork} paperwork problem${paperwork === 1 ? '' : 's'}` : '', tone: 'red', to: '/money?tab=vendors' },
       can('/subs') && { icon: Wrench, label: 'Subcontractors', to: '/projects?tab=crews' },
       can('/catalog') && { icon: Package, label: 'Catalog', to: '/catalog?tab=items' },
     ] },
   ].map(s => ({ ...s, tiles: s.tiles.filter(Boolean) })).filter(s => s.tiles.length)
 
   const alerts = [
-    o.overdueInvoices && { label: `${o.overdueInvoices} overdue invoice${o.overdueInvoices === 1 ? '' : 's'}`, to: '/money?tab=invoices' },
-    o.overdueBills && { label: `${o.overdueBills} overdue bill${o.overdueBills === 1 ? '' : 's'}`, to: '/money?tab=bills' },
-    paperwork && { label: `${paperwork} vendor${paperwork === 1 ? '' : 's'} with expired or missing GL / WC / W-9`, to: '/money?tab=vendors' },
+    mt.has('invoices') && o.overdueInvoices && { label: `${o.overdueInvoices} overdue invoice${o.overdueInvoices === 1 ? '' : 's'}`, to: '/money?tab=invoices' },
+    mt.has('bills') && o.overdueBills && { label: `${o.overdueBills} overdue bill${o.overdueBills === 1 ? '' : 's'}`, to: '/money?tab=bills' },
+    mt.has('vendors') && paperwork && { label: `${paperwork} vendor${paperwork === 1 ? '' : 's'} with expired or missing GL / WC / W-9`, to: '/money?tab=vendors' },
   ].filter(Boolean)
 
   return (

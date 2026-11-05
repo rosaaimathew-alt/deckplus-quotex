@@ -154,18 +154,20 @@ export function JobTransactions({ proposal }) {
 // Field mode page for the crew / PM.
 export const DOC_FOLDERS = ['Contract', 'Change orders', 'Plans & permits', 'Photos', 'Receipts', 'Other']
 
-export function jobDocuments(proposal) {
+// Receipts are job money: left out for someone with job money switched off.
+export function jobDocuments(proposal, includeReceipts = true) {
   const jd = proposal.jobData || {}
   return [
-    ...(jd.documents || []),
-    ...(jd.receipts || []).map(r => ({ ...r, folder: 'Receipts', legacyReceipt: true })),
+    ...(jd.documents || []).filter(d => includeReceipts || d.folder !== 'Receipts'),
+    ...(includeReceipts ? (jd.receipts || []) : []).map(r => ({ ...r, folder: 'Receipts', legacyReceipt: true })),
   ]
 }
 
-export function JobDocuments({ proposal }) {
+export function JobDocuments({ proposal, showReceipts = true }) {
   const updateJobData = useStore(s => s.updateJobData)
   const jd = proposal.jobData || {}
-  const docs = jobDocuments(proposal)
+  const docs = jobDocuments(proposal, showReceipts)
+  const folderList = DOC_FOLDERS.filter(f => showReceipts || f !== 'Receipts')
   const [folder, setFolder] = useState('Other')
   const [openFolder, setOpenFolder] = useState(null)
   const [q, setQ] = useState('')
@@ -214,7 +216,7 @@ export function JobDocuments({ proposal }) {
   }
 
   const s = q.trim().toLowerCase()
-  const folders = DOC_FOLDERS.map(f => ({ name: f, files: docs.filter(d => (d.folder || 'Other') === f) })).filter(f => f.files.length)
+  const folders = folderList.map(f => ({ name: f, files: docs.filter(d => (d.folder || 'Other') === f) })).filter(f => f.files.length)
   const visible = s ? docs.filter(d => String(d.name).toLowerCase().includes(s)) : openFolder ? docs.filter(d => (d.folder || 'Other') === openFolder) : null
 
   const fileRow = (d) => (
@@ -225,7 +227,7 @@ export function JobDocuments({ proposal }) {
         <p className="text-[11px] text-gray-400">{shortDate(d.uploadedAt)}{s ? ` · ${d.folder || 'Other'}` : ''}</p>
       </div>
       <select value={d.folder || 'Other'} onChange={e => patchDoc(d, { folder: e.target.value })} disabled={d.legacyReceipt} className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white" aria-label="Folder">
-        {DOC_FOLDERS.map(f => <option key={f}>{f}</option>)}
+        {folderList.map(f => <option key={f}>{f}</option>)}
       </select>
       <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0" title="Show on the job in Field mode">
         <input type="checkbox" checked={!!d.shareMobile} onChange={e => patchDoc(d, { shareMobile: e.target.checked })} />
@@ -244,7 +246,7 @@ export function JobDocuments({ proposal }) {
         </div>
         <div className="flex-1" />
         <select value={folder} onChange={e => setFolder(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white" aria-label="Upload into folder">
-          {DOC_FOLDERS.map(f => <option key={f}>{f}</option>)}
+          {folderList.map(f => <option key={f}>{f}</option>)}
         </select>
         <input ref={fileRef} type="file" multiple onChange={onFiles} className="hidden" />
         <button onClick={() => fileRef.current?.click()} disabled={uploading} className={btnPrimary}>
