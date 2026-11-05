@@ -263,3 +263,44 @@ const inspectionTitle = (code) => BOARD_COLUMNS.find(c => c.key === code)?.title
 
 export const countyFinaled = (proposal) =>
   (proposal.countyPermit?.permits || []).some(p => p.role === 'building' && /closed|final/i.test(p.recordStatus || p.status || ''))
+
+// ── Finished jobs ────────────────────────────────────────────────────────────
+// A job is done with inspections when the building final has passed and every
+// county permit on it is finished too: its own final passed, or the county
+// shows it finaled / complete. Such a job leaves the board and moves to
+// Closed in Job Management (see closeIfFinaled).
+const PERMIT_DONE = /closed|complete|finaled|^final|c\.?c\.? issued/i
+function permitFinished(permit) {
+  if (PERMIT_DONE.test(permit.recordStatus || permit.status || '')) return true
+  return (permit.completed || []).some(i => i.code === 'FI' && isPassResult(i.result))
+}
+
+// Returns the date the last final passed (YYYY-MM-DD), or '' if not finished.
+export function allFinalsPassed(proposal) {
+  const fi = boardCells(proposal).FI
+  if (fi?.state !== 'pass') return ''
+  const county = (proposal.countyPermit?.permits || []).filter(p => !p.manual)
+  if (!county.every(permitFinished)) return ''
+  let last = fi.date || ''
+  for (const p of allPermits(proposal)) {
+    for (const i of p.completed || []) if (i.code === 'FI' && isPassResult(i.result) && (i.date || '') > last) last = i.date
+  }
+  return last || today()
+}
+
+// Close a job whose finals have all passed — the same "Job Closed" stage the
+// PM's close-out sets, without the customer email or the profit entry.
+export function closeIfFinaled(proposalId, getState) {
+  const { proposals, updateJobData, toggleJobStage } = getState()
+  const p = proposals.find(x => x.id === proposalId)
+  if (!p || (p.jobData?.completedStages || []).includes('closed')) return false
+  const finalDate = allFinalsPassed(p)
+  if (!finalDate) return false
+  updateJobData(p.id, {
+    completionDate: p.jobData?.completionDate || finalDate,
+    closedAt: new Date().toISOString(),
+    autoClosed: { at: new Date().toISOString(), reason: 'All final inspections passed' },
+  })
+  toggleJobStage(p.id, 'closed')
+  return true
+}
