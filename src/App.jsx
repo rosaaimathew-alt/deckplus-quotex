@@ -266,11 +266,7 @@ function AppShell() {
               <Smartphone size={17} /> <span className="flex-1 text-left">Field mode</span>
             </button>
           )}
-          <button onClick={() => { setPaletteOpen(true); closeSidebar() }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm brand-nav-inactive">
-            <Search size={17} /> <span className="flex-1 text-left">Search</span>
-            <kbd className="text-[10px] opacity-60 border border-current rounded px-1">Ctrl K</kbd>
-          </button>
+          {/* Search lives in the top bar (and Ctrl K) — no second copy here */}
           <NavLink to="/settings" onClick={closeSidebar}
             className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${isActive ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
             <SettingsIcon size={17} /> <span>Settings</span>

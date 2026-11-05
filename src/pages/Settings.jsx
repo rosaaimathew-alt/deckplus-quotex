@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Upload, Trash2, CheckCircle, RefreshCw, Palette, Building2, Eye, Download, FolderOpen, AlertTriangle, CloudUpload, HardDrive, Wifi, WifiOff, Lock, Sparkles, Mail, Sun, Moon } from 'lucide-react'
+import { Upload, Trash2, CheckCircle, RefreshCw, Palette, Building2, Download, FolderOpen, AlertTriangle, CloudUpload, HardDrive, Wifi, WifiOff, Lock, Sparkles, Mail, Sun, Moon } from 'lucide-react'
 import { useStore } from '../store'
-import { extractDominantColor, generatePalette, applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR, FREE_PRIMARY_COLOR, FREE_SIDEBAR_COLOR, BRAND_PRESETS, DP_ORANGE, DEFAULT_BACKGROUND, DEFAULT_BACKGROUND_DARK } from '../brand'
+import { extractDominantColor, applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR, FREE_PRIMARY_COLOR, FREE_SIDEBAR_COLOR, BRAND_PRESETS, DP_ORANGE, DEFAULT_BACKGROUND, DEFAULT_BACKGROUND_DARK } from '../brand'
 import { canCustomizeBranding, PLAN_ORDER, PLAN_META } from '../plans'
 import { ROLE_ORDER, ROLE_META } from '../roles'
 import { DEMO } from '../demo'
@@ -22,46 +22,6 @@ const PRESET_COLORS = [
   { label: 'Charcoal',    hex: '#1f2937' },
   { label: 'Navy',        hex: '#1e3a5f' },
 ]
-
-function SidebarPreview({ companyName, tagline, logo, color, sidebar }) {
-  const palette = generatePalette(color || DEFAULT_BRAND_COLOR)
-  const bg = sidebar || palette[700]
-  // Pick readable text on the sidebar background
-  const lum = (() => {
-    const h = bg.replace('#', '')
-    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
-    return (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  })()
-  const navText = lum > 0.62 ? '#1f2937' : palette[100]
-  return (
-    <div
-      className="rounded-xl overflow-hidden shadow-lg w-48 shrink-0"
-      style={{ backgroundColor: bg }}
-    >
-      {/* Logo area */}
-      <div className="px-4 py-4 border-b flex flex-col items-center" style={{ borderColor: 'rgba(255,255,255,0.14)' }}>
-        {logo
-          ? <img src={logo} alt="logo" className="h-12 object-contain" />
-          : <p className="text-lg font-black tracking-widest leading-tight" style={{ color: lum > 0.62 ? '#1f2937' : '#fff' }}>{companyName || 'QUOTEX'}</p>}
-      </div>
-      {/* Nav items preview */}
-      <div className="py-3 px-2 space-y-0.5">
-        {['Dashboard', 'Build Quote', 'Proposal Tracker', 'Contracts'].map((item, i) => (
-          <div
-            key={item}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium"
-            style={i === 0 ? { backgroundColor: '#fff', color: palette[700] } : { color: navText }}
-          >
-            {item}
-          </div>
-        ))}
-      </div>
-      <div className="px-4 py-2.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.14)' }}>
-        <p className="text-xs" style={{ color: navText }}>© 2025 {companyName || 'QUOTEX'}</p>
-      </div>
-    </div>
-  )
-}
 
 // ── Connect email: each person's own sending mailbox ─────────────────────────
 // Pick a provider, enter the address + an app password; the server logs in to
@@ -837,9 +797,10 @@ export default function Settings() {
           </div>
           )}
 
-          {/* ── Workspace ──────────────────────────────────────────── */}
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Workspace</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* ── Workspace (demo only: the role switcher and plan picker mean
+              nothing to a company running its own copy) ─────────────── */}
+          {DEMO && <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Workspace</h3>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 empty:hidden">
             {/* Role switcher: demo only — real roles come from the org membership */}
             {/* Role / view */}
             {DEMO && (
@@ -868,8 +829,8 @@ export default function Settings() {
             </div>
             )}
 
-            {/* Plan / subscription tier (org setting: office/admin only) */}
-            {canManage && (
+            {/* Plan / subscription tier (demo only) */}
+            {DEMO && canManage && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles size={16} className="text-gray-400" />
@@ -923,23 +884,6 @@ export default function Settings() {
           <DataManagement />
         </div>
 
-        {/* Right: live preview */}
-        <div className="w-56 shrink-0">
-          <div className="sticky top-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Eye size={14} className="text-gray-400" />
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Live Preview</p>
-            </div>
-            <SidebarPreview
-              companyName={companyName}
-              tagline={tagline}
-              logo={logo}
-              color={primaryColor}
-              sidebar={sidebarColor}
-            />
-            <p className="text-xs text-gray-400 mt-3 text-center">Reflects across the whole platform</p>
-          </div>
-        </div>
 
       </div>
     </div>

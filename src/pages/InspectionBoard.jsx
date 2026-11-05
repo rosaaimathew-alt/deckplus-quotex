@@ -358,7 +358,6 @@ export default function InspectionBoard() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Inspections</h2>
           <p className="text-xs text-gray-500 mt-0.5">
             {jobs.length} ongoing job{jobs.length === 1 ? '' : 's'} · county site {permitPulse?.lastRunAt
               ? `checked ${new Date(permitPulse.lastRunAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
@@ -407,9 +406,10 @@ export default function InspectionBoard() {
         </div>
       ))}
 
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-100">{counts.failed} with a failed inspection</span>
-        <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">{counts.sched} scheduled</span>
+      {/* Only the counts that matter right now — no "0 failed" chips */}
+      <div className="flex flex-wrap gap-2 text-xs empty:hidden">
+        {counts.failed > 0 && <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-100">{counts.failed} with a failed inspection</span>}
+        {counts.sched > 0 && <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">{counts.sched} scheduled</span>}
         {counts.pick > 0 && <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-100">{counts.pick} need a permit picked</span>}
         {counts.missing > 0 && <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">{counts.missing} not found on the county site</span>}
       </div>

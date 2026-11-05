@@ -34,8 +34,7 @@ export default function Designs() {
   return (
     <div className="p-4 sm:p-6 max-w-7xl space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm text-gray-500">3D renderings and floor plans for every porch, deck and patio quoted in QuoteX.</p>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap ml-auto">
           {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           <label className="relative">
             <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />

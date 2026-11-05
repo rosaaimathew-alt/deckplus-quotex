@@ -1409,7 +1409,7 @@ export const useStore = create(
       members: [],                  // everyone in the org, for the PM picker
       // office/admin: whose numbers the dashboard and pipeline show — 'mine'
       // (default) or 'everyone' (the whole organization). Remembered per browser.
-      officeView: (() => { try { return localStorage.getItem('qx_office_view') || 'mine' } catch { return 'mine' } })(),
+      officeView: (() => { try { return localStorage.getItem('qx_office_view') || 'everyone' } catch { return 'everyone' } })(),   // office / admin start on All
       contractPrefix: 'DP',
       // The company's signature on file (office/admin adopt it in Settings) and
       // the welcome email a customer gets once the contract is fully signed.

@@ -11,7 +11,8 @@ import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
 import { useNav, useJobMoney } from '../nav'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
-import { JobSummary, JobTransactions, JobDocuments, ProfitRing, jobDocuments } from './books/JobBooks'
+import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'
+import { QuickPicks } from '../components/FilterBar'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1715,21 +1716,19 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
           <div className="hidden lg:flex items-center gap-5 shrink-0 text-right">
             <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Revenue</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.revenue)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.invoiced)} invoiced</p></div>
             <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Committed</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.committed)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.committedByType.materials || 0)} materials</p></div>
-            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Profit</p><p className={`text-sm font-semibold ${jobMoney.profit < 0 ? 'text-red-600' : 'text-gray-900'}`}>{money0(jobMoney.profit)}</p></div>
-            <ProfitRing margin={jobMoney.committed ? jobMoney.margin : null} size={40} />
+            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Profit</p><p className={`text-sm font-semibold ${jobMoney.profit < 0 ? 'text-red-600' : 'text-gray-900'}`}>{money0(jobMoney.profit)}</p>{jobMoney.committed ? <p className="text-[10px] text-gray-400">{Math.round(jobMoney.margin)}% margin</p> : null}</div>
           </div>
         )}
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusPill.cls}`}>{statusPill.label}</span>
-
-        <div className="relative w-10 h-10 shrink-0">
-          <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-            <circle cx="18" cy="18" r="15.9" fill="none"
-              stroke={isClosed ? '#10b981' : pct > 0 ? '#3b82f6' : '#d1d5db'}
-              strokeWidth="3" strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" />
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-gray-600">{pct}%</span>
-        </div>
+        {/* One progress figure: "8 of 15 steps" with a thin bar; a pill only
+            when it says something (closed, or the job type isn't picked). */}
+        {isClosed || noType
+          ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusPill.cls}`}>{statusPill.label}</span>
+          : (
+            <div className="w-24 shrink-0 text-right" title={`${pct}% of the steps done`}>
+              <p className="text-xs font-medium text-gray-600">{done} of {stages.length} steps</p>
+              <div className="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden"><div className="h-full rounded-full bg-[var(--brand-500)]" style={{ width: `${pct}%` }} /></div>
+            </div>
+          )}
 
         {!isClosed && (
           <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
@@ -1991,21 +1990,13 @@ export default function Jobs() {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 self-start">
-          {[
-            { key: 'all',         label: 'All',         count: counts.all },
-            { key: 'active',      label: 'Active',      count: counts.active },
-            { key: 'in-progress', label: 'In Progress', count: counts['in-progress'] },
-            { key: 'not-started', label: 'Not Started', count: counts['not-started'] },
-            { key: 'closed',      label: 'Closed',      count: counts.closed },
-          ].map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filter === f.key ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}>
-              {f.label} <span className="ml-1 text-gray-400">{f.count}</span>
-            </button>
-          ))}
+        <div className="overflow-x-auto qx-scroll-x -mx-1 px-1">
+          <QuickPicks value={filter} onChange={setFilter} options={[
+            { value: 'active',      label: 'Active',      count: counts.active },
+            { value: 'not-started', label: 'Not started', count: counts['not-started'] },
+            { value: 'closed',      label: 'Closed',      count: counts.closed },
+            { value: 'all',         label: 'All',         count: counts.all },
+          ]} />
         </div>
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-52">
           <Search size={13} className="text-gray-400 shrink-0" />
@@ -2041,7 +2032,7 @@ export default function Jobs() {
       )}
 
       {stageGroups.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap mb-4 -mt-1">
+        <div className="hidden sm:flex items-center gap-1.5 flex-wrap mb-4 -mt-1">
           <span className="text-xs font-medium text-gray-500 mr-1">Current stage:</span>
           {stageGroups.map(([label, n]) => (
             <button key={label} onClick={() => setStageFilter(stageFilter === label ? null : label)}

@@ -728,7 +728,6 @@ export default function Finance() {
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div>
           <h1 className="qx-hide-embedded text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2"><Wallet size={22} className="text-gray-400" /> Finance</h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Every dollar sorted into a job, operating, subscriptions or inventory — anything else shows up as unaccounted.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <select aria-label="Period" value={periodKey} onChange={e => setPeriodKey(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2 py-2">

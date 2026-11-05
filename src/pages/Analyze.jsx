@@ -238,7 +238,7 @@ function AnalyzeTab() {
             <label className="text-xs font-medium text-gray-500 mb-1.5">Or paste estimate text</label>
             <textarea
               className="flex-1 border border-gray-200 rounded-lg p-3 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 min-h-32"
-              placeholder={'Example:\nRemove 140 LF chain link fence\nInstall 6ft cedar privacy fence 140 LF  $38/lf\n(2) single walk gates  $320 ea'}
+              placeholder={'Example:\nDemo existing 12x16 deck\nTrex Transcend decking 320 SF  $34/sf\nTrex Select aluminum railing 40 LF  $112/lf\n(1) stair run, 4 steps  $650'}
               value={text}
               onChange={e => { setText(e.target.value); setFile(null); setSaved(false); setResults([]) }}
             />
@@ -319,7 +319,6 @@ function AnalyzeTab() {
         <div className="text-center py-10 text-gray-400">
           <FileText size={36} className="mx-auto mb-3 opacity-40" />
           <p className="text-sm">Upload a PDF, photo, or paste your estimate text above, then click <strong>Analyze Estimate</strong>.</p>
-          <p className="text-xs mt-2 text-gray-300">Supported: PDF · JPEG · PNG · TXT · CSV</p>
         </div>
       )}
     </div>

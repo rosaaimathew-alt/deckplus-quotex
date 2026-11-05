@@ -705,8 +705,9 @@ export default function BuildQuote() {
 
   return (
     <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-5 h-full min-h-screen">
-      {/* Left: Catalog picker */}
-      <div className="lg:w-64 shrink-0 flex flex-col gap-3">
+      {/* Left: Catalog picker (on a phone it comes after the customer and the
+          quote, so the form isn't buried under 20 catalog cards) */}
+      <div className="order-2 lg:order-1 lg:w-64 shrink-0 flex flex-col gap-3">
         <h3 className="font-semibold text-gray-800 text-sm">Catalog</h3>
         <div className="relative">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -725,7 +726,7 @@ export default function BuildQuote() {
             </button>
           ))}
         </div>
-        <div className="flex-1 overflow-y-auto space-y-1 max-h-[calc(100vh-220px)]">
+        <div className="flex-1 overflow-y-auto space-y-1 max-h-[50vh] lg:max-h-[calc(100vh-220px)]">
           {filtered.map(item => (
             <button key={item.id} onClick={() => addItem(item)}
               className="w-full text-left px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors group">
@@ -739,7 +740,7 @@ export default function BuildQuote() {
       </div>
 
       {/* Right: Quote builder */}
-      <div className="flex-1 flex flex-col gap-4">
+      <div className="order-1 lg:order-2 flex-1 flex flex-col gap-4">
         {revisingParentId && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
             <Copy size={13} className="shrink-0" />
@@ -847,7 +848,7 @@ export default function BuildQuote() {
               <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" value={expiration} onChange={e => setExpiration(e.target.value)} />
             </div>
             <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Project Type <span className="text-gray-400">(multi-select — used on contract)</span></label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Project Type</label>
               <div className="flex flex-wrap gap-1.5">
                 {PROJECT_TYPE_OPTIONS.map(t => (
                   <button key={t} type="button" onClick={() => toggleProjectType(t)}

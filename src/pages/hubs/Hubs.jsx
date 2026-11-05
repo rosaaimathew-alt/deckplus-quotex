@@ -3,8 +3,7 @@
 // themselves are unchanged; the destination decides which one is on screen,
 // counts what needs attention in each tab, and offers the one primary action.
 import { useMemo } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import Hub from '../../components/Hub'
 import { useNav } from '../../nav'
 import { useStore } from '../../store'
@@ -33,17 +32,6 @@ import Vendors from '../books/Vendors'
 import ChangeOrdersAll from '../books/ChangeOrdersAll'
 import { invoiceStatus, billStatus, jobIndex } from '../../lib/books'
 
-function NewQuoteButton() {
-  const navigate = useNavigate()
-  const { can } = useNav()
-  if (!can('/quote')) return null
-  return (
-    <button onClick={() => navigate('/quote')}
-      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm bg-[var(--brand-600)] hover:bg-[var(--brand-700)] transition-colors">
-      <Plus size={15} /> New quote
-    </button>
-  )
-}
 
 const withRender = (tabs, renderers, counts = {}) =>
   tabs.map(t => ({ ...t, render: renderers[t.key] || (() => null), ...(counts[t.key] || {}) }))
@@ -67,7 +55,7 @@ export function SalesHub() {
     designs:   () => <Designs />,
   }, { proposals: { count: dueCount, countTone: 'alert' } })
 
-  return <Hub title="Sales" tabs={tabs} actions={<NewQuoteButton />} rememberKey="sales" />
+  return <Hub title="Sales" tabs={tabs} rememberKey="sales" />
 }
 
 // ── Projects ─────────────────────────────────────────────────────────────────
@@ -174,5 +162,5 @@ export function CatalogHub() {
     import:    () => <Analyze />,
     assistant: () => <AiChat />,
   })
-  return <Hub title="Catalog" tabs={tabs} actions={<NewQuoteButton />} rememberKey="catalog" />
+  return <Hub title="Catalog" tabs={tabs} rememberKey="catalog" />
 }

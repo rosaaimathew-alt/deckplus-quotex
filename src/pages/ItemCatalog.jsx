@@ -524,10 +524,8 @@ function FormulasView() {
     updateCustom: useStore(s => s.updateDeckCustomComponent), removeCustom: useStore(s => s.removeDeckCustomComponent),
     locked: useStore(s => s.deckFormulaLocked), setLocked: useStore(s => s.setDeckFormulaLocked),
     scopeTemplate: useStore(s => s.deckScopeTemplate), setScopeTemplate: useStore(s => s.setDeckScopeTemplate),
-    footerNote: 'The Deck Builder prices from the Deck price-list items in this catalog (Deck, Steps, Landing, railing, fascia, skirting, paint and add-ons) — change a price on the item and the builder uses it. Components added here show on every deck quote with a quantity the rep fills in.',
     scopeTitle: 'Open Deck — standard scope of work',
     scopeSubtitle: 'Materials & methods on every open-deck quote. One bullet per line — the builder adds size, decking, railing, stairs & fascia automatically.',
-    scopeHint: 'Put your always-included framing here (footers, posts & beams, joist size & spacing, framing tape). Per-quote selections are appended automatically.',
   }
   // Porch slices
   const porch = {
@@ -537,10 +535,8 @@ function FormulasView() {
     updateCustom: useStore(s => s.updatePorchCustomComponent), removeCustom: useStore(s => s.removePorchCustomComponent),
     locked: useStore(s => s.porchFormulaLocked), setLocked: useStore(s => s.setPorchFormulaLocked),
     scopeTemplate: useStore(s => s.porchScopeTemplate), setScopeTemplate: useStore(s => s.setPorchScopeTemplate),
-    footerNote: 'These rates feed the Porch Conversion builder — it counts windows, columns, transoms & doors from the width, depth & wall height you enter.',
     scopeTitle: 'Porch Conversion — standard scope of work',
     scopeSubtitle: 'Materials & methods on every Eze-Breeze porch quote. One bullet per line — the builder adds the window/column counts, transoms & doors automatically.',
-    scopeHint: 'Put your always-included work here (columns & plates, window install, paint/seal/refinish). The window, transom and door counts are appended automatically.',
   }
   return (
     <div className="space-y-6">
@@ -553,7 +549,7 @@ function FormulasView() {
 
 function FormulaCard({ title, defaults, rates, setRate, customComponents, addCustom, updateCustom, removeCustom,
                       locked, setLocked, scopeTemplate, setScopeTemplate, isManager,
-                      footerNote, scopeTitle, scopeSubtitle, scopeHint }) {
+                      scopeTitle, scopeSubtitle }) {
   const canEdit = isManager || !locked   // sales can only touch pricing while it's unlocked
   const [open, setOpen] = useState(true)
   const [newComp, setNewComp] = useState({ label: '', unit: 'EA', rate: '', cost: '' })
@@ -684,9 +680,6 @@ function FormulaCard({ title, defaults, rates, setRate, customComponents, addCus
 
       {open && (
         <>
-          <p className="text-xs text-gray-400 px-1 leading-relaxed">
-            {footerNote} Lock the formula so salespeople quote with your pricing and can't change it.
-          </p>
 
           {/* Standard scope of work — the customer-facing build description */}
           <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
@@ -703,7 +696,6 @@ function FormulaCard({ title, defaults, rates, setRate, customComponents, addCus
                 placeholder="One scope bullet per line…"
                 className={`w-full text-sm rounded-lg px-3 py-2 leading-relaxed focus:outline-none resize-y ${canEdit ? 'border border-gray-300 focus:ring-2 focus:ring-[var(--brand-200)]' : 'border border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed'}`}
               />
-              <p className="text-xs text-gray-400 mt-2">Tip: {scopeHint}</p>
             </div>
           </div>
         </>
@@ -813,9 +805,8 @@ export default function ItemCatalog({ mode: forcedMode } = {}) {
 
       {mode === 'formulas' ? (
         <>
-          <div className="mb-4">
-            <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-0.5">Builder rates</h2>
-            <p className="text-sm text-gray-500">Manager-set pricing the builders use — set the rates, then lock them so sales must follow.</p>
+          <div className="qx-hide-embedded mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-0.5">Builder rates</h2>
           </div>
           <FormulasView />
         </>
