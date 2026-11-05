@@ -84,7 +84,9 @@ export function SwitchChip({ label, checked, onChange, title }) {
 // Whose deals: All first, then each sales rep by name.
 export function RepToggle({ reps, repId, setRep }) {
   return (
-    <div className="inline-flex flex-wrap items-center gap-4" role="group" aria-label="Whose numbers">
+    <div className="inline-flex flex-wrap items-center gap-4" role="group" aria-label="Sales rep">
+      {/* Labeled like "Period", so "All" reads as "every sales rep" */}
+      <span className="h-9 flex items-center text-sm font-medium text-gray-400 -mr-1.5">Sales rep</span>
       {[[null, 'All'], ...reps.map(r => [r.id, r.name])].map(([id, label]) => (
         <button key={id || 'all'} type="button" onClick={() => setRep(id)} aria-pressed={repId === id}
           className={`h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${repId === id ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
