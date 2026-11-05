@@ -2179,31 +2179,22 @@
             const so = B(sw2 * k2, 0.04, zS1 - zS0, t, sd * sw2 / 2, beamTop + (hw - sw2 / 2) * gp - 0.04, (zS0 + zS1) / 2, { cast: false }); so.rotation.z = -sd * a2;
           });
           if (end === 'siding') { tri([[-span, 0], [span, 0], [0, apex]], 0.2, M.porchSiding(), m => m.position.set(0, y0, zFace - (dir > 0 ? 0.22 : -0.02))); return; }
-          // Three panes like the job photos: two side triangles and a centre pane with clipped top corners.
-          const f = 0.28, base = 0.42, mx = Math.min(W / 6, span * 0.42), m = 0.16;
+          // Glass to the rafters, like the job photos: two side triangles and a tall centre pane
+          // reaching the peak, with slim white frames (gable and semi-vault alike).
+          const f = 0.2, base = 0.28, mx = Math.min(W / 6, span * 0.38), m = 0.1;
           const top = (x) => (span - Math.abs(x)) * gp - f;
-          // A semi-vault has a flat ceiling across the middle: glass only up to that line, siding above it.
-          const semiTop = semi ? (hw - hw * 0.42) * gp : null;
-          const xEdge = span - (base + f) / gp, clipY = semi ? semiTop - f : apex - f - 0.9;
-          const xAt = (yy) => span - (yy + f) / gp;                     // where the clip line meets the rake
-          const side = (sd) => top(mx + m) > clipY
-            ? [[sd * (mx + m), base], [sd * xEdge, base], [sd * xAt(clipY), clipY], [sd * (mx + m), clipY]]
-            : [[sd * (mx + m), base], [sd * xEdge, base], [sd * (mx + m), top(mx + m)]];
+          const xEdge = span - (base + f) / gp;
           const panes = [
-            side(-1).reverse(), side(1),
-            [[-mx + m, base], [mx - m, base], [mx - m, Math.min(top(mx - m), clipY)], ...(top(mx - m) > clipY ? [[span - (clipY + f) / gp, clipY], [-(span - (clipY + f) / gp), clipY]] : []), [-mx + m, Math.min(top(mx - m), clipY)]],
-          ].filter(pts => pts.length >= 3 && Math.abs(pts[1][0] - pts[0][0]) > 0.4);
+            [[-xEdge, base], [-mx - m, base], [-mx - m, top(mx + m)]],
+            [[mx + m, base], [xEdge, base], [mx + m, top(mx + m)]],
+            [[-mx + m, base], [mx - m, base], [mx - m, top(mx - m)], [0, top(0)], [-mx + m, top(mx - m)]],
+          ].filter(pts => Math.abs(pts[1][0] - pts[0][0]) > 0.4 && pts.every(q => q[1] >= base - 0.01));
           const outer = new THREE.Shape(); outer.moveTo(-span, 0); outer.lineTo(span, 0); outer.lineTo(0, apex); outer.closePath();
           panes.forEach(pts => { const h = new THREE.Path(); h.moveTo(...pts[0]); pts.slice(1).forEach(q => h.lineTo(...q)); h.closePath(); outer.holes.push(h); });
           const frame = new THREE.Mesh(new THREE.ExtrudeGeometry(outer, { depth: 0.2, bevelEnabled: false }), t);
           frame.position.set(0, y0, dir > 0 ? zFace - 0.24 : zFace + 0.04); frame.castShadow = frame.receiveShadow = true; G.add(frame);
           const infill = end === 'screen' ? M.screen() : M.gableGlass();
           panes.forEach(pts => tri(pts, 0.02, infill, mm => { mm.position.set(0, y0, zFace - dir * 0.15); mm.userData.noAO = true; mm.castShadow = false; }));
-          if (semi) {
-            const xc = span - semiTop / gp;
-            tri([[-xc, semiTop], [xc, semiTop], [0, apex]], 0.22, M.porchSiding(), mm => mm.position.set(0, y0, zFace - (dir > 0 ? 0.23 : -0.01)));
-            B(2 * xc + 0.3, 0.3, 0.12, t, 0, y0 + semiTop, zFace + dir * 0.0);
-          }
         };
         // Eave returns: the short flat piece at each front corner, under the rake.
         [-1, 1].forEach(sd => B(1.0, 0.05, zB - zF - col / 2, t, sd * (hw + 0.5), beamTop - gp, (zB + zF + col / 2) / 2, { cast: false }));
@@ -2857,12 +2848,13 @@
     const infill = gableEndOf(x), mat = infill === 'siding' ? 'siding' : infill === 'screen' ? 'screen' : 'glass';
     if (x.roof === 'shed') return 'single-slope SHED roof: it slopes down from the house wall to the front header; there is NO gable and NO triangle on the front';
     if (x.roof === 'hip') return 'HIP roof: it slopes down to the front and to both sides; there is NO gable and NO triangle on the front';
+    const panes = `${mat} fills the triangular gable end above the front header all the way up to the rafters: two side triangles and one tall centre pane reaching the peak, separated by slim white frames`;
     if (x.roof === 'semivault') return mat === 'siding'
-      ? 'front-facing GABLE roof; the triangular gable end above the front header is solid siding with white trim, no glass'
-      : `front-facing GABLE roof with a SEMI-VAULTED ceiling. The triangular gable end above the front header has ${mat} ONLY in a LOW band (two small side triangles and one short centre pane, all below the flat-ceiling line); ABOVE that line the upper triangle up to the peak is SOLID siding with a horizontal white trim band between them. There is NO ${mat} in the upper part of the triangle. Do not draw a full-height glass triangle`;
+      ? 'front-facing GABLE roof (semi-vaulted ceiling inside); the triangular gable end above the front header is solid siding with white trim, no glass'
+      : `front-facing GABLE roof (semi-vaulted ceiling inside). ${panes}`;
     return mat === 'siding'
       ? 'front-facing GABLE roof with a cathedral ceiling; the triangular gable end above the front header is solid siding with white trim'
-      : `front-facing GABLE roof with a cathedral ceiling; the triangular gable end above the front header is filled with ${mat} in three panes up to the peak`;
+      : `front-facing GABLE roof with a cathedral ceiling. ${panes}`;
   }
   function inventory() {
     const L = [], hs = HS();
