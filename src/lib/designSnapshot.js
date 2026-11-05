@@ -11,7 +11,9 @@ export async function withSavedDesign(snapshot, proposalId) {
     const { data, error } = await supabase.from('proposal_designs').select('data').eq('proposal_id', String(proposalId)).maybeSingle()
     const d = !error && data?.data
     if (!d || !Array.isArray(d.els) || !d.els.length) return snapshot
-    if (d.share === false) return snapshot          // the rep chose not to show the design on this proposal
+    // Off by default: the customer gets just the proposal unless the rep ticked
+    // "Show on proposal" in the design editor.
+    if (d.share !== true) return snapshot
     // Only the drawing itself: shapes, heights, angles, porch/patio options, finishes and
     // the customer's house as matched from a photo (numbers and colors; no photo).
     return { ...snapshot, design: { els: d.els, color: d.color || null, build: d.build || null, nextId: d.nextId || d.els.length + 1, house: d.house || null } }

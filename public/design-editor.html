@@ -136,7 +136,7 @@
     <div class="sheetg"><select id="sheet" aria-label="Design sheet"><option value="auto">Sheet: auto</option><option value="s11">11×17</option><option value="s24">18×24</option></select>
       <button type="button" class="ghost-btn" id="b-reset" hidden title="Rebuild the drawing from the proposal (undo brings it back)">Reset to proposal</button>
       <button type="button" class="ghost-btn" id="b-print">Print plan</button><button type="button" class="ghost-btn" id="b-svg">Export SVG</button></div>
-    <div class="saveg"><label class="share-tg" title="Include this design (3D and floor plan) on the customer's proposal link"><input type="checkbox" id="b-share" checked> Show on proposal</label><span class="save-status" id="save-status" role="status"></span><button type="button" class="save-btn" id="b-save" disabled>Save to proposal</button></div>
+    <div class="saveg"><label class="share-tg" title="Off by default: the customer gets just the proposal. Tick to add this design (3D and floor plan) to their proposal link."><input type="checkbox" id="b-share"> Show on proposal</label><span class="save-status" id="save-status" role="status"></span><button type="button" class="save-btn" id="b-save" disabled>Save to proposal</button></div>
   </header>
   <div class="main">
   <nav class="rail" role="toolbar" aria-label="Tools" aria-orientation="vertical">
@@ -440,11 +440,11 @@
 
   // ═══ History ═════════════════════════════════════════════════════════════
   const hist = [], fut = [];
-  const snap = () => JSON.stringify({ v: 2, els: S.els, color: S.color, build: S.build, nextId, house: S.house || null, share: S.share !== false });
+  const snap = () => JSON.stringify({ v: 2, els: S.els, color: S.color, build: S.build, nextId, house: S.house || null, share: S.share === true });
   let lastSaved = snap();
   let onChange = () => {};        // set once the saved design has loaded (see Save to the proposal)
   function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); onChange(); }
-  function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; S.house = o.house || null; S.share = o.share !== false; if ($('b-share')) $('b-share').checked = S.share; S.build = { ...BUILD_DEF, ...(o.build || legacyBuild(o.color)) }; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
+  function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; S.house = o.house || null; S.share = o.share === true; if ($('b-share')) $('b-share').checked = S.share; S.build = { ...BUILD_DEF, ...(o.build || legacyBuild(o.color)) }; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
   function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); refreshButtons(); onChange(); }
   function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); refreshButtons(); onChange(); }
 
