@@ -141,9 +141,11 @@ export default function Dashboard() {
       {/* Numbers — one quiet strip with a single period choice */}
       <section className="bg-white rounded-xl border border-gray-200 overflow-hidden" aria-label="Your numbers">
         <div className="px-5 pt-3.5 flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-gray-900">{!canChoose || mineOnly ? 'Your numbers' : repId ? `${repName}'s numbers` : 'Organization numbers'}</p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-5 flex-wrap min-w-0">
+            <p className="text-sm font-semibold text-gray-900">{!canChoose || mineOnly ? 'Your numbers' : repId ? `${repName}'s numbers` : 'Organization numbers'}</p>
             {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
+          </div>
+          <div className="flex items-center gap-3">
             {insights && <span className="hidden sm:block"><LinkBtn onClick={() => navigate('/insights')}>All insights</LinkBtn></span>}
             <MenuChip label="Period" value={periodKey} onChange={setPeriodKey} align="right" options={PERIODS.map(({ value, label }) => ({ value, label }))} />
           </div>

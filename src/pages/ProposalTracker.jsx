@@ -1333,6 +1333,8 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
             </button>
           ))}
         </div>
+        {/* Whose deals — always first, on the left */}
+        {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
         {tab === 'list' && (
           <label className="flex items-center gap-2 h-9 text-sm min-w-0">
             <Search size={14} className="text-gray-400 shrink-0" />
@@ -1354,7 +1356,6 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
               <Bell size={14} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
             </span>
           )}
-          {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           {tab === 'list' && (
             <button type="button" onClick={() => setShowOpens(v => !v)} aria-pressed={showOpens} title="When customers opened their proposals"
               className={`flex items-center gap-1.5 h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${showOpens ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
