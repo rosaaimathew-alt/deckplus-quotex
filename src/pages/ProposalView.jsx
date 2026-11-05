@@ -4,6 +4,7 @@ import { Printer, Copy, ArrowLeft, CheckCircle, Send, X, Loader, Link2 } from 'l
 import { useStore } from '../store'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import { withSavedDesign } from '../lib/designSnapshot'
+import DesignShareToggle from '../components/DesignShareToggle'
 import { DEFAULT_BRAND_COLOR } from '../brand'
 import { toCanvas } from 'html-to-image'
 import jsPDF from 'jspdf'
@@ -306,6 +307,7 @@ export default function ProposalView() {
         >
           <Printer size={14} /> Print / Save PDF
         </button>
+        <DesignShareToggle proposalId={proposalIdRef.current ?? data?.id ?? null} className="px-1" />
         <button
           onClick={handleGetLink}
           disabled={gettingLink}
