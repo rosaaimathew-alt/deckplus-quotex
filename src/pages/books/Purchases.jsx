@@ -3,15 +3,18 @@
 // A PO can be split across several jobs; with no job it's company spend
 // (operating / inventory), which feeds fixed-cost tracking.
 import { useMemo, useState } from 'react'
-import { Plus, Mail, XCircle, Trash2, Split } from 'lucide-react'
+import { Plus, Mail, X, Trash2, Split, ClipboardList, Network } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { BillModal } from './Bills'
 import { useStore } from '../../store'
 import {
   PO_TYPES, OVERHEAD_BUCKETS, poTypeLabel, money, shortDate, todayISO, jobIndex, jobLabel, poAllocations,
   poBilled, nextPoNumber, downloadCsv,
 } from '../../lib/books'
 import {
-  StatusPill, SearchBox, DateRange, ExportButton, usePaged, Th, sortRows, Modal, Field, Combo,
+  StatusPill, SearchBox, usePaged, Th, sortRows, Modal, Field, Combo,
   useJobOptions, useVendorList, Empty, inputCls, btnPrimary, btnGhost,
+  PageHead, Toolbar, DateButton, FilterButton, FilterGroup, StatusCell, RowIcon, XlsButton, viewReport, btnHead, btnHeadPrimary,
 } from './ui'
 
 export function PurchaseModal({ po, presetJobId, onClose }) {
@@ -128,8 +131,10 @@ export default function Purchases() {
   const byId = useMemo(() => jobIndex(proposals), [proposals])
   const jobOptions = useJobOptions()
   const vendorList = useVendorList()
-  const [q, setQ] = useState('')
+  const [params] = useSearchParams()
+  const [q, setQ] = useState(() => params.get('q') || '')   // Vendors › "Approved to be spent" opens it filtered
   const [jobFilter, setJobFilter] = useState(null)
+  const [billFor, setBillFor] = useState(null)   // PO to enter a bill against
   const [type, setType] = useState('all')
   const [status, setStatus] = useState('live')
   const [range, setRange] = useState({ from: '', to: '' })
@@ -139,8 +144,9 @@ export default function Purchases() {
   const rows = useMemo(() => purchases.map(po => {
     const allocs = poAllocations(po)
     const jobs = allocs.map(a => byId.get(String(a.jobId))).filter(Boolean)
-    return { po, allocs, jobs, status: po.status || 'open', where: jobs.length ? jobs.map(jobLabel).join(', ') : (po.bucket ? `Company · ${po.bucket}` : 'Company') }
-  }), [purchases, byId])
+    // vendor: the vendor record's current name, so a search finds POs typed under an older name
+    return { po, allocs, jobs, status: po.status || 'open', vendor: po.vendorRef ? (vendorList.find(v => v.ref === po.vendorRef)?.name || '') : '', where: jobs.length ? jobs.map(jobLabel).join(', ') : (po.bucket ? `Company · ${po.bucket}` : 'Company') }
+  }), [purchases, byId, vendorList])
 
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase()
@@ -151,7 +157,7 @@ export default function Purchases() {
       if (jobFilter != null && !r.allocs.some(a => String(a.jobId) === String(jobFilter))) return false
       if (range.from && (r.po.date || '') < range.from) return false
       if (range.to && (r.po.date || '') > range.to) return false
-      if (s && ![r.po.number, r.po.vendorName, r.po.items, r.where, r.po.enteredBy].some(v => String(v || '').toLowerCase().includes(s))) return false
+      if (s && ![r.po.number, r.po.vendorName, r.vendor, r.po.items, r.where, r.po.enteredBy].some(v => String(v || '').toLowerCase().includes(s))) return false
       return true
     })
     return sortRows(out, sort, { date: r => r.po.date || '', amount: r => Number(r.po.amount) || 0, number: r => String(r.po.number || ''), vendor: r => r.po.vendorName || '' })
@@ -163,64 +169,73 @@ export default function Purchases() {
     ['Status', r => r.status], ['Date', r => r.po.date], ['PO #', r => r.po.number], ['Type', r => poTypeLabel(r.po.type)],
     ['Vendor', r => r.po.vendorName], ['Items', r => r.po.items], ['Allocated to', r => r.where], ['Amount', r => (Number(r.po.amount) || 0).toFixed(2)], ['Entered by', r => r.po.enteredBy],
   ], shown)
+  const report = () => viewReport('Purchases', [
+    ['Status', r => r.status], ['Date', r => shortDate(r.po.date)], ['Allocated to', r => r.where], ['PO #', r => r.po.number],
+    ['Vendor', r => r.po.vendorName], ['Items', r => `${poTypeLabel(r.po.type)} · ${r.po.items || ''}`], ['From', r => r.po.enteredBy], ['Amount', r => Number(r.po.amount) || 0],
+  ], shown, ['Amount'])
+  const filterCount = (type !== 'all' ? 1 : 0) + (status !== 'live' ? 1 : 0)
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="w-full sm:w-56"><Combo options={jobOptions} value={jobFilter} onChange={setJobFilter} placeholder="All jobs" allowNone noneLabel="All jobs" /></div>
-        <SearchBox value={q} onChange={setQ} placeholder="Search PO #, vendor, items" />
-        <select value={type} onChange={e => setType(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2.5 py-2 bg-white" aria-label="Type">
-          <option value="all">All types</option>
-          {PO_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-        </select>
-        <select value={status} onChange={e => setStatus(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2.5 py-2 bg-white" aria-label="Status">
-          <option value="live">Open + closed</option><option value="open">Open</option><option value="closed">Closed</option><option value="void">Void</option><option value="all">All</option>
-        </select>
-        <DateRange from={range.from} to={range.to} onChange={(from, to) => setRange({ from, to })} />
-        <div className="flex-1" />
-        <ExportButton onClick={exportCsv} />
-        <button onClick={() => setEditing('new')} className={btnPrimary}><Plus size={15} /> New purchase</button>
-      </div>
-      {shown.length > 0 && <p className="text-xs text-gray-500">{shown.length.toLocaleString()} purchase{shown.length === 1 ? '' : 's'} · {money(total)}</p>}
+    <div className="p-4 sm:p-6 lg:px-8 max-w-[1500px] space-y-5">
+      <PageHead title="Purchases">
+        <button onClick={report} className={btnHead}>View report</button>
+        <button onClick={() => setEditing('new')} className={btnHeadPrimary}>Add new purchase</button>
+      </PageHead>
+      <Toolbar
+        left={<>
+          <div className="w-full sm:w-56 flex items-center gap-2 h-[42px] border border-gray-300 rounded-lg bg-white pl-3 [&_button]:border-0 [&_button]:h-[40px]">
+            <Network size={16} className="text-gray-600 shrink-0" />
+            <div className="flex-1 min-w-0"><Combo options={jobOptions} value={jobFilter} onChange={setJobFilter} placeholder="All" allowNone noneLabel="All" /></div>
+          </div>
+          <SearchBox value={q} onChange={setQ} placeholder="Search" />
+          <DateButton label="Date" iconOnly from={range.from} to={range.to} onChange={(from, to) => setRange({ from, to })} />
+          <FilterButton count={filterCount}>
+            <FilterGroup title="Type" options={[['all', 'All types'], ...PO_TYPES.map(t => [t.key, t.label])]} value={type} onChange={setType} />
+            <FilterGroup title="Status" options={[['live', 'Open + closed'], ['open', 'Open'], ['closed', 'Closed'], ['void', 'Void'], ['all', 'All']]} value={status} onChange={setStatus} />
+          </FilterButton>
+        </>}
+        right={<><XlsButton onClick={exportCsv} />{pager}</>} />
+      {shown.length > 0 && filterCount + (jobFilter != null ? 1 : 0) + (q ? 1 : 0) > 0 && <p className="text-sm text-gray-500">{shown.length.toLocaleString()} purchase{shown.length === 1 ? '' : 's'} · {money(total)}</p>}
 
       {shown.length === 0 ? <Empty>{purchases.length ? 'No purchases match.' : 'No purchase orders yet.'}</Empty> : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm min-w-[920px]">
+        <div className="bg-white border border-gray-200 overflow-x-auto">
+          <table className="w-full text-[15px] min-w-[960px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
-                <Th>Status</Th>
+                <Th className="text-center">Status</Th>
                 <Th sortKey="date" sort={sort} setSort={setSort}>Date</Th>
                 <Th>Allocated to</Th>
                 <Th sortKey="amount" sort={sort} setSort={setSort} className="text-right">Amount</Th>
-                <Th sortKey="number" sort={sort} setSort={setSort}>PO #</Th>
+                <Th sortKey="number" sort={sort} setSort={setSort}>PO#</Th>
                 <Th sortKey="vendor" sort={sort} setSort={setSort}>Vendor</Th>
                 <Th>Items</Th>
                 <Th>From</Th>
                 <Th>&nbsp;</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-200">
               {slice.map(r => (
                 <tr key={r.po.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditing(r.po)}>
-                  <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
-                  <td className="px-3 py-2.5 text-gray-700">{shortDate(r.po.date)}</td>
-                  <td className="px-3 py-2.5 max-w-[220px]"><p className="truncate text-gray-900">{r.where}</p>{r.allocs.length > 1 && <p className="text-[11px] text-gray-400">split {r.allocs.length} jobs</p>}</td>
-                  <td className="px-3 py-2.5 text-right font-medium">{money(r.po.amount)}</td>
-                  <td className="px-3 py-2.5 font-mono text-gray-700 max-w-[120px] truncate">#{r.po.number}</td>
-                  <td className="px-3 py-2.5 max-w-[180px] truncate">{r.po.vendorName || '—'}</td>
-                  <td className="px-3 py-2.5 max-w-[200px] truncate text-gray-600"><span className="text-[11px] text-gray-400 mr-1">{poTypeLabel(r.po.type)}</span>{r.po.items}</td>
-                  <td className="px-3 py-2.5 max-w-[120px] truncate text-gray-500">{r.po.enteredBy || ''}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => mailPo(r.po, byId, vendorList, branding)} title="Email PO to vendor" aria-label="Email PO to vendor" className="p-1.5 rounded-lg text-[var(--brand-600)] hover:bg-[var(--brand-50)]"><Mail size={17} /></button>
-                    {r.status !== 'void' && <button onClick={() => { if (window.confirm(`Void PO #${r.po.number}?`)) updatePurchase(r.po.id, { status: 'void' }) }} title="Void" aria-label="Void PO" className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><XCircle size={17} /></button>}
+                  <StatusCell status={r.status === 'open' ? 'active' : r.status} />
+                  <td className="px-3 text-gray-800">{shortDate(r.po.date)}</td>
+                  <td className="px-3 py-3 max-w-[190px]"><p className="truncate text-gray-900">{r.where}</p>{r.allocs.length > 1 ? <p className="text-xs text-gray-500">split {r.allocs.length} jobs</p> : r.jobs[0]?.address ? <p className="truncate text-gray-600">{r.jobs[0].address}</p> : null}</td>
+                  <td className="px-3 text-right text-gray-900">{money(r.po.amount)}</td>
+                  <td className="px-3 text-gray-800 max-w-[130px] truncate">#{r.po.number}</td>
+                  <td className="px-3 max-w-[170px] truncate text-gray-900">{r.po.vendorName || r.vendor || '—'}</td>
+                  <td className="px-3 max-w-[180px] truncate text-gray-800">{r.po.items || poTypeLabel(r.po.type)}</td>
+                  <td className="px-3 max-w-[120px] truncate text-gray-800">{r.po.enteredBy || ''}</td>
+                  <td className="px-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    {r.status !== 'void' && <RowIcon icon={ClipboardList} title="Enter a bill for this PO" onClick={() => setBillFor(r.po)} />}
+                    <RowIcon icon={Mail} title="Email PO to vendor" onClick={() => mailPo(r.po, byId, vendorList, branding)} />
+                    {r.status !== 'void' && <RowIcon icon={X} tone="muted" title="Void PO" onClick={() => { if (window.confirm(`Void PO #${r.po.number}?`)) updatePurchase(r.po.id, { status: 'void' }) }} />}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="flex justify-end px-3 py-2 border-t border-gray-100">{pager}</div>
         </div>
       )}
+      {billFor && <BillModal presetPo={billFor} onClose={() => setBillFor(null)} />}
       {editing && <PurchaseModal po={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
   )

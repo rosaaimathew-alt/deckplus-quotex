@@ -11,8 +11,9 @@ import {
 } from '../../lib/books'
 import { contractTotalOf } from '../../contractTotal'
 import {
-  StatusPill, DueBanner, SearchBox, DateRange, ExportButton, usePaged, Th, sortRows, Modal, Field, Combo,
+  StatusPill, DueBanner, SearchBox, usePaged, Th, sortRows, Modal, Field, Combo,
   useJobOptions, PaymentsEditor, Empty, inputCls, btnPrimary, btnGhost,
+  PageHead, Toolbar, DateButton, FilterButton, FilterGroup, StatusCell, RowIcon, XlsButton, viewReport, btnHead, btnHeadPrimary,
 } from './ui'
 
 const STATUS_FILTERS = [
@@ -219,67 +220,83 @@ export default function Invoices({ jobId = null }) {
   }, [rows, q, status, range, sort])
   const { slice, pager } = usePaged(shown)
 
-  const exportCsv = () => downloadCsv(`invoices-${todayISO()}.csv`, [
+  const csvCols = [
     ['Status', r => r.status], ['Due date', r => r.inv.dueDate], ['Invoice date', r => r.inv.date], ['Invoice #', r => r.inv.number],
     ['Job', r => r.job?.client], ['Address', r => r.job?.address], ['Kind', r => r.inv.kind], ['Memo', r => r.inv.memo],
     ['Total', r => r.total.toFixed(2)], ['Paid', r => (r.total - r.balance).toFixed(2)], ['Balance', r => r.balance.toFixed(2)],
-  ], shown)
+  ]
+  const exportCsv = () => downloadCsv(`invoices-${todayISO()}.csv`, csvCols, shown)
+  const report = () => viewReport('Invoices', [
+    ['Status', r => r.status], ['Due', r => shortDate(r.inv.dueDate)], ['Invoice date', r => shortDate(r.inv.date)], ['Invoice #', r => r.inv.number],
+    ['For', r => jobLabel(r.job)], ['Total', r => r.total], ['Balance', r => r.balance],
+  ], shown, ['Total', 'Balance'])
+  const filterCount = (status !== 'open' ? 1 : 0)
+
+  // Inside a job (Transactions) the list stays compact; the Money page gets
+  // the Knowify layout: title + buttons, banner, toolbar, table.
+  const rowsTable = shown.length === 0 ? <Empty>{invoices.length ? 'No invoices match.' : 'No invoices yet. Create one from a job’s payment schedule or a signed change order.'}</Empty> : (
+    <div className="bg-white border border-gray-200 overflow-x-auto">
+      <table className="w-full text-[15px] min-w-[900px]">
+        <thead className="border-b border-gray-200 text-left">
+          <tr>
+            <Th className="text-center">Status</Th>
+            <Th sortKey="due" sort={sort} setSort={setSort}>Due date</Th>
+            <Th sortKey="date" sort={sort} setSort={setSort}>Invoice date</Th>
+            <Th sortKey="balance" sort={sort} setSort={setSort} className="text-right">Balance</Th>
+            <Th sortKey="total" sort={sort} setSort={setSort} className="text-right">Total</Th>
+            <Th sortKey="number" sort={sort} setSort={setSort}>Invoice #</Th>
+            <Th sortKey="for" sort={sort} setSort={setSort}>For</Th>
+            <Th>&nbsp;</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {slice.map(r => (
+            <tr key={r.inv.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditing(r.inv)}>
+              <StatusCell status={r.status} />
+              <td className="px-3 text-gray-800">{shortDate(r.inv.dueDate)}</td>
+              <td className="px-3 text-gray-800">{shortDate(r.inv.date)}</td>
+              <td className="px-3 text-right text-gray-900">{money(r.balance)}</td>
+              <td className="px-3 text-right text-gray-900">{money(r.total)}</td>
+              <td className="px-3 text-gray-800">{r.inv.number}</td>
+              <td className="px-3 py-3"><p className="text-gray-900">{jobLabel(r.job)}</p><p className="text-gray-600 truncate max-w-[280px]">{r.inv.memo || r.job?.address || ''}</p></td>
+              <td className="px-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                {(r.status === 'outstanding' || r.status === 'overdue') && r.job && <RowIcon icon={CheckSquare} title="Record payment" onClick={() => setPaying(r)} />}
+                <RowIcon icon={Printer} title="Print invoice" onClick={() => printInvoice(r.inv, r.job, branding)} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
+  if (jobId) return (
+    <div className="space-y-4">
+      <Toolbar
+        left={<><SearchBox value={q} onChange={setQ} placeholder="Search" />
+          <FilterButton count={filterCount}><FilterGroup title="Status" options={STATUS_FILTERS} value={status} onChange={setStatus} /></FilterButton></>}
+        right={<><XlsButton onClick={exportCsv} />{pager}<button onClick={() => setEditing('new')} className={btnHeadPrimary}><Plus size={16} /> Add new invoice</button></>} />
+      {rowsTable}
+      {editing && <InvoiceModal invoice={editing === 'new' ? null : editing} presetJobId={jobId} onClose={() => setEditing(null)} />}
+      {paying && <PayModal invoiceId={paying.inv.id} onClose={() => setPaying(null)} />}
+    </div>
+  )
 
   return (
-    <div className={jobId ? 'space-y-4' : 'p-4 sm:p-6 max-w-7xl mx-auto space-y-4'}>
-      {!jobId && <DueBanner sum={sum} soonLabel="Due within 30 days" />}
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBox value={q} onChange={setQ} placeholder="Search # or customer" />
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-          {STATUS_FILTERS.map(([k, l]) => (
-            <button key={k} onClick={() => setStatus(k)} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${status === k ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>{l}</button>
-          ))}
-        </div>
-        {!jobId && <DateRange from={range.from} to={range.to} label="Invoice date" onChange={(from, to) => setRange({ from, to })} />}
-        <div className="flex-1" />
-        <ExportButton onClick={exportCsv} />
-        <button onClick={() => setEditing('new')} className={btnPrimary}><Plus size={15} /> New invoice</button>
-      </div>
-
-      {shown.length === 0 ? <Empty>{invoices.length ? 'No invoices match.' : 'No invoices yet. Create one from a job’s payment schedule or a signed change order.'}</Empty> : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm min-w-[860px]">
-            <thead className="border-b border-gray-200 text-left">
-              <tr>
-                <Th>Status</Th>
-                <Th sortKey="due" sort={sort} setSort={setSort}>Due date</Th>
-                <Th sortKey="date" sort={sort} setSort={setSort}>Invoice date</Th>
-                <Th sortKey="balance" sort={sort} setSort={setSort} className="text-right">Balance</Th>
-                <Th sortKey="total" sort={sort} setSort={setSort} className="text-right">Total</Th>
-                <Th sortKey="number" sort={sort} setSort={setSort}>Invoice #</Th>
-                <Th sortKey="for" sort={sort} setSort={setSort}>For</Th>
-                <Th className="text-right">&nbsp;</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {slice.map(r => (
-                <tr key={r.inv.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditing(r.inv)}>
-                  <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
-                  <td className="px-3 py-2.5 text-gray-700">{shortDate(r.inv.dueDate)}</td>
-                  <td className="px-3 py-2.5 text-gray-700">{shortDate(r.inv.date)}</td>
-                  <td className="px-3 py-2.5 text-right font-medium">{money(r.balance)}</td>
-                  <td className="px-3 py-2.5 text-right text-gray-700">{money(r.total)}</td>
-                  <td className="px-3 py-2.5 font-mono text-gray-700">{r.inv.number}</td>
-                  <td className="px-3 py-2.5"><p className="text-gray-900">{jobLabel(r.job)}</p>{r.inv.memo && <p className="text-xs text-gray-400 truncate max-w-[260px]">{r.inv.memo}</p>}</td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                    {(r.status === 'outstanding' || r.status === 'overdue') && r.job && (
-                      <button onClick={() => setPaying(r)} title="Record payment" aria-label="Record payment" className="p-1.5 rounded-lg text-[var(--brand-600)] hover:bg-[var(--brand-50)]"><CheckSquare size={18} /></button>
-                    )}
-                    <button onClick={() => printInvoice(r.inv, r.job, branding)} title="Print" aria-label="Print invoice" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><Printer size={18} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="flex justify-end px-3 py-2 border-t border-gray-100">{pager}</div>
-        </div>
-      )}
-
+    <div className="p-4 sm:p-6 lg:px-8 max-w-[1500px] space-y-5">
+      <PageHead title="Invoices">
+        <button onClick={report} className={btnHead}>View report</button>
+        <button onClick={() => setEditing('new')} className={btnHeadPrimary}>Add new invoice</button>
+      </PageHead>
+      <DueBanner sum={sum} soonLabel="Due within 30 days" />
+      <Toolbar
+        left={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search" />
+          <DateButton label="Invoice date" from={range.from} to={range.to} onChange={(from, to) => setRange({ from, to })} />
+          <FilterButton count={filterCount}><FilterGroup title="Status" options={STATUS_FILTERS} value={status} onChange={setStatus} /></FilterButton>
+        </>}
+        right={<><XlsButton onClick={exportCsv} />{pager}</>} />
+      {rowsTable}
       {editing && <InvoiceModal invoice={editing === 'new' ? null : editing} presetJobId={jobId} onClose={() => setEditing(null)} />}
       {paying && <PayModal invoiceId={paying.inv.id} onClose={() => setPaying(null)} />}
     </div>

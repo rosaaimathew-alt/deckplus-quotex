@@ -4,13 +4,14 @@
 // WC turn amber 30 days before they expire and red once expired or missing;
 // W9 is on file or not.
 import { useMemo, useState } from 'react'
-import { Plus, Pencil } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Pencil, Download, Filter } from 'lucide-react'
 import { useStore } from '../../store'
 import {
   VENDOR_TYPES, DOC_KEYS, vendorTypeLabel, docStatus, vendorDocProblems, money, todayISO, billBalance,
   billStatus, poIsLive, downloadCsv,
 } from '../../lib/books'
-import { SearchBox, ExportButton, usePaged, Th, sortRows, Modal, Field, useVendorList, Empty, inputCls, btnPrimary } from './ui'
+import { SearchBox, usePaged, Th, sortRows, Modal, Field, useVendorList, Empty, inputCls, btnPrimary, PageHead, PopButton, FilterGroup, btnHead } from './ui'
 
 const DOC_CLS = {
   ok: 'border-gray-300 text-gray-600 bg-white',
@@ -18,15 +19,19 @@ const DOC_CLS = {
   expired: 'border-red-700 text-white bg-red-700',
   missing: 'border-red-700 text-white bg-red-700',
 }
+// Knowify shows the papers on file, in the order GL, W9, WC — red when
+// expired, amber when expiring. Missing papers are what "Paperwork problems"
+// in Filters finds.
+const BADGE_ORDER = ['gl', 'w9', 'wc']
 function DocBadges({ v }) {
-  const keys = v.type === 'sub' ? DOC_KEYS : DOC_KEYS.filter(d => v.docs?.[d.key])
+  const keys = BADGE_ORDER.map(k => DOC_KEYS.find(d => d.key === k)).filter(d => d && docStatus(v.docs?.[d.key], d.dated) !== 'missing')
   if (!keys.length) return null
   return (
     <div className="flex gap-1">
       {keys.map(d => {
         const st = docStatus(v.docs?.[d.key], d.dated)
         const exp = v.docs?.[d.key]?.expires
-        return <span key={d.key} title={`${d.name}: ${st}${exp ? ` (expires ${exp})` : ''}`} className={`text-[11px] font-semibold border rounded px-1.5 py-0.5 ${DOC_CLS[st]}`}>{d.label}</span>
+        return <span key={d.key} title={`${d.name}: ${st}${exp ? ` (expires ${exp})` : ''}`} className={`text-[13px] font-semibold border rounded px-1.5 py-0.5 ${DOC_CLS[st]}`}>{d.label}</span>
       })}
     </div>
   )
@@ -101,6 +106,7 @@ export default function Vendors() {
   const [showInactive, setShowInactive] = useState(false)
   const [sort, setSort] = useState({ key: 'name', dir: 'asc' })
   const [editing, setEditing] = useState(null)
+  const navigate = useNavigate()
 
   const rows = useMemo(() => {
     const spent = new Map(), owed = new Map()
@@ -130,50 +136,60 @@ export default function Vendors() {
     ['Approved to be spent', r => r.spent.toFixed(2)], ['Outstanding bills', r => r.owed.toFixed(2)],
   ], shown)
 
+  const filterCount = (type !== 'all' ? 1 : 0) + (problemsOnly ? 1 : 0) + (showInactive ? 1 : 0)
+
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBox value={q} onChange={setQ} placeholder="Search vendors" />
-        <select value={type} onChange={e => setType(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2.5 py-2 bg-white" aria-label="Type">
-          <option value="all">All types</option>
-          {VENDOR_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-        </select>
-        <button onClick={() => setProblemsOnly(v => !v)} className={`text-xs px-3 py-2 rounded-lg border font-medium ${problemsOnly ? 'bg-red-700 border-red-700 text-white' : 'bg-white border-gray-200 text-gray-600'}`}>
-          Paperwork problems <span className="opacity-70">{problemCount}</span>
-        </button>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500"><input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} /> Show inactive</label>
-        <div className="flex-1" />
-        <ExportButton onClick={exportCsv} />
-        <button onClick={() => setEditing('new')} className={btnPrimary}><Plus size={15} /> Add vendor</button>
+    <div className="p-4 sm:p-6 lg:px-8 max-w-[1500px] space-y-5">
+      <PageHead title="Vendors" />
+      <div className="flex items-start justify-between gap-2 flex-wrap">
+        <div>
+          <SearchBox value={q} onChange={setQ} placeholder="Search" />
+          {/* Knowify's "Filters" link under the search box */}
+          <div className="mt-1.5 [&>div>button]:h-auto [&>div>button]:border-0 [&>div>button]:bg-transparent [&>div>button]:px-1 [&>div>button]:py-0.5 [&>div>button]:text-sm [&>div>button]:text-gray-600">
+            <PopButton icon={Filter} label={filterCount ? `Filters (${filterCount})` : 'Filters'} title="Filters">
+              <FilterGroup title="Type" options={[['all', 'All types'], ...VENDOR_TYPES.map(t => [t.key, t.label])]} value={type} onChange={setType} />
+              <label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={problemsOnly} onChange={e => setProblemsOnly(e.target.checked)} /> Paperwork problems only <span className="text-gray-400">({problemCount})</span></label>
+              <label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} /> Show inactive</label>
+            </PopButton>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={exportCsv} title="Export to Excel" aria-label="Export to Excel" className={`${btnHead} h-[42px] px-3 py-0`}><Download size={18} /></button>
+          <button onClick={() => setEditing('new')} className={`${btnHead} h-[42px] py-0`}><Plus size={17} /> Add new vendor</button>
+          {pager}
+        </div>
       </div>
 
       {shown.length === 0 ? <Empty>{list.length ? 'No vendors match.' : 'No vendors yet.'}</Empty> : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm min-w-[760px]">
+        <div className="bg-white border border-gray-200 overflow-x-auto">
+          <table className="w-full text-[15px] min-w-[860px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
                 <Th sortKey="name" sort={sort} setSort={setSort}>Vendor</Th>
                 <Th sortKey="type" sort={sort} setSort={setSort}>Type</Th>
-                <Th>Paperwork</Th>
+                <Th>Documentation</Th>
                 <Th sortKey="spent" sort={sort} setSort={setSort} className="text-right">Approved to be spent</Th>
                 <Th sortKey="owed" sort={sort} setSort={setSort} className="text-right">Outstanding bills</Th>
                 <Th>&nbsp;</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-200">
               {slice.map(r => (
-                <tr key={r.v.ref} className={`hover:bg-gray-50 cursor-pointer ${r.v.active ? '' : 'opacity-50'}`} onClick={() => setEditing(r.v)}>
-                  <td className="px-3 py-2.5"><p className="text-gray-900">{r.v.name}</p>{r.v.trade && <p className="text-[11px] text-gray-400">{r.v.trade}</p>}</td>
-                  <td className="px-3 py-2.5"><span className="text-xs bg-gray-100 text-gray-600 rounded px-2 py-1">{vendorTypeLabel(r.v.type)}</span></td>
-                  <td className="px-3 py-2.5"><DocBadges v={r.v} /></td>
-                  <td className="px-3 py-2.5 text-right">{money(r.spent)}</td>
-                  <td className={`px-3 py-2.5 text-right ${r.owed > 0 ? 'font-semibold text-amber-700' : ''}`}>{money(r.owed)}</td>
-                  <td className="px-3 py-2.5 text-right"><Pencil size={15} className="inline text-gray-400" /></td>
+                <tr key={r.v.ref} className={`hover:bg-gray-50 ${r.v.active ? '' : 'opacity-50'}`}>
+                  <td className="px-3 py-5"><p className="text-gray-900">{r.v.name}</p>{r.v.trade && <p className="text-xs text-gray-500">{r.v.trade}</p>}</td>
+                  <td className="px-3"><span className="text-[15px] bg-gray-100 border border-gray-200 text-gray-700 rounded px-2 py-1 whitespace-nowrap">{vendorTypeLabel(r.v.type)}</span></td>
+                  <td className="px-3"><DocBadges v={r.v} /></td>
+                  <td className="px-3 text-right">
+                    {r.spent > 0
+                      ? <button onClick={() => navigate(`/money?tab=purchases&q=${encodeURIComponent(r.v.name)}`)} className="underline underline-offset-2 text-gray-900 hover:text-[var(--brand-700)]" title={`Purchases from ${r.v.name}`}>{money(r.spent)}</button>
+                      : <span className="text-gray-900">{money(0)}</span>}
+                  </td>
+                  <td className={`px-3 text-right ${r.owed > 0 ? 'font-semibold text-amber-700' : 'text-gray-900'}`}>{money(r.owed)}</td>
+                  <td className="px-3 text-right"><button onClick={() => setEditing(r.v)} title={`Edit ${r.v.name}`} aria-label={`Edit ${r.v.name}`} className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"><Pencil size={20} /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="flex justify-end px-3 py-2 border-t border-gray-100">{pager}</div>
         </div>
       )}
       {editing && <VendorModal entry={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}

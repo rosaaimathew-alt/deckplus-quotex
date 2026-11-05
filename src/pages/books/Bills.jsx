@@ -10,13 +10,15 @@ import {
   poAllocations, dueSummary, downloadCsv,
 } from '../../lib/books'
 import {
-  StatusPill, DueBanner, SearchBox, DateRange, ExportButton, usePaged, Th, sortRows, Modal, Field, Combo,
+  StatusPill, DueBanner, SearchBox, usePaged, Th, sortRows, Modal, Field, Combo,
   useJobOptions, useVendorList, PaymentsEditor, Empty, inputCls, btnPrimary, btnGhost,
+  PageHead, Toolbar, DateButton, FilterButton, FilterGroup, StatusCell, RowIcon, XlsButton, viewReport, btnHead, btnHeadPrimary,
 } from './ui'
 
 const STATUS_FILTERS = [['open', 'Unpaid'], ['outstanding', 'Outstanding'], ['overdue', 'Overdue'], ['paid', 'Paid'], ['all', 'All']]
 
-export function BillModal({ bill, presetJobId = null, onClose }) {
+// presetPo: "Enter bill" from a purchase order (Purchases › clipboard).
+export function BillModal({ bill, presetJobId = null, presetPo = null, onClose }) {
   const purchases = useStore(s => s.purchases)
   const bills = useStore(s => s.bills)
   const addBill = useStore(s => s.addBill)
@@ -29,8 +31,8 @@ export function BillModal({ bill, presetJobId = null, onClose }) {
   const vendorOptions = useMemo(() => vendorList.map(v => ({ value: v.ref, label: v.name })), [vendorList])
 
   const [f, setF] = useState(() => bill ? { ...bill, vendorName: bill.vendorName || '', number: bill.number || '', target: bill.poId != null ? 'po' : bill.jobId != null ? 'job' : 'overhead' } : {
-    vendorRef: null, vendorName: '', number: '', date: todayISO(), dueDate: addDays(todayISO(), 30), total: '',
-    target: presetJobId != null ? 'job' : 'po', poId: null, jobId: presetJobId, bucket: 'operating', category: '', notes: '',
+    vendorRef: presetPo?.vendorRef || null, vendorName: presetPo?.vendorName || '', number: '', date: todayISO(), dueDate: addDays(todayISO(), 30), total: presetPo ? (Number(presetPo.amount) || '') : '',
+    target: presetJobId != null && !presetPo ? 'job' : 'po', poId: presetPo ? presetPo.id : null, jobId: presetJobId, bucket: 'operating', category: '', notes: '',
   })
   const set = (patch) => setF(x => ({ ...x, ...patch }))
   const live = bill ? bills.find(b => b.id === bill.id) || bill : null
@@ -161,60 +163,60 @@ export default function Bills() {
     ['Vendor invoice #', r => r.bill.number], ['PO #', r => r.bill.poNumber], ['Job', r => r.job?.client], ['Overhead', r => r.bill.bucket], ['Category', r => r.bill.category],
     ['Total', r => r.total.toFixed(2)], ['Paid', r => (r.total - r.balance).toFixed(2)], ['Balance', r => r.balance.toFixed(2)],
   ], shown)
+  const report = () => viewReport('Bills', [
+    ['Status', r => r.status], ['Due', r => shortDate(r.bill.dueDate)], ['Bill date', r => shortDate(r.bill.date)], ['Vendor', r => r.bill.vendorName],
+    ['PO # / for', r => r.forLabel.join(' · ')], ['Invoice #', r => r.bill.number], ['Total', r => r.total], ['Balance', r => r.balance],
+  ], shown, ['Total', 'Balance'])
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
-      <DueBanner sum={sum} soonLabel="Due within 7 days" />
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBox value={q} onChange={setQ} placeholder="Search vendor, #, job" />
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-          {STATUS_FILTERS.map(([k, l]) => (
-            <button key={k} onClick={() => setStatus(k)} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${status === k ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>{l}</button>
-          ))}
-        </div>
-        <DateRange from={range.from} to={range.to} label="Bill date" onChange={(from, to) => setRange({ from, to })} />
-        <div className="flex-1" />
-        <ExportButton onClick={exportCsv} />
-        <button onClick={() => setEditing('new')} className={btnPrimary}><Plus size={15} /> New bill</button>
-      </div>
+    <div className="p-4 sm:p-6 lg:px-8 max-w-[1500px] space-y-5">
+      <PageHead title="Bills">
+        <button onClick={report} className={btnHead}>View report</button>
+        <button onClick={() => setEditing('new')} className={btnHeadPrimary}>Add new bill</button>
+      </PageHead>
+      <DueBanner sum={sum} soonLabel="Due within 7 days" counts={false} />
+      <Toolbar
+        left={<>
+          <SearchBox value={q} onChange={setQ} placeholder="Search" />
+          <DateButton label="Invoice date" from={range.from} to={range.to} onChange={(from, to) => setRange({ from, to })} />
+          <FilterButton count={status !== 'open' ? 1 : 0}><FilterGroup title="Status" options={STATUS_FILTERS} value={status} onChange={setStatus} /></FilterButton>
+        </>}
+        right={<><XlsButton onClick={exportCsv} />{pager}</>} />
 
       {shown.length === 0 ? <Empty>{bills.length ? 'No bills match.' : 'No bills yet.'}</Empty> : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-          <table className="w-full text-sm min-w-[860px]">
+        <div className="bg-white border border-gray-200 overflow-x-auto">
+          <table className="w-full text-[15px] min-w-[960px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
-                <Th>Status</Th>
+                <Th className="text-center">Status</Th>
                 <Th sortKey="due" sort={sort} setSort={setSort}>Due date</Th>
-                <Th sortKey="date" sort={sort} setSort={setSort}>Bill date</Th>
+                <Th sortKey="date" sort={sort} setSort={setSort}>Invoice date</Th>
                 <Th sortKey="balance" sort={sort} setSort={setSort} className="text-right">Balance</Th>
                 <Th sortKey="total" sort={sort} setSort={setSort} className="text-right">Total</Th>
-                <Th sortKey="vendor" sort={sort} setSort={setSort}>Payee / vendor</Th>
-                <Th>PO # / for</Th>
+                <Th sortKey="vendor" sort={sort} setSort={setSort}>Payee/Vendor</Th>
+                <Th>PO#/For</Th>
                 <Th>Invoice #</Th>
                 <Th>&nbsp;</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-200">
               {slice.map(r => (
                 <tr key={r.bill.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditing(r.bill)}>
-                  <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
-                  <td className="px-3 py-2.5 text-gray-700">{shortDate(r.bill.dueDate)}</td>
-                  <td className="px-3 py-2.5 text-gray-700">{shortDate(r.bill.date)}</td>
-                  <td className="px-3 py-2.5 text-right font-medium">{money(r.balance)}</td>
-                  <td className="px-3 py-2.5 text-right text-gray-700">{money(r.total)}</td>
-                  <td className="px-3 py-2.5 max-w-[180px] truncate">{r.bill.vendorName || '—'}</td>
-                  <td className="px-3 py-2.5 max-w-[220px]">{r.forLabel.map((l, i) => <p key={i} className={`truncate ${i ? 'text-xs text-gray-500' : 'text-gray-800'}`}>{l}</p>)}</td>
-                  <td className="px-3 py-2.5 text-gray-600">{r.bill.number || ''}</td>
-                  <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                    {(r.status === 'outstanding' || r.status === 'overdue') && (
-                      <button onClick={() => setPaying(r.bill.id)} title="Pay bill" aria-label="Pay bill" className="p-1.5 rounded-lg text-[var(--brand-600)] hover:bg-[var(--brand-50)]"><CheckSquare size={18} /></button>
-                    )}
+                  <StatusCell status={r.status} />
+                  <td className="px-3 text-gray-800">{shortDate(r.bill.dueDate)}</td>
+                  <td className="px-3 text-gray-800">{shortDate(r.bill.date)}</td>
+                  <td className="px-3 text-right text-gray-900">{money(r.balance)}</td>
+                  <td className="px-3 text-right text-gray-900">{money(r.total)}</td>
+                  <td className="px-3 max-w-[180px] truncate text-gray-900">{r.bill.vendorName || '—'}</td>
+                  <td className="px-3 py-3 max-w-[240px]">{r.forLabel.map((l, i) => <p key={i} className="truncate text-gray-800">{l}</p>)}</td>
+                  <td className="px-3 text-gray-800">{r.bill.number || ''}</td>
+                  <td className="px-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    {(r.status === 'outstanding' || r.status === 'overdue') && <RowIcon icon={CheckSquare} title="Pay bill" onClick={() => setPaying(r.bill.id)} />}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="flex justify-end px-3 py-2 border-t border-gray-100">{pager}</div>
         </div>
       )}
       {editing && <BillModal bill={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}

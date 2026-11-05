@@ -158,7 +158,9 @@ export function MoneyHub() {
           The database isn't set up for invoices, bills, purchases and vendors yet (supabase/books.sql) — anything entered here won't be saved.
         </div>
       )}
-      <Hub title="Money" subtitle="What customers owe, what we owe, what we've committed to spend — and who we buy from." tabs={tabs} rememberKey="money" />
+      {/* A vertical toolbar (like Knowify's icon bar) instead of tabs, so the
+          office finds each page where it used to be. */}
+      <Hub layout="rail" title="Money" subtitle="What customers owe, what we owe, what we've committed to spend — and who we buy from." tabs={tabs} rememberKey="money" />
     </>
   )
 }

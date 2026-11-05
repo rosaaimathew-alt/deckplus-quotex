@@ -185,6 +185,7 @@ export const STATUS_STYLE = {
   draft:       { label: 'Draft',       cls: 'bg-gray-100 text-gray-600' },
   void:        { label: 'Void',        cls: 'bg-gray-100 text-gray-400 line-through' },
   open:        { label: 'Open',        cls: 'bg-green-600 text-white' },
+  active:      { label: 'Active',      cls: 'bg-green-500 text-white' },   // an open PO, as Knowify shows it
   closed:      { label: 'Closed',      cls: 'bg-gray-400 text-white' },
 }
 
