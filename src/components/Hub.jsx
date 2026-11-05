@@ -7,7 +7,7 @@ import { useSearchParams } from 'react-router-dom'
 // screen shows just what that task needs. The open tab lives in the URL
 // (?tab=jobs) so links, the back button and refreshes land on the same view.
 //
-//   <Hub title="Projects" subtitle="…" tabs={[{ key, label, icon, count, render }]} />
+//   <Hub title="Projects" tabs={[{ key, label, icon, count, render }]} />
 
 function useHubTab(tabs, fallback) {
   const [params, setParams] = useSearchParams()

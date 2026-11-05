@@ -67,7 +67,7 @@ export function SalesHub() {
     designs:   () => <Designs />,
   }, { proposals: { count: dueCount, countTone: 'alert' } })
 
-  return <Hub title="Sales" subtitle="Every quote from first draft to signed — and who you sent it to." tabs={tabs} actions={<NewQuoteButton />} rememberKey="sales" />
+  return <Hub title="Sales" tabs={tabs} actions={<NewQuoteButton />} rememberKey="sales" />
 }
 
 // ── Projects ─────────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ export function ProjectsHub() {
     const filter = params.get('filter')
     return <Navigate to={`/contracts${filter ? `?filter=${encodeURIComponent(filter)}` : ''}`} replace />
   }
-  return <Hub title="Projects" subtitle="Won work: the build, the schedule and the crews." tabs={tabs} rememberKey="projects" />
+  return <Hub title="Projects" tabs={tabs} rememberKey="projects" />
 }
 
 // ── Contracts ────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@ export function ContractsHub() {
   const tabs = withRender(tabsOf('contracts'), {
     all: () => <ContractsList initialFilter={params.get('filter') || undefined} />,
   })
-  return <Hub title="Contracts" subtitle="Prepare, send and track signatures for every won job." tabs={tabs} />
+  return <Hub title="Contracts" tabs={tabs} />
 }
 
 // ── Insights ─────────────────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ export function InsightsHub() {
     expenses: () => <Finance />,
   }, { profit: { count: pendingCosts } })
 
-  return <Hub title="Insights" subtitle="How the business is doing — revenue, wins, margins and spend." tabs={tabs} rememberKey="insights" />
+  return <Hub title="Insights" tabs={tabs} rememberKey="insights" />
 }
 
 // ── Money ────────────────────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ export function MoneyHub() {
       )}
       {/* A vertical toolbar (like Knowify's icon bar) instead of tabs, so the
           office finds each page where it used to be. */}
-      <Hub layout="rail" title="Money" subtitle="What customers owe, what we owe, what we've committed to spend — and who we buy from." tabs={tabs} rememberKey="money" />
+      <Hub layout="rail" title="Money" tabs={tabs} rememberKey="money" />
     </>
   )
 }
@@ -174,5 +174,5 @@ export function CatalogHub() {
     import:    () => <Analyze />,
     assistant: () => <AiChat />,
   })
-  return <Hub title="Catalog" subtitle="Your prices and the rates the deck and porch builders use." tabs={tabs} actions={<NewQuoteButton />} rememberKey="catalog" />
+  return <Hub title="Catalog" tabs={tabs} actions={<NewQuoteButton />} rememberKey="catalog" />
 }
