@@ -36,7 +36,7 @@
   body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; }
   .app { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: 100%; }
   body.embed .app { grid-template-columns: minmax(0, 1fr); }
-  body.embed aside.rail, body.embed .mode, body.embed .render-btn, body.embed .summary, body.embed .hint, body.embed .dim, body.embed .plan-actions, body.embed .plan-tools { display: none !important; }
+  body.embed aside.rail, body.embed .mode, body.embed .summary, body.embed .hint, body.embed .dim, body.embed .plan-actions, body.embed .plan-tools { display: none !important; }
   html.embed, html.embed body { height: 100% !important; } html.embed .app { height: 100% !important; grid-template-rows: minmax(0, 1fr); } html.embed .stage { height: 100% !important; min-height: 0 !important; order: 0 !important; }
   .rail { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto;
     padding-block: 20px 28px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: 20px;
@@ -2759,14 +2759,30 @@
 
   // ── Photo render ─────────────────────────────────────────────────────────
   function describe() {
+    const SK = { horizontal: 'horizontal composite board skirting', pt: 'stained pressure-treated board skirting', lattice: 'stained square-grid lattice skirting' };
+    const free = S.free || {}, plats = free.plats || [];
+    const extra = [
+      ...plats.map(p => { const xs = p.pts.map(q => q[0]), zs = p.pts.map(q => q[1]), w = Math.round(Math.max(...xs) - Math.min(...xs)), d = Math.round(Math.max(...zs) - Math.min(...zs)), sk = p.skirt || S.skirt;
+        return `${w}×${d} ft ${p.kind === 'landing' ? 'stair landing' : 'deck'} ${ftIn(p.h)} above grade${sk && sk !== 'none' ? ` with ${SK[sk]}` : ''}`; }),
+      ...(free.stairs || []).filter(st => st.top - st.bottom > 0.3).map(st => `${st.w} ft wide stairs with ${st.n - 1} treads${st.boxed ? ', boxed sides' : ''}`),
+    ];
+    const hs = HS(), house = hs ? [
+      `${hs.stories}-story house${hs.walkout ? ' over a walkout basement' : ''}, ${hs.wallWidthFt} ft wide`,
+      `${hs.siding} siding${hs.lower && hs.lower !== 'none' ? ` with ${hs.lower} on the lower ${hs.lowerHeightFt} ft` : ''}`,
+      hs.roofStyle === 'hip' ? 'hip roof' : hs.roofStyle === 'gable-front' ? 'gable roof facing the yard' : 'gable roof with the ridge along the back',
+      ...(hs.segments || []).filter(g => Number(g.outFt) > 0.5).map(g => `${g.shape === 'bay' ? 'angled bay' : 'bump-out'} ${g.widthFt} ft wide projecting ${g.outFt} ft with a ${g.roof} roof`),
+      ...(hs.crossGables || []).map(c => `cross gable ${c.widthFt} ft wide on the back wall`),
+      hs.chimney && hs.chimney !== 'none' ? `${hs.chimneyMaterial} chimney` : '',
+      hs.shutters ? 'shutters on the windows' : '',
+    ].filter(Boolean).join(', ') : `house in ${HOUSES.find(h => h.key === S.house).name.toLowerCase()}`;
     const parts = S.sections.map(s => {
-      if (s.kind === 'porch') return `${s.w}×${s.d} ft ${PORCH_TYPES[s.type].toLowerCase()} with a ${ROOF_LABEL[s.roof].toLowerCase()} (${s.tie === 'wall' ? 'tied to the house wall' : s.tie === 'roof' ? 'tied into the house roof' : 'freestanding, detached from the house'})${hasGableEnd(s) ? `, ${gableEndOf(s)} gable end` : ''}`;
+      if (s.kind === 'porch') return `${s.w}×${s.d} ft ${PORCH_TYPES[s.type].toLowerCase()} with a ${pitchOf(s)} ${ROOF_LABEL[s.roof].toLowerCase()}${s.skirt && s.skirt !== 'none' ? `, ${SK[s.skirt]} under its floor` : ''} (${s.tie === 'wall' ? 'tied to the house wall' : s.tie === 'roof' ? 'tied into the house roof' : 'freestanding, detached from the house'})${hasGableEnd(s) ? `, ${gableEndOf(s)} gable end` : ''}`;
       if (s.kind === 'deck') return `${s.w}×${s.d} ft raised deck with stairs`;
       return `${s.w}×${s.d} ft ${s.mat === 'concrete' ? 'concrete' : 'paver'} patio`;
     });
     const deck = S.decking === 'pt' ? 'pressure-treated wood decking' : `${DECKING[S.decking].label} composite decking in ${COLORS.find(c => c.key === S.color).name}`;
     const rail = S.rail === 'aluminum' ? 'black aluminum railing' : 'white railing with a composite cap and black round balusters';
-    return `${parts.join(', ')}; ${deck}; ${rail}; ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()} trim and columns; house in ${HOUSES.find(h => h.key === S.house).name.toLowerCase()}; floor ${ftIn(S.H)} above grade`;
+    return `${[...parts, ...extra].join(', ')}; ${deck}; ${rail}; ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()} trim and columns; ${house}; floor ${ftIn(S.H)} above grade`;
   }
   const promptText = () => `Turn this 3D model screenshot into a photorealistic exterior photograph of the same scene, as if taken with a professional camera on a sunny afternoon. Keep exactly the same camera angle, framing, house and every built element (posts, headers, roof shape, windows, doors, screens, railings, stairs, deck boards, patio) in the same positions, sizes and proportions. Do not add, remove or move any structural element. Keep the same colors and materials. Make it look real: true wood-grain composite decking, crisp painted trim, real siding or brick, architectural shingles, a natural lawn, realistic shrubs and trees, soft natural sunlight with accurate shadows. No people, no text. Project: ${describe()}.`;
   function snapshot(maxW = 1600) {

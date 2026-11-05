@@ -1179,7 +1179,7 @@
   }
   function init3D() {
     frame = document.createElement('iframe');
-    frame.src = 'porch-3d.html?embed=1'; frame.title = '3D view'; frame.setAttribute('allow', 'fullscreen');
+    frame.src = 'porch-3d.html?embed=1' + (CUSTOMER ? '&view=customer' : ''); frame.title = '3D view'; frame.setAttribute('allow', 'fullscreen');
     frame.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;display:block';
     $('view').appendChild(frame);
     window.addEventListener('message', (ev) => {
