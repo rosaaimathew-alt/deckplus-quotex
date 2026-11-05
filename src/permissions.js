@@ -42,16 +42,16 @@ export const isOff = (permissions, key) => permissions?.[key] === false
 // Paths shared by several tabs (/tracker, /jobs, /catalog) aren't listed:
 // switching one of those tabs off doesn't take the others with it.
 export const PATH_KEYS = {
-  '/clients':       'sales.clients',
+  '/clients':       'sales.proposals',
   '/contracts':     'contracts.all',
   '/scheduler':     'projects.calendar',
-  '/subs':          'projects.crews',
+  '/subs':          'money.vendors',
   '/checklists':    'projects.checklists',
   '/analytics':     'insights.overview',
   '/profitability': 'insights.profit',
   '/finance':       'insights.expenses',
   '/analyze':       'catalog.import',
-  '/ai':            'catalog.assistant',
+  '/ai':            'catalog.import',
 }
 
 // For the Team screen: which switches this person's department allows at all.

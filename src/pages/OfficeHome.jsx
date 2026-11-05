@@ -6,7 +6,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Hammer, FileSignature, ShoppingCart, Receipt, FileText, CalendarDays, ClipboardCheck, FilePen,
-  LayoutDashboard, Calculator, Users, Truck, Wrench, Package, AlertTriangle, ChevronRight,
+  LayoutDashboard, Calculator, Users, Truck, Package, AlertTriangle, ChevronRight,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { useNav } from '../nav'
@@ -62,9 +62,8 @@ export default function OfficeHome() {
       can('/profitability') && { icon: Calculator, label: 'Job profit', to: '/insights?tab=profit' },
     ] },
     { title: 'Company', tiles: [
-      can('/clients') && { icon: Users, label: 'Clients', to: '/sales?tab=clients' },
+      can('/tracker') && { icon: Users, label: 'Clients', to: '/sales?tab=proposals' },
       mt.has('vendors') && { icon: Truck, label: 'Vendors', note: paperwork ? `${paperwork} paperwork problem${paperwork === 1 ? '' : 's'}` : '', tone: 'red', to: '/money?tab=vendors' },
-      can('/subs') && { icon: Wrench, label: 'Subcontractors', to: '/projects?tab=crews' },
       can('/catalog') && { icon: Package, label: 'Catalog', to: '/catalog?tab=items' },
     ] },
   ].map(s => ({ ...s, tiles: s.tiles.filter(Boolean) })).filter(s => s.tiles.length)

@@ -11,6 +11,7 @@ import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
 import { useNav, useJobMoney } from '../nav'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
+import { useJobCostOf } from '../lib/jobCost'
 import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'
 import { QuickPicks } from '../components/FilterBar'
 import {
@@ -1470,7 +1471,15 @@ function CloseOutModal({ proposal, onClose }) {
   const revenue = contractTotalOf(proposal) + approvedChangeOrderTotal(proposal)
 
   const [completionDate, setCompletionDate] = useState(today())
-  const [profit, setProfit] = useState('')   // total profit $ achieved (optional, manual)
+  // Costs already recorded (Money's POs and bills, job receipts) — not counting
+  // an older hand-entered total, which this close-out replaces.
+  const costOf = useJobCostOf()
+  const fin = costOf(proposal)
+  const legacy = useStore(s => s.jobCosts?.[proposal.id])
+  const legacyCost = ['materials', 'labor', 'subcontractors', 'other'].reduce((t, k) => t + (Number(legacy?.[k]) || 0), 0)
+  const recordedCost = Math.max(0, fin.actualCost - legacyCost)
+  // Starts at what the books say; the PM can still correct it
+  const [profit, setProfit] = useState(() => (recordedCost > 0 ? String(Math.round(revenue - recordedCost)) : ''))   // total profit $ achieved
   const [sendEmail, setSendEmail] = useState(true)
   const [closing, setClosing] = useState(false)
   const [error, setError] = useState('')
@@ -1484,11 +1493,13 @@ function CloseOutModal({ proposal, onClose }) {
     setClosing(true); setError('')
     try {
       updateJobData(proposal.id, { completionDate, closedAt: new Date().toISOString() })
-      // If a profit was entered, record it so it flows to the Profitability tracker.
-      // The tracker computes profit as revenue − costs, so we store cost = revenue − profit.
+      // If a profit was entered, record the cost the books don't already
+      // have (revenue - profit - recorded costs), so Insights › Profit shows
+      // exactly this profit without counting the POs and bills twice.
       if (profit !== '' && !Number.isNaN(Number(profit))) {
         const p = Number(profit)
-        saveJobCosts(proposal.id, { other: Math.max(0, revenue - p), enteredProfit: p, source: 'manual-closeout' })
+        const gap = Math.max(0, revenue - p - recordedCost)
+        if (gap > 0 || legacy) saveJobCosts(proposal.id, { other: gap, enteredProfit: p, source: 'manual-closeout' })
       }
       toggleJobStage(proposal.id, 'payment')
       toggleJobStage(proposal.id, 'closed')
@@ -1543,7 +1554,7 @@ function CloseOutModal({ proposal, onClose }) {
           <div className="border border-gray-200 rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-gray-700">Profit on this job <span className="font-normal text-gray-400">(optional)</span></label>
-              <span className="text-xs text-gray-400">Revenue ${fmtDol(revenue)}</span>
+              <span className="text-xs text-gray-400">Revenue ${fmtDol(revenue)}{recordedCost > 0 ? ` · costs on file $${fmtDol(recordedCost)}` : ''}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1624,6 +1635,26 @@ function buildCloseOutHtml({ client, contractNum, address, projectType, completi
 </body></html>`
 }
 
+// ── Money tab: everything the job costs and brings in, one switch away ──────
+function JobMoneyTab({ proposal, books, costCount }) {
+  const parts = [
+    { value: 'budget', label: 'Budget' },
+    { value: 'costs', label: 'Costs', count: costCount || null },
+    { value: 'pricelist', label: 'Price list' },
+    ...(books ? [{ value: 'transactions', label: 'Invoices, POs & bills' }] : []),
+  ]
+  const [part, setPart] = useState('budget')
+  return (
+    <div className="space-y-4">
+      <div className="border-b border-gray-200"><QuickPicks value={part} onChange={setPart} options={parts} /></div>
+      {part === 'budget' && <BudgetTab proposal={proposal} />}
+      {part === 'costs' && <JobFinancials proposal={proposal} />}
+      {part === 'pricelist' && <JobPriceList proposal={proposal} />}
+      {part === 'transactions' && books && <JobTransactions proposal={proposal} />}
+    </div>
+  )
+}
+
 // ── Job Card ────────────────────────────────────────────────────────────────
 function JobCard({ proposal, jobMoney = null, focus = false }) {
   const { toggleJobStage, updateJobData } = useStore()
@@ -1631,7 +1662,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const { tabsOf } = useNav()
   const money = useJobMoney()   // off: no Budget / Price list / Costs / Receipts (Settings › Team › Access)
   // Invoices, POs and bills: office / admin with the Money pages and job money on.
-  const books = money && tabsOf('money').length > 0
+  const books = money && tabsOf('money').some(t => t.key !== 'vendors')
   const [expanded, setExpanded] = useState(focus)
   const [tab, setTab] = useState(focus && books ? 'summary' : 'stages')
   const cardRef = useRef(null)
@@ -1669,15 +1700,11 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
     ...(books ? [{ key: 'summary', label: 'Summary' }] : []),
     { key: 'stages',  label: 'Stages' },
     ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0) ? ` (${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0)})` : ''}` }] : []),
-    ...(money ? [
-      { key: 'budget',  label: 'Budget' },
-      { key: 'pricelist', label: 'Price list' },
-      { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
-    ] : []),
+    // Budget, costs, price list and the job's invoices / POs / bills: one Money tab
+    ...(money ? [{ key: 'money', label: 'Money' }] : []),
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
     { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
-    ...(books ? [{ key: 'transactions', label: 'Transactions' }] : []),
     { key: 'documents', label: `Documents${docCount ? ` (${docCount})` : ''}` },
   ]
 
@@ -1715,8 +1742,9 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
         {jobMoney && (
           <div className="hidden lg:flex items-center gap-5 shrink-0 text-right">
             <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Revenue</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.revenue)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.invoiced)} invoiced</p></div>
-            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Committed</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.committed)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.committedByType.materials || 0)} materials</p></div>
-            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Profit</p><p className={`text-sm font-semibold ${jobMoney.profit < 0 ? 'text-red-600' : 'text-gray-900'}`}>{money0(jobMoney.profit)}</p>{jobMoney.committed ? <p className="text-[10px] text-gray-400">{Math.round(jobMoney.margin)}% margin</p> : null}</div>
+            {/* Cost and profit: the same numbers as Insights › Profit (lib/jobCost.js) */}
+            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Cost</p><p className="text-sm font-semibold text-gray-900">{jobMoney.fin.hasCosts ? money0(jobMoney.fin.actualCost) : '—'}</p><p className="text-[10px] text-gray-400">{jobMoney.fin.hasCosts ? `${money0(jobMoney.committedByType.materials || 0)} materials` : 'no costs yet'}</p></div>
+            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Profit</p><p className={`text-sm font-semibold ${jobMoney.fin.hasCosts && jobMoney.fin.profit < 0 ? 'text-red-600' : 'text-gray-900'}`}>{jobMoney.fin.hasCosts ? money0(jobMoney.fin.profit) : '—'}</p>{jobMoney.fin.hasCosts && jobMoney.fin.margin != null ? <p className="text-[10px] text-gray-400">{Math.round(jobMoney.fin.margin)}% margin</p> : null}</div>
           </div>
         )}
         {/* One progress figure: "8 of 15 steps" with a thin bar; a pill only
@@ -1885,14 +1913,11 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
               </div>
             )}
             {tab === 'permits' && showPermits && <PermitsTab proposal={proposal} stages={stages} readOnly={permitAccess !== 'edit'} />}
-            {tab === 'budget'  && money && <BudgetTab proposal={proposal} />}
-            {tab === 'pricelist' && money && <JobPriceList proposal={proposal} />}
-            {tab === 'costs'   && money && <JobFinancials proposal={proposal} />}
+            {tab === 'money' && money && <JobMoneyTab proposal={proposal} books={books} costCount={costCount} />}
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}
             {tab === 'summary' && books && <JobSummary proposal={proposal} />}
-            {tab === 'transactions' && books && <JobTransactions proposal={proposal} />}
             {tab === 'documents' && <JobDocuments proposal={proposal} showReceipts={money} />}
           </div>
         </div>
@@ -1909,7 +1934,8 @@ export default function Jobs() {
   const purchases = useStore(s => s.purchases)
   const bills     = useStore(s => s.bills)
   const { tabsOf } = useNav()
-  const showMoney = useJobMoney() && tabsOf('money').length > 0
+  const showMoney = useJobMoney() && tabsOf('money').some(t => t.key !== 'vendors')
+  const costOf = useJobCostOf()
   const moneyIdx  = useMemo(() => (showMoney ? booksIndex({ invoices, purchases, bills }) : null), [showMoney, invoices, purchases, bills])
   const [params] = useSearchParams()
   const focusId = params.get('job')
@@ -2062,7 +2088,7 @@ export default function Jobs() {
 
       <div className="space-y-3">
         {focusId && <a href="?tab=jobs" className="inline-block text-xs text-[var(--brand-700)] hover:underline mb-1">← All jobs</a>}
-        {filtered.map(p => <JobCard key={p.id} proposal={p} focus={String(p.id) === focusId} jobMoney={moneyIdx ? jobMoneyFromIndex(p, moneyIdx) : null} />)}
+        {filtered.map(p => <JobCard key={p.id} proposal={p} focus={String(p.id) === focusId} jobMoney={moneyIdx ? { ...jobMoneyFromIndex(p, moneyIdx), fin: costOf(p) } : null} />)}
       </div>
     </div>
   )

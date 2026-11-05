@@ -2,12 +2,13 @@ import { useState, useMemo, useRef } from 'react'
 import StatCard from '../components/StatCard'
 import { loadPdfjs } from '../lib/pdfjs'
 import { useStore } from '../store'
+import { useJobCostOf } from '../lib/jobCost'
 import {
   Upload, Plus, X, Trash2, Pencil, CreditCard, Loader, Check, Search, Wallet, AlertTriangle,
   ChevronDown, ChevronRight, Package, Repeat, Briefcase, LayoutDashboard, Receipt,
 } from 'lucide-react'
 import {
-  BUCKETS, CATEGORIES, bucketOf, isAllocation, inPeriod, periodFor, companySummary, jobFinancials,
+  BUCKETS, CATEGORIES, bucketOf, isAllocation, inPeriod, periodFor, companySummary,
   adjustedForUnaccounted, monthlyCostOf, yearlyCostOf, nextRenewal, suggestBucket, matchSubscription, inventorySummary,
 } from '../lib/finance'
 import JobFinancials from '../components/JobFinancials'
@@ -444,10 +445,10 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
 }
 
 // ── Jobs P&L ─────────────────────────────────────────────────────────────────
-function JobsTab({ jobs, expenses, jobCosts, rate }) {
+function JobsTab({ jobs, costOf, rate }) {
   const [open, setOpen] = useState(null)
   const rows = jobs.map(j => {
-    const fin = jobFinancials(j, expenses, jobCosts?.[j.id])
+    const fin = costOf(j)
     return { j, fin, adj: adjustedForUnaccounted(fin, rate) }
   }).sort((a, b) => b.fin.revenue - a.fin.revenue)
   const tot = rows.reduce((t, r) => ({ rev: t.rev + r.fin.revenue, cost: t.cost + r.fin.actualCost, profit: t.profit + r.fin.profit, adj: t.adj + r.adj.profit, due: t.due + r.fin.balanceDue }), { rev: 0, cost: 0, profit: 0, adj: 0, due: 0 })
@@ -712,8 +713,9 @@ export default function Finance() {
 
   const period = useMemo(() => periodFor(periodKey), [periodKey])
   const jobs = useMemo(() => (proposals || []).filter(p => p.status === 'Won'), [proposals])
-  const sum = useMemo(() => companySummary({ expenses, proposals: proposals || [], subscriptions, jobCosts, period }), [expenses, proposals, subscriptions, jobCosts, period])
-  const rateYear = useMemo(() => companySummary({ expenses, proposals: proposals || [], subscriptions, jobCosts, period: periodFor('year') }).unaccountedRate, [expenses, proposals, subscriptions, jobCosts])
+  const costOf = useJobCostOf()
+  const sum = useMemo(() => companySummary({ expenses, proposals: proposals || [], subscriptions, jobCosts, period, costOf }), [expenses, proposals, subscriptions, jobCosts, period, costOf])
+  const rateYear = useMemo(() => companySummary({ expenses, proposals: proposals || [], subscriptions, jobCosts, period: periodFor('year'), costOf }).unaccountedRate, [expenses, proposals, subscriptions, jobCosts, costOf])
   const cashInPeriod = useMemo(() => expenses.filter(e => !isAllocation(e) && inPeriod(e.date, period)), [expenses, period])
 
   return (
@@ -743,7 +745,7 @@ export default function Finance() {
 
       {tab === 'overview' && <Overview sum={sum} period={period} onReviewUnaccounted={() => { setBucketFilter('misc'); setTab('expenses') }} />}
       {tab === 'expenses' && <ExpensesTab list={cashInPeriod} cards={cards} jobs={jobs} bucketFilter={bucketFilter} setBucketFilter={setBucketFilter} />}
-      {tab === 'jobs' && <JobsTab jobs={jobs} expenses={expenses} jobCosts={jobCosts} rate={rateYear} />}
+      {tab === 'jobs' && <JobsTab jobs={jobs} costOf={costOf} rate={rateYear} />}
       {tab === 'subscriptions' && <SubscriptionsTab subscriptions={subscriptions} expenses={expenses} cards={cards} period={period}
         onLogCharge={(sub) => setAdding({ description: sub.name, amount: String(sub.amount), bucket: 'subscription', category: sub.category || 'Software', subscriptionId: sub.id, cardId: sub.cardId || cards[0]?.id || '' })} />}
       {tab === 'inventory' && <InventoryTab expenses={expenses} jobs={jobs} period={period} onAddPurchase={() => setAdding({ bucket: 'inventory', category: 'Decking' })} />}

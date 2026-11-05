@@ -5,6 +5,7 @@ import { openProposal } from '../lib/openProposal'
 import { MenuChip, QuickPicks, SwitchChip, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
+import { headlineNumbers } from '../lib/headline'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import { withSavedDesign } from '../lib/designSnapshot'
 import {
@@ -89,8 +90,7 @@ function ActivityView({ proposals }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 max-w-2xl">
-      <p className="text-sm font-semibold text-gray-800 mb-1">Proposal Activity</p>
-      <p className="text-xs text-gray-400 mb-4">Every time a customer opens a proposal — newest first.</p>
+      <p className="text-sm font-semibold text-gray-800 mb-4">Opened by customers, newest first</p>
       {events === null ? (
         <p className="text-xs text-gray-400 italic py-6 text-center">Loading activity…</p>
       ) : events.length === 0 ? (
@@ -100,19 +100,6 @@ function ActivityView({ proposals }) {
       )}
     </div>
   )
-}
-
-// Collapse proposal groups to client-level outcomes for analytics
-function clientOutcomes(proposals) {
-  const groups = buildGroups(proposals)
-  return groups.map(({ root, revisions }) => {
-    const all = [root, ...revisions]
-    const isWon = all.some(p => p.status === 'Won')
-    // Archived = superseded revision of a won deal; neutral, not a loss.
-    const live = all.filter(p => p.status !== 'Archived')
-    const isLost = !isWon && live.length > 0 && live.every(p => p.status === 'Lost')
-    return { all, isWon, isLost }
-  })
 }
 
 const fmt = (n) =>
@@ -1038,23 +1025,17 @@ function AnalyticsView({ proposals: allProposals, periodKey = 'this-year' }) {
     return d >= pStart && d <= pEnd
   })
 
-  const won    = proposals.filter(p => p.status === 'Won')
+  // Revenue, win rate, average job and pipeline: the same rules as Home and
+  // Overview (lib/headline.js)
+  const h      = headlineNumbers(allProposals, pStart, pEnd)
+  const won    = h.won
   const lost   = proposals.filter(p => p.status === 'Lost')
-  // Open pipeline: each client's latest version only
-  const active = latestIterations(allProposals).filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status))
+  const wonClients    = h.wonClients
+  const notWonClients = h.clients.filter(g => !wonClients.includes(g))
+  const winRate = h.winRate !== null ? Math.round(h.winRate) : null
+  const uniqueClients = h.clients.length
 
-  // Win rate always all-time so client grouping is never broken by period filter
-  const outcomes      = clientOutcomes(allProposals)
-  const wonClients    = outcomes.filter(o => o.isWon)
-  const notWonClients = outcomes.filter(o => !o.isWon)
-  const winRate = outcomes.length > 0
-    ? Math.round((wonClients.length / outcomes.length) * 100)
-    : null
-  const uniqueClients = outcomes.length
-
-  const avgWon = won.length > 0
-    ? won.reduce((s, p) => s + wonRevenueOf(p), 0) / won.length
-    : null
+  const avgWon = h.avgJob
   const avgLost = lost.length > 0
     ? lost.reduce((s, p) => s + (p.total || 0), 0) / lost.length
     : null
@@ -1066,8 +1047,8 @@ function AnalyticsView({ proposals: allProposals, periodKey = 'this-year' }) {
     ? Math.round(closeTimes.reduce((a, b) => a + b, 0) / closeTimes.length)
     : null
 
-  const pipelineValue = active.reduce((s, p) => s + (p.total || 0), 0)
-  const wonRevenue = won.reduce((s, p) => s + wonRevenueOf(p), 0)
+  const pipelineValue = h.pipeline
+  const wonRevenue = h.wonRevenue
 
   // Win/Loss reason breakdown — only count proposals currently in Won or Lost status
   // (a proposal previously marked Lost then changed back to Sent still has winLossReason set)
@@ -1094,7 +1075,7 @@ function AnalyticsView({ proposals: allProposals, periodKey = 'this-year' }) {
     <div className="space-y-6">
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Win rate" value={winRate !== null ? `${winRate}%` : '—'} sub={`${wonClients.length} won / ${notWonClients.length} not won · ${uniqueClients} clients`} />
+        <StatCard label="Win rate" value={winRate !== null ? `${winRate}%` : '—'} sub={`${wonClients.length} of ${uniqueClients} clients signed · ${notWonClients.length} not yet`} />
         <StatCard label="Average won job" value={avgWon !== null ? fmtShort(avgWon) : '—'} sub={`vs ${avgLost !== null ? fmtShort(avgLost) : '—'} average lost`} />
         <StatCard label="Days to close" value={avgDaysToClose !== null ? avgDaysToClose : '—'} sub="sent → won, on average" />
         <StatCard label="Won revenue" value={`$${fmt(wonRevenue)}`} sub={`$${fmt(pipelineValue)} open pipeline`} />
@@ -1178,7 +1159,7 @@ function matchesStatus(p, f) {
 // Inside the Sales destination the hub picks the view (list / pipeline /
 // activity) and this page hides its own title and tab switcher. `initialStatus`
 // pre-filters the list (e.g. links from Home's "needs attention").
-export default function ProposalTracker({ view, initialStatus } = {}) {
+export default function ProposalTracker({ view, initialStatus, initialQuery = '', initialOpens = false } = {}) {
   const {
     updateProposalStatus, setWinLossReason,
     addReminder, dismissReminder,
@@ -1193,6 +1174,10 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
   const [ownTab, setTab] = useState('list')
   const tab = view || ownTab
   const [filterStatus, setFilterStatus] = useState(initialStatus || 'All')
+  // Search by client, email, phone or address (this used to be the Clients tab)
+  const [query, setQuery] = useState(initialQuery)
+  // Who opened what, newest first (this used to be the Opens tab)
+  const [showOpens, setShowOpens] = useState(initialOpens)
   const [periodFilter, setPeriodFilter] = useState('this-year')
   const [statsHidden, setStatsHidden] = useState(() => {
     // Collapsed by default — only expanded if the user explicitly chose to show it.
@@ -1204,6 +1189,11 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
     return n
   })
   const [winLossTarget, setWinLossTarget] = useState(null)
+  const searched = React.useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return proposals
+    return proposals.filter(p => [p.client, p.email, p.phone, p.address].some(v => String(v || '').toLowerCase().includes(q)))
+  }, [proposals, query])
   const [wlPeriod, setWlPeriod] = useState('this-year')
   const [reminderProposalId, setReminderProposalId] = useState(null)
   const [reminderDate, setReminderDate] = useState('')
@@ -1344,6 +1334,13 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
           ))}
         </div>
         {tab === 'list' && (
+          <label className="flex items-center gap-2 h-9 text-sm min-w-0">
+            <Search size={14} className="text-gray-400 shrink-0" />
+            <input className="w-36 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+              placeholder="Search clients" value={query} onChange={e => setQuery(e.target.value)} aria-label="Search clients" />
+          </label>
+        )}
+        {tab === 'list' && !showOpens && (
           <>
             <QuickPicks value={QUICK_STATUS.includes(filterStatus) ? filterStatus : null} onChange={setFilterStatus}
               options={QUICK_STATUS.map(s => ({ value: s, label: s, count: statusCount(s) }))} />
@@ -1359,9 +1356,15 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
           )}
           {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           {tab === 'list' && (
+            <button type="button" onClick={() => setShowOpens(v => !v)} aria-pressed={showOpens} title="When customers opened their proposals"
+              className={`flex items-center gap-1.5 h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${showOpens ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+              <Eye size={14} /> Opens
+            </button>
+          )}
+          {tab === 'list' && !showOpens && (
             <SwitchChip label="Numbers" checked={!statsHidden} onChange={toggleStats} title="Show totals for a period" />
           )}
-          {tab === 'list' && !statsHidden && (
+          {tab === 'list' && !showOpens && !statsHidden && (
             <MenuChip label="Period" value={periodFilter} onChange={setPeriodFilter} align="right"
               options={STATS_PERIODS.map(({ id, label }) => ({ value: id, label }))} />
           )}
@@ -1372,7 +1375,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
         </div>
       </div>
       {/* Stats strip */}
-      {!statsHidden && tab === 'list' && (() => {
+      {!statsHidden && tab === 'list' && !showOpens && (() => {
         const now = new Date()
         const inPeriod = (p) => {
           const d = new Date(p.closedAt || p.createdAt || p.sentAt || Date.now())
@@ -1414,9 +1417,10 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
       })()}
 
       {/* Tab content */}
-      {tab === 'list' && (
+      {tab === 'list' && showOpens && <ActivityView proposals={searched} />}
+      {tab === 'list' && !showOpens && (
         <ListView
-          proposals={proposals}
+          proposals={searched}
           filterStatus={filterStatus}
           onStatusChange={handleStatusChange}
           onReminderOpen={openReminder}

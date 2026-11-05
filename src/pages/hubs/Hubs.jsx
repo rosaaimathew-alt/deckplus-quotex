@@ -10,20 +10,17 @@ import { useStore } from '../../store'
 import { nextReminderDate, isJobClosed, isJob } from '../../lib/attention'
 
 import ProposalTracker from '../ProposalTracker'
-import ClientList from '../ClientList'
 import Jobs from '../Jobs'
 import InspectionBoard from '../InspectionBoard'
 import { permitTracked, boardCells } from '../../lib/permitTracking'
 import ContractsList from '../ContractsList'
 import PMCalendar from '../PMCalendar'
-import Subcontractors from '../Subcontractors'
 import Checklists from '../Checklists'
 import Analytics from '../Analytics'
 import ProfitabilityTracker from '../ProfitabilityTracker'
 import Finance from '../Finance'
 import ItemCatalog from '../ItemCatalog'
 import Analyze from '../Analyze'
-import AiChat from '../AiChat'
 import Designs from '../Designs'
 import Invoices from '../books/Invoices'
 import Bills from '../books/Bills'
@@ -31,6 +28,7 @@ import Purchases from '../books/Purchases'
 import Vendors from '../books/Vendors'
 import ChangeOrdersAll from '../books/ChangeOrdersAll'
 import { invoiceStatus, billStatus, jobIndex } from '../../lib/books'
+import { useJobCostOf } from '../../lib/jobCost'
 
 
 const withRender = (tabs, renderers, counts = {}) =>
@@ -48,13 +46,15 @@ export function SalesHub() {
     n + (p.reminders || []).filter(r => { const d = nextReminderDate(r); return d && new Date(d + 'T00:00:00') <= new Date() }).length, 0), [proposals])
 
   const tabs = withRender(tabsOf('sales'), {
-    proposals: () => <ProposalTracker view="list" initialStatus={status} />,
+    proposals: () => <ProposalTracker view="list" initialStatus={status} initialQuery={q} initialOpens={params.get('opens') === '1'} />,
     pipeline:  () => <ProposalTracker view="pipeline" initialStatus={status} />,
-    clients:   () => <ClientList initialQuery={q} />,
-    opens:     () => <ProposalTracker view="activity" />,
     designs:   () => <Designs />,
   }, { proposals: { count: dueCount, countTone: 'alert' } })
 
+  // Clients and Opens now live inside Proposals (search box, Opens switch)
+  const old = params.get('tab')
+  if (old === 'clients') return <Navigate to={`/sales?tab=proposals${q ? `&q=${encodeURIComponent(q)}` : ''}`} replace />
+  if (old === 'opens') return <Navigate to="/sales?tab=proposals&opens=1" replace />
   return <Hub title="Sales" tabs={tabs} rememberKey="sales" />
 }
 
@@ -78,10 +78,11 @@ export function ProjectsHub() {
     changeorders: () => <ChangeOrdersAll />,
     inspections: () => <InspectionBoard />,
     calendar:   () => <PMCalendar />,
-    crews:      () => <Subcontractors />,
     checklists: () => <Checklists />,
   }, counts)
 
+  // Subcontractors moved to Money › Vendors
+  if (params.get('tab') === 'crews') return <Navigate to="/money?tab=vendors" replace />
   // Contracts used to be a tab here — send old links to their own page
   if (params.get('tab') === 'contracts') {
     const filter = params.get('filter')
@@ -105,9 +106,9 @@ export function ContractsHub() {
 export function InsightsHub() {
   const { tabsOf } = useNav()
   const proposals = useStore(s => s.proposals)
-  const jobCosts  = useStore(s => s.jobCosts)
+  const costOf    = useJobCostOf()
   // Finished jobs still missing their actual costs (same rule as Home)
-  const pendingCosts = useMemo(() => proposals.filter(p => p.status === 'Won' && isJobClosed(p) && !(jobCosts || {})[p.id]).length, [proposals, jobCosts])
+  const pendingCosts = useMemo(() => proposals.filter(p => p.status === 'Won' && isJobClosed(p) && !costOf(p).hasCosts).length, [proposals, costOf])
 
   const tabs = withRender(tabsOf('insights'), {
     overview: () => <Analytics />,
@@ -155,12 +156,14 @@ export function MoneyHub() {
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
 export function CatalogHub() {
-  const { tabsOf } = useNav()
+  const { tabsOf, can } = useNav()
+  const [params] = useSearchParams()
   const tabs = withRender(tabsOf('catalog'), {
     items:     () => <ItemCatalog mode="catalog" />,
     rates:     () => <ItemCatalog mode="formulas" />,
-    import:    () => <Analyze />,
-    assistant: () => <AiChat />,
+    import:    () => <Analyze initialTab={params.get('mode') || 'analyze'} allowAi={can('/ai')} />,
   })
+  // AI edit used to be its own tab
+  if (params.get('tab') === 'assistant') return <Navigate to="/catalog?tab=import&mode=ai" replace />
   return <Hub title="Catalog" tabs={tabs} rememberKey="catalog" />
 }

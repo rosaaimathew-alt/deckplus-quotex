@@ -81,11 +81,11 @@ export function SwitchChip({ label, checked, onChange, title }) {
 }
 
 // Office / admin: show just my deals ("Mine") or the whole organization's.
-// Whose deals: each sales rep by name, then All.
+// Whose deals: All first, then each sales rep by name.
 export function RepToggle({ reps, repId, setRep }) {
   return (
     <div className="inline-flex flex-wrap items-center gap-4" role="group" aria-label="Whose numbers">
-      {[...reps.map(r => [r.id, r.name]), [null, 'All']].map(([id, label]) => (
+      {[[null, 'All'], ...reps.map(r => [r.id, r.name])].map(([id, label]) => (
         <button key={id || 'all'} type="button" onClick={() => setRep(id)} aria-pressed={repId === id}
           className={`h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${repId === id ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
           {label}

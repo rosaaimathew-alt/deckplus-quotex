@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, Check, Package, AlertTriangle, DollarSign, Store } from 'lucide-react'
 import { useStore } from '../store'
-import { CATEGORIES, jobFinancials, unaccountedRate, adjustedForUnaccounted, periodFor, inventorySummary, isAllocation } from '../lib/finance'
+import { useJobCostOf } from '../lib/jobCost'
+import { CATEGORIES, unaccountedRate, adjustedForUnaccounted, periodFor, inventorySummary, isAllocation } from '../lib/finance'
 
 // ── One job's money: what it sold for, what it cost, what's been collected ────
 // Used on the job (Jobs → Costs) and on Finance → Jobs. Costs are the shared
@@ -28,13 +29,13 @@ export default function JobFinancials({ proposal }) {
   const proposalsRaw    = useStore(s => s.proposals)
   const expenses        = useMemo(() => expensesRaw || [], [expensesRaw])
   const proposals       = useMemo(() => proposalsRaw || [], [proposalsRaw])
-  const legacy          = useStore(s => s.jobCosts?.[proposal.id])
   const addExpense      = useStore(s => s.addExpense)
   const deleteExpense   = useStore(s => s.deleteExpense)
   const addJobPayment   = useStore(s => s.addJobPayment)
   const removeJobPayment = useStore(s => s.removeJobPayment)
 
-  const fin = useMemo(() => jobFinancials(proposal, expenses, legacy), [proposal, expenses, legacy])
+  const costOf = useJobCostOf()
+  const fin = useMemo(() => costOf(proposal), [costOf, proposal])
   // The company's unaccounted rate this year — the share of revenue every job gives up to misc spend.
   const rate = useMemo(() => unaccountedRate({ expenses, proposals, period: periodFor('year') }), [expenses, proposals])
   const adj = adjustedForUnaccounted(fin, rate.rate)

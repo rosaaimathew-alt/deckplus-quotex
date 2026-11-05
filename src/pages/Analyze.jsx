@@ -1,5 +1,6 @@
 import { useState, useRef, lazy, Suspense } from 'react'
 import { QuickPicks } from '../components/FilterBar'
+import AiChat from './AiChat'
 import { loadPdfjs } from '../lib/pdfjs'
 import { getAnalyzeModel } from '../gemini'
 import { Upload, FileText, Image, File, Trash2, CheckCircle, AlertCircle, Save, RefreshCw } from 'lucide-react'
@@ -330,10 +331,13 @@ function AnalyzeTab() {
 const TABS = [
   { id: 'analyze', label: 'Analyze estimate' },
   { id: 'import',  label: 'Import spreadsheet' },
+  { id: 'ai',      label: 'AI edit' },
 ]
 
-export default function Analyze() {
-  const [tab, setTab] = useState('analyze')
+// Catalog › Import & AI: every way prices come in or get changed in bulk.
+export default function Analyze({ initialTab = 'analyze', allowAi = true }) {
+  const tabs = TABS.filter(t => t.id !== 'ai' || allowAi)
+  const [tab, setTab] = useState(tabs.some(t => t.id === initialTab) ? initialTab : 'analyze')
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -344,7 +348,7 @@ export default function Analyze() {
       </div>
 
       <div className="border-b border-gray-200 mb-6">
-        <QuickPicks value={tab} onChange={setTab} options={TABS.map(t => ({ value: t.id, label: t.label }))} />
+        <QuickPicks value={tab} onChange={setTab} options={tabs.map(t => ({ value: t.id, label: t.label }))} />
       </div>
 
       {/* Tab content */}
@@ -358,6 +362,7 @@ export default function Analyze() {
           <ImportTab />
         </Suspense>
       )}
+      {tab === 'ai' && <AiChat inline />}
     </div>
   )
 }

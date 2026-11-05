@@ -3,7 +3,7 @@ import StatCard from '../components/StatCard'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { MenuChip, QuickPicks } from '../components/FilterBar'
-import { clientGroups, latestIterations } from '../lib/proposalGroups'
+import { headlineNumbers } from '../lib/headline'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from '../historicalData'
 import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
 
@@ -748,6 +748,18 @@ function Bar({ pct, color, label, count, revenue }) {
 }
 
 // SVG line chart with hover tooltip
+// The Overview's period as [start, end] Dates ([null, null] = all time)
+function periodBounds(id) {
+  const now = new Date(), y = now.getFullYear(), q = Math.floor(now.getMonth() / 3)
+  const span = (y0, m0, y1, m1) => [new Date(y0, m0, 1), new Date(y1, m1 + 1, 0, 23, 59, 59, 999)]
+  if (id === 'all') return [null, null]
+  if (id === 'this-month') return span(y, now.getMonth(), y, now.getMonth())
+  if (id === 'this-quarter') return span(y, q * 3, y, q * 3 + 2)
+  if (id === 'last-quarter') { const lq = q === 0 ? 3 : q - 1, ly = q === 0 ? y - 1 : y; return span(ly, lq * 3, ly, lq * 3 + 2) }
+  if (id === 'this-year') return span(y, 0, y, 11)
+  return span(Number(id), 0, Number(id), 11)   // a specific prior year
+}
+
 const APPT_COLOR = '#0d9488' // teal — appointments line (right axis)
 
 function TrendChart({ months, activeTypes, allTypes }) {
@@ -945,45 +957,16 @@ export default function Analytics() {
       if (statsPeriod === 'this-year')    return y === now.getFullYear()
       return y === statsPeriod   // a specific prior year
     }
-    // Revenue counts by WON date (closedAt); win-rate & appointments by the date
-    // the estimate was DONE (createdAt).
-    const won  = proposals.filter(p => p.status === 'Won' && matchesPeriod(p.closedAt || p.sentAt || p.createdAt))
+    // Headline numbers: the same rules as Home and Win / loss (lib/headline.js)
+    const h = headlineNumbers(proposals, ...periodBounds(statsPeriod))
+    const won = h.won
     // 'Archived' is a superseded revision — neutral, never counted as a loss.
     const lost = proposals.filter(p => p.status !== 'Won' && p.status !== 'Archived' && matchesPeriod(p.createdAt || p.sentAt || p.closedAt))
-
-    // Win rate = deals won ÷ APPOINTMENTS completed (not proposals sent). An
-    // appointment = one estimate/opportunity (a root proposal, revisions excluded);
-    // it's "won" if any version of it closed. e.g. 3 won / 12 appointments = 25%.
-    // One group per client, every version included (src/lib/proposalGroups.js)
-    const rootGroups = clientGroups(proposals).map(g => g.all)
-      .filter(group => group.some(p => p.status !== 'Archived'))   // drop fully-archived opportunities
-
-    // Appointments completed in the period = estimates DONE in the period (root date).
-    // A never-sent Draft isn't a completed appointment, so require at least one
-    // version that actually left Draft (sent/lost/won/etc.) — this keeps forgotten
-    // drafts from inflating the denominator.
-    const apptGroups = rootGroups.filter(group =>
-      matchesPeriod(group[0].createdAt || group[0].sentAt || group[0].closedAt) &&
-      group.some(p => p.status !== 'Archived' && p.status !== 'Draft'))
-    const apptCount = apptGroups.length
-
-    // A deal counts as WON the moment the client commits — either it's tagged 'Won'
-    // OR its contract is signed (even if the status wasn't manually flipped yet).
-    // "Whether they sign it today or tomorrow, it's a win."
-    const isWon   = (p) => p.status === 'Won' || p.contractDraft?.signed === true
-    const wonDate = (p) => p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt
-    // Deals WON in the period = the win landed in the period (closedAt), counted once
-    // per opportunity — INDEPENDENT of when the estimate was done, so a deal estimated
-    // last month but signed this month still counts as this month's win. This matches
-    // the trend chart (which also counts wins by closedAt) so card and graph reconcile.
-    const wonAppts = rootGroups.filter(group =>
-      group.some(p => isWon(p) && matchesPeriod(wonDate(p)))).length
-    const winRate  = apptCount > 0 ? (wonAppts / apptCount) * 100 : 0
-
-    // Use the actual contract value (à la carte = items sold), not the full
-    // proposal menu, so declined options don't inflate won revenue.
-    const totalRevenue = won.reduce((s, p) => s + wonRevenueOf(p), 0)
-    const avgDeal = won.length ? totalRevenue / won.length : 0
+    const apptCount = h.clients.length
+    const wonAppts = h.wonClients.length
+    const winRate = h.winRate ?? 0
+    const totalRevenue = h.wonRevenue
+    const avgDeal = h.avgJob ?? 0
 
     // Project type breakdown (all time)
     const typeMap = {}
@@ -1008,13 +991,11 @@ export default function Analytics() {
     won.forEach(p => { const r = p.winLossReason?.category; if (r) winReasons[r] = (winReasons[r] || 0) + 1 })
     lost.forEach(p => { const r = p.winLossReason?.category; if (r) lossReasons[r] = (lossReasons[r] || 0) + 1 })
 
-    // Open pipeline: each client's latest version only
-    const pipelineValue = latestIterations(proposals)
-      .filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status) && matchesPeriod(p.createdAt || p.sentAt || p.closedAt))
-      .reduce((s, p) => s + Number(p.total || 0), 0)
+    // Open pipeline: right now, each client's latest version (lib/headline.js)
+    const pipelineValue = h.pipeline
 
     return {
-      stats: { won, lost, apptCount, wonAppts, totalRevenue, avgDeal, winRate, typeRows, winReasons, lossReasons, pipelineValue },
+      stats: { won, lost, apptCount, wonAppts, totalRevenue, avgDeal, winRate, typeRows, winReasons, lossReasons, pipelineValue, openCount: h.open.length },
       trendMonths: [],
       allTypes,
     }
@@ -1090,9 +1071,9 @@ export default function Analytics() {
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard label="Won revenue"  value={`$${fmt(stats.totalRevenue)}`} sub={`${stats.won.length} jobs won · ${periodLabel}`} />
-        <StatCard label="Win rate"       value={`${stats.winRate.toFixed(0)}%`} sub={`${stats.wonAppts} won / ${stats.apptCount} appointment${stats.apptCount !== 1 ? 's' : ''} · ${periodLabel}`} />
+        <StatCard label="Win rate"       value={`${stats.winRate.toFixed(0)}%`} sub={`${stats.wonAppts} of ${stats.apptCount} clients signed · ${periodLabel}`} />
         <StatCard label="Average job"  value={`$${fmt(stats.avgDeal)}`}       sub={`per won job · ${periodLabel}`} />
-        <StatCard label="Open pipeline"       value={`$${fmt(stats.pipelineValue)}`} sub={`open proposals · ${periodLabel}`} />
+        <StatCard label="Open pipeline"       value={`$${fmt(stats.pipelineValue)}`} sub={`${stats.openCount} open quote${stats.openCount !== 1 ? 's' : ''} · right now`} />
       </div>
 
       {/* Revenue Trend */}

@@ -31,7 +31,8 @@ export const isJobClosed = (p) => (p.jobData?.completedStages || []).includes('c
 export const isJob = (p) => p.status === 'Won' || p.status === 'Imported'
 
 // Each item: { key, tone, title, detail, count, people: [{ id, name, note }], to, cta }
-export function attentionItems({ proposals = [], jobCosts = {}, can = () => true, role = 'manager', permitPulse = null }) {
+// costOf: lib/jobCost.js's useJobCostOf(), so a job with POs / bills in Money counts as costed.
+export function attentionItems({ proposals = [], jobCosts = {}, costOf = null, can = () => true, role = 'manager', permitPulse = null }) {
   const items = []
 
   // A county permit site the inspection check can't read (lib/permitHealth.js)
@@ -129,12 +130,12 @@ export function attentionItems({ proposals = [], jobCosts = {}, can = () => true
   }
 
   if (can('/profitability')) {
-    const noCosts = won.filter(p => isJobClosed(p) && !jobCosts[p.id])
+    const noCosts = won.filter(p => isJobClosed(p) && !(costOf ? costOf(p).hasCosts : jobCosts[p.id]))
     if (noCosts.length) items.push({
       key: 'costs', tone: 'info', title: `${noCosts.length} finished job${noCosts.length !== 1 ? 's' : ''} without costs`,
-      detail: 'Enter actual costs to see real margins', count: noCosts.length,
+      detail: 'Add their POs and bills in Money to see real margins', count: noCosts.length,
       people: noCosts.map(p => ({ id: p.id, name: p.client || 'Unnamed', note: 'closed, no costs' })),
-      to: '/insights?tab=profit', cta: 'Enter costs',
+      to: '/insights?tab=profit', cta: 'See profit',
     })
   }
 

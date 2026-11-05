@@ -111,7 +111,13 @@ export function estimatedCostOf(proposal) {
   return (proposal?.lines || []).reduce((s, l) => s + (n(l.costMaterials) + n(l.costSub)) * (n(l.qty) || 1), 0)
 }
 
-export function jobFinancials(proposal, expenses = [], legacyCosts = null) {
+// Purchase-order / bill type (Money) → the cost category shown on a job.
+const BOOK_CATEGORY = { materials: 'Materials', sub: 'Subcontractor', labor: 'Labor', equipment: 'Equipment', commission: 'Commission', misc: 'Other job cost' }
+
+// books: the job's row from booksIndex() (lib/books.js) — its purchase orders
+// and bills from Money. Use lib/jobCost.js's useJobCostOf() rather than
+// calling this directly, so every page counts the same costs.
+export function jobFinancials(proposal, expenses = [], legacyCosts = null, books = null) {
   const contract = contractTotalOf(proposal)
   const changeOrders = approvedChangeOrderTotal(proposal)
   const revenue = contract + changeOrders
@@ -126,7 +132,14 @@ export function jobFinancials(proposal, expenses = [], legacyCosts = null) {
   for (const [k, label] of [['materials', 'Materials'], ['labor', 'Labor'], ['subcontractors', 'Subcontractor'], ['other', 'Other job cost']]) {
     if (n(legacy[k])) byCategory[label] = (byCategory[label] || 0) + n(legacy[k])
   }
+  for (const [k, v] of Object.entries(books?.committedByType || {})) {
+    if (!n(v)) continue
+    const label = BOOK_CATEGORY[k] || 'Other job cost'
+    byCategory[label] = (byCategory[label] || 0) + n(v)
+  }
   const actualCost = Object.values(byCategory).reduce((s, v) => s + v, 0)
+  // Anything recorded at all (a $0 entry still counts as "costs entered")
+  const hasCosts = mine.length > 0 || !!legacyCosts || n(books?.committed) > 0
   const estimatedCost = estimatedCostOf(proposal)
   const profit = revenue - actualCost
   const received = (proposal?.jobData?.paymentsReceived || []).reduce((s, p) => s + n(p.amount), 0)
@@ -138,12 +151,13 @@ export function jobFinancials(proposal, expenses = [], legacyCosts = null) {
     estimatedProfit: revenue - estimatedCost,
     received, balanceDue: Math.max(0, revenue - received),
     percentCollected: revenue > 0 ? Math.min(100, (received / revenue) * 100) : 0,
-    byCategory, entries: mine, milestones,
+    byCategory, entries: mine, milestones, hasCosts, fromBooks: n(books?.committed),
   }
 }
 
 // ── The whole company for a period ───────────────────────────────────────────
-export function companySummary({ expenses = [], proposals = [], subscriptions = [], jobCosts = {}, period }) {
+// costOf: lib/jobCost.js's useJobCostOf() — so job profit includes Money's POs and bills.
+export function companySummary({ expenses = [], proposals = [], subscriptions = [], jobCosts = {}, period, costOf = null }) {
   const cash = expenses.filter(e => !isAllocation(e) && inPeriod(e.date, period))
   const byBucket = Object.fromEntries(BUCKETS.map(b => [b.key, 0]))
   const countBy = Object.fromEntries(BUCKETS.map(b => [b.key, 0]))
@@ -164,7 +178,7 @@ export function companySummary({ expenses = [], proposals = [], subscriptions = 
   // Job profit for jobs sold in the period, and the same profit once the
   // unaccounted (misc) spend is assumed to be project cost spread over them.
   const soldJobs = jobs.filter(p => inPeriod(p.closedAt || p.sentAt || p.createdAt, period))
-  const jobProfit = soldJobs.reduce((s, p) => s + jobFinancials(p, expenses, jobCosts?.[p.id]).profit, 0)
+  const jobProfit = soldJobs.reduce((s, p) => s + (costOf ? costOf(p) : jobFinancials(p, expenses, jobCosts?.[p.id])).profit, 0)
   const unaccountedRate = sold > 0 ? (byBucket.misc / sold) * 100 : 0
   const adjustedJobProfit = jobProfit - byBucket.misc
 

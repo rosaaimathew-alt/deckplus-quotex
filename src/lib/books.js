@@ -90,7 +90,7 @@ export function allVendors(vendors = [], subcontractors = []) {
   const out = []
   for (const v of vendors) {
     if (!v) continue
-    out.push({ ref: `v:${v.id}`, source: 'vendor', id: v.id, name: v.name || 'Unnamed vendor', type: v.type || 'supplier',
+    out.push({ ref: `v:${v.id}`, source: 'vendor', id: v.id, name: v.name || 'Unnamed vendor', type: v.type || 'supplier', trade: v.trade || '',
       email: v.email || '', phone: v.phone || '', docs: v.docs || {}, active: v.active !== false, rec: v })
   }
   for (const s of subcontractors) {
