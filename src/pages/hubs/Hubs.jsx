@@ -26,6 +26,12 @@ import ItemCatalog from '../ItemCatalog'
 import Analyze from '../Analyze'
 import AiChat from '../AiChat'
 import Designs from '../Designs'
+import Invoices from '../books/Invoices'
+import Bills from '../books/Bills'
+import Purchases from '../books/Purchases'
+import Vendors from '../books/Vendors'
+import ChangeOrdersAll from '../books/ChangeOrdersAll'
+import { invoiceStatus, billStatus, jobIndex } from '../../lib/books'
 
 function NewQuoteButton() {
   const navigate = useNavigate()
@@ -81,6 +87,7 @@ export function ProjectsHub() {
 
   const tabs = withRender(tabsOf('projects'), {
     jobs:       () => <Jobs />,
+    changeorders: () => <ChangeOrdersAll />,
     inspections: () => <InspectionBoard />,
     calendar:   () => <PMCalendar />,
     crews:      () => <Subcontractors />,
@@ -118,10 +125,42 @@ export function InsightsHub() {
     overview: () => <Analytics />,
     winloss:  () => <ProposalTracker view="analytics" />,
     profit:   () => <ProfitabilityTracker />,
-    expenses: () => <Finance />,
   }, { profit: { count: pendingCosts } })
 
   return <Hub title="Insights" subtitle="How the business is doing — revenue, wins, margins and spend." tabs={tabs} rememberKey="insights" />
+}
+
+// ── Money ────────────────────────────────────────────────────────────────────
+export function MoneyHub() {
+  const { tabsOf } = useNav()
+  const proposals = useStore(s => s.proposals)
+  const invoices  = useStore(s => s.invoices)
+  const bills     = useStore(s => s.bills)
+  const counts = useMemo(() => {
+    const byId = jobIndex(proposals)
+    return {
+      invoices: { count: invoices.filter(i => invoiceStatus(i, byId.get(String(i.jobId))) === 'overdue').length, countTone: 'alert' },
+      bills:    { count: bills.filter(b => billStatus(b) === 'overdue').length, countTone: 'alert' },
+    }
+  }, [proposals, invoices, bills])
+  const tabs = withRender(tabsOf('money'), {
+    invoices:  () => <Invoices />,
+    bills:     () => <Bills />,
+    purchases: () => <Purchases />,
+    vendors:   () => <Vendors />,
+    expenses:  () => <Finance />,
+  }, counts)
+  const booksMissing = useStore(s => s.booksMissing)
+  return (
+    <>
+      {booksMissing && (
+        <div role="alert" className="bg-red-600 text-white text-sm px-4 py-2 text-center">
+          The database isn't set up for invoices, bills, purchases and vendors yet (supabase/books.sql) — anything entered here won't be saved. Expenses still save.
+        </div>
+      )}
+      <Hub title="Money" subtitle="What customers owe, what we owe, what we've committed to spend — and who we buy from." tabs={tabs} rememberKey="money" />
+    </>
+  )
 }
 
 // ── Catalog ──────────────────────────────────────────────────────────────────

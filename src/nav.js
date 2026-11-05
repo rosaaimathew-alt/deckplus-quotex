@@ -10,7 +10,7 @@ import { useMemo } from 'react'
 import {
   House, Handshake, HardHat, ChartColumn, Package, List, Columns3, Users, Eye, Ruler,
   ClipboardCheck, FileSignature, CalendarDays, Wrench, TrendingUp, Wallet, Target,
-  Upload, Sparkles, Calculator, Hammer, ShieldCheck,
+  Upload, Sparkles, Calculator, Hammer, ShieldCheck, Landmark, FileText, Receipt, ShoppingCart, Truck, FilePen,
 } from 'lucide-react'
 import { useStore } from './store'
 import { canAccessRoute } from './plans'
@@ -42,6 +42,7 @@ export const DESTINATIONS = [
     hint: 'Jobs, the schedule and crews', keywords: 'operations work won',
     tabs: [
       { key: 'jobs',       label: 'Jobs',       icon: Hammer, access: '/jobs', hint: 'Stages, change orders, logs, warranty', keywords: 'job management stages change order daily log warranty costs receipts payment close out' },
+      { key: 'changeorders', label: 'Change orders', icon: FilePen, access: '/jobs', hint: 'Every change order on every job', keywords: 'co addendum change order coordination' },
       { key: 'inspections', label: 'Inspections', icon: ShieldCheck, access: '/jobs', hint: 'Mecklenburg permits and inspections, every job on one screen', keywords: 'permit inspection county mecklenburg footing framing final failed' },
       { key: 'calendar',   label: 'Calendar',   icon: CalendarDays, access: '/scheduler', hint: 'Start dates, milestones, planned work', keywords: 'schedule scheduler dates planner milestones' },
       { key: 'crews',      label: 'Subcontractors', icon: Wrench, access: '/subs', hint: 'Subs, insurance and incidents', keywords: 'subs crews coi insurance trades' },
@@ -49,12 +50,23 @@ export const DESTINATIONS = [
     ] },
 
   { key: 'insights', to: '/insights', label: 'Insights', icon: ChartColumn,
-    hint: 'Revenue, win rate, profit and spend', keywords: 'reports analytics numbers metrics',
+    hint: 'Revenue, win rate and profit', keywords: 'reports analytics numbers metrics',
     tabs: [
       { key: 'overview', label: 'Overview',   icon: TrendingUp, access: '/analytics', hint: 'Revenue trend, win rate, project types, map', keywords: 'analytics revenue seasonality heat map past jobs' },
       { key: 'winloss',  label: 'Win / loss', icon: Target, access: ['/analytics', '/tracker'], hint: 'Pipeline by status, reasons, days to close', keywords: 'reasons funnel close rate' },
       { key: 'profit',   label: 'Profit',     icon: Calculator, access: '/profitability', hint: 'Actual job costs and margins', keywords: 'profitability margin job costs' },
-      { key: 'expenses', label: 'Expenses',   icon: Wallet, access: '/finance', hint: 'Card spend and statements', keywords: 'finance cards statement spend' },
+    ] },
+
+  // The office's money: what we bill, what we owe, what we've committed to
+  // spend, and who we buy from. Office / admin only (role 'manager').
+  { key: 'money', to: '/money', label: 'Money', icon: Landmark,
+    hint: 'Invoices, bills, purchase orders and vendors', keywords: 'accounting books finance ar ap',
+    tabs: [
+      { key: 'invoices',  label: 'Invoices',  icon: FileText, access: '/finance', hint: 'What customers owe us', keywords: 'invoice billing receivable overdue payment customer' },
+      { key: 'bills',     label: 'Bills',     icon: Receipt, access: '/finance', hint: 'What we owe vendors', keywords: 'bill payable vendor owe pay' },
+      { key: 'purchases', label: 'Purchases', icon: ShoppingCart, access: '/finance', hint: 'Purchase orders and commissions', keywords: 'po purchase order commission materials committed cost' },
+      { key: 'vendors',   label: 'Vendors',   icon: Truck, access: '/finance', hint: 'Suppliers, subs and their paperwork', keywords: 'vendor supplier w9 gl insurance workers comp' },
+      { key: 'expenses',  label: 'Expenses',  icon: Wallet, access: '/finance', hint: 'Card spend, fixed costs, subscriptions and inventory', keywords: 'finance cards statement spend fixed operating inventory subscriptions' },
     ] },
 
   { key: 'catalog', to: '/catalog', label: 'Catalog', icon: Package,
@@ -78,7 +90,7 @@ export const LEGACY_REDIRECTS = {
   '/checklists':    '/projects?tab=checklists',
   '/analytics':     '/insights?tab=overview',
   '/profitability': '/insights?tab=profit',
-  '/finance':       '/insights?tab=expenses',
+  '/finance':       '/money?tab=expenses',
   '/analyze':       '/catalog?tab=import',
   '/ai':            '/catalog?tab=assistant',
 }

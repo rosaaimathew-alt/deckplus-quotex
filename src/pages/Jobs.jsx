@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useStore, contractNumberFor } from '../store'
 import { DEMO } from '../demo'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
@@ -9,6 +9,9 @@ import PermitsTab from '../components/PermitsTab'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
+import { useNav } from '../nav'
+import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
+import { JobSummary, JobTransactions, JobDocuments, ProfitRing, jobDocuments } from './books/JobBooks'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1617,102 +1620,16 @@ function buildCloseOutHtml({ client, contractNum, address, projectType, completi
 </body></html>`
 }
 
-// ── Receipts tab — per-job receipt files, stored in Google Drive ────────────
-// ── Costs / Job P&L tab — see components/JobFinancials.jsx ──────────────────
-
-
-function ReceiptsTab({ proposal }) {
-  const { updateJobData } = useStore()
-  const receipts = proposal.jobData?.receipts || []
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState('')
-  const fileRef = useRef(null)
-  const contractNum = proposal.contractDraft?.contractNum || contractNumberFor(proposal.id)
-
-  const onFiles = async (e) => {
-    const files = [...(e.target.files || [])]
-    if (!files.length) return
-    setUploading(true); setError('')
-    try {
-      const added = []
-      for (const file of files) {
-        const base64 = await new Promise((resolve, reject) => {
-          const r = new FileReader()
-          r.onload = () => resolve(String(r.result).split(',')[1])
-          r.onerror = reject
-          r.readAsDataURL(file)
-        })
-        const res = await fetch('/api/drive/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pdfBase64: base64,
-            fileName: `Receipt-${contractNum}-${Date.now()}-${file.name}`,
-            mimeType: file.type || 'application/octet-stream',
-          }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Upload failed')
-        added.push({ id: data.fileId || `${Date.now()}${Math.random()}`, name: file.name, link: data.driveLink, mimeType: file.type, uploadedAt: new Date().toISOString() })
-      }
-      updateJobData(proposal.id, { receipts: [...receipts, ...added] })
-    } catch (err) {
-      setError(/token|auth|not connected|401|drive/i.test(err.message) ? 'Connect Google Drive in Settings first, then try again.' : err.message)
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
-  }
-
-  const remove = (id) => updateJobData(proposal.id, { receipts: receipts.filter(r => r.id !== id) })
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <p className="text-sm font-semibold text-gray-800">Receipts</p>
-          <p className="text-xs text-gray-400">{receipts.length} file{receipts.length !== 1 ? 's' : ''} · stored in your Google Drive</p>
-        </div>
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple onChange={onFiles} className="hidden" />
-        <button onClick={() => fileRef.current?.click()} disabled={uploading}
-          className="flex items-center gap-1.5 px-3 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-50 transition-colors">
-          {uploading ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-          {uploading ? 'Uploading…' : 'Add receipt'}
-        </button>
-      </div>
-
-      {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
-      {receipts.length === 0 ? (
-        <div className="text-center py-8 text-sm text-gray-400 border border-dashed border-gray-200 rounded-xl">
-          No receipts yet. Add photos or PDFs of receipts for this job.
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {receipts.map(r => (
-            <div key={r.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg group">
-              <FileText size={15} className="text-gray-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-800 truncate">{r.name}</p>
-                <p className="text-[11px] text-gray-400">{fmtDate(r.uploadedAt)}</p>
-              </div>
-              {r.link && <a href={r.link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--brand-600)] hover:underline shrink-0">View</a>}
-              <button onClick={() => { if (window.confirm('Remove this receipt from the job? (The file stays in your Drive.)')) remove(r.id) }}
-                className="text-gray-300 hover:text-red-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Job Card ────────────────────────────────────────────────────────────────
-function JobCard({ proposal }) {
+function JobCard({ proposal, jobMoney = null, focus = false }) {
   const { toggleJobStage, updateJobData } = useStore()
   const allExpenses = useStore(s => s.expenses)
-  const [expanded, setExpanded] = useState(false)
-  const [tab, setTab] = useState('stages')
+  const { can } = useNav()
+  const books = can('/finance')   // office / admin: invoices, POs, bills
+  const [expanded, setExpanded] = useState(focus)
+  const [tab, setTab] = useState(focus && books ? 'summary' : 'stages')
+  const cardRef = useRef(null)
+  useEffect(() => { if (focus) cardRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }, [focus])
   const [editingNote, setEditingNote] = useState(false)
   const [noteText, setNoteText] = useState(proposal.jobData?.notes || '')
   const [showReminder, setShowReminder] = useState(false)
@@ -1734,7 +1651,7 @@ function JobCard({ proposal }) {
   const coCount       = (jobData.changeOrders || []).length
   const openWarranty  = (jobData.warrantyItems || []).filter(w => w.status === 'Open').length
   const logCount      = (jobData.dailyLogs || []).length
-  const receiptCount  = (jobData.receipts || []).length
+  const docCount      = jobDocuments(proposal).length
   const costCount     = (allExpenses || []).filter(e => e.jobId === proposal.id).length
   const showPermits   = !!permitAccess && permitTracked(proposal)
   const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0, needsPick: false }
@@ -1743,6 +1660,7 @@ function JobCard({ proposal }) {
   const saveNote = () => { updateJobData(proposal.id, { notes: noteText }); setEditingNote(false) }
 
   const TABS = [
+    ...(books ? [{ key: 'summary', label: 'Summary' }] : []),
     { key: 'stages',  label: 'Stages' },
     ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0) ? ` (${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0)})` : ''}` }] : []),
     { key: 'budget',  label: 'Budget' },
@@ -1751,7 +1669,8 @@ function JobCard({ proposal }) {
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
     { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
-    { key: 'receipts',label: `Receipts${receiptCount ? ` (${receiptCount})` : ''}` },
+    ...(books ? [{ key: 'transactions', label: 'Transactions' }] : []),
+    { key: 'documents', label: `Documents${docCount ? ` (${docCount})` : ''}` },
   ]
 
   // One soft-pill status system for the card badge.
@@ -1764,7 +1683,7 @@ function JobCard({ proposal }) {
         : { label: 'Not Started', cls: 'bg-gray-100 text-gray-600' }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden transition-all">
+    <div ref={cardRef} className={`bg-white rounded-xl border shadow-sm overflow-hidden transition-all scroll-mt-4 ${focus ? 'border-[var(--brand-400)] ring-2 ring-[var(--brand-100)]' : 'border-gray-200'}`}>
       {/* Header — click anywhere on the row (e.g. the name) to expand the full job */}
       <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors"
         onClick={() => setExpanded(e => !e)}>
@@ -1785,6 +1704,14 @@ function JobCard({ proposal }) {
           </p>
         </div>
 
+        {jobMoney && (
+          <div className="hidden lg:flex items-center gap-5 shrink-0 text-right">
+            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Revenue</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.revenue)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.invoiced)} invoiced</p></div>
+            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Committed</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.committed)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.committedByType.materials || 0)} materials</p></div>
+            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Profit</p><p className={`text-sm font-semibold ${jobMoney.profit < 0 ? 'text-red-600' : 'text-gray-900'}`}>{money0(jobMoney.profit)}</p></div>
+            <ProfitRing margin={jobMoney.committed ? jobMoney.margin : null} size={40} />
+          </div>
+        )}
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusPill.cls}`}>{statusPill.label}</span>
 
         <div className="relative w-10 h-10 shrink-0">
@@ -1958,7 +1885,9 @@ function JobCard({ proposal }) {
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}
-            {tab === 'receipts'&& <ReceiptsTab proposal={proposal} />}
+            {tab === 'summary' && books && <JobSummary proposal={proposal} />}
+            {tab === 'transactions' && books && <JobTransactions proposal={proposal} />}
+            {tab === 'documents' && <JobDocuments proposal={proposal} />}
           </div>
         </div>
       )}
@@ -1970,6 +1899,14 @@ function JobCard({ proposal }) {
 
 export default function Jobs() {
   const proposals = useStore(s => s.proposals)
+  const invoices  = useStore(s => s.invoices)
+  const purchases = useStore(s => s.purchases)
+  const bills     = useStore(s => s.bills)
+  const { can } = useNav()
+  const showMoney = can('/finance')
+  const moneyIdx  = useMemo(() => (showMoney ? booksIndex({ invoices, purchases, bills }) : null), [showMoney, invoices, purchases, bills])
+  const [params] = useSearchParams()
+  const focusId = params.get('job')
   const [filter, setFilter] = useState('active')
   const [query,  setQuery]  = useState('')
   const [stageFilter, setStageFilter] = useState(null)   // current-stage chip (from the old Scheduler view)
@@ -2014,6 +1951,7 @@ export default function Jobs() {
     return [...map.entries()].sort((a, b) => b[1] - a[1])
   })()
   const filtered = wonJobs.filter(p => {
+    if (focusId) return String(p.id) === focusId
     const phase = phaseOf(p)
     if (stageFilter && (phase === 'closed' || currentStageOf(p) !== stageFilter)) return false
     if (permitAccess && permitsOnly && !permitTracked(p)) return false
@@ -2125,7 +2063,8 @@ export default function Jobs() {
       )}
 
       <div className="space-y-3">
-        {filtered.map(p => <JobCard key={p.id} proposal={p} />)}
+        {focusId && <a href="?tab=jobs" className="inline-block text-xs text-[var(--brand-700)] hover:underline mb-1">← All jobs</a>}
+        {filtered.map(p => <JobCard key={p.id} proposal={p} focus={String(p.id) === focusId} jobMoney={moneyIdx ? jobMoneyFromIndex(p, moneyIdx) : null} />)}
       </div>
     </div>
   )

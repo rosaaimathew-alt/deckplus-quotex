@@ -15,7 +15,7 @@ import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-
 import {
   Sun, CalendarDays, HardHat, PaintRoller, Phone, MessageSquare, Navigation,
   ChevronLeft, ChevronRight, Check, CheckCircle2, Circle, AlertTriangle, Clock,
-  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2, ShieldCheck,
+  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2, ShieldCheck, FileText,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR } from '../brand'
@@ -383,12 +383,35 @@ function JobScreen() {
 
       <JobMoney proposal={proposal} />
 
+      <SharedDocs proposal={proposal} />
+
       <button onClick={() => { setViewPref('full'); navigate('/projects?tab=jobs') }}
         className="w-full h-12 rounded-xl text-sm font-semibold text-gray-600 flex items-center justify-center gap-2">
         <Monitor size={16} /> Open budget, change orders & more in the full app
       </button>
       {toast}
     </div>
+  )
+}
+
+// Files the office shared to mobile (Jobs › Documents › "Mobile").
+function SharedDocs({ proposal }) {
+  const jd = proposal.jobData || {}
+  const docs = [...(jd.documents || []), ...(jd.receipts || [])].filter(d => d.shareMobile && d.link)
+  if (!docs.length) return null
+  return (
+    <Card className="px-4 pt-3 pb-1">
+      <p className="text-base font-semibold text-gray-900">Documents</p>
+      <ul className="divide-y divide-gray-100">
+        {docs.map(d => (
+          <li key={d.id}>
+            <a href={d.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 py-3 text-base text-gray-900">
+              <FileText size={18} className="text-gray-400 shrink-0" /><span className="flex-1 truncate">{d.name}</span><ChevronRight size={16} className="text-gray-300" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
 

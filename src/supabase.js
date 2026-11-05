@@ -130,7 +130,18 @@ export const RECORD_TABLES = {
   todos:                  'todos',
   checklists:             'checklists',
   expenses:               'expenses',
+  // Books (supabase/books.sql). Optional: an org whose database doesn't have
+  // these tables yet still loads; the Money pages just start empty.
+  vendors:                'vendors',
+  purchases:              'purchases',
+  bills:                  'bills',
+  invoices:               'invoices',
 }
+// Tables added after launch: a missing one loads as empty instead of failing
+// the whole sign-in, and nothing is written to it until it exists.
+const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices'])
+const _missing = new Set()
+const isMissingTable = (e) => e && (e.code === '42P01' || e.code === 'PGRST205' || /does not exist|could not find the table/i.test(e.message || ''))
 // Object-keyed-by-id collections → a table whose row id is the key.
 export const MAP_TABLES = { jobCosts: 'job_costs' }
 // Singletons → one org_settings row (data jsonb) per org.
@@ -189,8 +200,16 @@ export async function loadOrg() {
 
   const collections = {}
   await Promise.all(Object.entries(RECORD_TABLES).map(async ([key, table]) => {
-    const rows = await fetchAll(table, orgId)
-    collections[key] = rows.map(r => r.data)
+    try {
+      const rows = await fetchAll(table, orgId)
+      collections[key] = rows.map(r => r.data)
+      _missing.delete(table)
+    } catch (e) {
+      if (!OPTIONAL_TABLES.has(table) || !isMissingTable(e)) throw e
+      console.warn(`[quotex] table ${table} is not in this database yet (run supabase/books.sql)`)
+      _missing.add(table)
+      collections[key] = []
+    }
   }))
   for (const [key, table] of Object.entries(MAP_TABLES)) {
     const rows = await fetchAll(table, orgId)
@@ -203,6 +222,7 @@ export async function loadOrg() {
     members: (members || []).map(m => ({ id: m.user_id, role: m.role, displayName: m.display_name, email: m.email })),
     settings: settingsRow?.data || {},
     collections,
+    missingTables: [..._missing],
   }
 }
 
@@ -315,6 +335,7 @@ function diffRecords(key, table, current) {
 function onStoreChange(state, prev) {
   if (!_armed || _applyingRemote) return
   for (const [key, table] of Object.entries(RECORD_TABLES)) {
+    if (_missing.has(table)) continue
     if (state[key] !== prev[key]) diffRecords(key, table, state[key] || [])
   }
   for (const [key, table] of Object.entries(MAP_TABLES)) {
@@ -396,6 +417,7 @@ export function armAdapter(store, orgId, settings) {
   if (_channel) supabase.removeChannel(_channel)
   let ch = supabase.channel(`org:${orgId}`)
   for (const table of [...Object.values(RECORD_TABLES), ...Object.values(MAP_TABLES)]) {
+    if (_missing.has(table)) continue
     ch = ch.on('postgres_changes',
       { event: '*', schema: 'public', table, filter: `org_id=eq.${orgId}` },
       (p) => applyRemote(store, table, p))
