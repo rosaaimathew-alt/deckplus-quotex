@@ -27,7 +27,8 @@ import { SITES, searchByAddress, searchByRecord, fetchPermit, fetchInspectionNot
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
 const MAX_JOBS = 8          // per request; the app sends the rest in further requests
-const MAX_NEW_NOTES = 12    // "View Details" pages read per job per pulse
+const MAX_NEW_NOTES = 4     // "View Details" pages read per job per pulse; the rest on later pulses
+const BUDGET_MS = 25000     // answer well inside the browser's ~60 s limit (Safari drops slower requests)
 
 // Connected counties: which site to read, how it numbers building and trade
 // (electrical / mechanical / plumbing) permits, and whether its "project
@@ -257,11 +258,14 @@ export default async function handler(req, res) {
   })).filter(j => j.id)
 
   const results = {}
-  const deadline = Date.now() + 40000   // leave room inside the 60 s limit
+  const deadline = Date.now() + BUDGET_MS
   await inBatches(jobs.map(j => ({ ...j, deadline })), 3, async (job) => {
     const checkedAt = new Date().toISOString()
     try {
-      results[job.id] = { ...(await checkJob(job)), checkedAt }
+      // A job still running at the deadline is answered "not read this time"
+      // (not a county failure) so the request always comes back in time.
+      const late = new Promise(resolve => setTimeout(() => resolve({ late: true, error: 'Not read this time (the county site was slow); the next check reads it.' }), Math.max(1000, job.deadline + 3000 - Date.now())))
+      results[job.id] = { ...(await Promise.race([checkJob(job), late])), checkedAt }
     } catch (e) {
       if (process.env.NODE_ENV !== 'production') console.error('[permit-pulse]', job.id, e)
       // siteError: the county site itself failed (down, blocked, or its pages

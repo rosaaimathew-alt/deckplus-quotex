@@ -44,40 +44,47 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
     const c = (stats[countyOf(p)] ||= { ok: 0, failed: 0, lastError: '' })
     if (ok) c.ok++; else { c.failed++; c.lastError = error || c.lastError }
   }
+  // One request for a batch, tried twice. A failure here is between the
+  // browser and our server (network drop, browser timeout) — not the county —
+  // so it doesn't count against the county's connection.
+  const send = async (batch) => {
+    const res = await fetch('/api/permit-pulse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jobs: batch.map(p => ({
+          id: p.id,
+          address: p.address,
+          client: p.client,
+          county: jobCounty(p),
+          jurisdiction: p.imported?.jurisdiction || '',
+          pick: p.jobData?.countyPick || null,
+          record: (String(p.imported?.permit || '').toUpperCase().match(/\b[A-Z]{1,5}-?(?:[A-Z]{2,5}-)?\d{2,4}-\d{3,7}\b/) || [])[0] || '',
+          knownNotes: Object.keys(knownNotes(p.countyPermit)),
+        })),
+      }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body.error || `The permit check failed (${res.status})`)
+    return body.results || {}
+  }
   for (let i = 0; i < jobs.length; i += BATCH) {
     const batch = jobs.slice(i, i + BATCH)
     let results = {}
     try {
-      const res = await fetch('/api/permit-pulse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobs: batch.map(p => ({
-            id: p.id,
-            address: p.address,
-            client: p.client,
-            county: jobCounty(p),
-            jurisdiction: p.imported?.jurisdiction || '',
-            pick: p.jobData?.countyPick || null,
-            record: (String(p.imported?.permit || '').toUpperCase().match(/\b[A-Z]{1,5}-?(?:[A-Z]{2,5}-)?\d{2,4}-\d{3,7}\b/) || [])[0] || '',
-            knownNotes: Object.keys(knownNotes(p.countyPermit)),
-          })),
-        }),
-      })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error || `The permit check failed (${res.status})`)
-      results = body.results || {}
+      try { results = await send(batch) } catch { results = await send(batch) }
     } catch (e) {
       // Keep going with the rest; these jobs are tried again on the next check
       failed += batch.length
       lastError = e
-      for (const p of batch) tally(p, false, e.message)
       useStore.getState().setPermitPulseProgress?.({ done: done + failed, total: jobs.length })
       continue
     }
     for (const p of batch) {
       const r = results[p.id]
-      if (!r) { failed++; tally(p, false, 'No answer for this job'); continue }
+      if (!r) { failed++; continue }
+      // Out of time on our side: keep what we had, read it next check
+      if (r.late) { failed++; continue }
       tally(p, !r.siteError, r.error)
       // Keep the last good reading if this check failed, with the error on top.
       const prev = useStore.getState().proposals.find(x => x.id === p.id)?.countyPermit
