@@ -692,6 +692,16 @@ function bestInGroup(all) {
 const apptDate = (p) => p?.createdAt || p?.sentAt || p?.closedAt || null
 
 // The sales rep who created a proposal, by name, for office/admin views.
+// Periods for the Numbers strip on the proposal list.
+const STATS_PERIODS = [
+  { id: 'this-month',   label: 'This Month' },
+  { id: 'last-month',   label: 'Last Month' },
+  { id: 'this-quarter', label: 'This Quarter' },
+  { id: 'last-quarter', label: 'Last Quarter' },
+  { id: 'this-year',    label: 'This Year' },
+  { id: 'all-time',     label: 'All Time' },
+]
+
 const repName = (members, id) => {
   const m = (members || []).find(x => x.id === id)
   return m ? (m.displayName || (m.email || '').split('@')[0]) : ''
@@ -1363,7 +1373,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
 
       {/* One quiet filter row: everyday status picks, the rest in "More",
           and the view / numbers toggles on the right. */}
-      <div className="flex items-center gap-2 flex-wrap mb-4">
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
         <div className={`${view ? 'hidden' : 'flex'} gap-1 bg-gray-100 rounded-lg p-1 mr-1`}>
           {TABS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setTab(id)}
@@ -1380,15 +1390,19 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
               onChange={setFilterStatus} options={MORE_STATUS.map(s => ({ value: s, label: s, count: statusCount(s) }))} />
           </>
         )}
-        <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+        <div className="ml-auto flex items-center gap-x-5 gap-y-1 flex-wrap">
           {dueCount > 0 && (
-            <span className="flex items-center gap-1.5 h-8 px-3 rounded-full bg-amber-50 border border-amber-200 text-xs font-medium text-amber-800">
-              <Bell size={13} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
+            <span className="flex items-center gap-1.5 h-9 text-sm font-medium text-amber-700">
+              <Bell size={14} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
             </span>
           )}
           {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           {tab === 'list' && (
             <SwitchChip label="Numbers" checked={!statsHidden} onChange={toggleStats} title="Show totals for a period" />
+          )}
+          {tab === 'list' && !statsHidden && (
+            <MenuChip label="Period" value={periodFilter} onChange={setPeriodFilter} align="right"
+              options={STATS_PERIODS.map(({ id, label }) => ({ value: id, label }))} />
           )}
         </div>
       </div>
@@ -1410,15 +1424,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
           if (periodFilter === 'this-year')   return d.getFullYear() === now.getFullYear()
           return true
         }
-        const PERIODS = [
-          { id: 'this-month',   label: 'This Month' },
-          { id: 'last-month',   label: 'Last Month' },
-          { id: 'this-quarter', label: 'This Quarter' },
-          { id: 'last-quarter', label: 'Last Quarter' },
-          { id: 'this-year',    label: 'This Year' },
-          { id: 'all-time',     label: 'All Time' },
-        ]
-        const periodLabel   = PERIODS.find(x => x.id === periodFilter)?.label || 'All Time'
+        const periodLabel   = STATS_PERIODS.find(x => x.id === periodFilter)?.label || 'All Time'
         const inPeriodAll   = proposals.filter(inPeriod)               // every proposal in the period
         const rootsInPeriod = inPeriodAll.filter(p => !p.parentId)     // unique estimates (no revisions)
         const wonInPeriod = proposals.filter(p => p.status === 'Won' && inPeriod(p))
@@ -1434,11 +1440,6 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
         ]
         return (
           <>
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Numbers · {periodLabel}</p>
-            <MenuChip label="Period" value={periodFilter} onChange={setPeriodFilter} align="right"
-              options={PERIODS.map(({ id, label }) => ({ value: id, label }))} />
-          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             {/* Total Proposals — shows unique clients, total proposals as sub */}
             <div className="bg-white rounded-xl border border-gray-200 p-4">

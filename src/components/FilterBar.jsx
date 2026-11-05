@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
 
 // ── Quiet filter controls ────────────────────────────────────────────────────
-// One row instead of walls of buttons: a few quick picks for what people use
-// every day, everything else tucked into a small menu, and on/off choices as
-// a switch. Used by the proposal list, Insights and Profit.
+// One flat line instead of walls of buttons: plain text choices with an
+// underline on the one that's on (no boxes), everything else tucked into a
+// small menu, and on/off choices as a switch. Used by the proposal list,
+// the dashboard, Insights and Profit.
 
 // Small dropdown "chip": shows the current choice, opens a short menu.
 //   <MenuChip label="Period" value={v} options={[{ value, label, count? }]} onChange={setV} />
@@ -24,10 +25,10 @@ export function MenuChip({ label, value, options, onChange, placeholder, active,
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="listbox" aria-expanded={open}
-        className={`flex items-center gap-1.5 h-8 pl-3 pr-2 rounded-full border text-xs font-medium transition-colors whitespace-nowrap ${
-          isActive ? 'border-[var(--brand-300)] bg-[var(--brand-50)] text-[var(--brand-800)]' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+        className={`flex items-center gap-1.5 h-9 text-sm font-medium transition-colors whitespace-nowrap ${
+          isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'
         }`}>
-        {label && <span className={isActive ? 'text-[var(--brand-600)]' : 'text-gray-400'}>{label}</span>}
+        {label && <span className="text-gray-400">{label}</span>}
         <span>{current ? current.label : placeholder}</span>
         <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''} opacity-60`} />
       </button>
@@ -52,13 +53,13 @@ export function MenuChip({ label, value, options, onChange, placeholder, active,
 //   <QuickPicks value={v} options={[{ value, label, count? }]} onChange={setV} />
 export function QuickPicks({ value, options, onChange }) {
   return (
-    <div className="inline-flex items-center bg-gray-100 rounded-full p-0.5" role="radiogroup">
+    <div className="inline-flex items-center gap-5" role="radiogroup">
       {options.map(o => {
         const on = o.value === value
         return (
           <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)}
-            className={`h-7 px-3 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${on ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
-            {o.label}{o.count != null && <span className={`ml-1 tabular-nums ${on ? 'text-gray-400' : 'text-gray-400/80'}`}>{o.count}</span>}
+            className={`h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${on ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+            {o.label}{o.count != null && <span className="ml-1 tabular-nums text-gray-400">{o.count}</span>}
           </button>
         )
       })}
@@ -70,7 +71,7 @@ export function QuickPicks({ value, options, onChange }) {
 export function SwitchChip({ label, checked, onChange, title }) {
   return (
     <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} title={title}
-      className="flex items-center gap-2 h-8 px-2.5 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors whitespace-nowrap">
+      className="flex items-center gap-2 h-9 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap">
       <span className={`relative w-7 h-4 rounded-full transition-colors ${checked ? 'bg-[var(--brand-600)]' : 'bg-gray-300'}`}>
         <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${checked ? 'left-3.5' : 'left-0.5'}`} />
       </span>
@@ -83,10 +84,10 @@ export function SwitchChip({ label, checked, onChange, title }) {
 // Whose deals: each sales rep by name, then All.
 export function RepToggle({ reps, repId, setRep }) {
   return (
-    <div className="inline-flex flex-wrap rounded-full border border-gray-200 bg-white p-0.5" role="group" aria-label="Whose numbers">
+    <div className="inline-flex flex-wrap items-center gap-4" role="group" aria-label="Whose numbers">
       {[...reps.map(r => [r.id, r.name]), [null, 'All']].map(([id, label]) => (
         <button key={id || 'all'} type="button" onClick={() => setRep(id)} aria-pressed={repId === id}
-          className={`h-7 px-3 rounded-full text-xs font-medium transition-colors ${repId === id ? 'bg-[var(--brand-600)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+          className={`h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${repId === id ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
           {label}
         </button>
       ))}
