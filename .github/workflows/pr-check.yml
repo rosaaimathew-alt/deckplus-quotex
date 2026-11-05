@@ -1,0 +1,53 @@
+# Every pull request must build before it can be merged into main (branch
+# protection requires the "build" check below). Lint runs on the files the
+# pull request changes and fails only on problems those files didn't have
+# before — the codebase has older lint debt that isn't the PR's fault.
+name: PR check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Lint changed files (new problems only)
+        run: |
+          BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          FILES=$(git diff --name-only --diff-filter=AM "$BASE" HEAD -- '*.js' '*.jsx' | grep -v '^public/' || true)
+          if [ -z "$FILES" ]; then echo "No JS changes"; exit 0; fi
+          npx eslint $FILES -f json -o after.json || true
+          git stash -u -q || true
+          git checkout -q "$BASE"
+          EXISTING=$(for f in $FILES; do [ -f "$f" ] && echo "$f"; done)
+          if [ -n "$EXISTING" ]; then npx eslint $EXISTING -f json -o before.json || true; else echo '[]' > before.json; fi
+          git checkout -q -
+          node -e '
+            const fs = require("fs")
+            const key = (f, m) => `${f.filePath.replace(process.cwd() + "/", "")}|${m.ruleId}|${m.message}`
+            const count = (file) => { const c = {}; for (const f of JSON.parse(fs.readFileSync(file))) for (const m of f.messages) if (m.severity === 2) c[key(f, m)] = (c[key(f, m)] || 0) + 1; return c }
+            const before = count("before.json"), after = count("after.json")
+            const added = Object.entries(after).filter(([k, n]) => n > (before[k] || 0))
+            if (added.length) { console.log("New lint errors:"); for (const [k, n] of added) console.log("  " + k + " (x" + (n - (before[k] || 0)) + ")"); process.exit(1) }
+            console.log("No new lint errors")
+          '
