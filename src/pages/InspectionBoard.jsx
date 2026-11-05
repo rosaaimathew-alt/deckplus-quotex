@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
+import { QuickPicks, MenuChip, SwitchChip } from '../components/FilterBar'
 import { DEMO } from '../demo'
 import { getStages } from './Jobs'
 import PermitsTab from '../components/PermitsTab'
@@ -280,7 +281,8 @@ export default function InspectionBoard() {
   const [query, setQuery] = useState('')
   const [pm, setPm] = useState('')
   const [countyFilter, setCountyFilter] = useState('')
-  const [attention, setAttention] = useState(false)
+  // One "show" pick instead of separate count chips and a Needs-attention box
+  const [show, setShow] = useState('all')
   const [hideFinaled, setHideFinaled] = useState(false)
   const [open, setOpen] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -309,7 +311,10 @@ export default function InspectionBoard() {
   const shown = jobs.filter(j => {
     if (pm && j.pm !== pm) return false
     if (countyFilter && j.county !== countyFilter) return false
-    if (attention && !j.failed && !j.problem) return false
+    if (show === 'failed' && !j.failed) return false
+    if (show === 'sched' && !(Object.values(j.cells).some(c => c.state === 'sched') || j.p.jobData?.nextInspection?.code)) return false
+    if (show === 'pick' && j.problem !== 'Pick permit') return false
+    if (show === 'missing' && j.problem !== 'Not found') return false
     if (hideFinaled && j.finaled) return false
     if (query) {
       const q = query.toLowerCase()
@@ -356,39 +361,31 @@ export default function InspectionBoard() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {jobs.length} ongoing job{jobs.length === 1 ? '' : 's'} · county site {permitPulse?.lastRunAt
+      {/* Quiet status line: when the county was read, and the three actions */}
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm">
+        <p className="text-xs text-gray-500">
+          {progress
+            ? <span className="inline-flex items-center gap-1.5 text-blue-700"><Loader size={12} className="animate-spin" /> Reading the county site… {progress.done} of {progress.total}</span>
+            : <>County site {permitPulse?.lastRunAt
               ? `checked ${new Date(permitPulse.lastRunAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-              : 'not checked yet'} · checks at 8 AM and 1 PM
-          </p>
-          {progress && (
-            <p className="text-xs text-blue-700 mt-1 inline-flex items-center gap-1.5">
-              <Loader size={12} className="animate-spin" /> Reading the county site… {progress.done} of {progress.total} jobs
-            </p>
+              : 'not checked yet'} · checks at 8 AM and 1 PM</>}
+        </p>
+        {msg && <span className="text-xs text-gray-600">{msg}</span>}
+        <div className="ml-auto flex items-center gap-x-5">
+          {access === 'edit' && !DEMO && (
+            <button onClick={checkNow} disabled={busy} className="inline-flex items-center gap-1.5 h-8 font-medium text-gray-500 hover:text-gray-800 disabled:opacity-50 whitespace-nowrap">
+              {busy ? <Loader size={14} className="animate-spin" /> : <RefreshCw size={14} />} {busy ? 'Checking…' : 'Check now'}
+            </button>
           )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
           {access === 'edit' && (
-            <button onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-gray-300">
-              <Plus size={13} /> Add job
+            <button onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 h-8 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+              <Plus size={14} /> Add job
             </button>
           )}
           <button onClick={printReport} disabled={!shown.length}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--brand-600)] text-white hover:opacity-90 disabled:opacity-40">
-            <Printer size={13} /> Print weekly report
+            className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg bg-[var(--brand-600)] text-white font-medium hover:bg-[var(--brand-700)] disabled:opacity-40 whitespace-nowrap">
+            <Printer size={14} /> Weekly report
           </button>
-        {access === 'edit' && !DEMO && (
-          <div className="flex items-center gap-2">
-            {msg && <span className="text-xs text-gray-600">{msg}</span>}
-            <button onClick={checkNow} disabled={busy}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-gray-300 disabled:opacity-50">
-              {busy ? <Loader size={13} className="animate-spin" /> : <RefreshCw size={13} />} {busy ? 'Checking the county site…' : 'Check county now'}
-            </button>
-          </div>
-        )}
         </div>
       </div>
 
@@ -406,39 +403,31 @@ export default function InspectionBoard() {
         </div>
       ))}
 
-      {/* Only the counts that matter right now — no "0 failed" chips */}
-      <div className="flex flex-wrap gap-2 text-xs empty:hidden">
-        {counts.failed > 0 && <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-100">{counts.failed} with a failed inspection</span>}
-        {counts.sched > 0 && <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">{counts.sched} scheduled</span>}
-        {counts.pick > 0 && <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-100">{counts.pick} need a permit picked</span>}
-        {counts.missing > 0 && <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">{counts.missing} not found on the county site</span>}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-64">
-          <Search size={13} className="text-gray-400 shrink-0" />
-          <input className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
-            placeholder="Client, address, job type or permit #…" value={query} onChange={e => setQuery(e.target.value)} />
-          {query && <button onClick={() => setQuery('')} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>}
+      {/* One flat line: search, what to show (with counts), then county / PM */}
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200">
+        <label className="flex items-center gap-2 h-9 text-sm min-w-0">
+          <Search size={14} className="text-gray-400 shrink-0" />
+          <input className="w-40 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+            placeholder="Search jobs or permits" aria-label="Search jobs or permits" value={query} onChange={e => setQuery(e.target.value)} />
+        </label>
+        <QuickPicks value={show} onChange={setShow} options={[
+          { value: 'all', label: 'All', count: jobs.length },
+          ...(counts.failed ? [{ value: 'failed', label: 'Failed', count: counts.failed }] : []),
+          ...(counts.sched ? [{ value: 'sched', label: 'Scheduled', count: counts.sched }] : []),
+          ...(counts.pick ? [{ value: 'pick', label: 'Pick a permit', count: counts.pick }] : []),
+          ...(counts.missing ? [{ value: 'missing', label: 'Not on county site', count: counts.missing }] : []),
+        ]} />
+        <div className="ml-auto flex items-center gap-x-5 gap-y-1 flex-wrap">
+          {counties.length > 1 && (
+            <MenuChip label="County" placeholder="All counties" value={countyFilter || null} onChange={v => setCountyFilter(v || '')} align="right"
+              options={[{ value: '', label: 'All counties' }, ...counties.map(c => ({ value: c, label: `${c}${CONNECTED_COUNTIES.includes(c) ? '' : ' (by hand)'}` }))]} />
+          )}
+          {pms.length > 0 && (
+            <MenuChip label="PM" placeholder="All PMs" value={pm || null} onChange={v => setPm(v || '')} align="right"
+              options={[{ value: '', label: 'All PMs' }, ...pms.map(x => ({ value: x, label: `PM ${x}` }))]} />
+          )}
+          <SwitchChip label="Hide finaled" checked={hideFinaled} onChange={setHideFinaled} title="Hide jobs the county has finaled" />
         </div>
-        {counties.length > 1 && (
-          <select value={countyFilter} onChange={e => setCountyFilter(e.target.value)} className="qx-select text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
-            <option value="">All counties</option>
-            {counties.map(c => <option key={c} value={c}>{c}{CONNECTED_COUNTIES.includes(c) ? '' : ' (by hand)'}</option>)}
-          </select>
-        )}
-        {pms.length > 0 && (
-          <select value={pm} onChange={e => setPm(e.target.value)} className="qx-select text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
-            <option value="">All PMs</option>
-            {pms.map(x => <option key={x} value={x}>PM {x}</option>)}
-          </select>
-        )}
-        <label className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-          <input type="checkbox" checked={attention} onChange={e => setAttention(e.target.checked)} /> Needs attention
-        </label>
-        <label className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-          <input type="checkbox" checked={hideFinaled} onChange={e => setHideFinaled(e.target.checked)} /> Hide finaled at county
-        </label>
       </div>
 
       {/* Fits the screen — no sideways scrolling. On wide screens each job is one

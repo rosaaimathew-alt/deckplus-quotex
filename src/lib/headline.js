@@ -23,6 +23,9 @@ export const wonDateOf = (p) => p.closedAt || p.contractDraft?.signedAt || p.sen
 
 // start / end: Dates, or null for all time
 export function headlineNumbers(proposals = [], start = null, end = null) {
+  // Jobs imported from the office's project sheet were never estimated or
+  // sold here: they'd count as clients that never signed. Leave them out.
+  proposals = proposals.filter(p => p.status !== 'Imported')
   const inRange = (s) => {
     if (!start) return true
     const d = new Date(s)
