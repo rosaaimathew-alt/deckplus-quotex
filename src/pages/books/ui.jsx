@@ -3,6 +3,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { X, Search, Download, ChevronLeft, ChevronRight, Calendar, Filter, FileSpreadsheet } from 'lucide-react'
 import { useStore } from '../../store'
 import { STATUS_STYLE, money, shortDate, isBooksJob, jobLabel, allVendors } from '../../lib/books'
+export { jobLastName as jobName, jobStreet } from '../../lib/books'
 
 export const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--brand-200)]'
 export const labelCls = 'text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1'
@@ -124,7 +125,7 @@ export function FilterGroup({ title, options, value, onChange }) {
 export function StatusCell({ status }) {
   const st = STATUS_STYLE[status] || { label: status, cls: 'bg-gray-100 text-gray-600' }
   return (
-    <td className="w-[150px] min-w-[120px] pl-3 pr-2 py-2.5">
+    <td className="w-[124px] min-w-[116px] pl-3 pr-1.5 py-2.5">
       <span className={`flex items-center justify-center min-h-[48px] rounded-xl px-2 text-center text-[15px] font-semibold ${st.cls}`}>{st.label}</span>
     </td>
   )
@@ -134,7 +135,7 @@ export function StatusCell({ status }) {
 export function RowIcon({ icon, title, onClick, tone = 'brand' }) {
   const Icon = icon
   const cls = tone === 'muted' ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-[var(--brand-600)] hover:bg-[var(--brand-50)]'
-  return <button type="button" onClick={onClick} title={title} aria-label={title} className={`p-1 rounded-lg ${cls}`}><Icon size={24} strokeWidth={1.9} /></button>
+  return <button type="button" onClick={onClick} title={title} aria-label={title} className={`p-0.5 rounded-lg ${cls}`}><Icon size={24} strokeWidth={1.9} /></button>
 }
 
 // "View report": the rows on screen as a printable report (same columns as
@@ -206,7 +207,7 @@ export function usePaged(rows, size = 20) {
 
 // Sortable header cell.
 export function Th({ children, sortKey, sort, setSort, className = '' }) {
-  const base = `px-3 py-3.5 text-[15px] font-semibold whitespace-nowrap ${className}`
+  const base = `px-2 py-3.5 text-[15px] font-semibold whitespace-nowrap ${className}`
   if (!sortKey) return <th className={`${base} text-gray-600`}>{children}</th>
   const on = sort.key === sortKey
   return (
@@ -292,6 +293,15 @@ export function Combo({ options, value, onChange, placeholder, allowNone = false
       )}
     </div>
   )
+}
+
+// The sales rep on a job (whoever wrote the proposal).
+export function useRepName() {
+  const members = useStore(s => s.members)
+  return useMemo(() => {
+    const byId = new Map((members || []).map(m => [m.id, m.displayName || (m.email || '').split('@')[0]]))
+    return (job) => (job?.ownerId ? byId.get(job.ownerId) || '' : '')
+  }, [members])
 }
 
 export function useJobOptions() {

@@ -14,7 +14,7 @@ import {
 import {
   StatusPill, SearchBox, usePaged, Th, sortRows, Modal, Field, Combo,
   useJobOptions, useVendorList, Empty, inputCls, btnPrimary, btnGhost,
-  PageHead, Toolbar, DateButton, FilterButton, FilterGroup, StatusCell, RowIcon, XlsButton, viewReport, btnHead, btnHeadPrimary,
+  PageHead, Toolbar, DateButton, FilterButton, FilterGroup, StatusCell, RowIcon, XlsButton, viewReport, btnHead, btnHeadPrimary, jobName, jobStreet,
 } from './ui'
 
 export function PurchaseModal({ po, presetJobId, onClose }) {
@@ -156,7 +156,7 @@ export default function Purchases() {
     const allocs = poAllocations(po)
     const jobs = allocs.map(a => byId.get(String(a.jobId))).filter(Boolean)
     // vendor: the vendor record's current name, so a search finds POs typed under an older name
-    return { po, allocs, jobs, status: po.status || 'open', vendor: po.vendorRef ? (vendorList.find(v => v.ref === po.vendorRef)?.name || '') : '', where: jobs.length ? jobs.map(jobLabel).join(', ') : (po.bucket ? `Company · ${po.bucket}` : 'Company') }
+    return { po, allocs, jobs, jobName: jobs.map(jobName).filter(Boolean).join(', '), street: jobs.length === 1 ? jobStreet(jobs[0]) : '', status: po.status || 'open', vendor: po.vendorRef ? (vendorList.find(v => v.ref === po.vendorRef)?.name || '') : '', where: jobs.length ? jobs.map(jobLabel).join(', ') : (po.bucket ? `Company · ${po.bucket}` : 'Company') }
   }), [purchases, byId, vendorList])
 
   const shown = useMemo(() => {
@@ -168,20 +168,20 @@ export default function Purchases() {
       if (jobFilter != null && !r.allocs.some(a => String(a.jobId) === String(jobFilter))) return false
       if (range.from && (r.po.date || '') < range.from) return false
       if (range.to && (r.po.date || '') > range.to) return false
-      if (s && ![r.po.number, r.po.vendorName, r.vendor, r.po.items, r.where, r.po.enteredBy].some(v => String(v || '').toLowerCase().includes(s))) return false
+      if (s && ![r.po.number, r.po.vendorName, r.vendor, r.po.items, r.where, r.jobName, r.street, r.po.enteredBy].some(v => String(v || '').toLowerCase().includes(s))) return false
       return true
     })
-    return sortRows(out, sort, { date: r => r.po.date || '', amount: r => Number(r.po.amount) || 0, number: r => String(r.po.number || ''), vendor: r => r.po.vendorName || '' })
+    return sortRows(out, sort, { date: r => r.po.date || '', amount: r => Number(r.po.amount) || 0, number: r => String(r.po.number || ''), vendor: r => r.po.vendorName || '', job: r => r.jobName })
   }, [rows, q, status, type, jobFilter, range, sort])
   const { slice, pager } = usePaged(shown)
   const total = shown.reduce((s, r) => s + (r.status === 'void' ? 0 : Number(r.po.amount) || 0), 0)
 
   const exportCsv = () => downloadCsv(`purchases-${todayISO()}.csv`, [
     ['Status', r => r.status], ['Date', r => r.po.date], ['PO #', r => r.po.number], ['Type', r => poTypeLabel(r.po.type)],
-    ['Vendor', r => r.po.vendorName], ['Items', r => r.po.items], ['Allocated to', r => r.where], ['Amount', r => (Number(r.po.amount) || 0).toFixed(2)], ['Entered by', r => r.po.enteredBy],
+    ['Vendor', r => r.po.vendorName], ['Items', r => r.po.items], ['Job', r => `${r.jobName} ${r.street}`.trim()], ['Allocated to', r => r.where], ['Amount', r => (Number(r.po.amount) || 0).toFixed(2)], ['Entered by', r => r.po.enteredBy],
   ], shown)
   const report = () => viewReport('Purchases', [
-    ['Status', r => r.status], ['Date', r => shortDate(r.po.date)], ['Allocated to', r => r.where], ['PO #', r => r.po.number],
+    ['Status', r => r.status], ['Date', r => shortDate(r.po.date)], ['Job', r => `${r.jobName} ${r.street}`.trim()], ['Allocated to', r => r.where], ['PO #', r => r.po.number],
     ['Vendor', r => r.po.vendorName], ['Items', r => `${poTypeLabel(r.po.type)} · ${r.po.items || ''}`], ['From', r => r.po.enteredBy], ['Amount', r => Number(r.po.amount) || 0],
   ], shown, ['Amount'])
   const filterCount = (type !== 'all' ? 1 : 0) + (status !== 'live' ? 1 : 0)
@@ -210,11 +210,12 @@ export default function Purchases() {
 
       {shown.length === 0 ? <Empty>{purchases.length ? 'No purchases match.' : 'No purchase orders yet.'}</Empty> : (
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
-          <table className="w-full text-[15px] min-w-[960px]">
+          <table className="w-full text-[15px] min-w-[1060px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
                 <Th className="text-center">Status</Th>
                 <Th sortKey="date" sort={sort} setSort={setSort}>Date</Th>
+                <Th sortKey="job" sort={sort} setSort={setSort}>Job</Th>
                 <Th>Allocated to</Th>
                 <Th sortKey="amount" sort={sort} setSort={setSort} className="text-right">Amount</Th>
                 <Th sortKey="number" sort={sort} setSort={setSort}>PO#</Th>
@@ -228,14 +229,15 @@ export default function Purchases() {
               {slice.map(r => (
                 <tr key={r.po.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditing(r.po)}>
                   <StatusCell status={r.status === 'open' ? 'active' : r.status} />
-                  <td className="px-3 text-gray-800">{shortDate(r.po.date)}</td>
-                  <td className="px-3 py-3 max-w-[190px]"><p className="truncate text-gray-900">{r.where}</p>{r.allocs.length > 1 ? <p className="text-xs text-gray-500">split {r.allocs.length} jobs</p> : r.jobs[0]?.address ? <p className="truncate text-gray-600">{r.jobs[0].address}</p> : null}</td>
-                  <td className="px-3 text-right text-gray-900">{money(r.po.amount)}</td>
-                  <td className="px-3 text-gray-800 max-w-[130px] truncate">#{r.po.number}</td>
-                  <td className="px-3 max-w-[170px] truncate text-gray-900">{r.po.vendorName || r.vendor || '—'}</td>
-                  <td className="px-3 max-w-[180px] truncate text-gray-800">{r.po.items || poTypeLabel(r.po.type)}</td>
-                  <td className="px-3 max-w-[120px] truncate text-gray-800">{r.po.enteredBy || ''}</td>
-                  <td className="px-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                  <td className="px-2 text-gray-800">{shortDate(r.po.date)}</td>
+                  <td className="px-2 py-3 max-w-[170px]" title={r.jobName}><p className="font-semibold text-gray-900 truncate">{r.jobName || '—'}</p>{r.street ? <p className="text-gray-600 text-sm truncate">{r.street}</p> : r.allocs.length > 1 ? <p className="text-xs text-gray-500">split {r.allocs.length} jobs</p> : null}</td>
+                  <td className="px-2 py-3 max-w-[160px]"><p className="truncate text-gray-900">{r.where}</p></td>
+                  <td className="px-2 text-right text-gray-900">{money(r.po.amount)}</td>
+                  <td className="px-2 text-gray-800 max-w-[130px] truncate">#{r.po.number}</td>
+                  <td className="px-2 max-w-[150px] truncate text-gray-900">{r.po.vendorName || r.vendor || '—'}</td>
+                  <td className="px-2 max-w-[140px] truncate text-gray-800">{r.po.items || poTypeLabel(r.po.type)}</td>
+                  <td className="px-2 max-w-[110px] truncate text-gray-800">{r.po.enteredBy || ''}</td>
+                  <td className="px-2 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     {r.status !== 'void' && <RowIcon icon={ClipboardList} title="Enter a bill for this PO" onClick={() => setBillFor(r.po)} />}
                     <RowIcon icon={Mail} title="Email PO to vendor" onClick={() => mailPo(r.po, byId, vendorList, branding)} />
                     {r.status !== 'void' && <RowIcon icon={X} tone="muted" title="Void PO" onClick={() => { if (window.confirm(`Void PO #${r.po.number}?`)) updatePurchase(r.po.id, { status: 'void' }) }} />}

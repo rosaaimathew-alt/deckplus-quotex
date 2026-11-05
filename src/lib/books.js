@@ -135,15 +135,26 @@ export function poAllocations(po) {
 export const poToJob = (po, jobId) => poAllocations(po).filter(a => String(a.jobId) === String(jobId)).reduce((s, a) => s + n(a.amount), 0)
 export const poIsLive = (po) => po && po.status !== 'void'
 export const poBilled = (po, bills = []) => bills.filter(b => b.poId != null && String(b.poId) === String(po.id) && b.status !== 'void').reduce((s, b) => s + n(b.total), 0)
-// A job's PO is the client's last name, in capitals (how Deck Plus labels
+// A job's name is the client's last name in capitals (how Deck Plus labels
 // its supplier orders): "Clay Woodring" → WOODRING, "WOODRING, Clay" →
 // WOODRING, "Keith & Amy Allen" → ALLEN.
-export function jobPoName(job) {
+export function jobLastName(job) {
   const c = String(job?.client || job?.name || '').trim()
   if (!c) return ''
   if (c.includes(',')) return c.split(',')[0].trim().toUpperCase()
   const words = c.replace(/[()]/g, ' ').split(/\s+/).filter(w => w && !/^(jr|sr|ii|iii|iv)\.?$/i.test(w))
   return (words[words.length - 1] || c).replace(/[.,;]+$/, '').toUpperCase()
+}
+// The street part of the job's address ("1502 Old Tara Lane, Fort Mill, SC" →
+// "1502 Old Tara Lane") and its house number ("1502").
+export const jobStreet = (job) => String(job?.address || '').split(',')[0].trim()
+export const jobHouseNumber = (job) => (/^\s*(\d+[A-Za-z]?)\b/.exec(String(job?.address || '')) || [])[1] || ''
+// The job PO: last name + street address, so two Joneses never share one
+// ("WOODRING 1502 Old Tara Lane"). No address on file → just the last name.
+export function jobPoName(job) {
+  const last = jobLastName(job)
+  const street = jobStreet(job)
+  return last && street ? `${last} ${street}` : last
 }
 export function nextPoNumber(purchases = []) {
   const nums = purchases.map(p => parseInt(String(p.number || '').replace(/\D/g, ''), 10)).filter(x => Number.isFinite(x) && x < 1e7)

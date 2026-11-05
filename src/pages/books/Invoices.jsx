@@ -14,6 +14,7 @@ import {
   StatusPill, DueBanner, SearchBox, usePaged, Th, sortRows, Modal, Field, Combo,
   useJobOptions, PaymentsEditor, Empty, inputCls, btnPrimary, btnGhost,
   PageHead, Toolbar, DateButton, FilterButton, FilterGroup, StatusCell, RowIcon, XlsButton, viewReport, btnHead, btnHeadPrimary,
+  jobName, jobStreet, useRepName,
 } from './ui'
 
 const STATUS_FILTERS = [
@@ -188,6 +189,7 @@ export default function Invoices({ jobId = null }) {
   const proposals = useStore(s => s.proposals)
   const branding  = useStore(s => s.branding)
   const byId = useMemo(() => jobIndex(proposals), [proposals])
+  const repOf = useRepName()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState(jobId ? 'all' : 'open')
   const [range, setRange] = useState({ from: '', to: '' })
@@ -199,8 +201,8 @@ export default function Invoices({ jobId = null }) {
     .filter(i => jobId == null || String(i.jobId) === String(jobId))
     .map(i => {
       const job = byId.get(String(i.jobId))
-      return { inv: i, job, status: invoiceStatus(i, job), balance: invoiceBalance(i, job), total: invoiceTotal(i), dueDate: i.dueDate }
-    }), [invoices, byId, jobId])
+      return { inv: i, job, jobName: jobName(job), street: jobStreet(job), rep: repOf(job), status: invoiceStatus(i, job), balance: invoiceBalance(i, job), total: invoiceTotal(i), dueDate: i.dueDate }
+    }), [invoices, byId, jobId, repOf])
   const sum = useMemo(() => dueSummary(rows, 30), [rows])
 
   const shown = useMemo(() => {
@@ -210,25 +212,25 @@ export default function Invoices({ jobId = null }) {
       if (!['open', 'all'].includes(status) && r.status !== status) return false
       if (range.from && (r.inv.date || '') < range.from) return false
       if (range.to && (r.inv.date || '') > range.to) return false
-      if (s && ![r.inv.number, r.inv.memo, r.job?.client, r.job?.address].some(v => String(v || '').toLowerCase().includes(s))) return false
+      if (s && ![r.inv.number, r.inv.memo, r.jobName, r.street, r.rep, r.job?.client, r.job?.address].some(v => String(v || '').toLowerCase().includes(s))) return false
       return true
     })
     return sortRows(out, sort, {
       due: r => r.inv.dueDate || '', date: r => r.inv.date || '', balance: r => r.balance, total: r => r.total,
-      number: r => parseInt(String(r.inv.number).replace(/\D/g, ''), 10) || 0, for: r => r.job?.client || '',
+      number: r => parseInt(String(r.inv.number).replace(/\D/g, ''), 10) || 0, for: r => r.job?.client || '', job: r => r.jobName, rep: r => r.rep,
     })
   }, [rows, q, status, range, sort])
   const { slice, pager } = usePaged(shown)
 
   const csvCols = [
     ['Status', r => r.status], ['Due date', r => r.inv.dueDate], ['Invoice date', r => r.inv.date], ['Invoice #', r => r.inv.number],
-    ['Job', r => r.job?.client], ['Address', r => r.job?.address], ['Kind', r => r.inv.kind], ['Memo', r => r.inv.memo],
+    ['Job', r => `${r.jobName} ${r.street}`.trim()], ['Client', r => r.job?.client], ['Address', r => r.job?.address], ['Sales rep', r => r.rep], ['Kind', r => r.inv.kind], ['Memo', r => r.inv.memo],
     ['Total', r => r.total.toFixed(2)], ['Paid', r => (r.total - r.balance).toFixed(2)], ['Balance', r => r.balance.toFixed(2)],
   ]
   const exportCsv = () => downloadCsv(`invoices-${todayISO()}.csv`, csvCols, shown)
   const report = () => viewReport('Invoices', [
     ['Status', r => r.status], ['Due', r => shortDate(r.inv.dueDate)], ['Invoice date', r => shortDate(r.inv.date)], ['Invoice #', r => r.inv.number],
-    ['For', r => jobLabel(r.job)], ['Total', r => r.total], ['Balance', r => r.balance],
+    ['Job', r => `${r.jobName} ${r.street}`.trim()], ['For', r => jobLabel(r.job)], ['Sales rep', r => r.rep], ['Total', r => r.total], ['Balance', r => r.balance],
   ], shown, ['Total', 'Balance'])
   const filterCount = (status !== 'open' ? 1 : 0)
 
@@ -236,7 +238,7 @@ export default function Invoices({ jobId = null }) {
   // the Knowify layout: title + buttons, banner, toolbar, table.
   const rowsTable = shown.length === 0 ? <Empty>{invoices.length ? 'No invoices match.' : 'No invoices yet. Create one from a job’s payment schedule or a signed change order.'}</Empty> : (
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
-      <table className="w-full text-[15px] min-w-[900px]">
+      <table className="w-full text-[15px] min-w-[1000px]">
         <thead className="border-b border-gray-200 text-left">
           <tr>
             <Th className="text-center">Status</Th>
@@ -245,7 +247,9 @@ export default function Invoices({ jobId = null }) {
             <Th sortKey="balance" sort={sort} setSort={setSort} className="text-right">Balance</Th>
             <Th sortKey="total" sort={sort} setSort={setSort} className="text-right">Total</Th>
             <Th sortKey="number" sort={sort} setSort={setSort}>Invoice #</Th>
+            <Th sortKey="job" sort={sort} setSort={setSort}>Job</Th>
             <Th sortKey="for" sort={sort} setSort={setSort}>For</Th>
+            <Th sortKey="rep" sort={sort} setSort={setSort}>Sales rep</Th>
             <Th>&nbsp;</Th>
           </tr>
         </thead>
@@ -253,13 +257,15 @@ export default function Invoices({ jobId = null }) {
           {slice.map(r => (
             <tr key={r.inv.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditing(r.inv)}>
               <StatusCell status={r.status} />
-              <td className="px-3 text-gray-800">{shortDate(r.inv.dueDate)}</td>
-              <td className="px-3 text-gray-800">{shortDate(r.inv.date)}</td>
-              <td className="px-3 text-right text-gray-900">{money(r.balance)}</td>
-              <td className="px-3 text-right text-gray-900">{money(r.total)}</td>
-              <td className="px-3 text-gray-800">{r.inv.number}</td>
-              <td className="px-3 py-3"><p className="text-gray-900">{jobLabel(r.job)}</p><p className="text-gray-600 truncate max-w-[280px]">{r.inv.memo || r.job?.address || ''}</p></td>
-              <td className="px-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+              <td className="px-2 text-gray-800">{shortDate(r.inv.dueDate)}</td>
+              <td className="px-2 text-gray-800">{shortDate(r.inv.date)}</td>
+              <td className="px-2 text-right text-gray-900">{money(r.balance)}</td>
+              <td className="px-2 text-right text-gray-900">{money(r.total)}</td>
+              <td className="px-2 text-gray-800">{r.inv.number}</td>
+              <td className="px-2 py-3 whitespace-nowrap"><p className="font-semibold text-gray-900">{r.jobName || '—'}</p><p className="text-gray-600 text-sm">{jobStreet(r.job)}</p></td>
+              <td className="px-2 py-3" title={r.inv.memo || ''}><p className="text-gray-900 truncate max-w-[150px]">{jobLabel(r.job)}</p><p className="text-gray-600 text-sm truncate max-w-[150px]">{r.inv.memo || ''}</p></td>
+              <td className="px-2 text-gray-800"><p className="max-w-[120px] truncate" title={r.rep}>{r.rep || <span className="text-gray-300">—</span>}</p></td>
+              <td className="px-2 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                 {(r.status === 'outstanding' || r.status === 'overdue') && r.job && <RowIcon icon={CheckSquare} title="Record payment" onClick={() => setPaying(r)} />}
                 <RowIcon icon={Printer} title="Print invoice" onClick={() => printInvoice(r.inv, r.job, branding)} />
               </td>

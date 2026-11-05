@@ -12,7 +12,7 @@ import {
 import {
   StatusPill, DueBanner, SearchBox, usePaged, Th, sortRows, Modal, Field, Combo,
   useJobOptions, useVendorList, PaymentsEditor, Empty, inputCls, btnPrimary, btnGhost,
-  PageHead, Toolbar, DateButton, FilterButton, FilterGroup, StatusCell, RowIcon, XlsButton, viewReport, btnHead, btnHeadPrimary,
+  PageHead, Toolbar, DateButton, FilterButton, FilterGroup, StatusCell, RowIcon, XlsButton, viewReport, btnHead, btnHeadPrimary, jobName, jobStreet,
 } from './ui'
 
 const STATUS_FILTERS = [['open', 'Unpaid'], ['outstanding', 'Outstanding'], ['overdue', 'Overdue'], ['paid', 'Paid'], ['all', 'All']]
@@ -140,7 +140,7 @@ export default function Bills() {
   const rows = useMemo(() => bills.map(b => {
     const job = byId.get(String(b.jobId))
     const forLabel = [b.poNumber ? `PO #${b.poNumber}` : '', job ? jobLabel(job) : '', !job && b.bucket ? (OVERHEAD_BUCKETS.find(x => x.key === b.bucket)?.label || b.bucket) : ''].filter(Boolean)
-    return { bill: b, job, status: billStatus(b), balance: billBalance(b), total: Number(b.total) || 0, dueDate: b.dueDate, forLabel }
+    return { bill: b, job, jobName: jobName(job), street: jobStreet(job), status: billStatus(b), balance: billBalance(b), total: Number(b.total) || 0, dueDate: b.dueDate, forLabel }
   }), [bills, byId])
   const sum = useMemo(() => dueSummary(rows, 7), [rows])
 
@@ -151,21 +151,21 @@ export default function Bills() {
       if (!['open', 'all'].includes(status) && r.status !== status) return false
       if (range.from && (r.bill.date || '') < range.from) return false
       if (range.to && (r.bill.date || '') > range.to) return false
-      if (s && ![r.bill.vendorName, r.bill.number, r.bill.poNumber, r.bill.category, r.job?.client].some(v => String(v || '').toLowerCase().includes(s))) return false
+      if (s && ![r.bill.vendorName, r.bill.number, r.bill.poNumber, r.bill.category, r.jobName, r.street, r.job?.client].some(v => String(v || '').toLowerCase().includes(s))) return false
       return true
     })
-    return sortRows(out, sort, { due: r => r.bill.dueDate || '', date: r => r.bill.date || '', balance: r => r.balance, total: r => r.total, vendor: r => r.bill.vendorName || '' })
+    return sortRows(out, sort, { due: r => r.bill.dueDate || '', date: r => r.bill.date || '', balance: r => r.balance, total: r => r.total, vendor: r => r.bill.vendorName || '', job: r => r.jobName })
   }, [rows, q, status, range, sort])
   const { slice, pager } = usePaged(shown)
 
   const exportCsv = () => downloadCsv(`bills-${todayISO()}.csv`, [
     ['Status', r => r.status], ['Due date', r => r.bill.dueDate], ['Bill date', r => r.bill.date], ['Vendor', r => r.bill.vendorName],
-    ['Vendor invoice #', r => r.bill.number], ['PO #', r => r.bill.poNumber], ['Job', r => r.job?.client], ['Overhead', r => r.bill.bucket], ['Category', r => r.bill.category],
+    ['Vendor invoice #', r => r.bill.number], ['PO #', r => r.bill.poNumber], ['Job', r => `${r.jobName} ${r.street}`.trim()], ['Client', r => r.job?.client], ['Overhead', r => r.bill.bucket], ['Category', r => r.bill.category],
     ['Total', r => r.total.toFixed(2)], ['Paid', r => (r.total - r.balance).toFixed(2)], ['Balance', r => r.balance.toFixed(2)],
   ], shown)
   const report = () => viewReport('Bills', [
     ['Status', r => r.status], ['Due', r => shortDate(r.bill.dueDate)], ['Bill date', r => shortDate(r.bill.date)], ['Vendor', r => r.bill.vendorName],
-    ['PO # / for', r => r.forLabel.join(' · ')], ['Invoice #', r => r.bill.number], ['Total', r => r.total], ['Balance', r => r.balance],
+    ['Job', r => `${r.jobName} ${r.street}`.trim()], ['PO # / for', r => r.forLabel.join(' · ')], ['Invoice #', r => r.bill.number], ['Total', r => r.total], ['Balance', r => r.balance],
   ], shown, ['Total', 'Balance'])
 
   return (
@@ -185,7 +185,7 @@ export default function Bills() {
 
       {shown.length === 0 ? <Empty>{bills.length ? 'No bills match.' : 'No bills yet.'}</Empty> : (
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
-          <table className="w-full text-[15px] min-w-[960px]">
+          <table className="w-full text-[15px] min-w-[1060px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
                 <Th className="text-center">Status</Th>
@@ -194,6 +194,7 @@ export default function Bills() {
                 <Th sortKey="balance" sort={sort} setSort={setSort} className="text-right">Balance</Th>
                 <Th sortKey="total" sort={sort} setSort={setSort} className="text-right">Total</Th>
                 <Th sortKey="vendor" sort={sort} setSort={setSort}>Payee/Vendor</Th>
+                <Th sortKey="job" sort={sort} setSort={setSort}>Job</Th>
                 <Th>PO#/For</Th>
                 <Th>Invoice #</Th>
                 <Th>&nbsp;</Th>
@@ -203,14 +204,15 @@ export default function Bills() {
               {slice.map(r => (
                 <tr key={r.bill.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setEditing(r.bill)}>
                   <StatusCell status={r.status} />
-                  <td className="px-3 text-gray-800">{shortDate(r.bill.dueDate)}</td>
-                  <td className="px-3 text-gray-800">{shortDate(r.bill.date)}</td>
-                  <td className="px-3 text-right text-gray-900">{money(r.balance)}</td>
-                  <td className="px-3 text-right text-gray-900">{money(r.total)}</td>
-                  <td className="px-3 max-w-[180px] truncate text-gray-900">{r.bill.vendorName || '—'}</td>
-                  <td className="px-3 py-3 max-w-[240px]">{r.forLabel.map((l, i) => <p key={i} className="truncate text-gray-800">{l}</p>)}</td>
-                  <td className="px-3 text-gray-800">{r.bill.number || ''}</td>
-                  <td className="px-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                  <td className="px-2 text-gray-800">{shortDate(r.bill.dueDate)}</td>
+                  <td className="px-2 text-gray-800">{shortDate(r.bill.date)}</td>
+                  <td className="px-2 text-right text-gray-900">{money(r.balance)}</td>
+                  <td className="px-2 text-right text-gray-900">{money(r.total)}</td>
+                  <td className="px-2 max-w-[180px] truncate text-gray-900">{r.bill.vendorName || '—'}</td>
+                  <td className="px-2 py-3 whitespace-nowrap"><p className="font-semibold text-gray-900">{r.jobName || '—'}</p><p className="text-gray-600 text-sm">{jobStreet(r.job)}</p></td>
+                  <td className="px-2 py-3 max-w-[240px]">{r.forLabel.map((l, i) => <p key={i} className="truncate text-gray-800">{l}</p>)}</td>
+                  <td className="px-2 text-gray-800">{r.bill.number || ''}</td>
+                  <td className="px-2 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     {(r.status === 'outstanding' || r.status === 'overdue') && <RowIcon icon={CheckSquare} title="Pay bill" onClick={() => setPaying(r.bill.id)} />}
                   </td>
                 </tr>
