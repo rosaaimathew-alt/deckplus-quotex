@@ -175,6 +175,7 @@
   @media (max-width: 820px) { .plan-tools { max-width: calc(100% - 24px); top: calc(60px + env(safe-area-inset-top, 0px)); } }
   .plan-msg { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(64px + env(safe-area-inset-bottom, 0px)); background: var(--tag-bg); color: var(--tag-fg); font-size: 13px; padding: 8px 12px; border-radius: 6px; z-index: 3; max-width: calc(100% - 32px); }
   body.customer .edit-only { display: none !important; }
+  body.customer #view-inside { display: none !important; }   /* customers get the outside views only */
   .cust-note { display: none; border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: 14px; line-height: 1.5; color: var(--fg); background: var(--accent-soft); }
   body.customer .cust-note { display: block; }
   body.customer .sec-item { cursor: default; }
