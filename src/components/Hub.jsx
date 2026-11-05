@@ -61,7 +61,7 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
                   {Icon && <Icon size={15} className={on ? '' : 'opacity-70'} />}
                   {t.label}
                   {t.count ? (
-                    <span className={`ml-0.5 text-[11px] font-semibold rounded-full px-1.5 min-w-[18px] text-center ${t.countTone === 'alert' ? 'bg-amber-400 text-white' : on ? 'bg-[var(--brand-100)] text-[var(--brand-700)]' : 'bg-gray-100 text-gray-500'}`}>{t.count}</span>
+                    <span className={`ml-0.5 text-[11px] font-semibold rounded-full px-1.5 min-w-[18px] text-center ${t.countTone === 'alert' ? 'qx-badge' : on ? 'bg-[var(--brand-100)] text-[var(--brand-700)]' : 'bg-gray-100 text-gray-500'}`}>{t.count}</span>
                   ) : null}
                 </button>
               )

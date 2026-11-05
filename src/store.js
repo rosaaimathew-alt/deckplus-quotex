@@ -131,6 +131,11 @@ export function normalizeBranding(b) {
     sidebarColor: b.sidebarColor || '#26262b',     // charcoal default when unset
     accentColor: b.accentColor ?? null,
     plan: b.plan || 'enterprise',
+    // Appearance the whole team opens with (admin / office, Settings › Branding)
+    theme: b.theme === 'dark' ? 'dark' : 'light',
+    backgroundColor: b.backgroundColor || null,   // page background, light mode (null = built-in)
+    backgroundDark: b.backgroundDark || null,     // page background, dark mode
+    badgeColor: b.badgeColor || null,             // notification numbers (null = DP orange)
   }
 }
 
@@ -1428,7 +1433,9 @@ export function bootstrapOrg() {
     const { orgId, me, members, settings, collections } = await loadOrg()
     const merged = { ...SETTINGS_DEFAULTS(), ...settings, branding: normalizeBranding(settings.branding) }
     const cols   = { ...collections, catalog: stripDeckItems(collections.catalog || []) }
-    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), orgLoaded: true })
+    // Everyone opens in the company's chosen appearance (light / dark); the
+    // header toggle switches it for this visit only.
+    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true })
     armAdapter(useStore, orgId, settings)
     // A brand-new org gets the built-in email templates once; the adapter
     // writes them as rows because they arrive after arming. (Not for the paint

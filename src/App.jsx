@@ -22,7 +22,7 @@ import CommandPalette from './components/CommandPalette'
 import PermitPulse from './components/PermitPulse'
 import AuthGuard, { logout } from './components/AuthGuard'
 import { useStore, bootstrapOrg } from './store'
-import { applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR } from './brand'
+import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from './brand'
 import { canAccessRoute, landingRoute } from './plans'
 import { canRoleAccess, roleLanding } from './roles'
 import { useNav, LEGACY_REDIRECTS } from './nav'
@@ -122,7 +122,7 @@ function NavItem({ d, badge, onClick }) {
       <Icon size={19} className="shrink-0" />
       <span className="flex-1 truncate">{d.label}</span>
       {badge > 0 && (
-        <span className="bg-amber-400 text-[#1f1300] text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center leading-none">{badge > 99 ? '99+' : badge}</span>
+        <span className="qx-badge text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center leading-none">{badge > 99 ? '99+' : badge}</span>
       )}
     </NavLink>
   )
@@ -171,11 +171,8 @@ function AppShell() {
   useEffect(() => { autoExpireStaleSent() }, [autoExpireStaleSent])
 
   useEffect(() => {
-    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, {
-      sidebar: branding?.sidebarColor || null,
-      accent:  branding?.accentColor  || null,
-    })
-  }, [branding?.primaryColor, branding?.sidebarColor, branding?.accentColor])
+    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, brandOptions(branding || {}))
+  }, [branding])
 
   useEffect(() => { applyTheme(isDark) }, [isDark])
 
@@ -374,7 +371,7 @@ function MobileTab({ d, badge }) {
       className={({ isActive }) => `relative flex-1 flex flex-col items-center justify-center py-2 ${isActive ? 'text-[var(--brand-700)]' : 'text-gray-500'}`}>
       <Icon size={20} />
       <span className="text-[10px] font-medium mt-0.5">{d.label}</span>
-      {badge > 0 && <span className="absolute top-1 right-1/2 translate-x-4 bg-amber-400 text-[#1f1300] text-[9px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badge}</span>}
+      {badge > 0 && <span className="absolute top-1 right-1/2 translate-x-4 qx-badge text-[9px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badge}</span>}
     </NavLink>
   )
 }

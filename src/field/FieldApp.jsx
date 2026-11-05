@@ -18,7 +18,7 @@ import {
   Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2, ShieldCheck,
 } from 'lucide-react'
 import { useStore } from '../store'
-import { applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR } from '../brand'
+import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
 import { isJobClosed } from '../lib/attention'
 import { usePermitAccess, BOARD_COLUMNS } from '../lib/permitTracking'
 import { JOB_TYPE_OPTIONS } from '../pages/Jobs'
@@ -462,11 +462,8 @@ export default function FieldApp() {
   const tabs = paint ? PAINT_TABS : TABS
 
   useEffect(() => {
-    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, {
-      sidebar: branding?.sidebarColor || null,
-      accent: branding?.accentColor || null,
-    })
-  }, [branding?.primaryColor, branding?.sidebarColor, branding?.accentColor])
+    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, brandOptions(branding || {}))
+  }, [branding])
   useEffect(() => { applyTheme(theme === 'dark') }, [theme])
 
   const toFullApp = () => { setViewPref('full'); navigate('/') }

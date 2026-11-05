@@ -77,8 +77,21 @@ function isLight(hex) {
 // Apply the full brand theme. `opts.sidebar` sets the nav background
 // independently of the primary color (so e.g. a charcoal sidebar can pair with
 // a brass accent). `opts.accent` overrides the secondary highlight color.
+// Deck Plus orange (from the logo): notification numbers unless set otherwise.
+export const DP_ORANGE = '#ea7a24'
+export const DEFAULT_BACKGROUND = '#ebe5d8'       // .qx-ground in index.css
+export const DEFAULT_BACKGROUND_DARK = '#1c1c20'
+
+// The applyBrandStyles options for a saved branding record.
+export const brandOptions = (b = {}) => ({
+  sidebar: b.sidebarColor || null, accent: b.accentColor || null,
+  background: b.backgroundColor || null, backgroundDark: b.backgroundDark || null, badge: b.badgeColor || null,
+})
+
 export function applyBrandStyles(primaryHex, opts = {}) {
   const p = generatePalette(primaryHex || FREE_PRIMARY_COLOR)
+  const badge         = opts.badge || DP_ORANGE
+  const badgeText     = isLight(badge) ? '#1f1300' : '#ffffff'
   const sidebar       = opts.sidebar || p[700]
   const sidebarBorder = darken(sidebar, 0.08)
   const sidebarHover  = isLight(sidebar) ? darken(sidebar, 0.08) : p[600]
@@ -102,6 +115,15 @@ export function applyBrandStyles(primaryHex, opts = {}) {
       --accent:         ${accent};
       --sidebar:        ${sidebar};
       --sidebar-border: ${sidebarBorder};
+      --badge:          ${badge};
+      --badge-text:     ${badgeText};
+    }
+    /* Notification numbers (menu, tabs, needs-attention) */
+    .qx-badge { background-color: var(--badge); color: var(--badge-text); }
+    /* Page background, editable in Settings › Branding (screen only) */
+    @media screen {
+      ${opts.background ? `.qx-ground { background-color: ${opts.background}; }` : ''}
+      ${opts.backgroundDark ? `html.dark .qx-ground, html.dark body { background-color: ${opts.backgroundDark}; }` : ''}
     }
     .brand-nav-inactive        { color: ${navText}; }
     .brand-nav-inactive:hover  { background-color: ${sidebarHover}; color: #fff; }

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Upload, Trash2, CheckCircle, RefreshCw, Palette, Building2, Eye, Download, FolderOpen, AlertTriangle, CloudUpload, HardDrive, Wifi, WifiOff, Lock, Sparkles, Mail } from 'lucide-react'
 import { useStore } from '../store'
-import { extractDominantColor, generatePalette, applyBrandStyles, DEFAULT_BRAND_COLOR, FREE_PRIMARY_COLOR, FREE_SIDEBAR_COLOR, BRAND_PRESETS } from '../brand'
+import { extractDominantColor, generatePalette, applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR, FREE_PRIMARY_COLOR, FREE_SIDEBAR_COLOR, BRAND_PRESETS, DP_ORANGE, DEFAULT_BACKGROUND, DEFAULT_BACKGROUND_DARK } from '../brand'
 import { canCustomizeBranding, PLAN_ORDER, PLAN_META } from '../plans'
 import { ROLE_ORDER, ROLE_META } from '../roles'
 import { DEMO } from '../demo'
@@ -499,6 +499,12 @@ export default function Settings() {
   const [primaryColor, setPrimaryColor] = useState(branding.primaryColor || DEFAULT_BRAND_COLOR)
   const [sidebarColor, setSidebarColor] = useState(branding.sidebarColor || FREE_SIDEBAR_COLOR)
   const [accentColor, setAccentColor]   = useState(branding.accentColor || '')
+  // Appearance: what the whole team opens with, page backgrounds, badge color
+  const [appTheme, setAppTheme]         = useState(branding.theme === 'dark' ? 'dark' : 'light')
+  const [bgColor, setBgColor]           = useState(branding.backgroundColor || '')
+  const [bgDark, setBgDark]             = useState(branding.backgroundDark || '')
+  const [badgeColor, setBadgeColor]     = useState(branding.badgeColor || '')
+  const setTheme = useStore(s => s.setTheme)
   const [extracting, setExtracting]     = useState(false)
   const [saved, setSaved]               = useState(false)
   const fileRef = useRef()
@@ -512,9 +518,11 @@ export default function Settings() {
   const canBrand   = canCustomizeBranding(plan) && canManage
 
   // Keep preview in sync
+  const brandOpts = () => ({ sidebar: sidebarColor, accent: accentColor || null, background: bgColor || null, backgroundDark: bgDark || null, badge: badgeColor || null })
   useEffect(() => {
-    applyBrandStyles(primaryColor, { sidebar: sidebarColor, accent: accentColor || null })
-  }, [primaryColor, sidebarColor, accentColor])
+    applyBrandStyles(primaryColor, brandOpts())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryColor, sidebarColor, accentColor, bgColor, bgDark, badgeColor])
 
   const handleLogoUpload = async (file) => {
     if (!file) return
@@ -534,15 +542,19 @@ export default function Settings() {
   }
 
   const handleSave = () => {
-    updateBranding({ companyName, tagline, gcName: gcName.trim(), licenseNo: licenseNo.trim(), logo, primaryColor, sidebarColor, accentColor: accentColor || null })
-    applyBrandStyles(primaryColor, { sidebar: sidebarColor, accent: accentColor || null })
+    updateBranding({ companyName, tagline, gcName: gcName.trim(), licenseNo: licenseNo.trim(), logo, primaryColor, sidebarColor, accentColor: accentColor || null,
+      theme: appTheme, backgroundColor: bgColor || null, backgroundDark: bgDark || null, badgeColor: badgeColor || null })
+    applyBrandStyles(primaryColor, brandOpts())
+    setTheme(appTheme)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
   const handleReset = () => {
     // Reset to the standard-tier charcoal & brass identity
-    updateBranding({ companyName: 'QUOTEX', tagline: 'Smart Contractor Pricing', logo: null, primaryColor: FREE_PRIMARY_COLOR, sidebarColor: FREE_SIDEBAR_COLOR, accentColor: null })
+    updateBranding({ companyName: 'QUOTEX', tagline: 'Smart Contractor Pricing', logo: null, primaryColor: FREE_PRIMARY_COLOR, sidebarColor: FREE_SIDEBAR_COLOR, accentColor: null,
+      theme: 'light', backgroundColor: null, backgroundDark: null, badgeColor: null })
+    setAppTheme('light'); setBgColor(''); setBgDark(''); setBadgeColor(''); setTheme('light')
     setCompanyName('QUOTEX')
     setTagline('Smart Contractor Pricing')
     setLogo(null)
@@ -731,7 +743,10 @@ export default function Settings() {
                   { label: 'Primary / buttons', value: primaryColor, set: setPrimaryColor },
                   { label: 'Sidebar', value: sidebarColor, set: setSidebarColor },
                   { label: 'Accent (optional)', value: accentColor || primaryColor, set: setAccentColor },
-                ].map(({ label, value, set }) => (
+                  { label: 'Page background (light mode)', value: bgColor || DEFAULT_BACKGROUND, set: setBgColor, reset: bgColor && (() => setBgColor('')) },
+                  { label: 'Page background (dark mode)', value: bgDark || DEFAULT_BACKGROUND_DARK, set: setBgDark, reset: bgDark && (() => setBgDark('')) },
+                  { label: 'Notification numbers', value: badgeColor || DP_ORANGE, set: setBadgeColor, reset: badgeColor && (() => setBadgeColor('')) },
+                ].map(({ label, value, set, reset }) => (
                   <div key={label} className="flex items-center gap-3">
                     <input
                       type="color"
@@ -741,11 +756,32 @@ export default function Settings() {
                     />
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-gray-700">{label}</p>
-                      <p className="text-xs text-gray-400 font-mono">{value}</p>
+                      <p className="text-xs text-gray-400 font-mono">{value}{reset && <button type="button" onClick={() => { reset(); setSaved(false) }} className="ml-2 font-sans underline hover:text-gray-600">default</button>}</p>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Appearance: what everyone opens with. The header's sun / moon
+                  button still switches it for one person, for that visit. */}
+              <p className="text-xs font-medium text-gray-500 mt-5 mb-2">Appearance for the whole team</p>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Appearance for the whole team">
+                {[['light', 'Light', bgColor || DEFAULT_BACKGROUND, '#ffffff'], ['dark', 'Dark', bgDark || DEFAULT_BACKGROUND_DARK, '#26262b']].map(([key, label, ground, card]) => (
+                  <button key={key} type="button" role="radio" aria-checked={appTheme === key}
+                    onClick={() => { setAppTheme(key); setSaved(false); applyTheme(key === 'dark') }}
+                    className={`rounded-lg border p-2 text-left transition-all ${appTheme === key ? 'ring-2 ring-offset-1 ring-[var(--brand-500)] border-transparent' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <div className="h-14 rounded-md p-2 flex gap-1.5" style={{ backgroundColor: ground }}>
+                      <span className="w-3 rounded-sm" style={{ backgroundColor: sidebarColor }} />
+                      <span className="flex-1 rounded-sm flex items-end p-1" style={{ backgroundColor: card }}>
+                        <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: primaryColor }} />
+                        <span className="ml-auto text-[9px] font-bold rounded-full px-1 leading-tight" style={{ backgroundColor: badgeColor || DP_ORANGE, color: '#fff' }}>3</span>
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold mt-1.5" style={{ color: appTheme === key ? 'var(--brand-700)' : undefined }}>{label} mode</p>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1.5">Everyone opens the app in this mode. The sun / moon button at the top still switches it for one person, until they reload.</p>
             </div>
           ) : canManage ? (
             <div className="bg-gray-50 rounded-xl border border-dashed border-gray-300 p-5 text-center">
