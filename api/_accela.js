@@ -214,23 +214,77 @@ export async function fetchPermit(capIds, site = MECK) {
   if (!info.record) throw new Error('Permit page not found on the county site')
 
   const fields = formFields(page.text)
-  fields.set('ctl00$ScriptManager1', `${UPDATE_PANEL}|${REFRESH_BTN}`)
-  fields.set('__EVENTTARGET', REFRESH_BTN)
-  fields.set('__EVENTARGUMENT', '')
-  fields.set('__ASYNCPOST', 'true')
-  const delta = await request(page.url, {
-    method: 'POST',
-    body: fields.toString(),
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'X-MicrosoftAjax': 'Delta=true',
-      'X-Requested-With': 'XMLHttpRequest',
-      Referer: page.url,
-    },
-  })
-  if (!/InspectionList/.test(delta.text)) throw new Error('County site did not return the inspection list')
-  const { upcoming, completed } = parseInspections(delta.text)
-  return { ...info, url, upcoming, completed, checkedAt: new Date().toISOString() }
+  const post = async (target) => {
+    fields.set('ctl00$ScriptManager1', `${UPDATE_PANEL}|${target}`)
+    fields.set('__EVENTTARGET', target)
+    fields.set('__EVENTARGUMENT', '')
+    fields.set('__ASYNCPOST', 'true')
+    const delta = await request(page.url, {
+      method: 'POST',
+      body: fields.toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-MicrosoftAjax': 'Delta=true',
+        'X-Requested-With': 'XMLHttpRequest',
+        Referer: page.url,
+      },
+    })
+    keepHiddenFields(delta.text, fields)
+    return delta.text
+  }
+  const first = await post(REFRESH_BTN)
+  if (!/InspectionList/.test(first)) throw new Error('County site did not return the inspection list')
+  const lists = parseInspections(first)
+
+  // Each grid shows 5 inspections a page, oldest first — so a job with more
+  // than 5 has its latest results (and finals) on the later pages. Walk them.
+  for (const [grid, key] of [['gvListCompleted', 'completed'], ['gvListUpcoming', 'upcoming']]) {
+    let html = first
+    const visited = new Set([1])
+    for (let n = 0; n < 30; n++) {
+      const next = nextPageTarget(html, grid, visited)
+      if (!next) break
+      visited.add(next.page)
+      html = await post(next.target)
+      const have = new Set(lists[key].map(i => i.id))
+      const fresh = parseInspections(html)[key].filter(i => !have.has(i.id))
+      if (!fresh.length) break
+      lists[key] = lists[key].concat(fresh)
+    }
+  }
+  return { ...info, url, upcoming: lists.upcoming, completed: lists.completed, checkedAt: new Date().toISOString() }
+}
+
+// The pager under a grid: __doPostBack('…$gvListCompleted$ctl08$ctl03','')
+// links labelled 2, 3, … and "Next >". Returns the link to the lowest page
+// number not read yet (page 1 is the first answer).
+function nextPageTarget(html, grid, visited) {
+  const links = []
+  const re = /<a\b[^>]*href="javascript:__doPostBack\((?:&#39;|')([^'&"]+)(?:&#39;|')[^"]*"[^>]*>([\s\S]*?)<\/a>/gi
+  for (const m of html.matchAll(re)) {
+    const target = decode(m[1])
+    if (new RegExp(`\\$${grid}\\$ctl\\d+\\$ctl\\d+$`).test(target)) links.push({ target, label: textOf(m[2]).join(' ') })
+  }
+  const pages = links.map(l => ({ ...l, page: Number(l.label) }))
+    .filter(l => l.page > 1 && !visited.has(l.page)).sort((a, b) => a.page - b.page)
+  if (pages.length) return pages[0]
+  // Only "Next >" / "..." left: it leads to the page after the highest read
+  const more = links.find(l => /next|\.\.\.|>/i.test(l.label))
+  return more ? { target: more.target, page: Math.max(...visited) + 1 } : null
+}
+
+// An async postback answer carries the form's new hidden fields
+// ("len|hiddenField|__VIEWSTATE|value|"); keep them for the next postback.
+function keepHiddenFields(text, fields) {
+  let i = 0
+  while (i < text.length) {
+    const a = text.indexOf('|', i); if (a < 0) break
+    const len = Number(text.slice(i, a)); if (!Number.isFinite(len)) break
+    const b = text.indexOf('|', a + 1), c = b < 0 ? -1 : text.indexOf('|', b + 1)
+    if (c < 0) break
+    if (text.slice(a + 1, b) === 'hiddenField') fields.set(text.slice(b + 1, c), text.slice(c + 1, c + 1 + len))
+    i = c + 1 + len + 1
+  }
 }
 
 // ── Inspector notes ("Result Comments" on the View Details page) ────────────
