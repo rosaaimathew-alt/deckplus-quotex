@@ -2184,10 +2184,18 @@
           const f = 0.2, base = 0.28, mx = Math.min(W / 6, span * 0.38), m = 0.1;
           const top = (x) => (span - Math.abs(x)) * gp - f;
           const xEdge = span - (base + f) / gp;
+          // Semi-vault: the panes stop level at the flat-ceiling line and the triangle above is solid
+          // white trim (the ceiling runs flat behind it). Gable: glass all the way to the peak.
+          const clipY = semi ? (hw - hw * 0.42) * gp - f : Infinity, xAt = (yy) => span - (yy + f) / gp, a = mx + m, c2 = mx - m;
+          const sideP = (sd) => {
+            if (top(a) <= clipY) return sd < 0 ? [[-xEdge, base], [-a, base], [-a, top(a)]] : [[a, base], [xEdge, base], [a, top(a)]];
+            const xc = xAt(clipY);
+            return sd < 0 ? [[-xEdge, base], [-a, base], [-a, clipY], [-xc, clipY]] : [[a, base], [xEdge, base], [xc, clipY], [a, clipY]];
+          };
+          const cTop = Math.min(clipY, top(c2));
           const panes = [
-            [[-xEdge, base], [-mx - m, base], [-mx - m, top(mx + m)]],
-            [[mx + m, base], [xEdge, base], [mx + m, top(mx + m)]],
-            [[-mx + m, base], [mx - m, base], [mx - m, top(mx - m)], [0, top(0)], [-mx + m, top(mx - m)]],
+            sideP(-1), sideP(1),
+            semi ? [[-c2, base], [c2, base], [c2, cTop], [-c2, cTop]] : [[-c2, base], [c2, base], [c2, top(c2)], [0, top(0)], [-c2, top(c2)]],
           ].filter(pts => Math.abs(pts[1][0] - pts[0][0]) > 0.4 && pts.every(q => q[1] >= base - 0.01));
           const outer = new THREE.Shape(); outer.moveTo(-span, 0); outer.lineTo(span, 0); outer.lineTo(0, apex); outer.closePath();
           panes.forEach(pts => { const h = new THREE.Path(); h.moveTo(...pts[0]); pts.slice(1).forEach(q => h.lineTo(...q)); h.closePath(); outer.holes.push(h); });
@@ -2851,7 +2859,7 @@
     const panes = `${mat} fills the triangular gable end above the front header all the way up to the rafters: two side triangles and one tall centre pane reaching the peak, separated by slim white frames`;
     if (x.roof === 'semivault') return mat === 'siding'
       ? 'front-facing GABLE roof (semi-vaulted ceiling inside); the triangular gable end above the front header is solid siding with white trim, no glass'
-      : `front-facing GABLE roof (semi-vaulted ceiling inside). ${panes}`;
+      : `front-facing GABLE roof with a SEMI-VAULTED ceiling. The triangular gable end above the front header has ${mat} in a band of three panes (two side panes and a centre pane) whose tops are cut LEVEL at the flat-ceiling line; ABOVE that line the triangle up to the peak is SOLID WHITE trim with NO ${mat}`;
     return mat === 'siding'
       ? 'front-facing GABLE roof with a cathedral ceiling; the triangular gable end above the front header is solid siding with white trim'
       : `front-facing GABLE roof with a cathedral ceiling. ${panes}`;
