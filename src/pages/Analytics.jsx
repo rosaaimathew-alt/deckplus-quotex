@@ -2,7 +2,8 @@ import { useMemo, useState, useRef, useEffect } from 'react'
 import StatCard from '../components/StatCard'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
-import { MenuChip, QuickPicks } from '../components/FilterBar'
+import { MenuChip, QuickPicks, RepToggle } from '../components/FilterBar'
+import { useScopedProposals } from '../lib/proposalScope'
 import { headlineNumbers } from '../lib/headline'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from '../historicalData'
 import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
@@ -916,7 +917,8 @@ function TrendChart({ months, activeTypes, allTypes }) {
 }
 
 export default function Analytics() {
-  const proposals    = useStore(s => s.proposals)
+  // Whose numbers: All or one salesperson (the same choice as Home and Win / loss)
+  const { proposals, canChoose, reps, repId, setRep } = useScopedProposals({ includeImported: true })
   const PROJECT_TYPES = useStore(s => s.projectTypes)
   const CURRENT_YEAR = new Date().getFullYear()
   // Stat-card period: month / quarter / last-quarter / this-year (YTD) / a prior
@@ -1065,9 +1067,12 @@ export default function Analytics() {
       </div>
 
       {/* Summary cards — scoped to the selected period (defaults to this year) */}
-      <div className="flex items-center justify-end border-b border-gray-200 mb-4">
-        <MenuChip label="Period" value={statsPeriod} onChange={setStatsPeriod} align="right"
-          options={statsPeriods.map(p => ({ value: p.id, label: p.label }))} />
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
+        {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
+        <div className="ml-auto">
+          <MenuChip label="Period" value={statsPeriod} onChange={setStatsPeriod} align="right"
+            options={statsPeriods.map(p => ({ value: p.id, label: p.label }))} />
+        </div>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard label="Won revenue"  value={`$${fmt(stats.totalRevenue)}`} sub={`${stats.won.length} jobs won · ${periodLabel}`} />
