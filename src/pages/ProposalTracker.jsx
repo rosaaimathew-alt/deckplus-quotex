@@ -1147,11 +1147,15 @@ function AnalyticsView({ proposals: allProposals, periodKey = 'this-year' }) {
 
 // Status filters: four everyday picks; the individual stages live under "More".
 const OPEN_STATUSES = ['Draft', 'Sent', 'Followed Up', 'Negotiating']
-const QUICK_STATUS = ['All', 'Open', 'Won', 'Lost']
-const MORE_STATUS  = ['Draft', 'Sent', 'Followed Up', 'Negotiating', 'MIA', 'Archived']
+// Everyday picks: Open (anything not decided yet), Sent (with the customer),
+// Won. The rest — All, Lost and each single status — live under "More".
+const QUICK_STATUS = ['Open', 'Sent', 'Won']
+const MORE_STATUS  = ['All', 'Lost', 'Draft', 'Followed Up', 'Negotiating', 'MIA', 'Archived']
+const WITH_CUSTOMER = ['Sent', 'Followed Up', 'Negotiating']
 function matchesStatus(p, f) {
   if (!f || f === 'All') return true
   if (f === 'Open') return OPEN_STATUSES.includes(p.status)
+  if (f === 'Sent') return WITH_CUSTOMER.includes(p.status)
   return p.status === f
 }
 
@@ -1173,7 +1177,7 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
 
   const [ownTab, setTab] = useState('list')
   const tab = view || ownTab
-  const [filterStatus, setFilterStatus] = useState(initialStatus || 'All')
+  const [filterStatus, setFilterStatus] = useState(initialStatus || (view && view !== 'list' ? 'All' : 'Open'))
   // Search by client, email, phone or address (this used to be the Clients tab)
   const [query, setQuery] = useState(initialQuery)
   // Who opened what, newest first (this used to be the Opens tab)
