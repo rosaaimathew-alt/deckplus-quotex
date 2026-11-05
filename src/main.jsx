@@ -4,9 +4,12 @@ import './index.css'
 import App from './App'
 import { initAuth, getAccessToken } from './supabase'
 import { applyCachedBrand } from './brand'
+import { startAutoUpdate } from './lib/autoUpdate'
 
 // Company colors from the last visit, before anything paints (login page too).
 applyCachedBrand()
+// Open tabs pick up a new version on the next page change (lib/autoUpdate.js)
+startAutoUpdate()
 
 // Attach the Supabase session token to every same-origin /api/ request. Doing
 // it once here means no fetch call site can forget it, and public signing

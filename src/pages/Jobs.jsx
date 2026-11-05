@@ -1740,11 +1740,11 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
         </div>
 
         {jobMoney && (
-          <div className="hidden lg:flex items-center gap-5 shrink-0 text-right">
-            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Revenue</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.revenue)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.invoiced)} invoiced</p></div>
+          <div className="hidden lg:flex items-center gap-8 shrink-0 text-right mr-4">
+            <div className="w-28"><p className="text-[10px] uppercase tracking-wider text-gray-400">Revenue</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.revenue)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.invoiced)} invoiced</p></div>
             {/* Cost and profit: the same numbers as Insights › Profit (lib/jobCost.js) */}
-            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Cost</p><p className="text-sm font-semibold text-gray-900">{jobMoney.fin.hasCosts ? money0(jobMoney.fin.actualCost) : '—'}</p><p className="text-[10px] text-gray-400">{jobMoney.fin.hasCosts ? `${money0(jobMoney.committedByType.materials || 0)} materials` : 'no costs yet'}</p></div>
-            <div className="w-24"><p className="text-[10px] uppercase tracking-wider text-gray-400">Profit</p><p className={`text-sm font-semibold ${jobMoney.fin.hasCosts && jobMoney.fin.profit < 0 ? 'text-red-600' : 'text-gray-900'}`}>{jobMoney.fin.hasCosts ? money0(jobMoney.fin.profit) : '—'}</p>{jobMoney.fin.hasCosts && jobMoney.fin.margin != null ? <p className="text-[10px] text-gray-400">{Math.round(jobMoney.fin.margin)}% margin</p> : null}</div>
+            <div className="w-28"><p className="text-[10px] uppercase tracking-wider text-gray-400">Cost</p><p className="text-sm font-semibold text-gray-900">{jobMoney.fin.hasCosts ? money0(jobMoney.fin.actualCost) : '—'}</p><p className="text-[10px] text-gray-400">{jobMoney.fin.hasCosts ? `${money0(jobMoney.committedByType.materials || 0)} materials` : 'no costs yet'}</p></div>
+            <div className="w-28"><p className="text-[10px] uppercase tracking-wider text-gray-400">Profit</p><p className={`text-sm font-semibold ${jobMoney.fin.hasCosts && jobMoney.fin.profit < 0 ? 'text-red-600' : 'text-gray-900'}`}>{jobMoney.fin.hasCosts ? money0(jobMoney.fin.profit) : '—'}</p>{jobMoney.fin.hasCosts && jobMoney.fin.margin != null ? <p className="text-[10px] text-gray-400">{Math.round(jobMoney.fin.margin)}% margin</p> : null}</div>
           </div>
         )}
         {/* One progress figure: "8 of 15 steps" with a thin bar; a pill only
