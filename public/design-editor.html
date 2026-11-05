@@ -57,6 +57,9 @@
   .danger { color: var(--danger); }
   body.customer .rail, body.customer .saveg, body.customer .props, body.customer .bar .grp { display: none !important; }
   body.customer .main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  body.customer .view-wrap { order: -1; }            /* the customer sees the 3D first */
+  body.customer .plan-wrap { border-right: 0; }
+  body.customer .view-wrap { border-right: 1px solid var(--line); }
   body.customer #plan { cursor: grab; }
   .rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }
   .rail button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 8px; }
@@ -115,6 +118,12 @@
     .plan-wrap, .view-wrap { height: 52vh; min-height: 320px; }
     .plan-wrap { border-right: 0; border-bottom: 1px solid var(--line); }
     .tip { display: none; }
+    /* customer: 3D on top, floor plan below, each half the frame */
+    html:has(body.customer), body.customer, body.customer .app { height: 100%; }
+    body.customer .main { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+    body.customer .plan-wrap, body.customer .view-wrap { height: auto; min-height: 0; }
+    body.customer .view-wrap { border-bottom: 1px solid var(--line); }
+    body.customer .plan-wrap { border-bottom: 0; }
   }
 </style>
 
