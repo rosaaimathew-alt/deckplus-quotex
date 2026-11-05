@@ -161,7 +161,7 @@ export default function Vendors() {
       </div>
 
       {shown.length === 0 ? <Empty>{list.length ? 'No vendors match.' : 'No vendors yet.'}</Empty> : (
-        <div className="bg-white border border-gray-200 overflow-x-auto">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
           <table className="w-full text-[15px] min-w-[860px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>

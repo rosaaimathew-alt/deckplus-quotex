@@ -184,7 +184,7 @@ export default function Bills() {
         right={<><XlsButton onClick={exportCsv} />{pager}</>} />
 
       {shown.length === 0 ? <Empty>{bills.length ? 'No bills match.' : 'No bills yet.'}</Empty> : (
-        <div className="bg-white border border-gray-200 overflow-x-auto">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
           <table className="w-full text-[15px] min-w-[960px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>

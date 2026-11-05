@@ -235,7 +235,7 @@ export default function Invoices({ jobId = null }) {
   // Inside a job (Transactions) the list stays compact; the Money page gets
   // the Knowify layout: title + buttons, banner, toolbar, table.
   const rowsTable = shown.length === 0 ? <Empty>{invoices.length ? 'No invoices match.' : 'No invoices yet. Create one from a job’s payment schedule or a signed change order.'}</Empty> : (
-    <div className="bg-white border border-gray-200 overflow-x-auto">
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
       <table className="w-full text-[15px] min-w-[900px]">
         <thead className="border-b border-gray-200 text-left">
           <tr>

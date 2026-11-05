@@ -135,6 +135,16 @@ export function poAllocations(po) {
 export const poToJob = (po, jobId) => poAllocations(po).filter(a => String(a.jobId) === String(jobId)).reduce((s, a) => s + n(a.amount), 0)
 export const poIsLive = (po) => po && po.status !== 'void'
 export const poBilled = (po, bills = []) => bills.filter(b => b.poId != null && String(b.poId) === String(po.id) && b.status !== 'void').reduce((s, b) => s + n(b.total), 0)
+// A job's PO is the client's last name, in capitals (how Deck Plus labels
+// its supplier orders): "Clay Woodring" → WOODRING, "WOODRING, Clay" →
+// WOODRING, "Keith & Amy Allen" → ALLEN.
+export function jobPoName(job) {
+  const c = String(job?.client || job?.name || '').trim()
+  if (!c) return ''
+  if (c.includes(',')) return c.split(',')[0].trim().toUpperCase()
+  const words = c.replace(/[()]/g, ' ').split(/\s+/).filter(w => w && !/^(jr|sr|ii|iii|iv)\.?$/i.test(w))
+  return (words[words.length - 1] || c).replace(/[.,;]+$/, '').toUpperCase()
+}
 export function nextPoNumber(purchases = []) {
   const nums = purchases.map(p => parseInt(String(p.number || '').replace(/\D/g, ''), 10)).filter(x => Number.isFinite(x) && x < 1e7)
   return String((nums.length ? Math.max(...nums) : 1000) + 1)

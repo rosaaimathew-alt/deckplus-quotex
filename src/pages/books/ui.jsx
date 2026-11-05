@@ -23,7 +23,7 @@ export function DueBanner({ sum, soonLabel, counts = true }) {
     </p>
   )
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-2 border-amber-300 bg-amber-50 px-4 py-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-2 border-amber-300 bg-amber-50 rounded-2xl px-4 py-4">
       {cell('Outstanding', sum.outstanding, sum.outstandingCount, 'text-amber-600')}
       {cell(soonLabel, sum.dueSoon, sum.dueSoonCount, 'text-amber-600')}
       {cell('Overdue', sum.overdue, sum.overdueCount, 'text-red-600')}
@@ -119,10 +119,15 @@ export function FilterGroup({ title, options, value, onChange }) {
   )
 }
 
-// The status column: the whole cell in the status color (Knowify style).
+// The status column: a big block in the status color, where Knowify has its
+// colored cell — rounded, to match the rest of Deck Plus.
 export function StatusCell({ status }) {
   const st = STATUS_STYLE[status] || { label: status, cls: 'bg-gray-100 text-gray-600' }
-  return <td className={`w-[150px] min-w-[120px] px-3 py-5 text-center text-[15px] font-medium ${st.cls}`}>{st.label}</td>
+  return (
+    <td className="w-[150px] min-w-[120px] pl-3 pr-2 py-2.5">
+      <span className={`flex items-center justify-center min-h-[48px] rounded-xl px-2 text-center text-[15px] font-semibold ${st.cls}`}>{st.label}</span>
+    </td>
+  )
 }
 
 // Row action icon (record payment, print, email, void…).

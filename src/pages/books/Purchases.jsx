@@ -9,7 +9,7 @@ import { BillModal } from './Bills'
 import { useStore } from '../../store'
 import {
   PO_TYPES, OVERHEAD_BUCKETS, poTypeLabel, money, shortDate, todayISO, jobIndex, jobLabel, poAllocations,
-  poBilled, nextPoNumber, downloadCsv,
+  poBilled, nextPoNumber, jobPoName, downloadCsv,
 } from '../../lib/books'
 import {
   StatusPill, SearchBox, usePaged, Th, sortRows, Modal, Field, Combo,
@@ -18,6 +18,7 @@ import {
 } from './ui'
 
 export function PurchaseModal({ po, presetJobId, onClose }) {
+  const proposals = useStore(s => s.proposals)
   const purchases = useStore(s => s.purchases)
   const bills = useStore(s => s.bills)
   const me = useStore(s => s.me)
@@ -33,10 +34,20 @@ export function PurchaseModal({ po, presetJobId, onClose }) {
     allocations: poAllocations(po).length ? poAllocations(po).map(a => ({ ...a })) : [{ jobId: null, amount: '' }],
     forJob: poAllocations(po).length > 0 || !po.bucket,
   } : {
-    number: nextPoNumber(purchases), date: todayISO(), vendorRef: null, vendorName: '', type: 'materials', items: '', amount: '',
+    number: presetJobId != null ? (jobPoName(proposals.find(p => String(p.id) === String(presetJobId))) || nextPoNumber(purchases)) : nextPoNumber(purchases),
+    date: todayISO(), vendorRef: null, vendorName: '', type: 'materials', items: '', amount: '',
     allocations: [{ jobId: presetJobId ?? null, amount: '' }], forJob: true, bucket: 'operating', status: 'open', notes: '',
   })
   const set = (patch) => setF(x => ({ ...x, ...patch }))
+  // The PO # follows the job (client's last name) until someone types their own.
+  const [autoNumber, setAutoNumber] = useState(!po)
+  const poFor = (allocs, forJob) => {
+    const first = forJob ? allocs.find(a => a.jobId != null) : null
+    const job = first ? proposals.find(p => String(p.id) === String(first.jobId)) : null
+    return job ? (jobPoName(job) || nextPoNumber(purchases)) : nextPoNumber(purchases)
+  }
+  const setAllocs = (allocations) => set(autoNumber ? { allocations, number: poFor(allocations, f.forJob) } : { allocations })
+  const setForJob = (forJob) => set(autoNumber ? { forJob, number: poFor(f.allocations, forJob) } : { forJob })
   const split = f.allocations.length > 1
   const allocTotal = f.allocations.reduce((s, a) => s + (Number(a.amount) || 0), 0)
   const amount = Number(f.amount) || 0
@@ -63,7 +74,7 @@ export function PurchaseModal({ po, presetJobId, onClose }) {
         <button onClick={() => save(f.status === 'void' ? 'open' : f.status)} disabled={!canSave} className={btnPrimary}>{po ? 'Save' : 'Create PO'}</button>
       </>}>
       <div className="grid sm:grid-cols-3 gap-3">
-        <Field label="PO #"><input value={f.number} onChange={e => set({ number: e.target.value })} className={inputCls} /></Field>
+        <Field label="PO #"><input value={f.number} onChange={e => { setAutoNumber(false); set({ number: e.target.value }) }} className={inputCls} title="Fills in with the client's last name when you pick the job" /></Field>
         <Field label="Date"><input type="date" value={f.date} onChange={e => set({ date: e.target.value })} className={inputCls} /></Field>
         <Field label="Type">
           <select value={f.type} onChange={e => set({ type: e.target.value })} className={inputCls}>
@@ -86,14 +97,14 @@ export function PurchaseModal({ po, presetJobId, onClose }) {
 
       <div className="rounded-xl border border-gray-200 p-3 space-y-2">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-max">
-          <button type="button" onClick={() => set({ forJob: true })} className={`px-3 py-1 rounded-md text-xs font-medium ${f.forJob ? 'bg-white shadow-sm' : 'text-gray-500'}`}>For a job</button>
-          <button type="button" onClick={() => set({ forJob: false })} className={`px-3 py-1 rounded-md text-xs font-medium ${!f.forJob ? 'bg-white shadow-sm' : 'text-gray-500'}`}>Company spend</button>
+          <button type="button" onClick={() => setForJob(true)} className={`px-3 py-1 rounded-md text-xs font-medium ${f.forJob ? 'bg-white shadow-sm' : 'text-gray-500'}`}>For a job</button>
+          <button type="button" onClick={() => setForJob(false)} className={`px-3 py-1 rounded-md text-xs font-medium ${!f.forJob ? 'bg-white shadow-sm' : 'text-gray-500'}`}>Company spend</button>
         </div>
         {f.forJob ? (
           <>
             {f.allocations.map((a, i) => (
               <div key={i} className={`grid gap-2 ${split ? 'grid-cols-[1fr_120px_auto]' : 'grid-cols-1'}`}>
-                <Combo options={jobOptions} value={a.jobId} onChange={v => set({ allocations: f.allocations.map((x, j) => (j === i ? { ...x, jobId: v } : x)) })} placeholder="Pick a job…" />
+                <Combo options={jobOptions} value={a.jobId} onChange={v => setAllocs(f.allocations.map((x, j) => (j === i ? { ...x, jobId: v } : x)))} placeholder="Pick a job…" />
                 {split && <input type="number" step="0.01" value={a.amount} onChange={e => set({ allocations: f.allocations.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)) })} placeholder="0.00" className={inputCls} aria-label="Amount to this job" />}
                 {split && <button type="button" onClick={() => set({ allocations: f.allocations.filter((_, j) => j !== i) })} className="text-gray-300 hover:text-red-500 px-1" aria-label="Remove job"><XCircle size={15} /></button>}
               </div>
@@ -198,7 +209,7 @@ export default function Purchases() {
       {shown.length > 0 && filterCount + (jobFilter != null ? 1 : 0) + (q ? 1 : 0) > 0 && <p className="text-sm text-gray-500">{shown.length.toLocaleString()} purchase{shown.length === 1 ? '' : 's'} · {money(total)}</p>}
 
       {shown.length === 0 ? <Empty>{purchases.length ? 'No purchases match.' : 'No purchase orders yet.'}</Empty> : (
-        <div className="bg-white border border-gray-200 overflow-x-auto">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
           <table className="w-full text-[15px] min-w-[960px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
