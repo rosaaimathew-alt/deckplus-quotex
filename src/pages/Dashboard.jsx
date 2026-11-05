@@ -70,6 +70,7 @@ export default function Dashboard() {
   const { proposals, canChoose, reps, repId, mineOnly, repName, setRep } = useScopedProposals()
   const jobCosts   = useStore(s => s.jobCosts) || {}
   const { can, role } = useNav()
+  const me = useStore(s => s.me)
   const permitPulse = useStore(s => s.permitPulse)
   const attention  = attentionItems({ proposals, jobCosts, can, role, permitPulse })
 
@@ -130,6 +131,7 @@ export default function Dashboard() {
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName = (me?.displayName || '').trim().split(/\s+/)[0]
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   const summary = attention.length
     ? `${attention.length} thing${attention.length !== 1 ? 's' : ''} need${attention.length === 1 ? 's' : ''} you today`
@@ -138,7 +140,7 @@ export default function Dashboard() {
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5">
       <header>
-        <h1 className="text-2xl font-bold text-gray-900">{greeting}</h1>
+        <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
         <p className="text-sm text-gray-500 mt-0.5">{dateStr} · {summary}</p>
       </header>
 

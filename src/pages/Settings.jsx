@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Upload, Trash2, CheckCircle, RefreshCw, Palette, Building2, Eye, Download, FolderOpen, AlertTriangle, CloudUpload, HardDrive, Wifi, WifiOff, Lock, Sparkles, Mail } from 'lucide-react'
+import { Upload, Trash2, CheckCircle, RefreshCw, Palette, Building2, Eye, Download, FolderOpen, AlertTriangle, CloudUpload, HardDrive, Wifi, WifiOff, Lock, Sparkles, Mail, Sun, Moon } from 'lucide-react'
 import { useStore } from '../store'
 import { extractDominantColor, generatePalette, applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR, FREE_PRIMARY_COLOR, FREE_SIDEBAR_COLOR, BRAND_PRESETS, DP_ORANGE, DEFAULT_BACKGROUND, DEFAULT_BACKGROUND_DARK } from '../brand'
 import { canCustomizeBranding, PLAN_ORDER, PLAN_META } from '../plans'
@@ -504,7 +504,12 @@ export default function Settings() {
   const [bgColor, setBgColor]           = useState(branding.backgroundColor || '')
   const [bgDark, setBgDark]             = useState(branding.backgroundDark || '')
   const [badgeColor, setBadgeColor]     = useState(branding.badgeColor || '')
+  const [sidebarDark, setSidebarDark]   = useState(branding.sidebarDark || '')   // '' = same as light
   const setTheme = useStore(s => s.setTheme)
+  // Which mode's colors the pickers below edit (and preview). Light and dark
+  // each keep their own sidebar and page background.
+  const [editMode, setEditMode] = useState(() => (useStore.getState().theme === 'dark' ? 'dark' : 'light'))
+  const previewMode = (m) => { setEditMode(m); applyTheme(m === 'dark') }
   const [extracting, setExtracting]     = useState(false)
   const [saved, setSaved]               = useState(false)
   const fileRef = useRef()
@@ -518,11 +523,11 @@ export default function Settings() {
   const canBrand   = canCustomizeBranding(plan) && canManage
 
   // Keep preview in sync
-  const brandOpts = () => ({ sidebar: sidebarColor, accent: accentColor || null, background: bgColor || null, backgroundDark: bgDark || null, badge: badgeColor || null })
+  const brandOpts = () => ({ sidebar: sidebarColor, sidebarDark: sidebarDark || null, accent: accentColor || null, background: bgColor || null, backgroundDark: bgDark || null, badge: badgeColor || null })
   useEffect(() => {
     applyBrandStyles(primaryColor, brandOpts())
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [primaryColor, sidebarColor, accentColor, bgColor, bgDark, badgeColor])
+  }, [primaryColor, sidebarColor, sidebarDark, accentColor, bgColor, bgDark, badgeColor])
 
   const handleLogoUpload = async (file) => {
     if (!file) return
@@ -543,9 +548,9 @@ export default function Settings() {
 
   const handleSave = () => {
     updateBranding({ companyName, tagline, gcName: gcName.trim(), licenseNo: licenseNo.trim(), logo, primaryColor, sidebarColor, accentColor: accentColor || null,
-      theme: appTheme, backgroundColor: bgColor || null, backgroundDark: bgDark || null, badgeColor: badgeColor || null })
+      theme: appTheme, backgroundColor: bgColor || null, backgroundDark: bgDark || null, badgeColor: badgeColor || null, sidebarDark: sidebarDark || null })
     applyBrandStyles(primaryColor, brandOpts())
-    setTheme(appTheme)
+    setTheme(appTheme); applyTheme(appTheme === 'dark'); setEditMode(appTheme)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
@@ -553,8 +558,8 @@ export default function Settings() {
   const handleReset = () => {
     // Reset to the standard-tier charcoal & brass identity
     updateBranding({ companyName: 'QUOTEX', tagline: 'Smart Contractor Pricing', logo: null, primaryColor: FREE_PRIMARY_COLOR, sidebarColor: FREE_SIDEBAR_COLOR, accentColor: null,
-      theme: 'light', backgroundColor: null, backgroundDark: null, badgeColor: null })
-    setAppTheme('light'); setBgColor(''); setBgDark(''); setBadgeColor(''); setTheme('light')
+      theme: 'light', backgroundColor: null, backgroundDark: null, badgeColor: null, sidebarDark: null })
+    setAppTheme('light'); setBgColor(''); setBgDark(''); setBadgeColor(''); setSidebarDark(''); setTheme('light'); previewMode('light')
     setCompanyName('QUOTEX')
     setTagline('Smart Contractor Pricing')
     setLogo(null)
@@ -565,9 +570,10 @@ export default function Settings() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
+  // A preset sets the buttons color and the sidebar of the mode being edited.
   const applyPreset = (preset) => {
     setPrimaryColor(preset.primary)
-    setSidebarColor(preset.sidebar)
+    if (editMode === 'dark') setSidebarDark(preset.sidebar); else setSidebarColor(preset.sidebar)
     setSaved(false)
   }
 
@@ -716,11 +722,25 @@ export default function Settings() {
                 <h3 className="font-semibold text-gray-800 text-sm">Theme Colors</h3>
               </div>
 
-              {/* Preset theme combos (primary + sidebar) */}
+              {/* Which mode the pickers edit. Light and dark each keep their own
+                  sidebar and page background; buttons, accent and the
+                  notification numbers are shared. Picking a tab previews it. */}
+              <p className="text-xs font-medium text-gray-500 mb-2">Colors for</p>
+              <div className="inline-flex rounded-lg border border-gray-200 p-0.5 mb-4" role="tablist" aria-label="Colors for">
+                {[['light', 'Light mode'], ['dark', 'Dark mode']].map(([key, label]) => (
+                  <button key={key} type="button" role="tab" aria-selected={editMode === key} onClick={() => previewMode(key)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${editMode === key ? 'bg-[var(--brand-600)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    {key === 'dark' ? <Moon size={14} /> : <Sun size={14} />} {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Preset theme combos (primary + this mode's sidebar) */}
               <p className="text-xs font-medium text-gray-500 mb-2">Preset themes</p>
               <div className="grid grid-cols-4 gap-2 mb-5">
                 {BRAND_PRESETS.map(preset => {
-                  const active = primaryColor === preset.primary && sidebarColor === preset.sidebar
+                  const modeSidebar = editMode === 'dark' ? (sidebarDark || sidebarColor) : sidebarColor
+                  const active = primaryColor === preset.primary && modeSidebar === preset.sidebar
                   return (
                     <button
                       key={preset.label}
@@ -740,38 +760,43 @@ export default function Settings() {
               {/* Individual color pickers */}
               <div className="space-y-3">
                 {[
-                  { label: 'Primary / buttons', value: primaryColor, set: setPrimaryColor },
-                  { label: 'Sidebar', value: sidebarColor, set: setSidebarColor },
-                  { label: 'Accent (optional)', value: accentColor || primaryColor, set: setAccentColor },
-                  { label: 'Page background (light mode)', value: bgColor || DEFAULT_BACKGROUND, set: setBgColor, reset: bgColor && (() => setBgColor('')) },
-                  { label: 'Page background (dark mode)', value: bgDark || DEFAULT_BACKGROUND_DARK, set: setBgDark, reset: bgDark && (() => setBgDark('')) },
-                  { label: 'Notification numbers', value: badgeColor || DP_ORANGE, set: setBadgeColor, reset: badgeColor && (() => setBadgeColor('')) },
-                ].map(({ label, value, set, reset }) => (
+                  ...(editMode === 'dark' ? [
+                    { label: 'Sidebar (dark mode)', value: sidebarDark || sidebarColor, set: setSidebarDark, reset: sidebarDark && (() => setSidebarDark('')), resetLabel: 'same as light' },
+                    { label: 'Page background (dark mode)', value: bgDark || DEFAULT_BACKGROUND_DARK, set: setBgDark, reset: bgDark && (() => setBgDark('')) },
+                  ] : [
+                    { label: 'Sidebar (light mode)', value: sidebarColor, set: setSidebarColor },
+                    { label: 'Page background (light mode)', value: bgColor || DEFAULT_BACKGROUND, set: setBgColor, reset: bgColor && (() => setBgColor('')) },
+                  ]),
+                  { label: 'Primary / buttons (both modes)', value: primaryColor, set: setPrimaryColor },
+                  { label: 'Accent, optional (both modes)', value: accentColor || primaryColor, set: setAccentColor },
+                  { label: 'Notification numbers (both modes)', value: badgeColor || DP_ORANGE, set: setBadgeColor, reset: badgeColor && (() => setBadgeColor('')) },
+                ].map(({ label, value, set, reset, resetLabel }) => (
                   <div key={label} className="flex items-center gap-3">
                     <input
                       type="color"
                       value={value}
                       onChange={e => { set(e.target.value); setSaved(false) }}
+                      aria-label={label}
                       className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5 shrink-0"
                     />
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-gray-700">{label}</p>
-                      <p className="text-xs text-gray-400 font-mono">{value}{reset && <button type="button" onClick={() => { reset(); setSaved(false) }} className="ml-2 font-sans underline hover:text-gray-600">default</button>}</p>
+                      <p className="text-xs text-gray-400 font-mono">{value}{reset && <button type="button" onClick={() => { reset(); setSaved(false) }} className="ml-2 font-sans underline hover:text-gray-600">{resetLabel || 'default'}</button>}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Appearance: what everyone opens with. The header's sun / moon
-                  button still switches it for one person, for that visit. */}
-              <p className="text-xs font-medium text-gray-500 mt-5 mb-2">Appearance for the whole team</p>
-              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Appearance for the whole team">
-                {[['light', 'Light', bgColor || DEFAULT_BACKGROUND, '#ffffff'], ['dark', 'Dark', bgDark || DEFAULT_BACKGROUND_DARK, '#26262b']].map(([key, label, ground, card]) => (
+              {/* Which mode the whole team opens in. Only the default: the
+                  colors above are kept for both modes either way. */}
+              <p className="text-xs font-medium text-gray-500 mt-5 mb-2">Team opens in</p>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Team opens in">
+                {[['light', 'Light', bgColor || DEFAULT_BACKGROUND, '#ffffff', sidebarColor], ['dark', 'Dark', bgDark || DEFAULT_BACKGROUND_DARK, '#26262b', sidebarDark || sidebarColor]].map(([key, label, ground, card, side]) => (
                   <button key={key} type="button" role="radio" aria-checked={appTheme === key}
-                    onClick={() => { setAppTheme(key); setSaved(false); applyTheme(key === 'dark') }}
+                    onClick={() => { setAppTheme(key); setSaved(false) }}
                     className={`rounded-lg border p-2 text-left transition-all ${appTheme === key ? 'ring-2 ring-offset-1 ring-[var(--brand-500)] border-transparent' : 'border-gray-200 hover:border-gray-300'}`}>
                     <div className="h-14 rounded-md p-2 flex gap-1.5" style={{ backgroundColor: ground }}>
-                      <span className="w-3 rounded-sm" style={{ backgroundColor: sidebarColor }} />
+                      <span className="w-3 rounded-sm" style={{ backgroundColor: side }} />
                       <span className="flex-1 rounded-sm flex items-end p-1" style={{ backgroundColor: card }}>
                         <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: primaryColor }} />
                         <span className="ml-auto text-[9px] font-bold rounded-full px-1 leading-tight" style={{ backgroundColor: badgeColor || DP_ORANGE, color: '#fff' }}>3</span>
@@ -781,7 +806,7 @@ export default function Settings() {
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-gray-400 mt-1.5">Everyone opens the app in this mode. The sun / moon button at the top still switches it for one person, until they reload.</p>
+              <p className="text-[11px] text-gray-400 mt-1.5">Everyone opens the app in this mode. The sun / moon button at the top still switches it for one person, until they reload. Each mode keeps its own colors.</p>
             </div>
           ) : canManage ? (
             <div className="bg-gray-50 rounded-xl border border-dashed border-gray-300 p-5 text-center">

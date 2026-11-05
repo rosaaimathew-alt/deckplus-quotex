@@ -137,6 +137,8 @@
     font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
     letter-spacing: -0.01em;
   }
+  /* The home page greeting ("Good morning, Matt") stays in the app's sans */
+  h1.qx-greeting { font-family: inherit; letter-spacing: normal; }
   /* Keep the legal contract document in its original sans typography */
   .contract-doc h1, .contract-doc h2, .contract-doc h3 {
     font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

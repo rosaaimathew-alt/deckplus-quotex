@@ -79,7 +79,7 @@ export default function OfficeHome() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-7">
       <div>
         <p className="text-sm text-gray-500">Home{branding?.companyName ? ` | ${branding.companyName}` : ''}</p>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Welcome, <span className="text-[var(--brand-600)]">{first}</span></h1>
+        <h1 className="qx-greeting text-2xl sm:text-3xl font-bold text-gray-900">Welcome, <span className="text-[var(--brand-600)]">{first}</span></h1>
       </div>
 
       <div>

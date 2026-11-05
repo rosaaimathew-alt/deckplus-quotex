@@ -136,6 +136,7 @@ export function normalizeBranding(b) {
     backgroundColor: b.backgroundColor || null,   // page background, light mode (null = built-in)
     backgroundDark: b.backgroundDark || null,     // page background, dark mode
     badgeColor: b.badgeColor || null,             // notification numbers (null = DP orange)
+    sidebarDark: b.sidebarDark || null,           // sidebar in dark mode (null = same as light)
   }
 }
 

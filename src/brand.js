@@ -84,7 +84,7 @@ export const DEFAULT_BACKGROUND_DARK = '#1c1c20'
 
 // The applyBrandStyles options for a saved branding record.
 export const brandOptions = (b = {}) => ({
-  sidebar: b.sidebarColor || null, accent: b.accentColor || null,
+  sidebar: b.sidebarColor || null, sidebarDark: b.sidebarDark || null, accent: b.accentColor || null,
   background: b.backgroundColor || null, backgroundDark: b.backgroundDark || null, badge: b.badgeColor || null,
 })
 
@@ -136,6 +136,17 @@ export function applyBrandStyles(primaryHex, opts = {}) {
     .brand-nav-active          { background-color: #fff; color: ${p[700]}; }
     .brand-badge               { color: ${p[700]}; }
     .brand-footer              { color: ${navText}; }
+    ${opts.sidebarDark ? (() => {
+      // Dark mode's own sidebar (Settings › Branding › Colors for: Dark mode)
+      const sd = opts.sidebarDark
+      const textD = isLight(sd) ? '#1f2937' : p[100]
+      return `@media screen {
+      html.dark { --sidebar: ${sd}; --sidebar-border: ${darken(sd, 0.08)}; }
+      html.dark .brand-nav-inactive       { color: ${textD}; }
+      html.dark .brand-nav-inactive:hover { background-color: ${isLight(sd) ? darken(sd, 0.08) : p[600]}; color: #fff; }
+      html.dark .brand-footer             { color: ${textD}; }
+    }`
+    })() : ''}
     .brand-bg-light            { background-color: ${p[50]}; }
 
     /* Make the app's hard-coded blue follow the brand color, app-wide. */

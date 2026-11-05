@@ -17,6 +17,7 @@ const ymd = (d) => d.toISOString().split('T')[0]
 export default function PMHome() {
   const proposals = useStore(s => s.proposals)
   const { can, role } = useNav()
+  const me = useStore(s => s.me)
   const items = attentionItems({ proposals, can, role })
 
   // Milestones dated in the next 7 days, not yet done
@@ -43,13 +44,14 @@ export default function PMHome() {
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName = (me?.displayName || '').trim().split(/\s+/)[0]
   const today = ymd(new Date())
 
   return (
     <div className="space-y-5">
       <div className="p-4 sm:p-6 pb-0 sm:pb-0 max-w-7xl mx-auto space-y-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{greeting}!</h1>
+          <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}!</h1>
           <p className="text-sm text-gray-400 mt-0.5">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
