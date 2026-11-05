@@ -5,7 +5,7 @@
 // at 8 AM and 1 PM (and right away for jobs never checked), or by "Check county now".
 import { useStore } from '../store'
 import { getStages } from '../pages/Jobs'
-import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty } from './permitTracking'
+import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty, closeIfFinaled } from './permitTracking'
 import { isJob } from './attention'
 import { countyOf, gradeRun, sendConnectionAlert } from './permitHealth'
 
@@ -86,6 +86,8 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
         : withNotes(r, prev)
       const stageKeys = (getStages(p) || []).map(s => s.key)
       setCountyPermit(p.id, next, r.permits ? countyPassedStages({ countyPermit: next }, stageKeys) : [])
+      // Every final passed: off the board and into Closed jobs
+      if (r.permits?.length && !r.error) closeIfFinaled(p.id, useStore.getState)
       done++
     }
     onProgress?.({ done, failed, total: jobs.length })

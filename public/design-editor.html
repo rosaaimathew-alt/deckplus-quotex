@@ -54,6 +54,8 @@
   body.customer .sheetg { display: none !important; }
   .share-tg { display: flex; align-items: center; gap: 6px; font: 600 13px var(--font-body); color: var(--fg); cursor: pointer; white-space: nowrap; }
   .share-tg input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .share-tg.off { color: #b03a2e; }
+  .share-tg.off::after { content: ': not on the proposal, tick to add it'; font-weight: 500; }
   .saveg { display: flex; align-items: center; gap: 8px; }
   .save-status { font-size: 12px; color: var(--muted); }
   .save-btn { font: 600 13px var(--font-body); padding: 6px 12px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); cursor: pointer; }
@@ -452,7 +454,7 @@
   let lastSaved = snap();
   let onChange = () => {};        // set once the saved design has loaded (see Save to the proposal)
   function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); onChange(); }
-  function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; S.house = o.house || null; S.share = o.share === true; if ($('b-share')) $('b-share').checked = S.share; S.build = { ...BUILD_DEF, ...(o.build || legacyBuild(o.color)) }; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
+  function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; S.house = o.house || null; S.share = o.share === true; if ($('b-share')) $('b-share').checked = S.share; if (typeof shareNote === 'function') shareNote(); S.build = { ...BUILD_DEF, ...(o.build || legacyBuild(o.color)) }; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
   function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); refreshButtons(); onChange(); }
   function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); refreshButtons(); onChange(); }
 
@@ -1236,7 +1238,10 @@
     const askPlan = (action) => { clearTimeout(sendT); if (!frame?.contentWindow || !OPTS) return; frame.contentWindow.postMessage(renderModel(), '*'); frame.contentWindow.postMessage({ type: 'qx-plan-request', sheet: $('sheet').value, action }, '*'); };
     $('b-print').addEventListener('click', () => askPlan('print'));
     // Whether the design goes on the customer's proposal link (saved with the design).
-    $('b-share').addEventListener('change', (ev) => { S.share = ev.target.checked; commit(); setStatus(S.share ? 'Will show on the proposal' : 'Hidden from the proposal'); });
+    // It lets go of focus right away: Space is the pan key, and Space on a focused checkbox would
+    // silently flip it.
+    $('b-share').addEventListener('change', (ev) => { S.share = ev.target.checked; ev.target.blur(); commit(); shareNote(); setStatus(S.share ? 'Will show on the proposal' : 'Not on the proposal'); });
+    $('b-share').addEventListener('pointerup', (ev) => setTimeout(() => ev.target.blur(), 0));
     if (DESIGN) { $('b-reset').hidden = false; $('b-reset').addEventListener('click', () => {
       const els = layoutFrom(DESIGN); if (!els.length) return;
       S.els = els; nextId = Math.max(...els.map(e => e.id)) + 1; sel = null; commit(); changed(); send3D(true); fitPlan();
@@ -1267,6 +1272,9 @@
   // the layout worked out from the quote.
   const store = CUSTOMER ? null : window.qxDesignStore, saveBtn = $('b-save');
   const setStatus = (t) => { $('save-status').textContent = t; };
+  // Say plainly when the design is not going on the customer's proposal (the default).
+  function shareNote() { const l = document.querySelector('.share-tg'); if (l) l.classList.toggle('off', S.share !== true); }
+  shareNote();
   if (DESIGN?.client) $('proj').textContent = [DESIGN.client, DESIGN.address].filter(Boolean).join(' · ');
   let saveT = null, dirty = false;
   async function saveNow() {

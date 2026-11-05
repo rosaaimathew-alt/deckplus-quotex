@@ -9,7 +9,7 @@ import { startPulse, runPermitPulse } from '../lib/permitPulse'
 import { locateAddress } from '../lib/permitFees'
 import {
   usePermitAccess, permitTracked, BOARD_COLUMNS, boardCells, countyFinaled, inspectionLabel, INSPECTION_TYPES,
-  jobCounty, jobJurisdiction, countyConnected, CONNECTED_COUNTIES,
+  jobCounty, jobJurisdiction, countyConnected, CONNECTED_COUNTIES, closeIfFinaled,
 } from '../lib/permitTracking'
 import { Search, X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck, Printer, Plus, Trash2, Pencil } from 'lucide-react'
 import { buildWeeklyReportHtml } from '../lib/inspectionReport'
@@ -200,6 +200,8 @@ function OfficeResultForm({ proposal, connected }) {
   const save = () => {
     updateJobData(proposal.id, { officeInspections: [...list, { ...f, id: `o${Date.now()}`, by: me?.displayName || me?.email || '' }] })
     setF(blank); setOpen(false)
+    // A passed final that finishes the job moves it to Closed jobs
+    if (f.code === 'FI') closeIfFinaled(proposal.id, useStore.getState)
   }
   const remove = (id) => updateJobData(proposal.id, { officeInspections: list.filter(o => o.id !== id) })
   const input = 'text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white'
