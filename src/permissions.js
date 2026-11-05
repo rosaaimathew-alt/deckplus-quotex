@@ -8,8 +8,9 @@
 //   '<destination>.<tab>'  every tab in the navigation (nav.js DESTINATIONS),
 //                          e.g. 'projects.inspections', 'insights.profit'
 //   'job.money'            the money inside a job: Budget, Price list, Costs,
-//                          Receipts, payments, close-out profit, and the quote
-//                          builder's cost / margin. The job's value stays.
+//                          Receipts, payments, close-out profit, Money › Bills
+//                          and Purchases, and the quote builder's cost / margin.
+//                          The job's value stays.
 //
 // The database enforces the money ones too (supabase/permissions.sql): with
 // 'job.money' and 'insights.profit' off, job costs are refused; with
@@ -30,7 +31,7 @@ export const permissionGroups = () => [
   {
     label: 'Money',
     items: [{ key: JOB_MONEY, label: 'Job money & profit', access: '/jobs',
-      hint: 'Budget, price list, costs, receipts, payments and profit on a job; cost and margin in the quote builder' }],
+      hint: 'Budget, price list, costs, receipts, payments and profit on a job; Money › Bills and Purchases; cost and margin in the quote builder' }],
   },
 ]
 

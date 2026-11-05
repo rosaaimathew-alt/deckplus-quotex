@@ -150,7 +150,7 @@ export function buildDemoSeed() {
         completedStages: ['hoa', 'zoning', 'building', 'precon', 'start', 'demo_footings', 'footing_insp', 'materials'],
         notes: 'Framing inspection scheduled for next week.',
         changeOrders: [
-          { id: 'co1', number: 1, status: 'Approved', total: 2400, description: 'Add under-deck lighting package.', createdAt: iso(-8) },
+          { id: 'co1', number: 1, coNumber: 'DP-0005-CO-001', status: 'Approved', total: 2400, amount: 2400, signedAt: iso(-7), description: 'Add under-deck lighting package.', createdAt: iso(-8) },
         ],
       },
       contractDraft: {
@@ -231,10 +231,40 @@ export function buildDemoSeed() {
     { id: 5, name: 'Summit Roofing', trade: 'Roofing', phone: '704-555-2266', email: 'office@summitroof.example', rating: 5, startDate: ymd(-500), endDate: '', notes: 'Porch and pavilion roofing. Excellent cleanup.', incidents: [], cois: [] },
   ]
 
+  // Books: fictional vendors, POs, bills and invoices on the three won jobs.
+  const vendors = [
+    { id: 9001, name: 'Piedmont Lumber Supply', type: 'supplier', email: 'orders@piedmontlumber.example', phone: '704-555-3101', docs: { w9: { onFile: true } }, active: true },
+    { id: 9002, name: 'Carolina Composite Decking', type: 'supplier', email: 'sales@ccdecking.example', phone: '704-555-3102', docs: {}, active: true },
+    { id: 9003, name: 'Queen City Dumpsters', type: 'service', email: 'dispatch@qcdumpsters.example', phone: '704-555-3103', docs: {}, active: true },
+  ]
+  subcontractors[0].docs = { gl: { expires: ymd(200) }, wc: { expires: ymd(20) }, w9: { onFile: true } }
+  subcontractors[1].docs = { gl: { expires: ymd(-5) }, w9: { onFile: true } }
+  const purchases = [
+    { id: 9101, number: '1001', date: ymd(-18), vendorRef: 'v:9001', vendorName: 'Piedmont Lumber Supply', type: 'materials', items: 'Framing lumber and hardware', amount: 6240.55, allocations: [{ jobId: 5, amount: 6240.55 }], status: 'open', enteredBy: 'Office' },
+    { id: 9102, number: '1002', date: ymd(-15), vendorRef: 'v:9002', vendorName: 'Carolina Composite Decking', type: 'materials', items: 'Trex Transcend boards, fascia', amount: 11980, allocations: [{ jobId: 5, amount: 8180 }, { jobId: 6, amount: 3800 }], status: 'open', enteredBy: 'Office' },
+    { id: 9103, number: '1003', date: ymd(-12), vendorRef: 's:1', vendorName: 'Cardinal Framing Co.', type: 'sub', items: 'Framing labor', amount: 9500, allocations: [{ jobId: 5, amount: 9500 }], status: 'open', enteredBy: 'Office' },
+    { id: 9104, number: '1004', date: ymd(-10), vendorName: 'Jordan Reyes', type: 'commission', items: 'Commission - First payment', amount: 1905, allocations: [{ jobId: 5, amount: 1905 }], status: 'open', enteredBy: 'Office' },
+    { id: 9105, number: '1005', date: ymd(-4), vendorRef: 'v:9003', vendorName: 'Queen City Dumpsters', type: 'misc', items: '20-yard dumpster', amount: 425, allocations: [{ jobId: 7, amount: 425 }], status: 'open', enteredBy: 'Office' },
+    { id: 9106, number: '1006', date: ymd(-3), vendorRef: 'v:9001', vendorName: 'Piedmont Lumber Supply', type: 'materials', items: 'Shop stock: joist hangers, screws', amount: 812.4, allocations: [], bucket: 'inventory', status: 'open', enteredBy: 'Office' },
+  ]
+  const bills = [
+    { id: 9201, vendorRef: 'v:9001', vendorName: 'Piedmont Lumber Supply', number: 'INV-55821', date: ymd(-16), dueDate: ymd(-1), total: 6240.55, poId: 9101, poNumber: '1001', jobId: 5, payments: [] },
+    { id: 9202, vendorRef: 's:1', vendorName: 'Cardinal Framing Co.', number: '2231', date: ymd(-8), dueDate: ymd(6), total: 4750, poId: 9103, poNumber: '1003', jobId: 5, payments: [] },
+    { id: 9203, vendorName: 'Ballantyne Office Park', number: 'Rent', date: ymd(-30), dueDate: ymd(-25), total: 2800, bucket: 'operating', category: 'Rent', payments: [{ id: 1, date: ymd(-26), amount: 2800, method: 'ACH' }] },
+  ]
+  const invoices = [
+    { id: 9301, jobId: 5, kind: 'progress', number: '4988', date: ymd(-20), dueDate: ymd(-20), memo: 'Deposit', lines: [{ description: 'Deposit — 1/3 of contract', amount: 21166.67 }], total: 21166.67, status: 'sent' },
+    { id: 9302, jobId: 5, kind: 'progress', number: '4989', date: ymd(-5), dueDate: ymd(-1), memo: 'Framing complete', lines: [{ description: 'Framing complete — 1/3 of contract', amount: 21166.67 }], total: 21166.67, status: 'sent' },
+    { id: 9303, jobId: 6, kind: 'progress', number: '4990', date: ymd(-2), dueDate: ymd(13), memo: 'Deposit', lines: [{ description: 'Deposit', amount: 4300 }], total: 4300, status: 'sent' },
+  ]
+  const won5 = proposals.find(p => p.id === 5)
+  won5.jobData = { ...(won5.jobData || {}), paymentsReceived: [...(won5.jobData?.paymentsReceived || []), { id: 9401, date: ymd(-19), amount: 21166.67, method: 'Check', invoiceId: 9301, milestone: 'Deposit' }] }
+
   return {
     proposals,
     nextProposalId: 9,
     subcontractors,
+    vendors, purchases, bills, invoices,
     nextSubId: 6,
     catalog: DEMO_CATALOG,
     nextCatalogId: DEMO_CATALOG.length + 1,

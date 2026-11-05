@@ -17,7 +17,8 @@ import ContractViewFull from './pages/ContractViewFull'
 import PublicProposal from './pages/PublicProposal'
 import Legal from './pages/Legal'
 import EsignCertificate from './pages/EsignCertificate'
-import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub } from './pages/hubs/Hubs'
+import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub, MoneyHub } from './pages/hubs/Hubs'
+import OfficeHome from './pages/OfficeHome'
 import CommandPalette from './components/CommandPalette'
 import PermitPulse from './components/PermitPulse'
 import AuthGuard, { logout } from './components/AuthGuard'
@@ -65,9 +66,14 @@ function BootGate({ children }) {
 }
 
 // Home depends on role: project managers plan from the job calendar.
+// Office logins get the office manager home (anyone can preview it at /?home=office).
 function RoleHome() {
   const role = useStore(s => s.role || 'manager')
-  return role === 'pm' ? <PMHome /> : <Dashboard />
+  const me = useStore(s => s.me)
+  const location = useLocation()
+  if (role === 'pm') return <PMHome />
+  if (role === 'manager' && (me?.role === 'office' || new URLSearchParams(location.search).get('home') === 'office')) return <OfficeHome />
+  return <Dashboard />
 }
 
 // Blocks a route the current plan OR role can't reach, redirecting home.
@@ -325,6 +331,7 @@ function AppShell() {
             <Route path="/projects"  element={<GatedDestination dkey="projects"><ProjectsHub /></GatedDestination>} />
             <Route path="/insights"  element={<GatedDestination dkey="insights"><InsightsHub /></GatedDestination>} />
             <Route path="/catalog"   element={<GatedDestination dkey="catalog"><CatalogHub /></GatedDestination>} />
+            <Route path="/money"     element={<GatedDestination dkey="money"><MoneyHub /></GatedDestination>} />
             <Route path="/inbox"     element={<Navigate to="/" replace />} />
             <Route path="/quote"     element={<Gated path="/quote"><BuildQuote /></Gated>} />
             <Route path="/proposal"  element={<Gated path="/proposal"><ProposalView /></Gated>} />

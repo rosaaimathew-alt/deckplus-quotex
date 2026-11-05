@@ -1244,6 +1244,63 @@ export const useStore = create(
       deleteExpense: (id) =>
         set((s) => ({ expenses: s.expenses.filter((e) => e.id !== id), tombstones: [...(s.tombstones || []), `expense:${id}`] })),
 
+      // ── Books: vendors, purchase orders, bills, invoices (src/lib/books.js) ──
+      // Ids are Date.now()·1000 + random so two office logins never collide.
+      vendors: [],
+      purchases: [],
+      bills: [],
+      invoices: [],
+      addVendor: (v) => {
+        const rec = { id: Date.now() * 1000 + Math.floor(Math.random() * 1000), createdAt: new Date().toISOString(), active: true, ...v }
+        set((s) => ({ vendors: [...s.vendors, rec] }))
+        return rec
+      },
+      updateVendor: (id, changes) =>
+        set((s) => ({ vendors: s.vendors.map((v) => (v.id === id ? { ...v, ...changes } : v)) })),
+      deleteVendor: (id) =>
+        set((s) => ({ vendors: s.vendors.filter((v) => v.id !== id) })),
+      addPurchase: (po) => {
+        const rec = { id: Date.now() * 1000 + Math.floor(Math.random() * 1000), createdAt: new Date().toISOString(), status: 'open', ...po }
+        set((s) => ({ purchases: [rec, ...s.purchases] }))
+        return rec
+      },
+      updatePurchase: (id, changes) =>
+        set((s) => ({ purchases: s.purchases.map((p) => (p.id === id ? { ...p, ...changes, updatedAt: new Date().toISOString() } : p)) })),
+      deletePurchase: (id) =>
+        set((s) => ({ purchases: s.purchases.filter((p) => p.id !== id) })),
+      addBill: (b) => {
+        const rec = { id: Date.now() * 1000 + Math.floor(Math.random() * 1000), createdAt: new Date().toISOString(), payments: [], ...b }
+        set((s) => ({ bills: [rec, ...s.bills] }))
+        return rec
+      },
+      updateBill: (id, changes) =>
+        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, ...changes, updatedAt: new Date().toISOString() } : b)) })),
+      deleteBill: (id) =>
+        set((s) => ({ bills: s.bills.filter((b) => b.id !== id) })),
+      addBillPayment: (billId, payment) =>
+        set((s) => ({ bills: s.bills.map((b) => (b.id === billId
+          ? { ...b, payments: [...(b.payments || []), { id: Date.now(), ...payment }], updatedAt: new Date().toISOString() }
+          : b)) })),
+      removeBillPayment: (billId, paymentId) =>
+        set((s) => ({ bills: s.bills.map((b) => (b.id === billId
+          ? { ...b, payments: (b.payments || []).filter((p) => p.id !== paymentId) }
+          : b)) })),
+      addInvoice: (inv) => {
+        const rec = { id: Date.now() * 1000 + Math.floor(Math.random() * 1000), createdAt: new Date().toISOString(), status: 'sent', ...inv }
+        set((s) => ({ invoices: [rec, ...s.invoices] }))
+        return rec
+      },
+      updateInvoice: (id, changes) =>
+        set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, ...changes, updatedAt: new Date().toISOString() } : i)) })),
+      deleteInvoice: (id) =>
+        set((s) => ({
+          invoices: s.invoices.filter((i) => i.id !== id),
+          // Its payments stay on the job as plain payments received.
+          proposals: s.proposals.map((p) => ((p.jobData?.paymentsReceived || []).some((x) => x.invoiceId === id)
+            ? { ...p, jobData: { ...p.jobData, paymentsReceived: p.jobData.paymentsReceived.map((x) => (x.invoiceId === id ? { ...x, invoiceId: null } : x)) } }
+            : p)),
+        })),
+
       // ── One-click follow-up email templates ──────────────────────────────────
       emailTemplates: DEFAULT_EMAIL_TEMPLATES,
       addEmailTemplate: (t) =>
@@ -1430,12 +1487,12 @@ export function bootstrapOrg() {
   if (DEMO) return Promise.resolve()
   if (_booting) return _booting
   _booting = (async () => {
-    const { orgId, me, members, settings, collections } = await loadOrg()
+    const { orgId, me, members, settings, collections, missingTables } = await loadOrg()
     const merged = { ...SETTINGS_DEFAULTS(), ...settings, branding: normalizeBranding(settings.branding) }
     const cols   = { ...collections, catalog: stripDeckItems(collections.catalog || []) }
     // Everyone opens in the company's chosen appearance (light / dark); the
     // header toggle switches it for this visit only.
-    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true })
+    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).length > 0 })
     armAdapter(useStore, orgId, settings)
     // A brand-new org gets the built-in email templates once; the adapter
     // writes them as rows because they arrive after arming. (Not for the paint

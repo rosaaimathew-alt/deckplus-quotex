@@ -53,7 +53,8 @@ create or replace function record_tables() returns text[] language sql immutable
   select array[
     'proposals','catalog_items','templates','scope_templates','payment_schedules',
     'email_templates','finance_cards','subcontractors','standalone_change_orders',
-    'planned_projects','todos','checklists','expenses','job_costs'
+    'planned_projects','todos','checklists','expenses','job_costs',
+    'vendors','purchases','bills','invoices'   -- books.sql: office/admin only
   ]
 $$;
 
