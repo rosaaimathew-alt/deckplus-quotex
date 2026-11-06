@@ -36,15 +36,15 @@ jobs:
           BASE=$(git merge-base origin/${{ github.base_ref }} HEAD)
           FILES=$(git diff --name-only --diff-filter=AM "$BASE" HEAD -- '*.js' '*.jsx' | grep -v '^public/' || true)
           if [ -z "$FILES" ]; then echo "No JS changes"; exit 0; fi
-          npx eslint $FILES -f json -o after.json || true
-          git stash -u -q || true
+          OUT="$RUNNER_TEMP"
+          npx eslint $FILES -f json -o "$OUT/after.json" || true
           git checkout -q "$BASE"
           EXISTING=$(for f in $FILES; do [ -f "$f" ] && echo "$f"; done)
-          if [ -n "$EXISTING" ]; then npx eslint $EXISTING -f json -o before.json || true; else echo '[]' > before.json; fi
+          if [ -n "$EXISTING" ]; then npx eslint $EXISTING -f json -o "$OUT/before.json" || true; else echo '[]' > "$OUT/before.json"; fi
           git checkout -q -
-          node -e '
+          cd "$OUT" && node -e '
             const fs = require("fs")
-            const key = (f, m) => `${f.filePath.replace(process.cwd() + "/", "")}|${m.ruleId}|${m.message}`
+            const key = (f, m) => `${f.filePath.replace(process.env.GITHUB_WORKSPACE + "/", "")}|${m.ruleId}|${m.message}`
             const count = (file) => { const c = {}; for (const f of JSON.parse(fs.readFileSync(file))) for (const m of f.messages) if (m.severity === 2) c[key(f, m)] = (c[key(f, m)] || 0) + 1; return c }
             const before = count("before.json"), after = count("after.json")
             const added = Object.entries(after).filter(([k, n]) => n > (before[k] || 0))
