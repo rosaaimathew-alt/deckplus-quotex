@@ -31,7 +31,7 @@ import { nextReminderDate, contractStatusOf, isJobClosed } from './lib/attention
 import { TodoDock } from './components/TodoPanel'
 import { DEMO, DEMO_BASENAME, resetDemo } from './demo'
 import FieldApp from './field/FieldApp'
-import { useFieldHome, useIsPhone, canUseField, setViewPref } from './field/fieldMode'
+import { useFieldHome, useIsPhone, canUseField, setViewPref, readViewPref } from './field/fieldMode'
 
 const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
 
@@ -146,7 +146,13 @@ function ShellSwitch() {
   // The paint PM only ever gets Field mode — at every address, on every
   // device — so typing /sales or /settings can't reach the full app.
   if (role === 'paint') return <FieldApp />
-  if (path === '/field' || path.startsWith('/field/')) return <FieldApp />
+  if (path === '/field' || path.startsWith('/field/')) {
+    // The phone home-screen app used to open at /field for everyone. Field mode
+    // is the PM's screen: anyone else lands in the full app, unless they picked
+    // Field mode themselves on this phone.
+    if (role === 'pm' || (canUseField(role) && readViewPref() === 'field')) return <FieldApp />
+    return <Navigate to="/" replace />
+  }
   if (path === '/' && fieldHome) return <FieldApp />
   return <AppShell />
 }

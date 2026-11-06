@@ -1,9 +1,9 @@
 {
-  "name": "Deck Plus Field",
+  "name": "Deck Plus",
   "short_name": "Deck Plus",
-  "description": "Today's jobs, next steps and notes for Deck Plus project and paint managers.",
+  "description": "Deck Plus: sales, projects, inspections and money.",
   "id": "/field",
-  "start_url": "/field",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
