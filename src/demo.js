@@ -263,9 +263,18 @@ export function buildDemoSeed() {
   // Subs booked on the won jobs (lib/subTasks).
   const jobOf = (id) => proposals.find(p => p.id === id) || {}
   const subTasks = [
-    { id: 'st_demo1', proposalId: 5, subId: 1, subName: 'Cardinal Framing Co.', title: 'Frame the deck', agreedAmount: 9500, startDate: ymd(-6), endDate: ymd(2), status: 'near', statusDates: { started: { at: iso(-6) }, near: { at: iso(0) } }, notes: 'Ledger on the left side of the house.', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-10) },
-    { id: 'st_demo2', proposalId: 5, subId: 2, subName: 'Bright Spark Electric', title: 'Rough electrical', agreedAmount: 4200, startDate: ymd(4), endDate: ymd(6), status: 'booked', notes: '', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-9) },
-    { id: 'st_demo3', proposalId: 6, subId: 3, subName: 'Stoneworks Hardscape', title: 'Footings', agreedAmount: 6000, startDate: ymd(-2), endDate: ymd(1), status: 'started', statusDates: { started: { at: iso(-2) } }, notes: '', client: jobOf(6).client, address: jobOf(6).address, createdAt: iso(-8) },
+    { id: 'st_demo1', proposalId: 5, subId: 1, subName: 'Cardinal Framing Co.', title: 'Frame the deck', startDate: ymd(-6), endDate: ymd(2), status: 'near', statusDates: { started: { at: iso(-6) }, near: { at: iso(0) } }, notes: 'Ledger on the left side of the house.', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-10) },
+    { id: 'st_demo2', proposalId: 5, subId: 2, subName: 'Bright Spark Electric', title: 'Rough electrical', startDate: ymd(4), endDate: ymd(6), status: 'booked', notes: '', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-9) },
+    { id: 'st_demo3', proposalId: 6, subId: 3, subName: 'Stoneworks Hardscape', title: 'Footings', startDate: ymd(-2), endDate: ymd(1), status: 'started', statusDates: { started: { at: iso(-2) } }, notes: '', client: jobOf(6).client, address: jobOf(6).address, createdAt: iso(-8) },
+  ]
+  // Agreed amounts on those bookings (office / the sub only).
+  const subTerms = [{ id: 'st_demo1', agreedAmount: 9500 }, { id: 'st_demo2', agreedAmount: 4200 }, { id: 'st_demo3', agreedAmount: 6000 }]
+  // Bright Spark is an outside electrical company with its own PM and crew.
+  subcontractors[1].hasCrew = true
+  subcontractors[1].crew = [
+    { name: 'Sam Sparks', email: 'sam@brightspark.example', userId: 'u-crew-1' },
+    { name: 'Dee Watts', email: 'dee@brightspark.example', userId: 'u-crew-2' },
+    { name: 'Lou Ohm', email: 'lou@brightspark.example', userId: null },
   ]
   // A weekly draw invoice waiting for the office (lib/subDraws).
   const monday = (() => { const d = new Date(now); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return ymd(Math.round((d - now) / DAY)) })()
@@ -279,6 +288,7 @@ export function buildDemoSeed() {
     nextProposalId: 9,
     subcontractors,
     subTasks,
+    subTerms,
     subDraws,
     vendors, purchases, bills, invoices,
     nextSubId: 6,

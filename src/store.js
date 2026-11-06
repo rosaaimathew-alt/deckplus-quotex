@@ -1151,6 +1151,17 @@ export const useStore = create(
       addSubTaskPhoto: (id, photo) =>
         set((s) => ({ subTasks: (s.subTasks || []).map((t) => (t.id === id ? { ...t, photos: [...(t.photos || []), photo] } : t)) })),
 
+      // ── Agreed amounts on sub bookings (one record per task, id = task id) ─
+      subTerms: [],
+      setAgreedAmount: (taskId, amount) =>
+        set((s) => {
+          const list = s.subTerms || []
+          const id = String(taskId)
+          return { subTerms: list.some(t => String(t.id) === id)
+            ? list.map(t => (String(t.id) === id ? { ...t, agreedAmount: amount } : t))
+            : [...list, { id, agreedAmount: amount }] }
+        }),
+
       // ── Sub draw invoices (lib/subDraws) ─────────────────────────────────
       subDraws: [],
       addSubDraw: (draw) => {

@@ -12,7 +12,11 @@
 --               take a task past its agreed amount, or a second live one
 --               for the same week.
 --               PMs, reps, paint PM: nothing (money stays with the office).
---   sub_tasks   agreedAmount is set by the office / admin only.
+--   sub_task_terms  the agreed amount on each booking (id = the task's id).
+--               office / admin: set it. The sub the task is booked with
+--               (an outside company: its PM) reads it. Nobody else — not
+--               PMs, and not an outside company's crew, who can see the
+--               task itself but never what their company is paid.
 
 -- 1. Join the record-table list so patch_record / delete_record accept it.
 create or replace function record_tables() returns text[] language sql immutable as $$
@@ -21,7 +25,7 @@ create or replace function record_tables() returns text[] language sql immutable
     'email_templates','finance_cards','subcontractors','standalone_change_orders',
     'planned_projects','todos','checklists','expenses','job_costs',
     'vendors','purchases','bills','invoices',
-    'sub_tasks','sub_draws'
+    'sub_tasks','sub_draws','sub_task_terms'
   ]
 $$;
 alter function record_tables() set search_path = public;
@@ -59,6 +63,35 @@ revoke execute on function public.sync_sub_draw_cols() from public, anon;
 drop trigger if exists sub_draws_sync_cols on public.sub_draws;
 create trigger sub_draws_sync_cols before insert or update on public.sub_draws
   for each row execute function public.sync_sub_draw_cols();
+
+-- 2b. Agreed amounts, apart from the task so a crew member can't read them
+create table if not exists public.sub_task_terms (
+  id         text not null,   -- the sub task's id
+  org_id     uuid not null references public.orgs(id) on delete cascade,
+  owner_id   uuid, pm_id uuid, status text,
+  data       jsonb not null default '{}'::jsonb,   -- { id, agreedAmount }
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  primary key (org_id, id)
+);
+create index if not exists sub_task_terms_org_updated_idx on public.sub_task_terms (org_id, updated_at);
+alter table public.sub_task_terms enable row level security;
+alter table public.sub_task_terms replica identity full;
+drop trigger if exists sub_task_terms_updated_at on public.sub_task_terms;
+create trigger sub_task_terms_updated_at before update on public.sub_task_terms
+  for each row execute function set_updated_at();
+
+drop policy if exists sub_task_terms_office on public.sub_task_terms;
+create policy sub_task_terms_office on public.sub_task_terms for all
+  using (org_id = auth_org() and auth_role() in ('office','admin'))
+  with check (org_id = auth_org() and auth_role() in ('office','admin'));
+drop policy if exists sub_task_terms_sub_select on public.sub_task_terms;
+create policy sub_task_terms_sub_select on public.sub_task_terms for select using (
+  org_id = auth_org() and auth_role() = 'sub' and deleted_at is null
+  and exists (select 1 from public.sub_tasks t where t.org_id = sub_task_terms.org_id and t.id = sub_task_terms.id
+              and t.owner_id = auth.uid() and t.deleted_at is null)
+);
 
 -- 3. Who may
 drop policy if exists sub_draws_office on public.sub_draws;
@@ -116,7 +149,8 @@ begin
     select coalesce(sum((x->>'amount')::numeric), 0) into drawn
       from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
       where d.org_id = new.org_id and d.deleted_at is null and d.data->>'status' <> 'rejected' and x->>'taskId' = t.id;
-    if drawn + amt > coalesce(nullif(t.data->>'agreedAmount', '')::numeric, 0) then
+    if drawn + amt > coalesce((select nullif(m.data->>'agreedAmount', '')::numeric from public.sub_task_terms m
+                               where m.org_id = new.org_id and m.id = t.id and m.deleted_at is null), 0) then
       raise exception '%that''s more than is left on "%"', bad, t.data->>'title' using errcode = '42501';
     end if;
     total := total + amt;
@@ -131,26 +165,17 @@ drop trigger if exists sub_draws_check on public.sub_draws;
 create trigger sub_draws_check before insert or update on public.sub_draws
   for each row execute function public.check_sub_draw();
 
--- 5. Agreed amounts on bookings: office / admin only
-create or replace function public.guard_agreed_amount() returns trigger
-language plpgsql set search_path = public as $$
-begin
-  if auth_role() in ('office','admin') then return new; end if;
-  if (tg_op = 'INSERT' and nullif(new.data->>'agreedAmount', '') is not null)
-     or (tg_op = 'UPDATE' and (new.data->'agreedAmount') is distinct from (old.data->'agreedAmount')) then
-    raise exception 'permission denied: only the office sets the agreed amount' using errcode = '42501';
-  end if;
-  return new;
-end $$;
-revoke execute on function public.guard_agreed_amount() from public, anon;
+-- 5. (Agreed amounts used to live on the task; they're in sub_task_terms now.)
 drop trigger if exists sub_tasks_agreed_guard on public.sub_tasks;
-create trigger sub_tasks_agreed_guard before insert or update on public.sub_tasks
-  for each row execute function public.guard_agreed_amount();
+drop function if exists public.guard_agreed_amount();
 
 -- 6. Realtime
 do $$
 begin
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'sub_draws') then
     alter publication supabase_realtime add table public.sub_draws;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'sub_task_terms') then
+    alter publication supabase_realtime add table public.sub_task_terms;
   end if;
 end $$;

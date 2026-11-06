@@ -29,6 +29,7 @@ create table if not exists public.sub_tasks (
   owner_id   uuid,          -- the sub's login (data.subUserId), once they have one
   pm_id      uuid,          -- the PM who booked it (data.pmId)
   status     text,          -- booked | started | near | done
+  crew_id    uuid,          -- an outside company's crew member doing it (data.crewUserId)
   data       jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -36,7 +37,9 @@ create table if not exists public.sub_tasks (
   primary key (org_id, id)
 );
 create index if not exists sub_tasks_org_updated_idx on public.sub_tasks (org_id, updated_at);
+alter table public.sub_tasks add column if not exists crew_id uuid;
 create index if not exists sub_tasks_owner_idx on public.sub_tasks (org_id, owner_id);
+create index if not exists sub_tasks_crew_idx on public.sub_tasks (org_id, crew_id);
 alter table public.sub_tasks enable row level security;
 alter table public.sub_tasks replica identity full;
 
@@ -50,6 +53,7 @@ language plpgsql set search_path = public as $$
 begin
   new.owner_id = case when new.data->>'subUserId' ~ '^[0-9a-f-]{36}$' then (new.data->>'subUserId')::uuid end;
   new.pm_id    = case when new.data->>'pmId'      ~ '^[0-9a-f-]{36}$' then (new.data->>'pmId')::uuid end;
+  new.crew_id  = case when new.data->>'crewUserId' ~ '^[0-9a-f-]{36}$' then (new.data->>'crewUserId')::uuid end;
   new.status   = new.data->>'status';
   return new;
 end $$;

@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Plus, X, CalendarDays, Phone } from 'lucide-react'
 import { useStore } from '../store'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
-import { drawnOn, money } from '../lib/subDraws'
+import { drawnOn, money, agreedOf } from '../lib/subDraws'
 import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
 
@@ -18,6 +18,7 @@ export function BookSubForm({ proposal, onDone, big = false }) {
   const subs = useStore(s => s.subcontractors)
   const me = useStore(s => s.me)
   const addSubTask = useStore(s => s.addSubTask)
+  const setAgreedAmount = useStore(s => s.setAgreedAmount)
   const active = (subs || []).filter(s => s && s.active !== false && !s.endDate).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   const isOffice = useStore(s => s.role === 'manager')   // the agreed amount is the office's call
   const [f, setF] = useState({ subId: '', title: '', startDate: '', endDate: '', notes: '', agreed: '' })
@@ -27,16 +28,16 @@ export function BookSubForm({ proposal, onDone, big = false }) {
 
   const save = () => {
     if (!ok) return
-    addSubTask({
+    const id = addSubTask({
       proposalId: proposal.id,
       subId: sub.id, subName: sub.name || '', subUserId: sub.userId || null,
       pmId: proposal.pmId || me?.id || null,
       title: f.title.trim(), notes: f.notes.trim(),
-      ...(isOffice && Number(f.agreed) > 0 ? { agreedAmount: Math.round(Number(f.agreed) * 100) / 100 } : {}),
       startDate: f.startDate || null, endDate: f.endDate || null,
       // What the sub needs to find the job, without opening the proposal.
       client: proposal.client || '', address: proposal.address || '',
     })
+    if (isOffice && Number(f.agreed) > 0) setAgreedAmount(id, Math.round(Number(f.agreed) * 100) / 100)
     onDone?.()
   }
 
@@ -92,6 +93,8 @@ export default function JobSubsTab({ proposal }) {
   const setSubTaskStatus = useStore(s => s.setSubTaskStatus)
   const isOffice = useStore(s => s.role === 'manager')
   const draws = useStore(s => s.subDraws)
+  const terms = useStore(s => s.subTerms)
+  const setAgreedAmount = useStore(s => s.setAgreedAmount)
   const updateSubTask = useStore(s => s.updateSubTask)
   const deleteSubTask = useStore(s => s.deleteSubTask)
   const [adding, setAdding] = useState(false)
@@ -120,7 +123,7 @@ export default function JobSubsTab({ proposal }) {
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900">{t.title}</p>
                 <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
-                  <span>{subNameOf(t, subs)}</span>
+                  <span>{subNameOf(t, subs)}{t.crewName ? ` · ${t.crewName}` : ''}</span>
                   {sub?.phone && <a href={`tel:${sub.phone}`} className="flex items-center gap-0.5 hover:underline"><Phone size={11} /> {sub.phone}</a>}
                   {(t.startDate || t.endDate) && (
                     <span className="flex items-center gap-0.5"><CalendarDays size={11} /> {fmt(t.startDate) || '?'}{t.endDate ? ` – ${fmt(t.endDate)}` : ''}</span>
@@ -134,7 +137,7 @@ export default function JobSubsTab({ proposal }) {
               </div>
             </div>
             {t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
-            {isOffice && <AgreedLine task={t} draws={draws} onSave={(v) => updateSubTask(t.id, { agreedAmount: v })} />}
+            {isOffice && <AgreedLine key={`${t.id}-${agreedOf(t.id, terms)}`} task={t} agreed={agreedOf(t.id, terms) || null} draws={draws} onSave={(v) => setAgreedAmount(t.id, v)} />}
             {missingTodaysPhotos(t) && <p className="text-xs font-semibold text-red-600">No photos from the sub today</p>}
             <PhotoDays task={t} />
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -162,13 +165,13 @@ export default function JobSubsTab({ proposal }) {
 }
 
 // Office only: what the sub may draw on this booking, and what they've drawn.
-function AgreedLine({ task, draws, onSave }) {
-  const [v, setV] = useState(task.agreedAmount != null ? String(task.agreedAmount) : '')
+function AgreedLine({ task, agreed, draws, onSave }) {
+  const [v, setV] = useState(agreed != null ? String(agreed) : '')
   const drawn = drawnOn(task.id, draws)
   const save = () => {
     const n = v.trim() === '' ? null : Math.round(Number(v) * 100) / 100
-    if (n === (task.agreedAmount ?? null) || (n != null && !(n >= 0))) return
-    if (n != null && n < drawn) { window.alert(`The sub has already drawn ${money(drawn)} on this.`); setV(String(task.agreedAmount ?? '')); return }
+    if (n === agreed || (n != null && !(n >= 0))) return
+    if (n != null && n < drawn) { window.alert(`The sub has already drawn ${money(drawn)} on this.`); setV(String(agreed ?? '')); return }
     onSave(n)
   }
   return (
@@ -177,7 +180,7 @@ function AgreedLine({ task, draws, onSave }) {
       <input inputMode="decimal" value={v} onChange={e => setV(e.target.value.replace(/[^\d.]/g, ''))} onBlur={save}
         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} placeholder="$0.00"
         className="w-28 text-xs border border-gray-200 rounded-lg px-2 py-1" aria-label="Agreed amount" />
-      {Number(task.agreedAmount) > 0 && <span className="text-gray-500">Drawn {money(drawn)} · Left {money(Number(task.agreedAmount) - drawn)}</span>}
+      {agreed > 0 && <span className="text-gray-500">Drawn {money(drawn)} · Left {money(agreed - drawn)}</span>}
     </div>
   )
 }

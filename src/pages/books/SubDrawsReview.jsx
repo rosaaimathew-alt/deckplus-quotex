@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { FileText } from 'lucide-react'
 import { useStore } from '../../store'
 import { todayISO, jobIndex, jobLabel } from '../../lib/books'
-import { money, weekLabel, drawnOn } from '../../lib/subDraws'
+import { money, weekLabel, drawnOn, agreedOf } from '../../lib/subDraws'
 import { Modal, inputCls, btnPrimary, btnGhost } from './ui'
 
 export default function SubDrawsReview() {
@@ -39,7 +39,7 @@ export default function SubDrawsReview() {
 function ReviewModal({ id, onClose }) {
   const d = useStore(s => (s.subDraws || []).find(x => x.id === id))
   const draws = useStore(s => s.subDraws)
-  const tasks = useStore(s => s.subTasks)
+  const terms = useStore(s => s.subTerms)
   const proposals = useStore(s => s.proposals)
   const me = useStore(s => s.me)
   const addBill = useStore(s => s.addBill)
@@ -86,8 +86,7 @@ function ReviewModal({ id, onClose }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {(d.lines || []).map(l => {
-                const t = (tasks || []).find(x => String(x.id) === String(l.taskId))
-                const agreed = Number(t?.agreedAmount) || 0
+                const agreed = agreedOf(l.taskId, terms)
                 const before = drawnOn(l.taskId, draws, { exceptId: d.id })
                 const job = jobs.get(String(l.proposalId))
                 return (

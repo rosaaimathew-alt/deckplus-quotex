@@ -58,6 +58,8 @@ function StarRating({ value, onChange, size = 15 }) {
 function SubAppAccess({ sub }) {
   const live = useStore(s => s.subcontractors.find(x => x.id === sub.id)) || sub
   const canInvite = useStore(s => s.role === 'manager')
+  const updateSubcontractor = useStore(s => s.updateSubcontractor)
+  const crew = live.crew || []
   const [email, setEmail] = useState(live.appEmail || live.email || '')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)   // { ok, text, link }
@@ -89,6 +91,18 @@ function SubAppAccess({ sub }) {
       )}
       {msg && (
         <p className={`text-xs ${msg.ok ? 'text-emerald-700' : 'text-red-600'} break-all`}>{msg.text}{msg.link ? <><br />{msg.link}</> : null}</p>
+      )}
+      {/* An outside company (e.g. electrical) with its own PM and crew: the
+          login above is their PM; they invite and assign their own people. */}
+      <label className="flex items-start gap-2 text-sm text-gray-700 pt-1">
+        <input type="checkbox" className="mt-0.5" checked={!!live.hasCrew} disabled={!canInvite}
+          onChange={e => updateSubcontractor(live.id, { hasCrew: e.target.checked })} />
+        <span>Outside company with its own PM and crew<span className="block text-xs text-gray-500">The login above is their PM. They add their own people and put one on each job.</span></span>
+      </label>
+      {live.hasCrew && crew.length > 0 && (
+        <ul className="text-xs text-gray-600 space-y-0.5 pl-6">
+          {crew.map(c => <li key={c.email}>{c.name} · {c.userId ? 'signed up' : 'invited'}</li>)}
+        </ul>
       )}
     </div>
   )

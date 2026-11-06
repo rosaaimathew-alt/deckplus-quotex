@@ -10,6 +10,9 @@
 //           progress, and before every status change (lib/taskPhotos).
 //   Invoices — once a week, ask the office to draw part of the agreed amount
 //           on their jobs (SubInvoices, lib/subDraws).
+//   Crew  — an outside company's PM (e.g. the electricians) invites their
+//           own people and puts one on each job; that person sees only the
+//           jobs they're on, never the money (SubCrew).
 //
 // Near completion and Completed land on the PM's Today screen right away
 // ("Schedule inspection"), and in the job's Subs tab in the office.
@@ -25,6 +28,7 @@ import { Card, dayLabel, mapsUrl, todayStr, addDays, useUndo, BackButton } from 
 import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos'
 import { PhotoDays, AddPhotosButton } from '../components/TaskPhotos'
 import { WeekInvoiceCard, InvoicesScreen, NewInvoiceScreen, TaskMoneyLine } from './SubInvoices'
+import { CrewLink, CrewPicker, CrewScreen } from './SubCrew'
 
 // The one next step for each status, and what it moves the task to.
 const NEXT = {
@@ -70,6 +74,7 @@ function TaskList() {
       </div>
 
       <WeekInvoiceCard />
+      <CrewLink />
 
       <Section title="Working on" tasks={working} empty="Nothing in progress." />
       <Section title="Up next" tasks={next} empty="Nothing booked yet. Your PM will add tasks here." />
@@ -105,7 +110,7 @@ function TaskRow({ t }) {
       className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${noPhotos ? 'border-l-red-500' : late ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
       <div className="flex-1 min-w-0">
         <p className="text-base font-semibold text-gray-900 truncate">{t.title}</p>
-        <p className="text-sm text-gray-600 truncate">{t.client || t.address || 'Job'}</p>
+        <p className="text-sm text-gray-600 truncate">{t.client || t.address || 'Job'}{t.crewName ? ` · ${t.crewName}` : ''}</p>
         <p className={`text-sm truncate ${late ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>{late ? `Was due ${dayLabel(t.endDate)}` : dateRange(t)}</p>
         {noPhotos && <p className="text-sm font-semibold text-red-600 flex items-center gap-1"><Camera size={14} /> Photos needed today</p>}
       </div>
@@ -161,6 +166,8 @@ function TaskScreen() {
           <span className="text-sm font-semibold text-[var(--brand-700)] shrink-0">Directions</span>
         </a>
       )}
+
+      <CrewPicker task={t} />
 
       {/* Today's photos: required before the status buttons work */}
       {step && (
@@ -274,6 +281,7 @@ export default function SubApp() {
           <Route path="/task/:id" element={<TaskScreen />} />
           <Route path="/invoices" element={<InvoicesScreen />} />
           <Route path="/invoices/new" element={<NewInvoiceScreen />} />
+          <Route path="/crew" element={<CrewScreen />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

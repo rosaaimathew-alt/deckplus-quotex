@@ -9,15 +9,23 @@ import { useStore } from '../store'
 import { submitSubDraw } from '../supabase'
 import { DEMO } from '../demo'
 import { Card, BackButton } from '../field/shared'
-import { DRAW_STATUS, money, round2, weekOf, weekLabel, remainingOn, thisWeeksDraw, newDrawId } from '../lib/subDraws'
+import { DRAW_STATUS, money, round2, weekOf, weekLabel, remainingOn, agreedOf, thisWeeksDraw, newDrawId } from '../lib/subDraws'
 
+// Only tasks booked with this login carry money. An outside company's crew
+// member sees tasks they were put on, but invoicing is their company PM's.
 const useMine = () => {
   const tasks = useStore(s => s.subTasks)
   const draws = useStore(s => s.subDraws)
-  return { tasks: (tasks || []).filter(Boolean), draws: (draws || []).filter(Boolean) }
+  const terms = useStore(s => s.subTerms)
+  const me = useStore(s => s.me)
+  return {
+    tasks: (tasks || []).filter(t => t && (DEMO || !me?.id || t.subUserId === me.id)),
+    draws: (draws || []).filter(Boolean),
+    terms: terms || [],
+  }
 }
 // Jobs with money left to draw.
-const drawable = (tasks, draws) => tasks.filter(t => Number(t.agreedAmount) > 0 && remainingOn(t, draws) > 0)
+const drawable = (tasks, terms, draws) => tasks.filter(t => remainingOn(t.id, terms, draws) > 0)
 
 function StatusPill({ d }) {
   const st = DRAW_STATUS[d.status] || DRAW_STATUS.submitted
@@ -27,9 +35,9 @@ function StatusPill({ d }) {
 // On the task list: this week's invoice, or the button to send it.
 export function WeekInvoiceCard() {
   const navigate = useNavigate()
-  const { tasks, draws } = useMine()
+  const { tasks, draws, terms } = useMine()
   const sent = thisWeeksDraw(draws)
-  const open = drawable(tasks, draws)
+  const open = drawable(tasks, terms, draws)
   if (!sent && !open.length && !draws.length) return null
   return (
     <Card className="p-4 space-y-3">
@@ -58,9 +66,9 @@ export function WeekInvoiceCard() {
 // Every invoice this sub has sent, newest first.
 export function InvoicesScreen() {
   const navigate = useNavigate()
-  const { tasks, draws } = useMine()
+  const { tasks, draws, terms } = useMine()
   const list = [...draws].sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')))
-  const canSend = !thisWeeksDraw(draws) && drawable(tasks, draws).length > 0
+  const canSend = !thisWeeksDraw(draws) && drawable(tasks, terms, draws).length > 0
   return (
     <div className="space-y-4">
       <BackButton />
@@ -94,10 +102,10 @@ export function InvoicesScreen() {
 // The invoice form.
 export function NewInvoiceScreen() {
   const navigate = useNavigate()
-  const { tasks, draws } = useMine()
+  const { tasks, draws, terms } = useMine()
   const me = useStore(s => s.me)
   const addSubDraw = useStore(s => s.addSubDraw)
-  const jobs = useMemo(() => drawable(tasks, draws), [tasks, draws])
+  const jobs = useMemo(() => drawable(tasks, terms, draws), [tasks, terms, draws])
   const [amounts, setAmounts] = useState({})   // taskId → string
   const [notes, setNotes] = useState({})       // taskId → what was done
   const [number, setNumber] = useState('')
@@ -107,7 +115,7 @@ export function NewInvoiceScreen() {
   const monday = weekOf()
   const already = thisWeeksDraw(draws, monday)
 
-  const lines = jobs.map(t => ({ t, left: remainingOn(t, draws), amt: round2(amounts[t.id]) }))
+  const lines = jobs.map(t => ({ t, left: remainingOn(t.id, terms, draws), amt: round2(amounts[t.id]) }))
   const picked = lines.filter(l => l.amt > 0)
   const over = lines.find(l => l.amt > l.left)
   const total = round2(picked.reduce((s, l) => s + l.amt, 0))
@@ -155,7 +163,7 @@ export function NewInvoiceScreen() {
             <p className="text-sm text-gray-500">{t.client}</p>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <p className="text-gray-500">Agreed <span className="block text-base font-semibold text-gray-900">{money(t.agreedAmount)}</span></p>
+            <p className="text-gray-500">Agreed <span className="block text-base font-semibold text-gray-900">{money(agreedOf(t.id, terms))}</span></p>
             <p className="text-gray-500">Left to draw <span className="block text-base font-semibold text-gray-900">{money(left)}</span></p>
           </div>
           <label className="flex items-center gap-2 h-12 px-3 rounded-xl border border-gray-300 bg-white">
@@ -197,11 +205,13 @@ export function NewInvoiceScreen() {
 // One line on a task: agreed / drawn / left (only when an amount is agreed).
 export function TaskMoneyLine({ task }) {
   const draws = useStore(s => s.subDraws)
-  if (!(Number(task.agreedAmount) > 0)) return null
-  const left = remainingOn(task, draws || [])
+  const terms = useStore(s => s.subTerms)
+  const agreed = agreedOf(task.id, terms)
+  if (!(agreed > 0)) return null
+  const left = remainingOn(task.id, terms, draws || [])
   return (
     <p className="text-base text-gray-800 flex items-center gap-2">
-      <FileText size={18} className="text-gray-500 shrink-0" /> Agreed {money(task.agreedAmount)} · {money(left)} left to draw
+      <FileText size={18} className="text-gray-500 shrink-0" /> Agreed {money(agreed)} · {money(left)} left to draw
     </p>
   )
 }

@@ -47,7 +47,7 @@ export default function SubTasksCard({ proposal }) {
                   <span className="flex-1 min-w-0">
                     <span className="block text-base font-semibold text-gray-900 truncate">{t.title}</span>
                     <span className="block text-sm text-gray-500 truncate">
-                      {subNameOf(t, subs)}{t.startDate ? ` · ${dayLabel(t.startDate)}` : ''}
+                      {subNameOf(t, subs)}{t.crewName ? ` · ${t.crewName}` : ''}{t.startDate ? ` · ${dayLabel(t.startDate)}` : ''}
                     </span>
                   </span>
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_PILL[st]}`}>{statusLabel(t)}</span>

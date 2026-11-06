@@ -1,6 +1,6 @@
 // ── Sub draw invoices ────────────────────────────────────────────────────────
-// The owner / office sets an agreed amount on each sub booking (task
-// .agreedAmount). Once a week a sub sends the office an invoice asking to
+// The owner / office sets an agreed amount on each sub booking (subTerms,
+// see agreedOf below). Once a week a sub sends the office an invoice asking to
 // draw part of what's left on their jobs — no draw schedule, any amount up to
 // what remains. The office approves it (it becomes a bill per job in Money ›
 // Bills, the same layout as every other bill) or sends it back with a reason.
@@ -46,7 +46,11 @@ export function drawnOn(taskId, draws, { exceptId = null } = {}) {
   }
   return round2(s)
 }
-export const remainingOn = (task, draws, opts) => round2((Number(task?.agreedAmount) || 0) - drawnOn(task?.id, draws, opts))
+// The agreed amount lives apart from the task (store.subTerms, table
+// sub_task_terms) so an outside company's crew, who can see the task, never
+// sees what their company is paid.
+export const agreedOf = (taskId, terms) => Number((terms || []).find(t => t && String(t.id) === String(taskId))?.agreedAmount) || 0
+export const remainingOn = (taskId, terms, draws, opts) => round2(agreedOf(taskId, terms) - drawnOn(taskId, draws, opts))
 
 // This week's live invoice for a sub, if one was already sent.
 export const thisWeeksDraw = (draws, monday = weekOf()) => (draws || []).find(d => live(d) && d.weekOf === monday) || null
