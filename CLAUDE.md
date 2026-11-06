@@ -8,7 +8,7 @@ through a pull request:
 2. Run `npm run build` (and fix anything new from `npx eslint <changed files>`).
 3. Push the branch and open a pull request into `main` with a plain-English
    summary of what changes for the office and how you tested it.
-4. Stop there. The gatekeeper (a scheduled Claude session, hourly) reviews,
+4. Stop there. The gatekeeper (a scheduled Claude session, every 20 minutes) reviews,
    builds, tests and merges it, or comments on the PR with what to fix.
 
 Don't merge your own PR, don't push to `main`, don't change branch protection.
