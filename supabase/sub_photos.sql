@@ -4,6 +4,9 @@
 -- A private bucket 'job-photos'. Each photo lives at
 --   <org id>/<sub task id>/<yyyy-mm-dd>/<photo id>.jpg
 -- and is listed on its task (sub_tasks.data.photos, src/lib/taskPhotos.js).
+-- A sub's invoice files (photo or PDF) sit beside them at
+--   <org id>/<sub task id>/invoices/<file id>.<jpg|pdf>
+-- and are listed on the invoice (sub_draws.data.files).
 --
 --   sub              add and view photos on their own tasks only (a crew
 --                    member: the tasks they're put on); never
@@ -13,7 +16,7 @@
 --   everyone else    nothing (reps, paint PM, the public)
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('job-photos', 'job-photos', false, 10485760, array['image/jpeg','image/png','image/webp','image/heic'])
+values ('job-photos', 'job-photos', false, 10485760, array['image/jpeg','image/png','image/webp','image/heic','application/pdf'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 -- Is this photo path on a sub task the signed-in sub owns, or that their

@@ -276,11 +276,12 @@ export function buildDemoSeed() {
     { name: 'Dee Watts', email: 'dee@brightspark.example', userId: 'u-crew-2' },
     { name: 'Lou Ohm', email: 'lou@brightspark.example', userId: null },
   ]
-  // A weekly draw invoice waiting for the office (lib/subDraws).
+  // A sub invoice waiting for the office (lib/subDraws).
   const monday = (() => { const d = new Date(now); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return ymd(Math.round((d - now) / DAY)) })()
   const subDraws = [
-    { id: 'dr_demo1', subId: 1, subName: 'Cardinal Framing Co.', weekOf: monday, status: 'submitted', number: '2240', notes: 'Joists and beams set.',
-      total: 3000, submittedAt: iso(0), lines: [{ taskId: 'st_demo1', proposalId: 5, client: jobOf(5).client, title: 'Frame the deck', amount: 3000, note: 'Beams, joists, ledger' }] },
+    { id: 'dr_demo1', subId: 1, subName: 'Cardinal Framing Co.', email: 'office@cardinalframing.example', date: ymd(0), weekOf: monday, status: 'submitted', notes: 'Joists and beams set.',
+      workTypes: ['Carpentry'], total: 3000, submittedAt: iso(0), files: [],
+      lines: [{ taskId: 'st_demo1', proposalId: 5, client: jobOf(5).client, address: jobOf(5).address, title: 'Frame the deck', amount: 3000 }] },
   ]
 
   return {

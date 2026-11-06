@@ -1,17 +1,24 @@
-// ── Sub draw invoices ────────────────────────────────────────────────────────
+// ── Sub invoices ─────────────────────────────────────────────────────────────
 // The owner / office sets an agreed amount on each sub booking (subTerms,
-// see agreedOf below). Once a week a sub sends the office an invoice asking to
-// draw part of what's left on their jobs — no draw schedule, any amount up to
-// what remains. The office approves it (it becomes a bill per job in Money ›
-// Bills, the same layout as every other bill) or sends it back with a reason.
+// see agreedOf below). A sub invoices one job at a time, answering the same
+// questions as the office's Google Form "Deckplus Subcontractor Invoice":
+// company, date, job name / address, work type, invoice amount, notes, and
+// the invoice itself (photo or PDF, required). Any amount up to what's left
+// on the job; one invoice per job per week. The office approves it (it
+// becomes a bill on that job in Money › Bills, the same layout as every
+// other bill) or sends it back with a reason.
 //
 // One record per invoice (store.subDraws, table sub_draws):
-//   { id, subId, subName, subUserId, weekOf: Monday 'yyyy-mm-dd',
-//     lines: [{ taskId, proposalId, client, title, amount, note }],
-//     total, number, notes, status: 'submitted' | 'approved' | 'rejected',
+//   { id, subId, subName, subUserId, email, date: 'yyyy-mm-dd',
+//     weekOf: Monday 'yyyy-mm-dd' (the week it was sent),
+//     workTypes: ['Carpentry' | 'Masonry', ...],
+//     lines: [{ taskId, proposalId, client, address, title, amount }]  (one job),
+//     total, notes, files: [{ id, name, type: 'photo' | 'pdf', path }],
+//     status: 'submitted' | 'approved' | 'rejected',
 //     submittedAt, submittedBy, decidedAt, decidedBy, reason, billIds }
-// The database refuses an invoice that would take a task past its agreed
-// amount, or a second live invoice for the same week (supabase/sub_draws.sql).
+// The database refuses an invoice that would take a job past its agreed
+// amount, a second live invoice for the same job in the same week, or one
+// with no invoice file (supabase/sub_draws.sql).
 
 export const round2 = (x) => Math.round((Number(x) || 0) * 100) / 100
 export const money = (x) => `$${round2(x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -52,7 +59,15 @@ export function drawnOn(taskId, draws, { exceptId = null } = {}) {
 export const agreedOf = (taskId, terms) => Number((terms || []).find(t => t && String(t.id) === String(taskId))?.agreedAmount) || 0
 export const remainingOn = (taskId, terms, draws, opts) => round2(agreedOf(taskId, terms) - drawnOn(taskId, draws, opts))
 
-// This week's live invoice for a sub, if one was already sent.
-export const thisWeeksDraw = (draws, monday = weekOf()) => (draws || []).find(d => live(d) && d.weekOf === monday) || null
+// The live invoice already sent for this job this week, if any.
+export const sentThisWeek = (draws, taskId, monday = weekOf()) =>
+  (draws || []).find(d => live(d) && d.weekOf === monday && (d.lines || []).some(l => String(l.taskId) === String(taskId))) || null
+
+// The kinds of work on the form (Tipo de trabajo).
+export const WORK_TYPES = [
+  { key: 'Carpentry', es: 'Carpintería' },
+  { key: 'Masonry',   es: 'Albañilería' },
+]
+export const MAX_FILES = 10
 
 export const newDrawId = () => `dr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`

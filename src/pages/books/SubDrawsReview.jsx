@@ -1,13 +1,15 @@
 // ── Sub invoices waiting for the office (Money › Bills) ─────────────────────
-// Weekly draw invoices subs send from the sub app (lib/subDraws). Approve →
-// one bill per job, to the sub, on that job, so it sits in the Bills list
-// like any other bill and counts toward job cost. Send back → the sub sees
-// the reason and can send a corrected invoice for the same week.
+// Invoices subs send from the sub app (lib/subDraws): the same questions as
+// the office's Google Form, plus the invoice photo / PDF. Approve → a bill to
+// the sub on that job, so it sits in the Bills list like any other bill and
+// counts toward job cost. Send back → the sub sees the reason and can send a
+// corrected invoice for the same job and week.
 import { useState } from 'react'
-import { FileText } from 'lucide-react'
+import { FileText, Paperclip } from 'lucide-react'
 import { useStore } from '../../store'
 import { todayISO, jobIndex, jobLabel } from '../../lib/books'
 import { money, weekLabel, drawnOn, agreedOf } from '../../lib/subDraws'
+import { usePhotoUrl } from '../../lib/taskPhotos'
 import { Modal, inputCls, btnPrimary, btnGhost } from './ui'
 
 export default function SubDrawsReview() {
@@ -24,7 +26,7 @@ export default function SubDrawsReview() {
           <li key={d.id}>
             <button onClick={() => setOpen(d.id)} className="w-full px-4 py-2.5 flex items-center gap-4 text-left hover:bg-gray-50">
               <span className="flex-1 min-w-0 truncate text-gray-900 font-medium">{d.subName || 'Sub'}</span>
-              <span className="text-gray-600 text-sm hidden sm:inline">{weekLabel(d.weekOf)}</span>
+              <span className="text-gray-600 text-sm hidden sm:inline">{d.date ? dateLabel(d.date) : weekLabel(d.weekOf)}</span>
               <span className="text-gray-600 text-sm">{(d.lines || []).length} job{(d.lines || []).length === 1 ? '' : 's'}</span>
               <span className="w-28 text-right font-semibold text-gray-900">{money(d.total)}</span>
             </button>
@@ -33,6 +35,19 @@ export default function SubDrawsReview() {
       </ul>
       {open && <ReviewModal id={open} onClose={() => setOpen(null)} />}
     </div>
+  )
+}
+
+const dateLabel = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+// The sub's invoice file: opens the photo / PDF in a new tab.
+function FileLink({ file }) {
+  const url = usePhotoUrl(file)
+  return (
+    <a href={url || undefined} target="_blank" rel="noreferrer"
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-sm ${url ? 'text-[var(--brand-700)] hover:bg-gray-50' : 'text-gray-400 pointer-events-none'}`}>
+      <Paperclip size={14} /> {file.name || (file.type === 'pdf' ? 'Invoice.pdf' : 'Invoice photo')}
+    </a>
   )
 }
 
@@ -55,9 +70,9 @@ function ReviewModal({ id, onClose }) {
     const today = todayISO()
     const billIds = (d.lines || []).map(l => addBill({
       vendorRef: d.subId != null ? `s:${d.subId}` : null, vendorName: d.subName || 'Sub',
-      number: d.number || `Draw ${d.weekOf}`, date: today, dueDate: today, total: Number(l.amount) || 0,
+      number: d.number || `Sub invoice ${d.date || d.weekOf}`, date: d.date || today, dueDate: today, total: Number(l.amount) || 0,
       jobId: l.proposalId ?? null, type: 'sub', poId: null, poNumber: null, bucket: null, category: '',
-      notes: [`Draw: ${l.title}`, l.note].filter(Boolean).join(' — '), subDrawId: d.id,
+      notes: [l.title, (d.workTypes || []).join(', '), l.note, d.notes].filter(Boolean).join(' — '), subDrawId: d.id,
     }).id)
     updateSubDraw(d.id, { status: 'approved', decidedAt: new Date().toISOString(), decidedBy: who, billIds })
     onClose()
@@ -78,7 +93,12 @@ function ReviewModal({ id, onClose }) {
         <button onClick={approve} className={btnPrimary}>Approve</button>
       </>}>
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">{weekLabel(d.weekOf)}{d.number ? ` · Invoice #${d.number}` : ''} · sent {d.submittedAt ? new Date(d.submittedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}</p>
+        <p className="text-sm text-gray-600">
+          {d.date ? dateLabel(d.date) : weekLabel(d.weekOf)}{d.number ? ` · Invoice #${d.number}` : ''}
+          {(d.workTypes || []).length ? ` · ${d.workTypes.join(', ')}` : ''}
+          {d.email ? ` · ${d.email}` : ''}
+          {' · '}sent {d.submittedAt ? new Date(d.submittedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}
+        </p>
         <div className="border border-gray-200 rounded-xl overflow-x-auto">
           <table className="w-full text-sm min-w-[620px]">
             <thead className="text-left text-gray-500 border-b border-gray-200">
@@ -91,7 +111,7 @@ function ReviewModal({ id, onClose }) {
                 const job = jobs.get(String(l.proposalId))
                 return (
                   <tr key={l.taskId}>
-                    <td className="px-3 py-2.5"><p className="font-semibold text-gray-900">{l.title}</p><p className="text-gray-600">{job ? jobLabel(job) : l.client}</p>{l.note && <p className="text-gray-500 italic">{l.note}</p>}</td>
+                    <td className="px-3 py-2.5"><p className="font-semibold text-gray-900">{l.title}</p><p className="text-gray-600">{job ? jobLabel(job) : [l.client, l.address].filter(Boolean).join(' · ')}</p>{l.note && <p className="text-gray-500 italic">{l.note}</p>}</td>
                     <td className="px-3 text-right">{money(agreed)}</td>
                     <td className="px-3 text-right">{money(before)}</td>
                     <td className="px-3 text-right font-semibold">{money(l.amount)}</td>
@@ -103,6 +123,7 @@ function ReviewModal({ id, onClose }) {
           </table>
         </div>
         {d.notes && <p className="text-sm text-gray-700"><span className="font-semibold">Notes from the sub:</span> {d.notes}</p>}
+        {(d.files || []).length > 0 && <div className="flex flex-wrap gap-2">{d.files.map(f => <FileLink key={f.id} file={f} />)}</div>}
         {sendingBack && (
           <label className="block">
             <span className="block text-sm font-medium text-gray-700 mb-1">Why it's going back (the sub sees this)</span>

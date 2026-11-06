@@ -8,8 +8,10 @@
 //           big button that moves it along: I started → Almost done →
 //           Completed. Photos are mandatory: every day a task is in
 //           progress, and before every status change (lib/taskPhotos).
-//   Invoices — once a week, ask the office to draw part of the agreed amount
-//           on their jobs (SubInvoices, lib/subDraws).
+//   Invoices — invoice the office for a job: the same questions as the
+//           office's Google Form, plus the invoice photo / PDF; up to what's
+//           left of the agreed amount, once per job per week (SubInvoices,
+//           lib/subDraws).
 //   Crew  — an outside company's PM (e.g. the electricians) invites their
 //           own people and puts one on each job; that person sees only the
 //           jobs they're on, never the money (SubCrew).

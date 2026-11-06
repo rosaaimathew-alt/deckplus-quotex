@@ -30,13 +30,13 @@ export function photosByDay(t) {
 }
 
 // Shrink a camera photo to a JPEG blob.
-async function shrink(file) {
+async function shrink(file, maxSide = MAX_SIDE) {
   const url = URL.createObjectURL(file)
   try {
     const img = await new Promise((resolve, reject) => {
       const i = new Image(); i.onload = () => resolve(i); i.onerror = () => reject(new Error(`"${file.name}" isn't a photo this phone can read.`)); i.src = url
     })
-    const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight))
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight))
     const c = document.createElement('canvas')
     c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale)
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
@@ -58,6 +58,28 @@ export async function uploadTaskPhoto({ orgId, task, file, by }) {
   const path = `${orgId}/${task.id}/${date}/${id}.jpg`
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false })
   if (error) throw new Error(/fetch|network/i.test(error.message) ? 'No signal: the photo did not upload. Try again when you have service.' : error.message)
+  return { ...entry, path }
+}
+
+// A sub's invoice file (lib/subDraws): a photo of the paper invoice, or the
+// PDF itself. Stored next to that job's photos (same bucket, same access) at
+// <org>/<task>/invoices/<id>.<jpg|pdf>. Photos are shrunk but kept large
+// enough to read; PDFs go up as they are (10 MB max).
+const MAX_FILE = 10 * 1024 * 1024
+export async function uploadInvoiceFile({ orgId, taskId, file }) {
+  const pdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')
+  if (!pdf && !/^image\//.test(file.type || '') && !/\.(jpe?g|png|heic|webp)$/i.test(file.name || '')) {
+    throw new Error(`"${file.name}" isn't a photo or a PDF.`)
+  }
+  const blob = pdf ? file : await shrink(file, 2400)
+  if (blob.size > MAX_FILE) throw new Error(`"${file.name}" is too big (10 MB max).`)
+  const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  const entry = { id, name: file.name || (pdf ? 'invoice.pdf' : 'invoice.jpg'), type: pdf ? 'pdf' : 'photo' }
+  if (DEMO || !supabase) return { ...entry, dataUrl: await blobToDataUrl(blob) }
+  if (!orgId) throw new Error('Not signed in to a company yet. Reload and try again.')
+  const path = `${orgId}/${taskId}/invoices/${id}.${pdf ? 'pdf' : 'jpg'}`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: pdf ? 'application/pdf' : 'image/jpeg', upsert: false })
+  if (error) throw new Error(/fetch|network/i.test(error.message) ? 'No signal: the file did not upload. Try again when you have service.' : error.message)
   return { ...entry, path }
 }
 

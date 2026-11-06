@@ -3,14 +3,16 @@
 -- re-running schema.sql, books.sql or sub_tasks.sql, which rewrite
 -- record_tables()).
 --
--- Once a week a sub asks the office to draw part of the agreed amount on
--- their jobs (src/lib/subDraws.js documents the record). Who reaches what:
+-- A sub invoices the office for part of the agreed amount on a job, answering
+-- the office's Google Form questions plus a photo / PDF of the invoice
+-- (src/lib/subDraws.js documents the record). Who reaches what:
 --
 --   sub_draws   office / admin: everything (approve or send back)
 --               sub: read their own; send (insert) a new one; never edit or
 --               delete one. The checks below refuse an invoice that would
---               take a task past its agreed amount, or a second live one
---               for the same week.
+--               take a task past its agreed amount, a second live one for
+--               the same job in the same week, or one without the invoice
+--               file, date or work type.
 --               PMs, reps, paint PM: nothing (money stays with the office).
 --   sub_task_terms  the agreed amount on each booking (id = the task's id).
 --               office / admin: set it. The sub the task is booked with
@@ -116,7 +118,7 @@ create policy sub_draws_sub_update on public.sub_draws for update
 create or replace function public.check_sub_draw() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
-  l jsonb; t public.sub_tasks; amt numeric; drawn numeric; total numeric := 0; seen text[] := '{}';
+  l jsonb; f jsonb; t public.sub_tasks; amt numeric; drawn numeric; total numeric := 0; seen text[] := '{}';
   bad constant text := 'permission denied: ';
 begin
   if auth_role() is distinct from 'sub' then return new; end if;
@@ -131,9 +133,11 @@ begin
   if coalesce(new.data->>'weekOf', '') !~ '^\d{4}-\d{2}-\d{2}$' then
     raise exception '%the invoice needs its week', bad using errcode = '42501';
   end if;
-  if exists (select 1 from public.sub_draws d where d.org_id = new.org_id and d.owner_id = auth.uid()
-             and d.deleted_at is null and d.data->>'status' <> 'rejected' and d.data->>'weekOf' = new.data->>'weekOf') then
-    raise exception '%this week''s invoice was already sent', bad using errcode = '42501';
+  if coalesce(new.data->>'date', '') !~ '^\d{4}-\d{2}-\d{2}$' then
+    raise exception '%the invoice needs its date', bad using errcode = '42501';
+  end if;
+  if jsonb_typeof(new.data->'workTypes') is distinct from 'array' or jsonb_array_length(new.data->'workTypes') = 0 then
+    raise exception '%pick the work type', bad using errcode = '42501';
   end if;
   if jsonb_typeof(new.data->'lines') <> 'array' or jsonb_array_length(new.data->'lines') = 0 then
     raise exception '%the invoice has no jobs on it', bad using errcode = '42501';
@@ -144,6 +148,12 @@ begin
     select * into t from public.sub_tasks
       where org_id = new.org_id and id = l->>'taskId' and owner_id = auth.uid() and deleted_at is null;
     if not found then raise exception '%that job isn''t booked for you', bad using errcode = '42501'; end if;
+    if exists (select 1 from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
+               where d.org_id = new.org_id and d.owner_id = auth.uid() and d.deleted_at is null
+                 and d.data->>'status' <> 'rejected' and d.data->>'weekOf' = new.data->>'weekOf'
+                 and x->>'taskId' = t.id) then
+      raise exception '%"%" was already invoiced this week', bad, t.data->>'title' using errcode = '42501';
+    end if;
     amt := case when (l->>'amount') ~ '^\d+(\.\d{1,2})?$' then (l->>'amount')::numeric end;
     if amt is null or amt <= 0 then raise exception '%each amount must be more than $0', bad using errcode = '42501'; end if;
     select coalesce(sum((x->>'amount')::numeric), 0) into drawn
@@ -158,6 +168,19 @@ begin
   if abs(total - coalesce(nullif(new.data->>'total', '')::numeric, -1)) > 0.004 then
     raise exception '%the total doesn''t add up', bad using errcode = '42501';
   end if;
+  -- The invoice itself (photo or PDF), stored beside that job's photos.
+  if jsonb_typeof(new.data->'files') is distinct from 'array' or jsonb_array_length(new.data->'files') = 0 then
+    raise exception '%add a photo or PDF of the invoice', bad using errcode = '42501';
+  end if;
+  if jsonb_array_length(new.data->'files') > 10 then
+    raise exception '%up to 10 files per invoice', bad using errcode = '42501';
+  end if;
+  for f in select * from jsonb_array_elements(new.data->'files') loop
+    if split_part(f->>'path', '/', 1) <> new.org_id::text or not (split_part(f->>'path', '/', 2) = any(seen))
+       or split_part(f->>'path', '/', 3) <> 'invoices' then
+      raise exception '%an invoice file isn''t on this job', bad using errcode = '42501';
+    end if;
+  end loop;
   return new;
 end $$;
 revoke execute on function public.check_sub_draw() from public, anon, authenticated;
