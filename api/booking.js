@@ -1,3 +1,4 @@
+/* global process */
 /**
  * Public round-robin booking API (used by /book and the website embed).
  *   GET  /api/booking            → whose turn it is + their open slots
@@ -13,6 +14,7 @@ import dotenv from 'dotenv'
 import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep, googleBusyStrict, calendarMode, googleCalendarLink } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
 import { sendDueReport } from './_lead-report.js'
+import { verifyStaff, staffRole } from './_auth.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
@@ -164,6 +166,18 @@ function alreadyBooked(res, b) {
   })
 }
 
+// Outside parties the owner has shut out of the calendar (the marketing agency
+// sending "test lead" bookings). Refused quietly, like any failed booking.
+const BLOCKED_DOMAINS = ['reachunited.com']
+const BLOCKED_NAMES = /reach\s*united/i
+const BLOCKED_PHONES = ['(704) 993-7696']
+function blockedLead(lead) {
+  const domain = lead.email.split('@')[1] || ''
+  return BLOCKED_DOMAINS.some(d => domain === d || domain.endsWith(`.${d}`))
+    || BLOCKED_NAMES.test(`${lead.first_name} ${lead.last_name} ${lead.notes}`)
+    || BLOCKED_PHONES.includes(lead.phone)
+}
+
 async function book(req, res) {
   const body = req.body || {}
   if (body.website) return res.status(200).json({ ok: true })   // honeypot: bots fill every field
@@ -172,6 +186,7 @@ async function book(req, res) {
   if (!body.repId || Number.isNaN(startMs)) return res.status(400).json({ error: 'Please pick a time.' })
   const { lead, errors } = validateLead(body)
   if (errors) return res.status(400).json({ error: 'Please complete the highlighted fields.', fields: errors })
+  if (blockedLead(lead)) return res.status(400).json({ error: "We couldn't book that time online. Please call us to schedule." })
   const name = `${lead.first_name} ${lead.last_name}`
   const { email, phone } = lead
   const notes = lead.notes || null
@@ -325,14 +340,37 @@ function failedBookingAlert(body, err) {
   }
 }
 
+// Only Deck Plus's own sites may call the booking API from a browser. The
+// calendar itself (book.html) is served from the app, so it's same-origin.
+const OWN_ORIGINS = new Set(['https://deckplus.app', 'https://www.deckplus.app', 'https://deck.plus', 'https://www.deck.plus'])
+
+// The lead report, the calendar check and the test alert are for the daily
+// cron (Vercel sends CRON_SECRET) or a signed-in admin / office login only.
+async function trusted(req) {
+  const auth = req.headers?.authorization || ''
+  if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+  const staff = token ? await verifyStaff(token) : null
+  return !!staff && ['admin', 'office'].includes(await staffRole(token, staff))
+}
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  const origin = req.headers?.origin
+  const allowed = (o) => OWN_ORIGINS.has(o) || o === `https://${req.headers?.host}`
+  if (origin && allowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  }
   res.setHeader('Cache-Control', 'no-store')
-  if (req.method === 'OPTIONS') return res.status(200).end()
+  if (req.method === 'OPTIONS') return res.status(origin && allowed(origin) ? 200 : 403).end()
+  if (origin && !allowed(origin)) return res.status(403).json({ error: 'Not allowed' })
   try {
     if (req.method === 'POST' && (req.query?.step || req.query?.track)) return await trackEvent(req, res)
+    if (req.method === 'GET' && (req.query?.check || req.query?.report) && !(await trusted(req))) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
     if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
     if (req.method === 'GET' && req.query?.report)             return await sendDueReport(res)
     if (req.method === 'GET' && req.query?.check === 'alert') {

@@ -615,7 +615,8 @@
         if (!res.ok) throw new Error(data.error)
         showBooking(data.booking, f, false)
         track('booked')
-        parent.postMessage({ type: 'rr-booked', start: data.booking.start }, '*')
+        // Nothing about the booking is sent to the page around the calendar:
+        // outside tracking scripts on the website must not see who booked.
       } catch (e) {
         error(e.message || 'Booking failed. Please try again.')
       } finally {
