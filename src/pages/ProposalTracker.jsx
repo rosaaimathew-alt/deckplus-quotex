@@ -8,6 +8,7 @@ import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { headlineNumbers } from '../lib/headline'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import { withSavedDesign } from '../lib/designSnapshot'
+import DesignShareToggle from '../components/DesignShareToggle'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
   contractNumberFor,
@@ -367,6 +368,7 @@ function ActivityLog({ proposal, groupProposals }) {
 
       {/* Shareable tracked link — create once, paste into any email */}
       <div className="mb-2">
+        <DesignShareToggle proposalId={proposal.id} className="mb-1.5" />
         {!linkUrl ? (
           <button onClick={makeLink} disabled={linkBusy}
             className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50">
