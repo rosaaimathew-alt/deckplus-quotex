@@ -263,9 +263,15 @@ export function buildDemoSeed() {
   // Subs booked on the won jobs (lib/subTasks).
   const jobOf = (id) => proposals.find(p => p.id === id) || {}
   const subTasks = [
-    { id: 'st_demo1', proposalId: 5, subId: 1, subName: 'Cardinal Framing Co.', title: 'Frame the deck', startDate: ymd(-6), endDate: ymd(2), status: 'near', statusDates: { started: { at: iso(-6) }, near: { at: iso(0) } }, notes: 'Ledger on the left side of the house.', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-10) },
-    { id: 'st_demo2', proposalId: 5, subId: 2, subName: 'Bright Spark Electric', title: 'Rough electrical', startDate: ymd(4), endDate: ymd(6), status: 'booked', notes: '', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-9) },
-    { id: 'st_demo3', proposalId: 6, subId: 3, subName: 'Stoneworks Hardscape', title: 'Footings', startDate: ymd(-2), endDate: ymd(1), status: 'started', statusDates: { started: { at: iso(-2) } }, notes: '', client: jobOf(6).client, address: jobOf(6).address, createdAt: iso(-8) },
+    { id: 'st_demo1', proposalId: 5, subId: 1, subName: 'Cardinal Framing Co.', title: 'Frame the deck', agreedAmount: 9500, startDate: ymd(-6), endDate: ymd(2), status: 'near', statusDates: { started: { at: iso(-6) }, near: { at: iso(0) } }, notes: 'Ledger on the left side of the house.', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-10) },
+    { id: 'st_demo2', proposalId: 5, subId: 2, subName: 'Bright Spark Electric', title: 'Rough electrical', agreedAmount: 4200, startDate: ymd(4), endDate: ymd(6), status: 'booked', notes: '', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-9) },
+    { id: 'st_demo3', proposalId: 6, subId: 3, subName: 'Stoneworks Hardscape', title: 'Footings', agreedAmount: 6000, startDate: ymd(-2), endDate: ymd(1), status: 'started', statusDates: { started: { at: iso(-2) } }, notes: '', client: jobOf(6).client, address: jobOf(6).address, createdAt: iso(-8) },
+  ]
+  // A weekly draw invoice waiting for the office (lib/subDraws).
+  const monday = (() => { const d = new Date(now); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return ymd(Math.round((d - now) / DAY)) })()
+  const subDraws = [
+    { id: 'dr_demo1', subId: 1, subName: 'Cardinal Framing Co.', weekOf: monday, status: 'submitted', number: '2240', notes: 'Joists and beams set.',
+      total: 3000, submittedAt: iso(0), lines: [{ taskId: 'st_demo1', proposalId: 5, client: jobOf(5).client, title: 'Frame the deck', amount: 3000, note: 'Beams, joists, ledger' }] },
   ]
 
   return {
@@ -273,6 +279,7 @@ export function buildDemoSeed() {
     nextProposalId: 9,
     subcontractors,
     subTasks,
+    subDraws,
     vendors, purchases, bills, invoices,
     nextSubId: 6,
     catalog: DEMO_CATALOG,

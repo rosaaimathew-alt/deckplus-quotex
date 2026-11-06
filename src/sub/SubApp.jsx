@@ -8,6 +8,8 @@
 //           big button that moves it along: I started → Almost done →
 //           Completed. Photos are mandatory: every day a task is in
 //           progress, and before every status change (lib/taskPhotos).
+//   Invoices — once a week, ask the office to draw part of the agreed amount
+//           on their jobs (SubInvoices, lib/subDraws).
 //
 // Near completion and Completed land on the PM's Today screen right away
 // ("Schedule inspection"), and in the job's Subs tab in the office.
@@ -22,6 +24,7 @@ import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, statusIndex } from '
 import { Card, dayLabel, mapsUrl, todayStr, addDays, useUndo, BackButton } from '../field/shared'
 import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos'
 import { PhotoDays, AddPhotosButton } from '../components/TaskPhotos'
+import { WeekInvoiceCard, InvoicesScreen, NewInvoiceScreen, TaskMoneyLine } from './SubInvoices'
 
 // The one next step for each status, and what it moves the task to.
 const NEXT = {
@@ -65,6 +68,8 @@ function TaskList() {
         <h1 className="text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
         <p className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </div>
+
+      <WeekInvoiceCard />
 
       <Section title="Working on" tasks={working} empty="Nothing in progress." />
       <Section title="Up next" tasks={next} empty="Nothing booked yet. Your PM will add tasks here." />
@@ -206,6 +211,7 @@ function TaskScreen() {
 
       <Card className="p-4 space-y-2">
         {dateRange(t) && <p className="text-base text-gray-800 flex items-center gap-2"><CalendarDays size={18} className="text-gray-500 shrink-0" /> {dateRange(t)}</p>}
+        <TaskMoneyLine task={t} />
         {pm && <p className="text-base text-gray-800 flex items-center gap-2"><HardHat size={18} className="text-gray-500 shrink-0" /> PM: {pm.displayName || pm.email}</p>}
         {t.inspectionDate && <p className="text-base text-gray-800 flex items-center gap-2"><CheckCircle2 size={18} className="text-gray-500 shrink-0" /> Inspection {dayLabel(t.inspectionDate)}</p>}
         {t.notes && (
@@ -266,6 +272,8 @@ export default function SubApp() {
         <Routes>
           <Route path="/" element={<TaskList />} />
           <Route path="/task/:id" element={<TaskScreen />} />
+          <Route path="/invoices" element={<InvoicesScreen />} />
+          <Route path="/invoices/new" element={<NewInvoiceScreen />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

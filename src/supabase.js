@@ -66,6 +66,14 @@ export const inviteInfo   = (code) => rpc('invite_info', { p_code: code })
 export const createInvite = ({ email, role, displayName }) => rpc('create_invite', { p_email: email, p_role: role, p_display_name: displayName || null })
 export const listInvites  = () => rpc('list_invites', {})
 export const revokeInvite = (code) => rpc('revoke_invite', { p_code: code })
+// A sub sends this week's draw invoice. Written straight away (not through
+// the queue) so a refusal — over the agreed amount, already sent this week —
+// shows on their screen instead of vanishing (supabase/sub_draws.sql).
+export async function submitSubDraw(draw, orgId = _orgId) {
+  need()
+  const { error } = await supabase.from('sub_draws').insert({ id: String(draw.id), org_id: orgId, data: draw })
+  if (error) throw new Error(String(error.message || error).replace(/^permission denied:\s*/i, ''))
+}
 // Office: invite a sub (Money › Vendors) to the sub app (supabase/sub_role.sql).
 export const createSubInvite = (subId, email) => rpc('create_sub_invite', { p_sub_id: String(subId), p_email: email })
 
@@ -142,10 +150,12 @@ export const RECORD_TABLES = {
   invoices:               'invoices',
   // Sub tasks (supabase/sub_tasks.sql): a sub booked for one service on a job.
   subTasks:               'sub_tasks',
+  // Subs' weekly draw invoices (supabase/sub_draws.sql): office and the sub.
+  subDraws:               'sub_draws',
 }
 // Tables added after launch: a missing one loads as empty instead of failing
 // the whole sign-in, and nothing is written to it until it exists.
-const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices', 'sub_tasks'])
+const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices', 'sub_tasks', 'sub_draws'])
 const _missing = new Set()
 const isMissingTable = (e) => e && (e.code === '42P01' || e.code === 'PGRST205' || /does not exist|could not find the table/i.test(e.message || ''))
 // Object-keyed-by-id collections → a table whose row id is the key.
@@ -212,7 +222,7 @@ export async function loadOrg() {
       _missing.delete(table)
     } catch (e) {
       if (!OPTIONAL_TABLES.has(table) || !isMissingTable(e)) throw e
-      console.warn(`[quotex] table ${table} is not in this database yet (run supabase/${table === 'sub_tasks' ? 'sub_tasks' : 'books'}.sql)`)
+      console.warn(`[quotex] table ${table} is not in this database yet (run supabase/${table.startsWith('sub_') ? table : 'books'}.sql)`)
       _missing.add(table)
       collections[key] = []
     }

@@ -6,6 +6,7 @@ import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
 import { appRoleOf } from './roles'
 import { newSubTaskId } from './lib/subTasks'
+import { newDrawId } from './lib/subDraws'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 // Real data lives in Supabase as one row per record (see src/supabase.js).
@@ -1150,6 +1151,16 @@ export const useStore = create(
       addSubTaskPhoto: (id, photo) =>
         set((s) => ({ subTasks: (s.subTasks || []).map((t) => (t.id === id ? { ...t, photos: [...(t.photos || []), photo] } : t)) })),
 
+      // ── Sub draw invoices (lib/subDraws) ─────────────────────────────────
+      subDraws: [],
+      addSubDraw: (draw) => {
+        const id = draw.id || newDrawId()
+        set((s) => ({ subDraws: [...(s.subDraws || []), { ...draw, id, submittedAt: new Date().toISOString(), submittedBy: s.me?.displayName || s.me?.email || '' }] }))
+        return id
+      },
+      updateSubDraw: (id, changes) =>
+        set((s) => ({ subDraws: (s.subDraws || []).map((d) => (d.id === id ? { ...d, ...changes } : d)) })),
+
       deleteSubTask: (id) =>
         set((s) => ({ subTasks: (s.subTasks || []).filter((t) => t.id !== id) })),
 
@@ -1528,7 +1539,7 @@ export function bootstrapOrg() {
     const cols   = { ...collections, catalog: stripDeckItems(collections.catalog || []) }
     // Everyone opens in the company's chosen appearance (light / dark); the
     // header toggle switches it for this visit only.
-    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).some(t => t !== 'sub_tasks') })
+    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).some(t => !t.startsWith('sub_')) })
     armAdapter(useStore, orgId, settings)
     // A brand-new org gets the built-in email templates once; the adapter
     // writes them as rows because they arrive after arming. (Not for the paint

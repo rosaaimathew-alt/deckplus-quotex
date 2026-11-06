@@ -126,13 +126,15 @@ export function MoneyHub() {
   const proposals = useStore(s => s.proposals)
   const invoices  = useStore(s => s.invoices)
   const bills     = useStore(s => s.bills)
+  const subDraws  = useStore(s => s.subDraws)
   const counts = useMemo(() => {
     const byId = jobIndex(proposals)
     return {
       invoices: { count: invoices.filter(i => invoiceStatus(i, byId.get(String(i.jobId))) === 'overdue').length, countTone: 'alert' },
-      bills:    { count: bills.filter(b => billStatus(b) === 'overdue').length, countTone: 'alert' },
+      // Overdue bills, plus sub invoices waiting for the office to review.
+      bills:    { count: bills.filter(b => billStatus(b) === 'overdue').length + (subDraws || []).filter(d => d?.status === 'submitted').length, countTone: 'alert' },
     }
-  }, [proposals, invoices, bills])
+  }, [proposals, invoices, bills, subDraws])
   const tabs = withRender(tabsOf('money'), {
     invoices:  () => <Invoices />,
     bills:     () => <Bills />,

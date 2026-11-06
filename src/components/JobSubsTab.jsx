@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { Plus, X, CalendarDays, Phone } from 'lucide-react'
 import { useStore } from '../store'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
+import { drawnOn, money } from '../lib/subDraws'
 import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
 
@@ -18,7 +19,8 @@ export function BookSubForm({ proposal, onDone, big = false }) {
   const me = useStore(s => s.me)
   const addSubTask = useStore(s => s.addSubTask)
   const active = (subs || []).filter(s => s && s.active !== false && !s.endDate).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-  const [f, setF] = useState({ subId: '', title: '', startDate: '', endDate: '', notes: '' })
+  const isOffice = useStore(s => s.role === 'manager')   // the agreed amount is the office's call
+  const [f, setF] = useState({ subId: '', title: '', startDate: '', endDate: '', notes: '', agreed: '' })
   const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
   const sub = active.find(s => String(s.id) === f.subId)
   const ok = sub && f.title.trim()
@@ -30,6 +32,7 @@ export function BookSubForm({ proposal, onDone, big = false }) {
       subId: sub.id, subName: sub.name || '', subUserId: sub.userId || null,
       pmId: proposal.pmId || me?.id || null,
       title: f.title.trim(), notes: f.notes.trim(),
+      ...(isOffice && Number(f.agreed) > 0 ? { agreedAmount: Math.round(Number(f.agreed) * 100) / 100 } : {}),
       startDate: f.startDate || null, endDate: f.endDate || null,
       // What the sub needs to find the job, without opening the proposal.
       client: proposal.client || '', address: proposal.address || '',
@@ -64,6 +67,12 @@ export function BookSubForm({ proposal, onDone, big = false }) {
         </div>
       </div>
       <div>
+        {isOffice && (
+          <div className="mb-3">
+            <label className={lbl}>Agreed amount</label>
+            <input inputMode="decimal" value={f.agreed} onChange={e => setF(x => ({ ...x, agreed: e.target.value.replace(/[^\d.]/g, '') }))} placeholder="$ the sub can draw against" className={fld} />
+          </div>
+        )}
         <label className={lbl}>Notes for the sub</label>
         <textarea rows={2} value={f.notes} onChange={set('notes')} className={`${fld} ${big ? 'h-auto py-2' : ''} resize-none`} />
       </div>
@@ -81,6 +90,8 @@ export default function JobSubsTab({ proposal }) {
   const tasks = tasksForJob(useStore(s => s.subTasks), proposal.id)
   const subs = useStore(s => s.subcontractors)
   const setSubTaskStatus = useStore(s => s.setSubTaskStatus)
+  const isOffice = useStore(s => s.role === 'manager')
+  const draws = useStore(s => s.subDraws)
   const updateSubTask = useStore(s => s.updateSubTask)
   const deleteSubTask = useStore(s => s.deleteSubTask)
   const [adding, setAdding] = useState(false)
@@ -123,6 +134,7 @@ export default function JobSubsTab({ proposal }) {
               </div>
             </div>
             {t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
+            {isOffice && <AgreedLine task={t} draws={draws} onSave={(v) => updateSubTask(t.id, { agreedAmount: v })} />}
             {missingTodaysPhotos(t) && <p className="text-xs font-semibold text-red-600">No photos from the sub today</p>}
             <PhotoDays task={t} />
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -145,6 +157,27 @@ export default function JobSubsTab({ proposal }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// Office only: what the sub may draw on this booking, and what they've drawn.
+function AgreedLine({ task, draws, onSave }) {
+  const [v, setV] = useState(task.agreedAmount != null ? String(task.agreedAmount) : '')
+  const drawn = drawnOn(task.id, draws)
+  const save = () => {
+    const n = v.trim() === '' ? null : Math.round(Number(v) * 100) / 100
+    if (n === (task.agreedAmount ?? null) || (n != null && !(n >= 0))) return
+    if (n != null && n < drawn) { window.alert(`The sub has already drawn ${money(drawn)} on this.`); setV(String(task.agreedAmount ?? '')); return }
+    onSave(n)
+  }
+  return (
+    <div className="flex items-center gap-2 text-xs text-gray-700 flex-wrap">
+      <span className="font-semibold">Agreed</span>
+      <input inputMode="decimal" value={v} onChange={e => setV(e.target.value.replace(/[^\d.]/g, ''))} onBlur={save}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }} placeholder="$0.00"
+        className="w-28 text-xs border border-gray-200 rounded-lg px-2 py-1" aria-label="Agreed amount" />
+      {Number(task.agreedAmount) > 0 && <span className="text-gray-500">Drawn {money(drawn)} · Left {money(Number(task.agreedAmount) - drawn)}</span>}
     </div>
   )
 }
