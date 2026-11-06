@@ -260,10 +260,19 @@ export function buildDemoSeed() {
   const won5 = proposals.find(p => p.id === 5)
   won5.jobData = { ...(won5.jobData || {}), paymentsReceived: [...(won5.jobData?.paymentsReceived || []), { id: 9401, date: ymd(-19), amount: 21166.67, method: 'Check', invoiceId: 9301, milestone: 'Deposit' }] }
 
+  // Subs booked on the won jobs (lib/subTasks).
+  const jobOf = (id) => proposals.find(p => p.id === id) || {}
+  const subTasks = [
+    { id: 'st_demo1', proposalId: 5, subId: 1, subName: 'Cardinal Framing Co.', title: 'Frame the deck', startDate: ymd(-6), endDate: ymd(2), status: 'near', statusDates: { started: { at: iso(-6) }, near: { at: iso(0) } }, notes: 'Ledger on the left side of the house.', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-10) },
+    { id: 'st_demo2', proposalId: 5, subId: 2, subName: 'Bright Spark Electric', title: 'Rough electrical', startDate: ymd(4), endDate: ymd(6), status: 'booked', notes: '', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-9) },
+    { id: 'st_demo3', proposalId: 6, subId: 3, subName: 'Stoneworks Hardscape', title: 'Footings', startDate: ymd(-2), endDate: ymd(1), status: 'started', statusDates: { started: { at: iso(-2) } }, notes: '', client: jobOf(6).client, address: jobOf(6).address, createdAt: iso(-8) },
+  ]
+
   return {
     proposals,
     nextProposalId: 9,
     subcontractors,
+    subTasks,
     vendors, purchases, bills, invoices,
     nextSubId: 6,
     catalog: DEMO_CATALOG,

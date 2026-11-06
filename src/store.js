@@ -5,6 +5,7 @@ import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
 import { appRoleOf } from './roles'
+import { newSubTaskId } from './lib/subTasks'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 // Real data lives in Supabase as one row per record (see src/supabase.js).
@@ -1118,6 +1119,36 @@ export const useStore = create(
       deleteSubcontractor: (id) =>
         set((s) => ({ subcontractors: s.subcontractors.filter((s) => s.id !== id) })),
 
+      // ── Sub tasks (a sub booked for one service on one job; lib/subTasks) ─
+      subTasks: [],
+
+      addSubTask: (task) => {
+        const id = task.id || newSubTaskId()
+        set((s) => ({
+          subTasks: [...(s.subTasks || []), {
+            status: 'booked', ...task, id,
+            bookedBy: task.bookedBy || s.me?.displayName || s.me?.email || '',
+            createdAt: new Date().toISOString(),
+          }],
+        }))
+        return id
+      },
+
+      updateSubTask: (id, changes) =>
+        set((s) => ({ subTasks: (s.subTasks || []).map((t) => (t.id === id ? { ...t, ...changes } : t)) })),
+
+      // Moves a task to a status and stamps when (and by whom) it got there.
+      setSubTaskStatus: (id, status) =>
+        set((s) => ({
+          subTasks: (s.subTasks || []).map((t) => t.id !== id ? t : {
+            ...t, status,
+            statusDates: { ...(t.statusDates || {}), [status]: { at: new Date().toISOString(), by: s.me?.displayName || s.me?.email || '' } },
+          }),
+        })),
+
+      deleteSubTask: (id) =>
+        set((s) => ({ subTasks: (s.subTasks || []).filter((t) => t.id !== id) })),
+
       // ── Standalone change orders (contracts signed outside QuoteX) ────────
       standaloneChangeOrders: [],
 
@@ -1493,7 +1524,7 @@ export function bootstrapOrg() {
     const cols   = { ...collections, catalog: stripDeckItems(collections.catalog || []) }
     // Everyone opens in the company's chosen appearance (light / dark); the
     // header toggle switches it for this visit only.
-    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).length > 0 })
+    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).some(t => t !== 'sub_tasks') })
     armAdapter(useStore, orgId, settings)
     // A brand-new org gets the built-in email templates once; the adapter
     // writes them as rows because they arrive after arming. (Not for the paint

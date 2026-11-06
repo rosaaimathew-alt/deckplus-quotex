@@ -138,10 +138,12 @@ export const RECORD_TABLES = {
   purchases:              'purchases',
   bills:                  'bills',
   invoices:               'invoices',
+  // Sub tasks (supabase/sub_tasks.sql): a sub booked for one service on a job.
+  subTasks:               'sub_tasks',
 }
 // Tables added after launch: a missing one loads as empty instead of failing
 // the whole sign-in, and nothing is written to it until it exists.
-const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices'])
+const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices', 'sub_tasks'])
 const _missing = new Set()
 const isMissingTable = (e) => e && (e.code === '42P01' || e.code === 'PGRST205' || /does not exist|could not find the table/i.test(e.message || ''))
 // Object-keyed-by-id collections → a table whose row id is the key.
@@ -208,7 +210,7 @@ export async function loadOrg() {
       _missing.delete(table)
     } catch (e) {
       if (!OPTIONAL_TABLES.has(table) || !isMissingTable(e)) throw e
-      console.warn(`[quotex] table ${table} is not in this database yet (run supabase/books.sql)`)
+      console.warn(`[quotex] table ${table} is not in this database yet (run supabase/${table === 'sub_tasks' ? 'sub_tasks' : 'books'}.sql)`)
       _missing.add(table)
       collections[key] = []
     }
