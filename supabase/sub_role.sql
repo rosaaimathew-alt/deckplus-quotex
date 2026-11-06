@@ -5,7 +5,9 @@
 --
 -- A sub is not staff. Their login reaches exactly this:
 --   sub_tasks      read the tasks booked for them (owner_id = their login);
---                  update only a task's status / statusDates (trigger below).
+--                  update only a task's status / statusDates, and add (never
+--                  remove) job photos (trigger below).
+--   storage        their own tasks' job photos (sub_photos.sql)
 --                  No inserts, no deletes, never another sub's task.
 --   org_settings   read (company name, logo, colors) — like every login
 --   org_members    read — like every login (names on the team)
@@ -81,7 +83,8 @@ create policy sub_tasks_sub_update on public.sub_tasks for update
   using (org_id = auth_org() and auth_role() = 'sub' and owner_id = auth.uid() and deleted_at is null)
   with check (org_id = auth_org() and auth_role() = 'sub' and owner_id = auth.uid());
 
--- A sub may only move their task along: status and statusDates. The one other
+-- A sub may only move their task along (status, statusDates) and add job
+-- photos: the photos list may grow, never lose an entry. The one other
 -- change let through is subUserId set to the sub's own login: that's
 -- link_sub_login() tying their booked tasks to them as they sign up (it runs
 -- inside their claim). RLS already keeps a sub to rows that are theirs. The
@@ -95,9 +98,18 @@ begin
   if new.deleted_at is distinct from old.deleted_at or new.org_id is distinct from old.org_id or new.id is distinct from old.id then
     raise exception 'permission denied: a sub can only update the status of their own task' using errcode = '42501';
   end if;
+  -- Photos are mandatory: a status change needs a photo from today (the
+  -- office is in Charlotte; a day's slack covers phones in other zones).
+  if (new.data->>'status') is distinct from (old.data->>'status') and not exists (
+       select 1 from jsonb_array_elements(case when jsonb_typeof(new.data->'photos') = 'array' then new.data->'photos' else '[]'::jsonb end) p
+       where p->>'date' >= to_char((now() at time zone 'America/New_York')::date - 1, 'YYYY-MM-DD')) then
+    raise exception 'permission denied: send today''s job photos before changing the status' using errcode = '42501';
+  end if;
   for k in select jsonb_object_keys(old.data || new.data) loop
     continue when (old.data->k) is not distinct from (new.data->k);
     continue when k in ('status', 'statusDates');
+    continue when k = 'photos' and jsonb_typeof(new.data->k) = 'array'
+      and (new.data->k) @> coalesce(case when jsonb_typeof(old.data->k) = 'array' then old.data->k end, '[]'::jsonb);
     continue when k = 'subUserId' and new.data->>k = auth.uid()::text;
     raise exception 'permission denied: a sub can only update the status of their own task' using errcode = '42501';
   end loop;

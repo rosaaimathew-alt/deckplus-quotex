@@ -30,6 +30,7 @@ import InstallCard from './InstallCard'
 import JobMoney from './JobMoney'
 import SubTasksCard from './SubTasksCard'
 import { needsInspection, statusKey, subNameOf } from '../lib/subTasks'
+import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { useJobMoney } from '../nav'
 import {
   todayStr, addDays, dayLabel, mapsUrl, telUrl, smsUrl, describeJob, useFieldJobs, Card, Progress, ScopeToggle, JobRow, nextLine, useUndo, BackButton, QuickAction, QuickNote, RecentNotes,
@@ -44,13 +45,19 @@ function TodayScreen() {
   const today = todayStr()
   const weekEnd = addDays(7)
 
-  // Subs near completion / done on these jobs, with no inspection lined up.
+  // Subs near completion / done on these jobs, with no inspection lined up;
+  // and from 3pm, subs at work who haven't sent today's photos.
+  const late = new Date().getHours() >= 15
   const subAsks = useMemo(() => {
     const byId = new Map(jobs.map(j => [String(j.p.id), j]))
-    return (subTasks || []).filter(needsInspection)
-      .map(t => ({ t, j: byId.get(String(t.proposalId)) })).filter(x => x.j)
-      .map(({ t, j }) => ({ t, j, why: `Schedule inspection · ${t.title} ${statusKey(t) === 'done' ? 'done' : 'almost done'} (${subNameOf(t, subs)})` }))
-  }, [jobs, subTasks, subs])
+    const onJobs = (subTasks || []).map(t => ({ t, j: byId.get(String(t.proposalId)) })).filter(x => x.j)
+    return [
+      ...onJobs.filter(({ t }) => needsInspection(t))
+        .map(({ t, j }) => ({ t, j, why: `Schedule inspection · ${t.title} ${statusKey(t) === 'done' ? 'done' : 'almost done'} (${subNameOf(t, subs)})` })),
+      ...(late ? onJobs.filter(({ t }) => missingTodaysPhotos(t))
+        .map(({ t, j }) => ({ t, j, why: `No photos today · ${t.title} (${subNameOf(t, subs)})` })) : []),
+    ]
+  }, [jobs, subTasks, subs, late])
 
   const { now, week } = useMemo(() => {
     const now = [], week = []
@@ -106,7 +113,7 @@ function TodayScreen() {
 
       <div className="space-y-2.5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Needs you now</h2>
-        {subAsks.map(({ t, j, why }) => <JobRow key={t.id} j={j} tone="amber" sub={why} />)}
+        {subAsks.map(({ t, j, why }, i) => <JobRow key={`${t.id}-${i}`} j={j} tone="amber" sub={why} />)}
         {now.length + subAsks.length === 0 ? (
           <Card className="p-5 flex items-center gap-3">
             <CheckCircle2 size={26} className="text-green-500 shrink-0" />

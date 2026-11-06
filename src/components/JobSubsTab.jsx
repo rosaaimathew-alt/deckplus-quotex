@@ -5,6 +5,8 @@
 import { useState } from 'react'
 import { Plus, X, CalendarDays, Phone } from 'lucide-react'
 import { useStore } from '../store'
+import { missingTodaysPhotos } from '../lib/taskPhotos'
+import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
 
 const fmt = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
@@ -121,6 +123,8 @@ export default function JobSubsTab({ proposal }) {
               </div>
             </div>
             {t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
+            {missingTodaysPhotos(t) && <p className="text-xs font-semibold text-red-600">No photos from the sub today</p>}
+            <PhotoDays task={t} />
             <div className="flex items-center gap-1.5 flex-wrap">
               {SUB_STATUSES.map(s => (
                 <button key={s.key} onClick={() => s.key !== st && setSubTaskStatus(t.id, s.key)}

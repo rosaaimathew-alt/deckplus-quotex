@@ -4,20 +4,24 @@
 // (supabase/sub_role.sql): no proposals, prices, contracts or other subs.
 //
 //   Tasks — what they're working on, what's next, what's done
-//   Task  — where the job is, the PM's notes, and ONE big button that moves
-//           it along: I started → Almost done → Completed
+//   Task  — where the job is, the PM's notes, today's job photos, and ONE
+//           big button that moves it along: I started → Almost done →
+//           Completed. Photos are mandatory: every day a task is in
+//           progress, and before every status change (lib/taskPhotos).
 //
 // Near completion and Completed land on the PM's Today screen right away
 // ("Schedule inspection"), and in the job's Subs tab in the office.
 import { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Settings2, Check, HardHat } from 'lucide-react'
+import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Settings2, Check, HardHat, Camera, Lock } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, statusIndex } from '../lib/subTasks'
 import { Card, dayLabel, mapsUrl, todayStr, addDays, useUndo, BackButton } from '../field/shared'
+import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos'
+import { PhotoDays, AddPhotosButton } from '../components/TaskPhotos'
 
 // The one next step for each status, and what it moves the task to.
 const NEXT = {
@@ -90,13 +94,15 @@ function TaskRow({ t }) {
   const navigate = useNavigate()
   const st = statusKey(t)
   const late = st !== 'done' && t.endDate && t.endDate < todayStr()
+  const noPhotos = missingTodaysPhotos(t)
   return (
     <button onClick={() => navigate(`/task/${t.id}`)}
-      className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${late ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
+      className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${noPhotos ? 'border-l-red-500' : late ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
       <div className="flex-1 min-w-0">
         <p className="text-base font-semibold text-gray-900 truncate">{t.title}</p>
         <p className="text-sm text-gray-600 truncate">{t.client || t.address || 'Job'}</p>
         <p className={`text-sm truncate ${late ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>{late ? `Was due ${dayLabel(t.endDate)}` : dateRange(t)}</p>
+        {noPhotos && <p className="text-sm font-semibold text-red-600 flex items-center gap-1"><Camera size={14} /> Photos needed today</p>}
       </div>
       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_PILL[st]}`}>{statusLabel(t)}</span>
       <ChevronRight size={20} className="text-gray-300 shrink-0" />
@@ -123,6 +129,8 @@ function TaskScreen() {
 
   const st = statusKey(t)
   const step = NEXT[st]
+  const today = photosOn(t)
+  const ready = hasPhotosToday(t)   // photos first, then the status buttons
   const pm = (members || []).find(m => m.id === t.pmId)
   const move = (to) => {
     const was = st
@@ -149,6 +157,20 @@ function TaskScreen() {
         </a>
       )}
 
+      {/* Today's photos: required before the status buttons work */}
+      {step && (
+        <Card className={`p-4 space-y-3 ${ready ? '' : 'border-red-300'}`}>
+          <div className="flex items-center gap-2">
+            <Camera size={20} className={ready ? 'text-green-600' : 'text-red-600'} />
+            <p className="flex-1 text-base font-semibold text-gray-900">Today's photos</p>
+            <span className={`text-sm font-semibold ${ready ? 'text-green-700' : 'text-red-600'}`}>{today.length ? `${today.length} sent` : 'Required'}</span>
+          </div>
+          {!ready && <p className="text-sm text-gray-600">Send photos of the work every day. The buttons below unlock once today's are in.</p>}
+          <AddPhotosButton task={t} label={ready ? 'Add more photos' : 'Take photos'} onAdded={(n) => showToast(`${n} photo${n > 1 ? 's' : ''} sent`)}
+            className={`w-full ${ready ? 'h-12 border border-gray-200 bg-white text-gray-800' : 'h-14 bg-[var(--brand-600)] text-white'} rounded-xl text-base font-bold flex items-center justify-center gap-2 disabled:opacity-60`} />
+        </Card>
+      )}
+
       {/* Where it stands, and the one thing to do next */}
       <Card className="p-4 space-y-4">
         <ol className="grid grid-cols-4 gap-1.5" aria-label="Progress">
@@ -164,12 +186,12 @@ function TaskScreen() {
         </ol>
         {step ? (
           <div className="space-y-2">
-            <button onClick={() => move(step.to)}
-              className="w-full h-16 rounded-xl bg-green-600 active:bg-green-700 text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm">
-              <Check size={24} /> {step.label}
+            <button onClick={() => move(step.to)} disabled={!ready}
+              className="w-full h-16 rounded-xl bg-green-600 active:bg-green-700 text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm disabled:bg-gray-300">
+              {ready ? <Check size={24} /> : <Lock size={22} />} {step.label}
             </button>
             {st === 'started' && (
-              <button onClick={() => move('done')} className="w-full h-12 rounded-xl border border-gray-200 text-base font-semibold text-gray-700">
+              <button onClick={() => move('done')} disabled={!ready} className="w-full h-12 rounded-xl border border-gray-200 text-base font-semibold text-gray-700 disabled:text-gray-300">
                 Skip to completed
               </button>
             )}
@@ -193,6 +215,12 @@ function TaskScreen() {
           </div>
         )}
       </Card>
+      {(t.photos || []).length > 0 && (
+        <Card className="p-4 space-y-2">
+          <p className="text-base font-semibold text-gray-900">Photos sent</p>
+          <PhotoDays task={t} big />
+        </Card>
+      )}
       {toast}
     </div>
   )

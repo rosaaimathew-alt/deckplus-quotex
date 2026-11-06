@@ -8,6 +8,8 @@ import { useStore } from '../store'
 import { BookSubForm } from '../components/JobSubsTab'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, needsInspection, subNameOf, tasksForJob } from '../lib/subTasks'
 import { Card, dayLabel, telUrl } from './shared'
+import { missingTodaysPhotos } from '../lib/taskPhotos'
+import { PhotoDays } from '../components/TaskPhotos'
 
 export default function SubTasksCard({ proposal }) {
   const tasks = tasksForJob(useStore(s => s.subTasks), proposal.id)
@@ -53,9 +55,13 @@ export default function SubTasksCard({ proposal }) {
                 {flag && open !== t.id && (
                   <p className="px-3 pb-3 -mt-1 text-sm font-medium text-amber-800">Schedule the inspection</p>
                 )}
+                {missingTodaysPhotos(t) && (
+                  <p className="px-3 pb-3 -mt-1 text-sm font-medium text-red-600">No photos from the sub today</p>
+                )}
                 {open === t.id && (
                   <div className="px-3 pb-3 space-y-2.5">
                     {t.notes && <p className="text-sm text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
+                    <PhotoDays task={t} maxDays={7} />
                     <div className="grid grid-cols-2 gap-2">
                       {SUB_STATUSES.map(s => (
                         <button key={s.key} onClick={() => s.key !== st && setSubTaskStatus(t.id, s.key)}

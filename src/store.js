@@ -1146,6 +1146,10 @@ export const useStore = create(
           }),
         })),
 
+      // A job photo (lib/taskPhotos) on a sub task. Photos are only ever added.
+      addSubTaskPhoto: (id, photo) =>
+        set((s) => ({ subTasks: (s.subTasks || []).map((t) => (t.id === id ? { ...t, photos: [...(t.photos || []), photo] } : t)) })),
+
       deleteSubTask: (id) =>
         set((s) => ({ subTasks: (s.subTasks || []).filter((t) => t.id !== id) })),
 
