@@ -16,7 +16,8 @@ const ROLES = [
   { key: 'office', label: 'Office',          blurb: 'Everything, plus settings' },
   { key: 'admin',  label: 'Admin',           blurb: 'Everything, plus the team' },
 ]
-const roleLabel = (k) => ROLES.find(r => r.key === k)?.label || k
+// Subs are invited from Money › Vendors (their login is tied to the sub), not here.
+const roleLabel = (k) => (k === 'sub' ? 'Sub (sub app)' : ROLES.find(r => r.key === k)?.label || k)
 const inputCls = 'w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-200)]'
 const linkFor = (code) => `${window.location.origin}/signup?code=${code}`
 
@@ -49,7 +50,7 @@ export function TeamCard() {
   // Change someone's role. Admin: anyone but yourself (never the last admin).
   // Office: non-admins, to a non-admin role. The database checks the same.
   const [changing, setChanging] = useState('')   // user id whose role is saving
-  const canChangeRole = (m) => !DEMO && m.id !== me?.id && (isAdmin || m.role !== 'admin')
+  const canChangeRole = (m) => !DEMO && m.id !== me?.id && m.role !== 'sub' && (isAdmin || m.role !== 'admin')
     && !(m.role === 'admin' && adminCount <= 1)
   const changeRole = async (m, next) => {
     if (next === m.role) return
@@ -67,7 +68,7 @@ export function TeamCard() {
   // Admin: switch sections off for one person (Access). Not yourself, and not
   // the paint PM (Field mode only — nothing to switch).
   const [accessFor, setAccessFor] = useState('')
-  const canAccess = (m) => isAdmin && !DEMO && m.id !== me?.id && m.role !== 'paint'
+  const canAccess = (m) => isAdmin && !DEMO && m.id !== me?.id && m.role !== 'paint' && m.role !== 'sub'
 
   // Admin: a new temporary password for someone who's locked out (no email needed).
   const [resetting, setResetting] = useState('')

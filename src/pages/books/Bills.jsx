@@ -5,6 +5,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, CheckSquare, Trash2 } from 'lucide-react'
 import { useStore } from '../../store'
+import SubDrawsReview from './SubDrawsReview'
 import {
   OVERHEAD_BUCKETS, PO_TYPES, money, shortDate, todayISO, addDays, jobIndex, jobLabel, billBalance, billStatus,
   poAllocations, dueSummary, downloadCsv,
@@ -175,6 +176,7 @@ export default function Bills() {
         <button onClick={() => setEditing('new')} className={btnHeadPrimary}>Add new bill</button>
       </PageHead>
       <DueBanner sum={sum} soonLabel="Due within 7 days" counts={false} />
+      <SubDrawsReview />
       <Toolbar
         left={<>
           <SearchBox value={q} onChange={setQ} placeholder="Search" />

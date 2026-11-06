@@ -105,7 +105,7 @@ export function makeAccess(plan, role) {
 // permissions: the person's own switches (permissions.js) — a tab the admin
 // switched off for them is left out like one their department doesn't have.
 export function visibleDestinations(plan, role, permissions = {}) {
-  if (role === 'paint') return []
+  if (role === 'paint' || role === 'sub') return []
   const can = makeAccess(plan, role)
   const out = []
   for (const d of DESTINATIONS) {

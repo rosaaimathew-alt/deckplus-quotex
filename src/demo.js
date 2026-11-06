@@ -260,10 +260,37 @@ export function buildDemoSeed() {
   const won5 = proposals.find(p => p.id === 5)
   won5.jobData = { ...(won5.jobData || {}), paymentsReceived: [...(won5.jobData?.paymentsReceived || []), { id: 9401, date: ymd(-19), amount: 21166.67, method: 'Check', invoiceId: 9301, milestone: 'Deposit' }] }
 
+  // Subs booked on the won jobs (lib/subTasks).
+  const jobOf = (id) => proposals.find(p => p.id === id) || {}
+  const subTasks = [
+    { id: 'st_demo1', proposalId: 5, subId: 1, subName: 'Cardinal Framing Co.', title: 'Frame the deck', startDate: ymd(-6), endDate: ymd(2), status: 'near', statusDates: { started: { at: iso(-6) }, near: { at: iso(0) } }, notes: 'Ledger on the left side of the house.', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-10) },
+    { id: 'st_demo2', proposalId: 5, subId: 2, subName: 'Bright Spark Electric', title: 'Rough electrical', startDate: ymd(4), endDate: ymd(6), status: 'booked', notes: '', client: jobOf(5).client, address: jobOf(5).address, createdAt: iso(-9) },
+    { id: 'st_demo3', proposalId: 6, subId: 3, subName: 'Stoneworks Hardscape', title: 'Footings', startDate: ymd(-2), endDate: ymd(1), status: 'started', statusDates: { started: { at: iso(-2) } }, notes: '', client: jobOf(6).client, address: jobOf(6).address, createdAt: iso(-8) },
+  ]
+  // Agreed amounts on those bookings (office / the sub only).
+  const subTerms = [{ id: 'st_demo1', agreedAmount: 9500 }, { id: 'st_demo2', agreedAmount: 4200 }, { id: 'st_demo3', agreedAmount: 6000 }]
+  // Bright Spark is an outside electrical company with its own PM and crew.
+  subcontractors[1].hasCrew = true
+  subcontractors[1].crew = [
+    { name: 'Sam Sparks', email: 'sam@brightspark.example', userId: 'u-crew-1' },
+    { name: 'Dee Watts', email: 'dee@brightspark.example', userId: 'u-crew-2' },
+    { name: 'Lou Ohm', email: 'lou@brightspark.example', userId: null },
+  ]
+  // A sub invoice waiting for the office (lib/subDraws).
+  const monday = (() => { const d = new Date(now); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return ymd(Math.round((d - now) / DAY)) })()
+  const subDraws = [
+    { id: 'dr_demo1', subId: 1, subName: 'Cardinal Framing Co.', email: 'office@cardinalframing.example', date: ymd(0), weekOf: monday, status: 'submitted', notes: 'Joists and beams set.',
+      workTypes: ['Carpentry'], total: 3000, submittedAt: iso(0), files: [],
+      lines: [{ taskId: 'st_demo1', proposalId: 5, client: jobOf(5).client, address: jobOf(5).address, title: 'Frame the deck', amount: 3000 }] },
+  ]
+
   return {
     proposals,
     nextProposalId: 9,
     subcontractors,
+    subTasks,
+    subTerms,
+    subDraws,
     vendors, purchases, bills, invoices,
     nextSubId: 6,
     catalog: DEMO_CATALOG,

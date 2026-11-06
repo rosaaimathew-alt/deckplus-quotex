@@ -6,6 +6,7 @@ import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
 import JobFinancials from '../components/JobFinancials'
 import JobPriceList from '../components/JobPriceList'
 import PermitsTab from '../components/PermitsTab'
+import JobSubsTab from '../components/JobSubsTab'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
@@ -1702,12 +1703,17 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
 
   const saveNote = () => { updateJobData(proposal.id, { notes: noteText }); setEditingNote(false) }
 
+  // Subs booked on this job: PMs and the office (reps can't read sub tasks).
+  const showSubs   = useStore(s => s.role !== 'sales')
+  const jobTasks   = (useStore(s => s.subTasks) || []).filter(t => t && String(t.proposalId) === String(proposal.id))
+
   const TABS = [
     ...(books ? [{ key: 'summary', label: 'Summary' }] : []),
     { key: 'stages',  label: 'Stages' },
     ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0) ? ` (${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0)})` : ''}` }] : []),
     // Budget, costs, price list and the job's invoices / POs / bills: one Money tab
     ...(money ? [{ key: 'money', label: 'Money' }] : []),
+    ...(showSubs ? [{ key: 'subs', label: `Subs${jobTasks.length ? ` (${jobTasks.length})` : ''}` }] : []),
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
     { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
@@ -1932,6 +1938,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
             )}
             {tab === 'permits' && showPermits && <PermitsTab proposal={proposal} stages={stages} readOnly={permitAccess !== 'edit'} />}
             {tab === 'money' && money && <JobMoneyTab proposal={proposal} books={books} costCount={costCount} />}
+            {tab === 'subs' && showSubs && <JobSubsTab proposal={proposal} />}
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}

@@ -8,8 +8,10 @@
 // suppliers, POs and bills to the office), and without the money columns.
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, Download, Filter, Star, Upload, FileText, X, Package } from 'lucide-react'
+import { Plus, Pencil, Download, Filter, Star, Upload, FileText, X, Package, Smartphone, CheckCircle2 } from 'lucide-react'
 import { useStore } from '../../store'
+import { createSubInvite } from '../../supabase'
+import { DEMO } from '../../demo'
 import { useNav, useJobMoney } from '../../nav'
 import { dataUrlToBytes, downloadZip } from '../../lib/zip'
 import {
@@ -47,6 +49,61 @@ function StarRating({ value, onChange, size = 15 }) {
           <Star size={size} fill={n <= value ? 'currentColor' : 'none'} />
         </button>
       ))}
+    </div>
+  )
+}
+
+// The sub's own phone login (src/sub): the office sends a one-time invite
+// link; once they sign up, the tasks PMs book for this sub show up there.
+function SubAppAccess({ sub }) {
+  const live = useStore(s => s.subcontractors.find(x => x.id === sub.id)) || sub
+  const canInvite = useStore(s => s.role === 'manager')
+  const updateSubcontractor = useStore(s => s.updateSubcontractor)
+  const crew = live.crew || []
+  const [email, setEmail] = useState(live.appEmail || live.email || '')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)   // { ok, text, link }
+  const invite = async () => {
+    setBusy(true); setMsg(null)
+    try {
+      if (DEMO) throw new Error('Invites are turned off in the demo.')
+      const r = await createSubInvite(live.id, email.trim())
+      const link = `${window.location.origin}/signup?code=${r.code}`
+      try { await navigator.clipboard?.writeText(link) } catch { /* shown below to copy by hand */ }
+      setMsg({ ok: true, text: `Invite link for ${r.email} copied. Text it to them; it works for 14 days.`, link })
+    } catch (e) { setMsg({ ok: false, text: e.message }) } finally { setBusy(false) }
+  }
+  return (
+    <div className="rounded-xl border border-gray-200 p-3 space-y-2">
+      <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5"><Smartphone size={14} /> Sub app</p>
+      {live.userId ? (
+        <p className="text-sm text-gray-700 flex items-center gap-1.5"><CheckCircle2 size={14} className="text-green-600" /> Signed up{live.appEmail ? ` as ${live.appEmail}` : ''}. Tasks booked for them show on their phone.</p>
+      ) : canInvite ? (
+        <>
+          {live.appEmail && <p className="text-xs text-gray-500">Invited {live.appEmail}, not signed up yet.</p>}
+          <div className="flex gap-2">
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Their email" className={inputCls} aria-label="Sub app email" />
+            <button type="button" onClick={invite} disabled={busy || !email.trim()} className={`${btnPrimary} whitespace-nowrap`}>{busy ? 'Inviting…' : live.appEmail ? 'Invite again' : 'Invite'}</button>
+          </div>
+        </>
+      ) : (
+        <p className="text-xs text-gray-500">{live.appEmail ? `Invited ${live.appEmail}, not signed up yet.` : 'Not on the sub app yet. The office can invite them.'}</p>
+      )}
+      {msg && (
+        <p className={`text-xs ${msg.ok ? 'text-emerald-700' : 'text-red-600'} break-all`}>{msg.text}{msg.link ? <><br />{msg.link}</> : null}</p>
+      )}
+      {/* An outside company (e.g. electrical) with its own PM and crew: the
+          login above is their PM; they invite and assign their own people. */}
+      <label className="flex items-start gap-2 text-sm text-gray-700 pt-1">
+        <input type="checkbox" className="mt-0.5" checked={!!live.hasCrew} disabled={!canInvite}
+          onChange={e => updateSubcontractor(live.id, { hasCrew: e.target.checked })} />
+        <span>Outside company with its own PM and crew<span className="block text-xs text-gray-500">The login above is their PM. They add their own people and put one on each job.</span></span>
+      </label>
+      {live.hasCrew && crew.length > 0 && (
+        <ul className="text-xs text-gray-600 space-y-0.5 pl-6">
+          {crew.map(c => <li key={c.email}>{c.name} · {c.userId ? 'signed up' : 'invited'}</li>)}
+        </ul>
+      )}
     </div>
   )
 }
@@ -191,6 +248,7 @@ function VendorModal({ entry, onClose, subsOnly }) {
           </div>
         ))}
       </div>
+      {wasSub && <SubAppAccess sub={rec} />}
       {wasSub && <SubExtras sub={rec} />}
       <Field label="Notes"><textarea rows={2} value={f.notes} onChange={e => set({ notes: e.target.value })} className={inputCls} /></Field>
       <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={f.active} onChange={e => set({ active: e.target.checked })} /> Active</label>

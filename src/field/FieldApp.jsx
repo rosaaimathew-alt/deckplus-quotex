@@ -28,6 +28,9 @@ import { setViewPref, usePaintView } from './fieldMode'
 import { PaintQueue, PaintSchedule, PaintTouchUps, PaintJob } from './PaintApp'
 import InstallCard from './InstallCard'
 import JobMoney from './JobMoney'
+import SubTasksCard from './SubTasksCard'
+import { needsInspection, statusKey, subNameOf } from '../lib/subTasks'
+import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { useJobMoney } from '../nav'
 import {
   todayStr, addDays, dayLabel, mapsUrl, telUrl, smsUrl, describeJob, useFieldJobs, Card, Progress, ScopeToggle, JobRow, nextLine, useUndo, BackButton, QuickAction, QuickNote, RecentNotes,
@@ -37,8 +40,24 @@ import {
 function TodayScreen() {
   const { jobs, scope, setScope, hasMine } = useFieldJobs()
   const me = useStore(s => s.me)
+  const subTasks = useStore(s => s.subTasks)
+  const subs = useStore(s => s.subcontractors)
   const today = todayStr()
   const weekEnd = addDays(7)
+
+  // Subs near completion / done on these jobs, with no inspection lined up;
+  // and from 3pm, subs at work who haven't sent today's photos.
+  const late = new Date().getHours() >= 15
+  const subAsks = useMemo(() => {
+    const byId = new Map(jobs.map(j => [String(j.p.id), j]))
+    const onJobs = (subTasks || []).map(t => ({ t, j: byId.get(String(t.proposalId)) })).filter(x => x.j)
+    return [
+      ...onJobs.filter(({ t }) => needsInspection(t))
+        .map(({ t, j }) => ({ t, j, why: `Schedule inspection · ${t.title} ${statusKey(t) === 'done' ? 'done' : 'almost done'} (${subNameOf(t, subs)})` })),
+      ...(late ? onJobs.filter(({ t }) => missingTodaysPhotos(t))
+        .map(({ t, j }) => ({ t, j, why: `No photos today · ${t.title} (${subNameOf(t, subs)})` })) : []),
+    ]
+  }, [jobs, subTasks, subs, late])
 
   const { now, week } = useMemo(() => {
     const now = [], week = []
@@ -86,15 +105,16 @@ function TodayScreen() {
           <p className="text-3xl font-bold text-gray-900">{jobs.length}</p>
           <p className="text-sm text-gray-500">open jobs</p>
         </Card>
-        <Card className={`p-4 ${now.length ? 'border-amber-300' : ''}`}>
-          <p className={`text-3xl font-bold ${now.length ? 'text-amber-600' : 'text-green-600'}`}>{now.length}</p>
+        <Card className={`p-4 ${now.length + subAsks.length ? 'border-amber-300' : ''}`}>
+          <p className={`text-3xl font-bold ${now.length + subAsks.length ? 'text-amber-600' : 'text-green-600'}`}>{now.length + subAsks.length}</p>
           <p className="text-sm text-gray-500">need you now</p>
         </Card>
       </div>
 
       <div className="space-y-2.5">
         <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Needs you now</h2>
-        {now.length === 0 ? (
+        {subAsks.map(({ t, j, why }, i) => <JobRow key={`${t.id}-${i}`} j={j} tone="amber" sub={why} />)}
+        {now.length + subAsks.length === 0 ? (
           <Card className="p-5 flex items-center gap-3">
             <CheckCircle2 size={26} className="text-green-500 shrink-0" />
             <p className="text-base font-medium text-gray-800">You're all caught up.</p>
@@ -346,6 +366,8 @@ function JobScreen() {
           </label>
         </Card>
       )}
+
+      <SubTasksCard proposal={proposal} />
 
       {j.tracked && <InspectionsCard j={j} />}
 
