@@ -75,10 +75,12 @@ export async function requireAuth(req, res) {
 // ── Field-only accounts ──────────────────────────────────────────────────────
 // The paint PM (role 'paint') uses Field mode's paint screens and nothing else;
 // Field mode calls no API. So a paint login gets no staff API at all: no
-// email, AI, Drive, permits, contract links or mailbox settings.
+// email, AI, Drive, permits, contract links or mailbox settings. The same goes
+// for a sub's login (role 'sub'): the sub app calls no staff API either.
 const FIELD_ONLY = 'This account is for Field mode only.'
 async function isFieldOnly(token, user) {
-  return (await staffRole(token, user)) === 'paint'
+  const role = await staffRole(token, user)
+  return role === 'paint' || role === 'sub'
 }
 
 // For handlers that check the token themselves (sign, co, google-auth): the

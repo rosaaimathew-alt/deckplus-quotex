@@ -1529,7 +1529,7 @@ export function bootstrapOrg() {
     // A brand-new org gets the built-in email templates once; the adapter
     // writes them as rows because they arrive after arming. (Not for the paint
     // PM: they can't read templates, so an empty list doesn't mean a new org.)
-    if (me.role !== 'paint' && !(collections.emailTemplates || []).length) useStore.setState({ emailTemplates: DEFAULT_EMAIL_TEMPLATES })
+    if (me.role !== 'paint' && me.role !== 'sub' && !(collections.emailTemplates || []).length) useStore.setState({ emailTemplates: DEFAULT_EMAIL_TEMPLATES })
     // Reserve an id block so this session never mints an id another rep has.
     try {
       const start = await reserveIdBlock()

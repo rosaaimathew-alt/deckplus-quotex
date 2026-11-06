@@ -66,6 +66,8 @@ export const inviteInfo   = (code) => rpc('invite_info', { p_code: code })
 export const createInvite = ({ email, role, displayName }) => rpc('create_invite', { p_email: email, p_role: role, p_display_name: displayName || null })
 export const listInvites  = () => rpc('list_invites', {})
 export const revokeInvite = (code) => rpc('revoke_invite', { p_code: code })
+// Office: invite a sub (Money › Vendors) to the sub app (supabase/sub_role.sql).
+export const createSubInvite = (subId, email) => rpc('create_sub_invite', { p_sub_id: String(subId), p_email: email })
 
 // Admins remove someone from the team (the database only lets admins do this).
 // Their proposals and jobs stay with the company; they can no longer sign in to it.
