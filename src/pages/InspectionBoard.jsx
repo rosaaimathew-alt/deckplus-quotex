@@ -391,19 +391,38 @@ export default function InspectionBoard() {
         </div>
       </div>
 
-      {connectionAlerts(permitPulse, { hasJobs: jobs.length > 0 }).map(a => (
-        <div key={a.key} className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          {a.stale ? (
-            <div><b>Inspections haven't been checked since {new Date(a.since).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.</b> The board may be out of date. {access === 'edit' ? 'Click "Check county now", and if it fails tell whoever looks after the app.' : 'Let the office know.'}</div>
-          ) : (
-            <div>
-              <b>{a.county} inspection results aren't coming through</b>{a.since ? ` since ${new Date(a.since).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}: the county site couldn't be read for {a.failed} of {a.total} job{a.total === 1 ? '' : 's'}. Those rows may be out of date; check the county site directly for anything urgent.
-              {a.error && <div className="text-xs text-red-700/80 mt-1">What the check saw: {a.error}</div>}
-            </div>
-          )}
-        </div>
-      ))}
+      {/* Connection problems: one short line, details on tap — not a box per county */}
+      {(() => {
+        const alerts = connectionAlerts(permitPulse, { hasJobs: jobs.length > 0 })
+        const down = alerts.filter(x => !x.stale)
+        const stale = alerts.find(x => x.stale)
+        const when = (iso) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        const names = down.map(x => x.county)
+        const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]
+        const since = down.map(x => x.since).filter(Boolean).sort()[0]
+        if (!down.length && !stale) return null
+        return (
+          <details className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <summary className="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              <AlertTriangle size={15} className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                {down.length > 0 && <><b>{list}</b> not reading{since ? ` since ${when(since)}` : ''}. </>}
+                {stale && <><b>Not checked since {when(stale.since)}.</b> </>}
+                <span className="text-red-700/80">Rows may be out of date.</span>
+              </span>
+              {access === 'edit' && !DEMO && (
+                <button type="button" onClick={(e) => { e.preventDefault(); checkNow() }} disabled={busy}
+                  className="shrink-0 font-medium underline underline-offset-2 disabled:opacity-50">{busy ? 'Checking…' : 'Check now'}</button>
+              )}
+            </summary>
+            {down.length > 0 && (
+              <ul className="mt-2 pl-6 space-y-0.5 text-xs text-red-700/90">
+                {down.map(x => <li key={x.key}>{x.county}: {x.failed} of {x.total} job{x.total === 1 ? '' : 's'} not read{x.error ? ` (${x.error})` : ''}</li>)}
+              </ul>
+            )}
+          </details>
+        )
+      })()}
 
       {/* One flat line: search, what to show (with counts), then county / PM */}
       <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200">
