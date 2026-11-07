@@ -41,9 +41,11 @@ function Cell({ cell, title }) {
 
 // A job sold outside the app, added so the office can track its permits.
 // It's stored with status 'Imported', which every sales number leaves out.
-function AddJobModal({ pms, onClose, onAdded }) {
+function AddJobModal({ onClose, onAdded }) {
   const addOffPlatformJob = useStore(s => s.addOffPlatformJob)
-  const [f, setF] = useState({ client: '', street: '', city: '', zip: '', state: 'NC', jurisdiction: '', pm: '', jobType: '', permit: '' })
+  const members = useStore(s => s.members)
+  const pmMembers = (members || []).filter(m => m.role === 'pm')
+  const [f, setF] = useState({ client: '', street: '', city: '', zip: '', state: 'NC', jurisdiction: '', pmId: '', jobType: '', permit: '' })
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
   const address = [f.street.trim(), f.city.trim(), `${f.state} ${f.zip.trim()}`.trim()].filter(Boolean).join(', ')
@@ -55,7 +57,7 @@ function AddJobModal({ pms, onClose, onAdded }) {
     if (!/^\d{5}$/.test(f.zip.trim())) return setErr('Add the 5-digit ZIP code. The county is looked up by it.')
     if (!county) return setErr("That ZIP isn't in a county the app knows yet. Tell whoever looks after the app which county it's in.")
     const id = addOffPlatformJob({
-      client: f.client.trim(), address, pm: f.pm.trim(), jobType: f.jobType.trim(),
+      client: f.client.trim(), address, pm: '', pmId: f.pmId || null, jobType: f.jobType.trim(),
       permit: f.permit.trim().toUpperCase(), county, jurisdiction: f.jurisdiction,
     })
     onAdded(id)
@@ -112,8 +114,10 @@ function AddJobModal({ pms, onClose, onAdded }) {
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className={label}>PM</label>
-            <input className={input} value={f.pm} onChange={set('pm')} list="qx-pm-list" placeholder="B" />
-            <datalist id="qx-pm-list">{pms.map(x => <option key={x} value={x} />)}</datalist>
+            <select className={input} value={f.pmId} onChange={set('pmId')} aria-label="Project manager">
+              <option value="">Not assigned</option>
+              {pmMembers.map(m => <option key={m.id} value={m.id}>{m.displayName || m.email}</option>)}
+            </select>
           </div>
           <div className="col-span-2">
             <label className={label}>Job type</label>
@@ -276,6 +280,7 @@ function NextCell({ proposal, edit }) {
 
 export default function InspectionBoard() {
   const proposals = useStore(s => s.proposals)
+  const members = useStore(s => s.members)
   const permitPulse = useStore(s => s.permitPulse)
   const progress = useStore(s => s.permitPulseProgress)
   const me = useStore(s => s.me)
@@ -300,9 +305,13 @@ export default function InspectionBoard() {
     const type = p.imported?.jobType || p.jobData?.projectTypeOverride
       || [...(p.contractDraft?.projectTypes || p.projectTypes || [])].join(', ')
       || building?.description || ''
-    return { p, cells, failed, problem, building, type, pm: p.imported?.pm || '', finaled: countyFinaled(p),
+    // The PM the job is assigned to (Jobs › Project Manager); the spreadsheet's
+    // letter only for a job nobody has been assigned to yet.
+    const pmMember = p.pmId ? (members || []).find(m => m.id === p.pmId) : null
+    const pmName = pmMember ? (pmMember.displayName || pmMember.email || '').split(' ')[0] : (p.imported?.pm || '')
+    return { p, cells, failed, problem, building, type, pm: pmName, finaled: countyFinaled(p),
       county: jobCounty(p), jurisdiction: jobJurisdiction(p), connected: countyConnected(p) }
-  }).sort((a, b) => String(a.p.client || '').localeCompare(String(b.p.client || ''))), [proposals])
+  }).sort((a, b) => String(a.p.client || '').localeCompare(String(b.p.client || ''))), [proposals, members])
 
   const pms = [...new Set(jobs.map(j => j.pm).filter(Boolean))].sort()
   const counties = [...new Set(jobs.map(j => j.county).filter(Boolean))].sort()
@@ -445,7 +454,7 @@ export default function InspectionBoard() {
           )}
           {pms.length > 0 && (
             <MenuChip label="PM" placeholder="All PMs" value={pm || null} onChange={v => setPm(v || '')} align="right"
-              options={[{ value: '', label: 'All PMs' }, ...pms.map(x => ({ value: x, label: `PM ${x}` }))]} />
+              options={[{ value: '', label: 'All PMs' }, ...pms.map(x => ({ value: x, label: x }))]} />
           )}
           <SwitchChip label="Hide finaled" checked={hideFinaled} onChange={setHideFinaled} title="Hide jobs the county has finaled" />
         </div>
@@ -528,7 +537,7 @@ export default function InspectionBoard() {
         })}
       </div>
 
-      {adding && <AddJobModal pms={pms} onClose={() => setAdding(false)} onAdded={onAdded} />}
+      {adding && <AddJobModal onClose={() => setAdding(false)} onAdded={onAdded} />}
 
       <p className="text-[11px] text-gray-400 flex items-center gap-1.5">
         <ShieldCheck size={12} /> ✓ green passed · ✗ red failed / inaccessible / partial (latest result) · ◷ blue scheduled at the county · – gray cancelled. Hover a cell for the result.

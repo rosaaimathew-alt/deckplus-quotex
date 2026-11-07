@@ -1737,7 +1737,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900 text-sm">{proposal.client}</span>
-            {proposal.imported && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Imported{proposal.imported.pm ? ` · PM ${proposal.imported.pm}` : ''}</span>}
+            {proposal.imported && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Imported{proposal.imported.pm && !proposal.pmId ? ` · PM ${proposal.imported.pm}` : ''}</span>}
             {openWarranty > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> {openWarranty} warranty</span>}
             {permitFlags.failed > 0 && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Failed inspection</span>}
             {permitFlags.needsPick && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Pick permit</span>}

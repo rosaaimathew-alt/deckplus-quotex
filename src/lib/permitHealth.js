@@ -1,9 +1,11 @@
 // ── County connection health ─────────────────────────────────────────────────
 // After every full inspection check, each county's connection is graded: did
 // we actually read its permit site? A county is "down" when none of its jobs
-// could be read, or when 30%+ of them failed — the site is down, blocking us,
-// or its pages changed so inspections can't be read. A job with no permit at
-// its address doesn't count against the county: the site answered.
+// could be read, or when at least 2 jobs and 30%+ of them failed — the site is
+// down, blocking us, or its pages changed so inspections can't be read. One
+// slow answer in a county with only a few jobs isn't an outage (that job is
+// simply tried again on the next 10-minute tick). A job with no permit at its
+// address doesn't count against the county: the site answered.
 //
 // Kept in the shared settings (permitPulse.health) so every office screen sees
 // the same state, and an email goes to office / admin only when a county goes
@@ -11,6 +13,7 @@
 import { locateAddress } from './permitFees'
 
 const DOWN_SHARE = 0.3
+const DOWN_MIN_FAILED = 2
 const STALE_MS = 26 * 3600 * 1000   // checks run at 8 AM and 1 PM — a day+ without one is a problem
 const REALERT_MS = 12 * 3600 * 1000
 
@@ -24,7 +27,7 @@ export function gradeRun(prevHealth = {}, stats = {}, now = new Date().toISOStri
   for (const [county, s] of Object.entries(stats)) {
     const total = s.ok + s.failed
     if (!total) continue
-    const down = s.failed > 0 && (s.ok === 0 || s.failed / total >= DOWN_SHARE)
+    const down = s.failed > 0 && (s.ok === 0 || (s.failed >= DOWN_MIN_FAILED && s.failed / total >= DOWN_SHARE))
     const prev = prevHealth[county] || {}
     const next = {
       ...prev,

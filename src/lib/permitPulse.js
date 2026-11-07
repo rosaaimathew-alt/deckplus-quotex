@@ -105,8 +105,9 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
       tally(p, !r.siteError, r.error)
       // Keep the last good reading if this check failed, with the error on top.
       const prev = useStore.getState().proposals.find(x => x.id === p.id)?.countyPermit
+      // (siteError stays on it so the 10-minute tick tries it again.)
       const next = r.error && !r.needsPick && prev?.permits?.length
-        ? { ...prev, error: r.error, checkedAt: r.checkedAt }
+        ? { ...prev, error: r.error, siteError: !!r.siteError, checkedAt: r.checkedAt }
         : withNotes(r, prev)
       const stageKeys = (getStages(p) || []).map(s => s.key)
       setCountyPermit(p.id, next, r.permits ? countyPassedStages({ countyPermit: next }, stageKeys) : [])
@@ -123,12 +124,13 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
 }
 
 // Tracked jobs the county site has never been read for (e.g. just imported),
-// or whose last read failed on the site's end (slow or down) before we had any
-// result — tried again on the next 10-minute tick instead of the next 8 AM / 1 PM.
+// or whose last read failed on the site's end (slow or down) — tried again on
+// the next 10-minute tick instead of the next 8 AM / 1 PM, so one slow answer
+// (and the county alert it raised) clears as soon as the site answers again.
 export function uncheckedJobIds() {
   return useStore.getState().proposals
     .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
-    .filter(p => !p.countyPermit || (p.countyPermit.siteError && !p.countyPermit.permits?.length))
+    .filter(p => !p.countyPermit || p.countyPermit.siteError)
     .map(p => p.id)
 }
 
