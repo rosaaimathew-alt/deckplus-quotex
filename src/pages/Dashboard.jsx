@@ -4,13 +4,13 @@ import { ArrowRight, FileCheck } from 'lucide-react'
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
 import { useScopedProposals } from '../lib/proposalScope'
-import { clientGroups, latestIterations } from '../lib/proposalGroups'
-import { wonRevenueOf } from '../contractTotal'
 import { TodoCard } from '../components/TodoPanel'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
 import NeedsAttention from '../components/NeedsAttention'
 import { MenuChip, RepToggle } from '../components/FilterBar'
 import { attentionItems, nextReminderDate, isJobClosed } from '../lib/attention'
+import { useJobCostOf } from '../lib/jobCost'
+import { headlineNumbers } from '../lib/headline'
 import { useNav } from '../nav'
 
 // ── Home ─────────────────────────────────────────────────────────────────────
@@ -70,8 +70,10 @@ export default function Dashboard() {
   const { proposals, canChoose, reps, repId, mineOnly, repName, setRep } = useScopedProposals()
   const jobCosts   = useStore(s => s.jobCosts) || {}
   const { can, role } = useNav()
+  const me = useStore(s => s.me)
   const permitPulse = useStore(s => s.permitPulse)
-  const attention  = attentionItems({ proposals, jobCosts, can, role, permitPulse })
+  const costOf     = useJobCostOf()
+  const attention  = attentionItems({ proposals, jobCosts, costOf, can, role, permitPulse })
 
   const [periodKey, setPeriodKey] = useState('year')
   const [showCounted, setShowCounted] = useState(false)
@@ -80,22 +82,15 @@ export default function Dashboard() {
   const pLabel = pick.label.toLowerCase()
 
   // ── Numbers (same rules as before / as Insights) ─────────────────────────
-  const inRange = (dateStr) => { const d = new Date(dateStr); return !Number.isNaN(d.getTime()) && d >= pStart && d <= pEnd }
-  // Win rate: clients estimated in the period (archived and drafts are neutral).
-  // Group every version first, so a revision is never counted as a new client.
-  const groups     = clientGroups(proposals)
-  const outcomes   = groups.filter(({ all }) => all.some(p => p.status !== 'Archived' && p.status !== 'Draft' && p.createdAt && inRange(p.createdAt)))
-  // A deal counts as won once the client commits — tagged Won or contract signed
-  const isWon      = (p) => p.status === 'Won' || p.contractDraft?.signed === true
-  const wonDate    = (p) => p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt
-  const wonClients = groups.filter(({ all }) => all.some(p => p.status !== 'Archived' && isWon(p) && inRange(wonDate(p))))
-  // Revenue counts realized Won contracts only, matching the Insights cards
-  const won        = proposals.filter(p => p.status === 'Won' && inRange(p.closedAt || p.sentAt || p.createdAt))
-  // Open pipeline: each client's latest version only, not every revision
-  const active     = latestIterations(proposals).filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status))
-  const wonRevenue = won.reduce((s, p) => s + wonRevenueOf(p), 0)
-  const pipeline   = active.reduce((s, p) => s + (p.total || 0), 0)
-  const winRate    = outcomes.length > 0 ? Math.round(wonClients.length / outcomes.length * 100) : null
+  // The same numbers as Insights (lib/headline.js)
+  const h          = headlineNumbers(proposals, pStart, pEnd)
+  const outcomes   = h.clients
+  const wonClients = h.wonClients
+  const won        = h.won
+  const active     = h.open
+  const wonRevenue = h.wonRevenue
+  const pipeline   = h.pipeline
+  const winRate    = h.winRate !== null ? Math.round(h.winRate) : null
   const insights   = can('/analytics')
 
   // ── Coming up: follow-ups and job starts in the next two weeks ───────────
@@ -130,6 +125,7 @@ export default function Dashboard() {
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const firstName = (me?.displayName || '').trim().split(/\s+/)[0]
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   const summary = attention.length
     ? `${attention.length} thing${attention.length !== 1 ? 's' : ''} need${attention.length === 1 ? 's' : ''} you today`
@@ -138,18 +134,20 @@ export default function Dashboard() {
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5">
       <header>
-        <h1 className="text-2xl font-bold text-gray-900">{greeting}</h1>
+        <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
         <p className="text-sm text-gray-500 mt-0.5">{dateStr} · {summary}</p>
       </header>
 
       {/* Numbers — one quiet strip with a single period choice */}
       <section className="bg-white rounded-xl border border-gray-200 overflow-hidden" aria-label="Your numbers">
         <div className="px-5 pt-3.5 flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-gray-900">{!canChoose || mineOnly ? 'Your numbers' : repId ? `${repName}'s numbers` : 'Organization numbers'}</p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-5 flex-wrap min-w-0">
+            <p className="text-sm font-semibold text-gray-900">{!canChoose || mineOnly ? 'Your numbers' : repId ? `${repName}'s numbers` : 'Organization numbers'}</p>
             {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
+          </div>
+          <div className="flex items-center gap-3">
             {insights && <span className="hidden sm:block"><LinkBtn onClick={() => navigate('/insights')}>All insights</LinkBtn></span>}
-            <MenuChip value={periodKey} onChange={setPeriodKey} align="right" options={PERIODS.map(({ value, label }) => ({ value, label }))} />
+            <MenuChip label="Period" value={periodKey} onChange={setPeriodKey} align="right" options={PERIODS.map(({ value, label }) => ({ value, label }))} />
           </div>
         </div>
         <div className="mt-2 grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border-t border-gray-100">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FileSignature, FilePen, CheckCircle2, Clock, Search, X, FileX, ExternalLink, Eye, Loader2, Copy, MoreHorizontal, ShieldCheck } from 'lucide-react'
 import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf } from '../contractTotal'
+import { QuickPicks } from '../components/FilterBar'
 
 const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -76,7 +77,7 @@ function SignaturesModal({ recordId, onClose }) {
           <h2 className="text-base font-bold text-gray-900">Signatures & Audit Trail</h2>
           <div className="flex items-center gap-3">
             <a href={`/view/${recordId}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-700 transition-colors">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--brand-600)] text-white rounded-lg text-xs font-medium hover:bg-[var(--brand-700)] transition-colors">
               <ExternalLink size={11} /> View Full Document
             </a>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
@@ -177,7 +178,7 @@ function LinksModal({ links, onClose }) {
                 <span className="text-xs font-bold uppercase tracking-wider text-gray-600">{label}</span>
                 <button
                   onClick={() => { navigator.clipboard.writeText(links[role]); setCopied(role); setTimeout(() => setCopied(''), 2000) }}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-gray-900 text-white rounded-md text-[11px] font-semibold hover:bg-gray-700"
+                  className="flex items-center gap-1 px-2.5 py-1 bg-[var(--brand-600)] text-white rounded-md text-[11px] font-semibold hover:bg-[var(--brand-700)]"
                 >
                   <Copy size={10} /> {copied === role ? 'Copied!' : 'Copy'}
                 </button>
@@ -377,37 +378,15 @@ export default function ContractsList({ initialFilter } = {}) {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5 gap-3">
-        <div className="qx-hide-embedded">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Contracts</h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">All contracts from won proposals</p>
-        </div>
-        <div className="text-xs sm:text-sm text-gray-400 shrink-0">
-          {wonProposals.length} won
-        </div>
+      <div className="qx-hide-embedded mb-5">
+        <h1 className="qx-title text-xl sm:text-2xl font-bold text-gray-900">Contracts</h1>
       </div>
 
       {/* Filter tabs + search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 self-start">
-          {FILTERS.map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-white shadow-sm text-gray-900'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {f}
-              <span className={`ml-1 sm:ml-1.5 text-xs ${filter === f ? 'text-[var(--brand-600)]' : 'text-gray-400'}`}>
-                {counts[f]}
-              </span>
-            </button>
-          ))}
-        </div>
+        <QuickPicks value={filter} onChange={setFilter} options={FILTERS.map(f => ({ value: f, label: f, count: counts[f] }))} />
 
+        <div className="flex items-center gap-2 w-full sm:w-auto">
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-56">
           <Search size={14} className="text-gray-400 shrink-0" />
           <input
@@ -422,27 +401,12 @@ export default function ContractsList({ initialFilter } = {}) {
             </button>
           )}
         </div>
-      </div>
-
-      {/* One-time backfill: mark pre-existing (off-platform) signed deals.
-          Self-removes once nothing is left in Not Started. */}
-      {notStartedProposals.length > 0 && (
-        <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <div className="flex items-start gap-2 text-sm text-amber-800">
-            <FileSignature size={16} className="shrink-0 mt-0.5" />
-            <span>
-              <span className="font-semibold">{notStartedProposals.length}</span> contract{notStartedProposals.length !== 1 ? 's' : ''} not started.
-              Already signed off-platform? Move {notStartedProposals.length !== 1 ? 'them' : 'it'} straight to Signed.
-            </span>
-          </div>
-          <button
-            onClick={handleBulkSignOffPlatform}
-            className="shrink-0 self-start sm:self-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 transition-colors whitespace-nowrap"
-          >
-            Mark all as signed (off-platform)
-          </button>
+        {/* One-time backfill for deals signed before the app: tucked in the menu */}
+        {notStartedProposals.length > 0 && (
+          <RowMenu items={[{ icon: <CheckCircle2 size={14} className="text-gray-400" />, label: `Mark ${notStartedProposals.length} not-started as signed (off-platform)`, onClick: handleBulkSignOffPlatform }]} />
+        )}
         </div>
-      )}
+      </div>
 
       {/* Empty state */}
       {wonProposals.length === 0 && (
@@ -490,12 +454,14 @@ export default function ContractsList({ initialFilter } = {}) {
             return (
               <div key={p.id} className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 border-b border-gray-100 last:border-b-0">
                 {/* Avatar */}
-                <div className="w-10 h-10 rounded-xl bg-[var(--brand-100)] text-[var(--brand-700)] flex items-center justify-center shrink-0 font-bold text-sm">
+                <div className="hidden sm:flex w-10 h-10 rounded-xl bg-[var(--brand-100)] text-[var(--brand-700)] items-center justify-center shrink-0 font-bold text-sm">
                   {initials(p.client)}
                 </div>
                 {/* Name + contract # · value */}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate">{p.client}</p>
+                  {/* On a phone the status goes under the name so the name isn't cut short */}
+                  <div className="sm:hidden mt-0.5">{clientSignedPending ? <span className="text-xs font-semibold text-blue-700">Client signed</span> : <StatusBadge status={status} />}</div>
                   <p className="text-xs text-gray-400 truncate">
                     <span className="font-mono">{contractNum}</span> · ${fmt(contractTotalOf(p))}
                     {status === 'signed' && (draft.signedOffPlatform
@@ -503,6 +469,7 @@ export default function ContractsList({ initialFilter } = {}) {
                       : signedAt ? ` · Signed ${fmtDate(signedAt)}` : '')}
                   </p>
                 </div>
+                <div className="hidden sm:block shrink-0">
                 {clientSignedPending ? (
                   <button onClick={() => recId && setViewingRecordId(recId)}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 shrink-0 hover:bg-blue-200 transition-colors"
@@ -512,9 +479,10 @@ export default function ContractsList({ initialFilter } = {}) {
                 ) : (
                   <StatusBadge status={status} />
                 )}
+                </div>
                 <button
                   onClick={() => openContract(p)}
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-[var(--brand-600)] text-white rounded-lg text-xs font-medium hover:bg-[var(--brand-700)] transition-colors shrink-0"
+                  className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 bg-[var(--brand-600)] text-white rounded-lg text-xs font-medium hover:bg-[var(--brand-700)] transition-colors shrink-0"
                 >
                   {primaryLabel}
                 </button>
@@ -532,21 +500,6 @@ export default function ContractsList({ initialFilter } = {}) {
         <LinksModal links={viewingLinks} onClose={() => setViewingLinks(null)} />
       )}
 
-      {/* Summary footer */}
-      {wonProposals.length > 0 && (
-        <div className="mt-6 grid grid-cols-3 gap-4">
-          {[
-            { label: 'Not Started', value: counts['Not Started'], color: 'bg-gray-50 text-gray-600' },
-            { label: 'In Progress', value: counts['In Progress'], color: 'bg-amber-50 text-amber-700' },
-            { label: 'Signed',      value: counts['Signed'],      color: 'bg-emerald-50 text-emerald-700' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className={`${color} rounded-xl px-5 py-4 flex items-center justify-between`}>
-              <span className="text-sm font-medium">{label}</span>
-              <span className="text-2xl font-bold">{value}</span>
-            </div>
-          ))}
-        </div>
-      )}
 
     </div>
   )

@@ -1,4 +1,5 @@
 import { Fragment, useState, useMemo } from 'react'
+import StatCard from '../components/StatCard'
 import { useNavigate } from 'react-router-dom'
 import {
   DollarSign, TrendingUp, TrendingDown, Target, ChevronDown, ChevronUp, ChevronRight,
@@ -8,7 +9,8 @@ import {
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
-import { MenuChip } from '../components/FilterBar'
+import { MenuChip, QuickPicks } from '../components/FilterBar'
+import { useJobCostOf } from '../lib/jobCost'
 
 const fmt   = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtSh = (n) => {
@@ -148,17 +150,15 @@ function CostEditor({ proposal, existing, onSave, onDelete, onClose }) {
 }
 
 // ── Monthly Trend Chart ───────────────────────────────────────────────────────
-function MonthlyChart({ jobs, jobCosts }) {
+function MonthlyChart({ jobs }) {
   const months = useMemo(() => {
     const map = {}
     jobs.forEach(p => {
       const d = new Date(p.closedAt || p.createdAt)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       if (!map[key]) map[key] = { label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), revenue: 0, cost: 0, profit: 0 }
-      const rev  = wonRevenueOf(p)
-      const cost = jobCosts[p.id]
-        ? ['materials', 'labor', 'subcontractors', 'other'].reduce((s, k) => s + (Number(jobCosts[p.id][k]) || 0), 0)
-        : 0
+      const rev  = p.rev
+      const cost = p.totalCost || 0
       map[key].revenue += rev
       map[key].cost    += cost
       map[key].profit  += (rev - cost)
@@ -167,7 +167,7 @@ function MonthlyChart({ jobs, jobCosts }) {
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-12)
       .map(([, v]) => v)
-  }, [jobs, jobCosts])
+  }, [jobs])
 
   if (months.length === 0) return null
 
@@ -211,6 +211,9 @@ export default function ProfitabilityTracker() {
   const saveJobCosts   = useStore(s => s.saveJobCosts)
   const deleteJobCosts = useStore(s => s.deleteJobCosts)
   const navigate   = useNavigate()
+  // Job cost = Money's POs and bills + job receipts + older hand-entered
+  // totals — the same figure as Projects › Jobs (lib/jobCost.js)
+  const costOf     = useJobCostOf()
 
   const [editingId, setEditingId] = useState(null)
   const [sortField, setSortField] = useState('closedAt')
@@ -238,15 +241,13 @@ export default function ProfitabilityTracker() {
 
   // Derived per-job metrics
   const jobs = useMemo(() => wonJobs.map(p => {
+    const fin  = costOf(p)
     const rev  = wonRevenueOf(p)
-    const costs = jobCosts[p.id]
-    const totalCost = costs
-      ? ['materials', 'labor', 'subcontractors', 'other'].reduce((s, k) => s + (Number(costs[k]) || 0), 0)
-      : null
+    const totalCost = fin.hasCosts ? fin.actualCost : null
     const profit = totalCost !== null ? rev - totalCost : null
     const margin = (totalCost !== null && rev > 0) ? (profit / rev) * 100 : null
-    return { ...p, rev, totalCost, profit, margin, hasCosts: totalCost !== null }
-  }), [wonJobs, jobCosts])
+    return { ...p, rev, totalCost, profit, margin, hasCosts: totalCost !== null, fromBooks: fin.fromBooks }
+  }), [wonJobs, costOf])
 
   // Everything below is scoped to the selected period, by SALE (won) month.
   const periodJobs = useMemo(
@@ -324,69 +325,28 @@ export default function ProfitabilityTracker() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
-        <div>
-          <h2 className="qx-hide-embedded text-xl sm:text-2xl font-bold text-gray-900">Profitability Tracker</h2>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Enter actual job costs to see your real margins.</p>
+      {/* One flat line: which jobs, what's missing, and the period */}
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
+        <QuickPicks value={filterHasCosts} onChange={setFilterHasCosts} options={[
+          { value: 'all', label: 'All won jobs' },
+          { value: 'entered', label: 'With costs' },
+          { value: 'pending', label: 'No costs yet', count: stats.jobsPending || null },
+        ]} />
+        <div className="ml-auto flex items-center gap-x-5">
+          <MenuChip label="Period" value={statsYear} onChange={setStatsYear} align="right"
+            options={[...statsYears.map(y => ({ value: y, label: y === CURRENT_YEAR ? `${y} (so far)` : String(y) })), { value: 'all', label: 'All time' }]} />
         </div>
-        {stats.jobsPending > 0 && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            <AlertCircle size={15} />
-            {stats.jobsPending} job{stats.jobsPending !== 1 ? 's' : ''} need costs entered
-          </div>
-        )}
-      </div>
-
-      {/* Period selector — scopes every metric below, by sale (won) month */}
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Performance · {periodLabel}</p>
-        <MenuChip label="Period" value={statsYear} onChange={setStatsYear} align="right"
-          options={[...statsYears.map(y => ({ value: y, label: y === CURRENT_YEAR ? `${y} (so far)` : String(y) })), { value: 'all', label: 'All time' }]} />
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><DollarSign size={16} /></span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Won Revenue</span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{fmtSh(stats.totalRev)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{stats.jobCount} won job{stats.jobCount !== 1 ? 's' : ''} · {periodLabel}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><TrendingDown size={16} /></span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Costs</span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{stats.withCosts > 0 ? fmtSh(stats.totalCost) : '—'}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{stats.withCosts} job{stats.withCosts !== 1 ? 's' : ''} with costs</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><TrendingUp size={16} /></span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Gross Profit</span>
-          </div>
-          <p className={`text-2xl font-bold ${stats.withCosts > 0 ? (stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-900'}`}>
-            {stats.withCosts > 0 ? fmtSh(stats.totalProfit) : '—'}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {stats.withCosts > 0 && stats.totalRev > 0
-              ? `${pct((stats.totalProfit / stats.totalRev) * 100)} overall margin`
-              : 'enter costs to see margin'}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center shrink-0"><Target size={16} /></span>
-            <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Avg Margin</span>
-          </div>
-          <p className={`text-2xl font-bold ${stats.avgMargin !== null ? MARGIN_COLOR(stats.avgMargin) : 'text-gray-900'}`}>
-            {stats.avgMargin !== null ? pct(stats.avgMargin) : '—'}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">per-job average</p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Won revenue" value={fmtSh(stats.totalRev)} sub={`${stats.jobCount} won job${stats.jobCount !== 1 ? 's' : ''} · ${periodLabel}`} />
+        <StatCard label="Total costs" value={stats.withCosts > 0 ? fmtSh(stats.totalCost) : '—'} sub={`${stats.withCosts} job${stats.withCosts !== 1 ? 's' : ''} with costs`} />
+        <StatCard label="Gross profit" value={stats.withCosts > 0 ? fmtSh(stats.totalProfit) : '—'}
+          tone={stats.withCosts > 0 ? (stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-900'}
+          sub={stats.withCosts > 0 && stats.totalRev > 0 ? `${pct((stats.totalProfit / stats.totalRev) * 100)} overall margin` : 'add POs or bills in Money'} />
+        <StatCard label="Average margin" value={stats.avgMargin !== null ? pct(stats.avgMargin) : '—'}
+          tone={stats.avgMargin !== null ? MARGIN_COLOR(stats.avgMargin) : 'text-gray-900'} sub="per-job average" />
       </div>
 
       {/* Monthly Revenue vs Profit — collapsible */}
@@ -397,36 +357,12 @@ export default function ProfitabilityTracker() {
             {showMonthly ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
             Monthly Revenue vs Profit (Won Jobs)
           </button>
-          {showMonthly && <MonthlyChart jobs={periodJobs} jobCosts={jobCosts} />}
+          {showMonthly && <MonthlyChart jobs={periodJobs} />}
         </div>
       )}
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Table header row with filters */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-            Won Jobs
-          </p>
-          <div className="flex gap-1">
-            {[
-              { value: 'all',      label: 'All' },
-              { value: 'entered',  label: 'Costs entered' },
-              { value: 'pending',  label: 'Pending' },
-            ].map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setFilterHasCosts(value)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  filterHasCosts === value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {jobs.length === 0 ? (
           <div className="py-16 text-center text-gray-400">
             <BarChart2 size={32} className="mx-auto mb-3 opacity-30" />
@@ -445,7 +381,7 @@ export default function ProfitabilityTracker() {
                   <span className="flex items-center justify-end">Revenue <SortIcon field="rev" /></span>
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">
-                  Actual Cost
+                  Cost
                 </th>
                 <th
                   className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-28 cursor-pointer hover:text-gray-700"
@@ -487,8 +423,8 @@ export default function ProfitabilityTracker() {
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {job.hasCosts
-                        ? <span className="font-semibold text-gray-700">${fmt(job.totalCost)}</span>
-                        : <span className="text-gray-300 italic text-xs">not entered</span>}
+                        ? <span className="font-semibold text-gray-700" title={job.fromBooks ? `$${fmt(job.fromBooks)} from POs and bills in Money` : 'Entered by hand'}>${fmt(job.totalCost)}</span>
+                        : <span className="text-gray-300 italic text-xs">none yet</span>}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {job.profit !== null
@@ -533,15 +469,15 @@ export default function ProfitabilityTracker() {
                               ? 'text-blue-600 bg-blue-100'
                               : 'text-gray-300 hover:text-blue-600 hover:bg-blue-50'
                           }`}
-                          title={job.hasCosts ? 'Edit costs' : 'Enter costs'}
+                          title="Other costs not in Money (entered by hand)"
                         >
                           <Edit3 size={13} />
                         </button>
-                        {job.hasCosts && editingId !== job.id && (
+                        {jobCosts[job.id] && editingId !== job.id && (
                           <button
                             onClick={() => { deleteJobCosts(job.id); setEditingId(null) }}
                             className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50"
-                            title="Clear costs"
+                            title="Clear the hand-entered costs"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -581,7 +517,6 @@ export default function ProfitabilityTracker() {
           <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-green-400 inline-block" /> ≥35% (strong)</div>
           <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" /> 20–34% (ok)</div>
           <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" /> &lt;20% (low)</div>
-          <span className="ml-auto">Click <Edit3 size={11} className="inline" /> to enter actual costs per job</span>
         </div>
       )}
     </div>

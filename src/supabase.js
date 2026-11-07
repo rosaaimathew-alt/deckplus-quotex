@@ -66,6 +66,19 @@ export const inviteInfo   = (code) => rpc('invite_info', { p_code: code })
 export const createInvite = ({ email, role, displayName }) => rpc('create_invite', { p_email: email, p_role: role, p_display_name: displayName || null })
 export const listInvites  = () => rpc('list_invites', {})
 export const revokeInvite = (code) => rpc('revoke_invite', { p_code: code })
+// A sub sends this week's draw invoice. Written straight away (not through
+// the queue) so a refusal — over the agreed amount, already sent this week —
+// shows on their screen instead of vanishing (supabase/sub_draws.sql).
+export async function submitSubDraw(draw, orgId = _orgId) {
+  need()
+  const { error } = await supabase.from('sub_draws').insert({ id: String(draw.id), org_id: orgId, data: draw })
+  if (error) throw new Error(String(error.message || error).replace(/^permission denied:\s*/i, ''))
+}
+// An outside company's PM (sub app): their crew, and inviting one of them.
+export const myCrew = () => rpc('my_crew', {})
+export const createCrewInvite = (email, name) => rpc('create_crew_invite', { p_email: email, p_name: name })
+// Office: invite a sub (Money › Vendors) to the sub app (supabase/sub_role.sql).
+export const createSubInvite = (subId, email) => rpc('create_sub_invite', { p_sub_id: String(subId), p_email: email })
 
 // Admins remove someone from the team (the database only lets admins do this).
 // Their proposals and jobs stay with the company; they can no longer sign in to it.
@@ -85,6 +98,10 @@ export async function resetMemberPassword(userId) {
   await rpc('admin_set_member_password', { p_user: userId, p_password: temp })
   return temp
 }
+// Admin: switch sections off for one person (permissions.js). { key: false }.
+export const setMemberPermissions = (userId, permissions) => rpc('set_member_permissions', { p_user: userId, p_permissions: permissions })
+// Admin / office: change someone's team role (office: non-admins only).
+export const setMemberRole = (userId, role) => rpc('set_member_role', { p_user: userId, p_role: role })
 export const claimInvite  = (code, name) => rpc('claim_invite', { p_code: code || null, p_name: name || null })
 
 // Creates the login. Returns { session } when signed in straight away, or
@@ -128,7 +145,24 @@ export const RECORD_TABLES = {
   todos:                  'todos',
   checklists:             'checklists',
   expenses:               'expenses',
+  // Books (supabase/books.sql). Optional: an org whose database doesn't have
+  // these tables yet still loads; the Money pages just start empty.
+  vendors:                'vendors',
+  purchases:              'purchases',
+  bills:                  'bills',
+  invoices:               'invoices',
+  // Sub tasks (supabase/sub_tasks.sql): a sub booked for one service on a job.
+  subTasks:               'sub_tasks',
+  // Subs' weekly draw invoices (supabase/sub_draws.sql): office and the sub.
+  subDraws:               'sub_draws',
+  // Agreed amount per booking (sub_draws.sql): office, and the sub it's with.
+  subTerms:               'sub_task_terms',
 }
+// Tables added after launch: a missing one loads as empty instead of failing
+// the whole sign-in, and nothing is written to it until it exists.
+const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices', 'sub_tasks', 'sub_draws', 'sub_task_terms'])
+const _missing = new Set()
+const isMissingTable = (e) => e && (e.code === '42P01' || e.code === 'PGRST205' || /does not exist|could not find the table/i.test(e.message || ''))
 // Object-keyed-by-id collections → a table whose row id is the key.
 export const MAP_TABLES = { jobCosts: 'job_costs' }
 // Singletons → one org_settings row (data jsonb) per org.
@@ -167,28 +201,36 @@ export async function loadOrg() {
   const uid = currentUserId()
   if (!supabase || !uid) throw new Error('Not signed in')
   const { data: member, error: mErr } = await supabase
-    .from('org_members').select('org_id, role, display_name, email').eq('user_id', uid).maybeSingle()
+    .from('org_members').select('org_id, role, display_name, email, permissions').eq('user_id', uid).maybeSingle()
   if (mErr) throw mErr
   let me = member
   if (!me) {
     // First sign-in after accepting an invite (e.g. once email is confirmed):
     // join the team the invite is for, then read the membership again.
     try { await claimInvite() } catch { /* no invite for this email */ }
-    const again = await supabase.from('org_members').select('org_id, role, display_name, email').eq('user_id', uid).maybeSingle()
+    const again = await supabase.from('org_members').select('org_id, role, display_name, email, permissions').eq('user_id', uid).maybeSingle()
     me = again.data
   }
   if (!me) throw new Error('This login is not on a team yet. Ask your admin for an invite link.')
   const orgId = me.org_id
 
   const [{ data: members }, { data: settingsRow }] = await Promise.all([
-    supabase.from('org_members').select('user_id, role, display_name, email').eq('org_id', orgId),
+    supabase.from('org_members').select('user_id, role, display_name, email, permissions').eq('org_id', orgId),
     supabase.from('org_settings').select('data').eq('org_id', orgId).maybeSingle(),
   ])
 
   const collections = {}
   await Promise.all(Object.entries(RECORD_TABLES).map(async ([key, table]) => {
-    const rows = await fetchAll(table, orgId)
-    collections[key] = rows.map(r => r.data)
+    try {
+      const rows = await fetchAll(table, orgId)
+      collections[key] = rows.map(r => r.data)
+      _missing.delete(table)
+    } catch (e) {
+      if (!OPTIONAL_TABLES.has(table) || !isMissingTable(e)) throw e
+      console.warn(`[quotex] table ${table} is not in this database yet (run supabase/${table === 'sub_task_terms' ? 'sub_draws' : table.startsWith('sub_') ? table : 'books'}.sql)`)
+      _missing.add(table)
+      collections[key] = []
+    }
   }))
   for (const [key, table] of Object.entries(MAP_TABLES)) {
     const rows = await fetchAll(table, orgId)
@@ -197,10 +239,11 @@ export async function loadOrg() {
 
   return {
     orgId,
-    me: { id: uid, role: me.role, displayName: me.display_name, email: me.email },
-    members: (members || []).map(m => ({ id: m.user_id, role: m.role, displayName: m.display_name, email: m.email })),
+    me: { id: uid, role: me.role, displayName: me.display_name, email: me.email, permissions: me.permissions || {} },
+    members: (members || []).map(m => ({ id: m.user_id, role: m.role, displayName: m.display_name, email: m.email, permissions: m.permissions || {} })),
     settings: settingsRow?.data || {},
     collections,
+    missingTables: [..._missing],
   }
 }
 
@@ -313,6 +356,7 @@ function diffRecords(key, table, current) {
 function onStoreChange(state, prev) {
   if (!_armed || _applyingRemote) return
   for (const [key, table] of Object.entries(RECORD_TABLES)) {
+    if (_missing.has(table)) continue
     if (state[key] !== prev[key]) diffRecords(key, table, state[key] || [])
   }
   for (const [key, table] of Object.entries(MAP_TABLES)) {
@@ -394,6 +438,7 @@ export function armAdapter(store, orgId, settings) {
   if (_channel) supabase.removeChannel(_channel)
   let ch = supabase.channel(`org:${orgId}`)
   for (const table of [...Object.values(RECORD_TABLES), ...Object.values(MAP_TABLES)]) {
+    if (_missing.has(table)) continue
     ch = ch.on('postgres_changes',
       { event: '*', schema: 'public', table, filter: `org_id=eq.${orgId}` },
       (p) => applyRemote(store, table, p))

@@ -1,10 +1,11 @@
 import { useState, useRef, lazy, Suspense } from 'react'
-import * as pdfjsLib from 'pdfjs-dist'
+import { QuickPicks } from '../components/FilterBar'
+import AiChat from './AiChat'
+import { loadPdfjs } from '../lib/pdfjs'
 import { getAnalyzeModel } from '../gemini'
 import { Upload, FileText, Image, File, Trash2, CheckCircle, AlertCircle, Save, RefreshCw } from 'lucide-react'
 import { useStore } from '../store'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
 
 const ANALYZE_SYSTEM_PROMPT = `You are a construction estimating assistant. Extract ONLY priced line items from the estimate.
 
@@ -156,6 +157,7 @@ function AnalyzeTab() {
   const extractPdfText = async (f) => {
     try {
       const buf = await f.arrayBuffer()
+      const pdfjsLib = await loadPdfjs()
       const pdf = await pdfjsLib.getDocument({ data: buf }).promise
       let text = ''
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -238,7 +240,7 @@ function AnalyzeTab() {
             <label className="text-xs font-medium text-gray-500 mb-1.5">Or paste estimate text</label>
             <textarea
               className="flex-1 border border-gray-200 rounded-lg p-3 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 min-h-32"
-              placeholder={'Example:\nRemove 140 LF chain link fence\nInstall 6ft cedar privacy fence 140 LF  $38/lf\n(2) single walk gates  $320 ea'}
+              placeholder={'Example:\nDemo existing 12x16 deck\nTrex Transcend decking 320 SF  $34/sf\nTrex Select aluminum railing 40 LF  $112/lf\n(1) stair run, 4 steps  $650'}
               value={text}
               onChange={e => { setText(e.target.value); setFile(null); setSaved(false); setResults([]) }}
             />
@@ -319,7 +321,6 @@ function AnalyzeTab() {
         <div className="text-center py-10 text-gray-400">
           <FileText size={36} className="mx-auto mb-3 opacity-40" />
           <p className="text-sm">Upload a PDF, photo, or paste your estimate text above, then click <strong>Analyze Estimate</strong>.</p>
-          <p className="text-xs mt-2 text-gray-300">Supported: PDF · JPEG · PNG · TXT · CSV</p>
         </div>
       )}
     </div>
@@ -328,12 +329,15 @@ function AnalyzeTab() {
 
 // ── Combined Page ─────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'analyze', label: 'Analyze Estimate', description: 'AI extracts line items from a PDF, photo, or pasted text' },
-  { id: 'import',  label: 'Import Spreadsheet', description: 'Map columns from an Excel or CSV pricing sheet' },
+  { id: 'analyze', label: 'Analyze estimate' },
+  { id: 'import',  label: 'Import spreadsheet' },
+  { id: 'ai',      label: 'AI edit' },
 ]
 
-export default function Analyze() {
-  const [tab, setTab] = useState('analyze')
+// Catalog › Import & AI: every way prices come in or get changed in bulk.
+export default function Analyze({ initialTab = 'analyze', allowAi = true }) {
+  const tabs = TABS.filter(t => t.id !== 'ai' || allowAi)
+  const [tab, setTab] = useState(tabs.some(t => t.id === initialTab) ? initialTab : 'analyze')
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -343,25 +347,9 @@ export default function Analyze() {
         <p className="text-sm text-gray-500 mt-0.5">Extract pricing from estimates and spreadsheets, then save directly to your catalog.</p>
       </div>
 
-      {/* Tab switcher */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="border-b border-gray-200 mb-6">
+        <QuickPicks value={tab} onChange={setTab} options={tabs.map(t => ({ value: t.id, label: t.label }))} />
       </div>
-
-      {/* Description */}
-      <p className="text-xs text-gray-400 mb-4 -mt-3">
-        {TABS.find(t => t.id === tab)?.description}
-      </p>
 
       {/* Tab content */}
       {tab === 'analyze' && <AnalyzeTab />}
@@ -374,6 +362,7 @@ export default function Analyze() {
           <ImportTab />
         </Suspense>
       )}
+      {tab === 'ai' && <AiChat inline />}
     </div>
   )
 }

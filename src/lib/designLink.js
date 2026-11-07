@@ -18,15 +18,30 @@ export function designParts(lines = []) {
         name: l.name || '', type: pb.type, width: n(pb.width), depth: n(pb.depth), tie: pb.tie, roof: pb.roof,
         floor: pb.floor, deckHeightFt: pb.deckHeightFt, wallHeightIn: pb.wallHeightIn, glassEnds: pb.glassEnds,
         flooring: pb.flooring, railing: { product: pb.railing?.product || '' }, sides: pb.sides || '',
+        // Where the door (and the steps off a raised porch) go, how wide the steps are, and a landing.
+        doorWall: pb.doorWall || '', stairWidthFt: n(pb.steps?.stairWidthFt) || 0, landings: n(pb.landings?.count) || 0,
+        // Steps are on the quote only when a stair product is picked; otherwise the porch walks out level onto the deck.
+        stepsQuoted: !!String(pb.steps?.product || '').trim(),
       })
       continue
     }
     const st = l.builder?.state
-    if (l.builder?.tool === 'deck' && st && n(st.width) > 0 && n(st.depth) > 0) {
+    // Eze-Breeze porch conversion (an existing open porch enclosed): front + sides from the quote.
+    if (l.builder?.tool === 'porch' && st && n(st.width) > 0 && n(st.depth) > 0) {
+      porches.push({ name: l.name || '', type: 'ezebreeze', width: n(st.width), depth: n(st.depth), tie: 'wall', roof: 'shed', floor: 'patio',
+        wallHeightIn: n(st.wallH) || 96, sides: st.sides || 'Front + 2 sides', conversion: true })
+      continue
+    }
+    if (l.builder?.tool === 'deck' && st && ((n(st.width) > 0 && n(st.depth) > 0) || n(st.areaSF) > 0)) {
+      // Decks priced on total SF (sizeMode 'sf') keep junk width/depth: draw a square of that area.
+      const bySF = st.sizeMode === 'sf' && n(st.areaSF) > 0, side = bySF ? Math.max(6, Math.round(Math.sqrt(n(st.areaSF)))) : 0
       decks.push({
-        name: l.name || '', width: n(st.width), depth: n(st.depth), height: n(st.height), collKey: st.collKey || '', rail: st.rail || '',
+        name: l.name || '', width: bySF ? side : n(st.width), depth: bySF ? side : n(st.depth), height: n(st.height), collKey: st.collKey || '', rail: st.rail || '',
+        freestanding: !!st.freestanding, skirt: typeof st.skirt === 'string' ? st.skirt : '',
+        // Extra deck sections (bump-outs) priced on the same line: width × depth, no position.
+        sections: (st.sections || []).filter(x => n(x.width) > 0 && n(x.depth) > 0).map(x => ({ width: n(x.width), depth: n(x.depth) })),
         // Stair runs and landings as the deck builder links them (from 'deck' / a landing → to a landing / 'grade'), for the design editor
-        stairs: (st.stairs || []).map(s => ({ id: s.id, across: n(s.across) || 4, steps: n(s.steps), from: s.from || 'deck', to: s.to || 'grade' })),
+        stairs: (st.stairs || []).filter(s => s.auto || n(s.steps) > 0).map(s => ({ id: s.id, across: n(s.across) || 4, steps: n(s.steps), from: s.from || 'deck', to: s.to || 'grade', boxed: /box/i.test(s.style || '') })),
         landings: (st.landings || []).map(x => ({ id: x.id, width: n(x.width), depth: n(x.depth), height: n(x.height) })),
       })
       continue
@@ -76,6 +91,8 @@ export function designUrl(p, mode = '3d') {
 // (proposal_designs), so it reopens where the rep left off.
 export function editorUrl(p) {
   const d = designParts(p?.lines)
-  const payload = { client: p?.client || '', address: p?.address || '', decks: d.decks, porches: d.porches }
+  // Everything on the proposal the drawing needs: porches (with all their options), decks
+  // (with stairs and landings), patios (with retaining walls) and the title-block details.
+  const payload = { client: p?.client || '', address: p?.address || '', phone: p?.phone || '', email: p?.email || '', contractNum: p?.contractDraft?.contractNum || '', decks: d.decks, porches: d.porches, patios: d.patios }
   return `/design-editor.html?design=${encodeURIComponent(JSON.stringify(payload))}${p?.id != null ? `&pid=${encodeURIComponent(p.id)}` : ''}`
 }

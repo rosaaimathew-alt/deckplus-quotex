@@ -132,23 +132,29 @@
   .qx-ground            { background-color: #ebe5d8; }
   html.dark .qx-ground  { background-color: #1c1c20; }
 
-  /* Serif display headings — the signature of the look */
-  h1, h2 {
-    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  /* Page titles (.qx-title: Sales, Projects…) use the same sans as the rest
+     of the app — no serif anywhere on screen. */
+  .qx-title {
+    font-family: inherit;
     letter-spacing: -0.01em;
   }
+  /* The home page greeting ("Good morning, Matt") stays in the app's sans */
+  h1.qx-greeting, h1.qx-sans { font-family: inherit; letter-spacing: normal; }
   /* Keep the legal contract document in its original sans typography */
   .contract-doc h1, .contract-doc h2, .contract-doc h3 {
     font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     letter-spacing: normal;
   }
 
-  /* Warm paper neutrals (light mode only; dark mode keeps its own palette) */
-  html:not(.dark) .bg-gray-50   { background-color: #f1ede4 !important; }
-  html:not(.dark) .bg-gray-100  { background-color: #eae4d8 !important; }
-  html:not(.dark) .border-gray-200 { border-color: #e7e1d4 !important; }
-  html:not(.dark) .border-gray-100 { border-color: #efe9df !important; }
-  html:not(.dark) .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #efe9df !important; }
+  /* Warm paper neutrals (light mode only; dark mode keeps its own palette).
+     With a page background chosen in Settings › Branding, brand.js sets these
+     variables to shades of that color instead, so search bars, chips and
+     borders match it. */
+  html:not(.dark) .bg-gray-50   { background-color: var(--qx-soft, #f1ede4) !important; }
+  html:not(.dark) .bg-gray-100  { background-color: var(--qx-soft-2, #eae4d8) !important; }
+  html:not(.dark) .border-gray-200 { border-color: var(--qx-line, #e7e1d4) !important; }
+  html:not(.dark) .border-gray-100 { border-color: var(--qx-line-soft, #efe9df) !important; }
+  html:not(.dark) .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--qx-line-soft, #efe9df) !important; }
 
   /* Softer, warmer surfaces + slightly more generous corners */
   .shadow-sm { box-shadow: 0 1px 2px rgba(38,38,43,.05), 0 1px 1px rgba(38,38,43,.04) !important; }
@@ -378,9 +384,10 @@ html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
 .dp-signing .dp-sign-btn.qx-next { animation: qx-next-pulse 1.2s ease-in-out 2; }
 @keyframes qx-next-pulse { 50% { background: #fde68a; } }
 
-/* Dropdown with its arrow tucked in from the edge (the browser's own arrow
-   sits flush against the right border). */
-.qx-select {
+/* Every dropdown: the arrow tucked in from the edge (the browser's own arrow
+   sits flush against the right border). A select that draws its own arrow
+   opts out with Tailwind's appearance-none. .qx-select is the older opt-in. */
+select:not([multiple]):not([size]):not(.appearance-none), .qx-select {
   appearance: none;
   -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
@@ -389,3 +396,10 @@ html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
   background-size: 1rem;
   padding-right: 2rem !important;
 }
+html.dark select:not([multiple]):not([size]):not(.appearance-none) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23a1a1aa' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+/* Contract payment schedule: the % column the office sees in the contract
+   editor (screen only — .no-print keeps it off prints and PDFs). */
+.dp-grid th.dp-office-only, .dp-grid td.dp-office-only { background: #fffbeb; color: #92400e; }

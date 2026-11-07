@@ -25,13 +25,14 @@ create trigger proposal_designs_updated_at before update on proposal_designs
 drop policy if exists proposal_designs_select on proposal_designs;
 drop policy if exists proposal_designs_insert on proposal_designs;
 drop policy if exists proposal_designs_update on proposal_designs;
--- The proposals check runs under the caller's own proposals RLS.
+-- The proposals check runs under the caller's own proposals RLS. The paint PM
+-- (Field mode only) has no use for layouts, so none for them (paint_role.sql).
 create policy proposal_designs_select on proposal_designs for select using (
-  org_id = auth_org() and exists (select 1 from proposals p where p.org_id = proposal_designs.org_id and p.id = proposal_designs.proposal_id)
+  org_id = auth_org() and auth_role() is distinct from 'paint' and exists (select 1 from proposals p where p.org_id = proposal_designs.org_id and p.id = proposal_designs.proposal_id)
 );
 create policy proposal_designs_insert on proposal_designs for insert with check (
-  org_id = auth_org() and exists (select 1 from proposals p where p.org_id = proposal_designs.org_id and p.id = proposal_designs.proposal_id)
+  org_id = auth_org() and auth_role() is distinct from 'paint' and exists (select 1 from proposals p where p.org_id = proposal_designs.org_id and p.id = proposal_designs.proposal_id)
 );
 create policy proposal_designs_update on proposal_designs for update using (
-  org_id = auth_org() and exists (select 1 from proposals p where p.org_id = proposal_designs.org_id and p.id = proposal_designs.proposal_id)
+  org_id = auth_org() and auth_role() is distinct from 'paint' and exists (select 1 from proposals p where p.org_id = proposal_designs.org_id and p.id = proposal_designs.proposal_id)
 ) with check (org_id = auth_org());

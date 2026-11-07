@@ -1,8 +1,11 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
+import StatCard from '../components/StatCard'
 import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
-import { MenuChip } from '../components/FilterBar'
-import { clientGroups, latestIterations } from '../lib/proposalGroups'
+import { MenuChip, QuickPicks, RepToggle } from '../components/FilterBar'
+import { useScopedProposals } from '../lib/proposalScope'
+import { headlineNumbers } from '../lib/headline'
+import { HISTORICAL_JOBS, HISTORICAL_APPTS } from '../historicalData'
 import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
 
 // ── Sales Heat Map ────────────────────────────────────────────────────────────
@@ -336,8 +339,8 @@ function PastJobPanel() {
 
       {open && (
         <div className="border-t border-gray-100 px-5 py-4">
-          {/* One-click load of the real 2024–2025 history */}
-          {!historyImported ? (
+          {/* One-click load of a bundled history (src/historicalData.js) — only when it has any */}
+          {HISTORICAL_JOBS.length + HISTORICAL_APPTS.length === 0 ? null : !historyImported ? (
             <div className="mb-4 flex items-center justify-between gap-3 bg-[var(--brand-50)] border border-[var(--brand-200)] rounded-xl px-4 py-3 flex-wrap">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Load 2024–2025 history</p>
@@ -357,15 +360,9 @@ function PastJobPanel() {
           )}
 
           {/* Tabs */}
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4 w-fit">
-            <button onClick={() => { setTab('won'); setError('') }}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === 'won' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              Won Jobs
-            </button>
-            <button onClick={() => { setTab('nonwon'); setError('') }}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${tab === 'nonwon' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              Non-Wins (Bulk)
-            </button>
+          <div className="border-b border-gray-200 mb-4">
+            <QuickPicks value={tab} onChange={v => { setTab(v); setError('') }}
+              options={[{ value: 'won', label: 'Won jobs' }, { value: 'nonwon', label: 'Not won (bulk)' }]} />
           </div>
 
           {tab === 'won' && (
@@ -655,7 +652,7 @@ function RemapProjectsModal({ onClose }) {
           )}
         </div>
         <div className="px-5 py-3 border-t border-gray-100 shrink-0">
-          <button onClick={onClose} className="w-full py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">Done</button>
+          <button onClick={onClose} className="w-full py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-xl hover:bg-[var(--brand-700)] transition-colors">Done</button>
         </div>
       </div>
     </div>
@@ -716,18 +713,6 @@ const TYPE_LIGHT = {
   'Other':              'bg-gray-100 text-gray-600',
 }
 
-function StatCard({ icon: Icon, label, value, sub, color = 'blue' }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-2xl font-bold text-gray-900 leading-tight">{value}</p>
-        <div className="p-2 rounded-lg bg-gray-100 text-gray-500 shrink-0"><Icon size={16} /></div>
-      </div>
-      <p className="text-xs text-gray-500 font-semibold mt-2">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5 leading-snug">{sub}</p>}
-    </div>
-  )
-}
 
 // Reusable collapsible card — used for secondary analytics kept off the calm default view
 function Collapsible({ icon: Icon, title, subtitle, badge, open, onToggle, children }) {
@@ -764,6 +749,18 @@ function Bar({ pct, color, label, count, revenue }) {
 }
 
 // SVG line chart with hover tooltip
+// The Overview's period as [start, end] Dates ([null, null] = all time)
+function periodBounds(id) {
+  const now = new Date(), y = now.getFullYear(), q = Math.floor(now.getMonth() / 3)
+  const span = (y0, m0, y1, m1) => [new Date(y0, m0, 1), new Date(y1, m1 + 1, 0, 23, 59, 59, 999)]
+  if (id === 'all') return [null, null]
+  if (id === 'this-month') return span(y, now.getMonth(), y, now.getMonth())
+  if (id === 'this-quarter') return span(y, q * 3, y, q * 3 + 2)
+  if (id === 'last-quarter') { const lq = q === 0 ? 3 : q - 1, ly = q === 0 ? y - 1 : y; return span(ly, lq * 3, ly, lq * 3 + 2) }
+  if (id === 'this-year') return span(y, 0, y, 11)
+  return span(Number(id), 0, Number(id), 11)   // a specific prior year
+}
+
 const APPT_COLOR = '#0d9488' // teal — appointments line (right axis)
 
 function TrendChart({ months, activeTypes, allTypes }) {
@@ -920,7 +917,8 @@ function TrendChart({ months, activeTypes, allTypes }) {
 }
 
 export default function Analytics() {
-  const proposals    = useStore(s => s.proposals)
+  // Whose numbers: All or one salesperson (the same choice as Home and Win / loss)
+  const { proposals, canChoose, reps, repId, setRep } = useScopedProposals({ includeImported: true })
   const PROJECT_TYPES = useStore(s => s.projectTypes)
   const CURRENT_YEAR = new Date().getFullYear()
   // Stat-card period: month / quarter / last-quarter / this-year (YTD) / a prior
@@ -961,45 +959,16 @@ export default function Analytics() {
       if (statsPeriod === 'this-year')    return y === now.getFullYear()
       return y === statsPeriod   // a specific prior year
     }
-    // Revenue counts by WON date (closedAt); win-rate & appointments by the date
-    // the estimate was DONE (createdAt).
-    const won  = proposals.filter(p => p.status === 'Won' && matchesPeriod(p.closedAt || p.sentAt || p.createdAt))
+    // Headline numbers: the same rules as Home and Win / loss (lib/headline.js)
+    const h = headlineNumbers(proposals, ...periodBounds(statsPeriod))
+    const won = h.won
     // 'Archived' is a superseded revision — neutral, never counted as a loss.
     const lost = proposals.filter(p => p.status !== 'Won' && p.status !== 'Archived' && matchesPeriod(p.createdAt || p.sentAt || p.closedAt))
-
-    // Win rate = deals won ÷ APPOINTMENTS completed (not proposals sent). An
-    // appointment = one estimate/opportunity (a root proposal, revisions excluded);
-    // it's "won" if any version of it closed. e.g. 3 won / 12 appointments = 25%.
-    // One group per client, every version included (src/lib/proposalGroups.js)
-    const rootGroups = clientGroups(proposals).map(g => g.all)
-      .filter(group => group.some(p => p.status !== 'Archived'))   // drop fully-archived opportunities
-
-    // Appointments completed in the period = estimates DONE in the period (root date).
-    // A never-sent Draft isn't a completed appointment, so require at least one
-    // version that actually left Draft (sent/lost/won/etc.) — this keeps forgotten
-    // drafts from inflating the denominator.
-    const apptGroups = rootGroups.filter(group =>
-      matchesPeriod(group[0].createdAt || group[0].sentAt || group[0].closedAt) &&
-      group.some(p => p.status !== 'Archived' && p.status !== 'Draft'))
-    const apptCount = apptGroups.length
-
-    // A deal counts as WON the moment the client commits — either it's tagged 'Won'
-    // OR its contract is signed (even if the status wasn't manually flipped yet).
-    // "Whether they sign it today or tomorrow, it's a win."
-    const isWon   = (p) => p.status === 'Won' || p.contractDraft?.signed === true
-    const wonDate = (p) => p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt
-    // Deals WON in the period = the win landed in the period (closedAt), counted once
-    // per opportunity — INDEPENDENT of when the estimate was done, so a deal estimated
-    // last month but signed this month still counts as this month's win. This matches
-    // the trend chart (which also counts wins by closedAt) so card and graph reconcile.
-    const wonAppts = rootGroups.filter(group =>
-      group.some(p => isWon(p) && matchesPeriod(wonDate(p)))).length
-    const winRate  = apptCount > 0 ? (wonAppts / apptCount) * 100 : 0
-
-    // Use the actual contract value (à la carte = items sold), not the full
-    // proposal menu, so declined options don't inflate won revenue.
-    const totalRevenue = won.reduce((s, p) => s + wonRevenueOf(p), 0)
-    const avgDeal = won.length ? totalRevenue / won.length : 0
+    const apptCount = h.clients.length
+    const wonAppts = h.wonClients.length
+    const winRate = h.winRate ?? 0
+    const totalRevenue = h.wonRevenue
+    const avgDeal = h.avgJob ?? 0
 
     // Project type breakdown (all time)
     const typeMap = {}
@@ -1024,13 +993,11 @@ export default function Analytics() {
     won.forEach(p => { const r = p.winLossReason?.category; if (r) winReasons[r] = (winReasons[r] || 0) + 1 })
     lost.forEach(p => { const r = p.winLossReason?.category; if (r) lossReasons[r] = (lossReasons[r] || 0) + 1 })
 
-    // Open pipeline: each client's latest version only
-    const pipelineValue = latestIterations(proposals)
-      .filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status) && matchesPeriod(p.createdAt || p.sentAt || p.closedAt))
-      .reduce((s, p) => s + Number(p.total || 0), 0)
+    // Open pipeline: right now, each client's latest version (lib/headline.js)
+    const pipelineValue = h.pipeline
 
     return {
-      stats: { won, lost, apptCount, wonAppts, totalRevenue, avgDeal, winRate, typeRows, winReasons, lossReasons, pipelineValue },
+      stats: { won, lost, apptCount, wonAppts, totalRevenue, avgDeal, winRate, typeRows, winReasons, lossReasons, pipelineValue, openCount: h.open.length },
       trendMonths: [],
       allTypes,
     }
@@ -1100,16 +1067,18 @@ export default function Analytics() {
       </div>
 
       {/* Summary cards — scoped to the selected period (defaults to this year) */}
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Performance · {periodLabel}</p>
-        <MenuChip label="Period" value={statsPeriod} onChange={setStatsPeriod} align="right"
-          options={statsPeriods.map(p => ({ value: p.id, label: p.label }))} />
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
+        {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
+        <div className="ml-auto">
+          <MenuChip label="Period" value={statsPeriod} onChange={setStatsPeriod} align="right"
+            options={statsPeriods.map(p => ({ value: p.id, label: p.label }))} />
+        </div>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <StatCard icon={DollarSign} label="Total Revenue"  value={`$${fmt(stats.totalRevenue)}`} sub={`${stats.won.length} jobs won · ${periodLabel}`} color="green" />
-        <StatCard icon={Target}     label="Win Rate"       value={`${stats.winRate.toFixed(0)}%`} sub={`${stats.wonAppts} won / ${stats.apptCount} appointment${stats.apptCount !== 1 ? 's' : ''} · ${periodLabel}`} color="blue" />
-        <StatCard icon={Award}      label="Avg Deal Size"  value={`$${fmt(stats.avgDeal)}`}       sub={`per won job · ${periodLabel}`} color="amber" />
-        <StatCard icon={TrendingUp} label="Pipeline"       value={`$${fmt(stats.pipelineValue)}`} sub={`open proposals · ${periodLabel}`} color="blue" />
+        <StatCard label="Won revenue"  value={`$${fmt(stats.totalRevenue)}`} sub={`${stats.won.length} jobs won · ${periodLabel}`} />
+        <StatCard label="Win rate"       value={`${stats.winRate.toFixed(0)}%`} sub={`${stats.wonAppts} of ${stats.apptCount} clients signed · ${periodLabel}`} />
+        <StatCard label="Average job"  value={`$${fmt(stats.avgDeal)}`}       sub={`per won job · ${periodLabel}`} />
+        <StatCard label="Open pipeline"       value={`$${fmt(stats.pipelineValue)}`} sub={`${stats.openCount} open quote${stats.openCount !== 1 ? 's' : ''} · right now`} />
       </div>
 
       {/* Revenue Trend */}

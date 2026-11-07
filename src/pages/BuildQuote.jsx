@@ -23,6 +23,7 @@ import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import { toBreakdown } from '../lib/priceList'
 import { priceRangeOf, rangeText, RANGE_PCT } from '../lib/priceRange'
+import { useJobMoney } from '../nav'
 
 const MARGIN_DEFAULT = 30
 
@@ -61,6 +62,7 @@ function porchWall(Lin, doorCount = 0) {
 }
 
 function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
+  const showMoney = useJobMoney()   // cost / margin: off for some people (Settings › Team › Access)
   const rates            = useStore(s => s.porchComponentRates) || PORCH_COMPONENT_DEFAULTS
   const customComponents = useStore(s => s.porchCustomComponents) || []
   const formulaLocked    = useStore(s => s.porchFormulaLocked)
@@ -266,8 +268,8 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 mt-3 border-t border-gray-200 pt-3">
-        <span className="text-xs text-gray-400">Est. cost <span className="text-gray-600 font-medium">{money(cost)}</span></span>
-        <span className="text-xs text-gray-400">Margin <span className={marginPct >= 30 ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>{marginPct.toFixed(0)}%</span></span>
+        {showMoney && <span className="text-xs text-gray-400">Est. cost <span className="text-gray-600 font-medium">{money(cost)}</span></span>}
+        {showMoney && <span className="text-xs text-gray-400">Margin <span className={marginPct >= 30 ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>{marginPct.toFixed(0)}%</span></span>}
         <span className="text-sm text-gray-500">Price <span className="text-lg font-bold text-gray-900">{money(price)}</span></span>
       </div>
 
@@ -290,6 +292,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
 }
 
 export default function BuildQuote() {
+  const showMoney = useJobMoney()   // the margin overlay: off for some people (Settings › Team › Access)
   const catalogRaw = useStore(s => s.catalog)
   // Make the formula/assembly builder reachable from the catalog on every site
   // (not just the demo) by injecting it into the picker when it isn't already there.
@@ -702,8 +705,9 @@ export default function BuildQuote() {
 
   return (
     <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-5 h-full min-h-screen">
-      {/* Left: Catalog picker */}
-      <div className="lg:w-64 shrink-0 flex flex-col gap-3">
+      {/* Left: Catalog picker (on a phone it comes after the customer and the
+          quote, so the form isn't buried under 20 catalog cards) */}
+      <div className="order-2 lg:order-1 lg:w-64 shrink-0 flex flex-col gap-3">
         <h3 className="font-semibold text-gray-800 text-sm">Catalog</h3>
         <div className="relative">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -722,7 +726,7 @@ export default function BuildQuote() {
             </button>
           ))}
         </div>
-        <div className="flex-1 overflow-y-auto space-y-1 max-h-[calc(100vh-220px)]">
+        <div className="flex-1 overflow-y-auto space-y-1 max-h-[50vh] lg:max-h-[calc(100vh-220px)]">
           {filtered.map(item => (
             <button key={item.id} onClick={() => addItem(item)}
               className="w-full text-left px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors group">
@@ -736,7 +740,7 @@ export default function BuildQuote() {
       </div>
 
       {/* Right: Quote builder */}
-      <div className="flex-1 flex flex-col gap-4">
+      <div className="order-1 lg:order-2 flex-1 flex flex-col gap-4">
         {revisingParentId && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
             <Copy size={13} className="shrink-0" />
@@ -844,7 +848,7 @@ export default function BuildQuote() {
               <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" value={expiration} onChange={e => setExpiration(e.target.value)} />
             </div>
             <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Project Type <span className="text-gray-400">(multi-select — used on contract)</span></label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Project Type</label>
               <div className="flex flex-wrap gap-1.5">
                 {PROJECT_TYPE_OPTIONS.map(t => (
                   <button key={t} type="button" onClick={() => toggleProjectType(t)}
@@ -1203,16 +1207,16 @@ export default function BuildQuote() {
             {isAlaCarte ? (
               <p className="text-xs text-gray-400 flex items-center gap-1.5"><Tag size={13} /> Discounts apply to a project total — not available on à la carte proposals.</p>
             ) : !discount ? (
-              <button onClick={() => setDiscount({ mode: 'amount', value: '', label: '' })} className="flex items-center gap-1.5 text-sm text-green-700 hover:underline">
+              <button onClick={() => setDiscount({ mode: 'amount', value: '', label: '' })} className="flex items-center gap-1.5 text-sm font-medium text-[var(--brand-700)] hover:underline">
                 <Tag size={14} /> Add a discount
               </button>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700"><Tag size={14} className="text-green-700" /> Discount</span>
+                <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700"><Tag size={14} className="text-[var(--brand-600)]" /> Discount</span>
                 <div className="inline-flex rounded-lg border border-gray-200 p-0.5" role="group" aria-label="Discount type">
                   {[['amount', '$ off'], ['percent', '% off']].map(([m, label]) => (
                     <button key={m} type="button" onClick={() => setDiscount(d => ({ ...d, mode: m }))}
-                      className={`px-2.5 py-1 text-xs rounded-md ${discount.mode === m ? 'bg-green-700 text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>{label}</button>
+                      className={`px-2.5 py-1 text-xs rounded-md ${discount.mode === m ? 'bg-[var(--brand-600)] text-white font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>{label}</button>
                   ))}
                 </div>
                 <input type="number" min="0" step={discount.mode === 'percent' ? '0.5' : '50'} aria-label="Discount amount" autoFocus
@@ -1300,7 +1304,8 @@ export default function BuildQuote() {
           </div>
         )}
 
-        {/* Margin overlay */}
+        {/* Margin overlay (not for someone with job money switched off) */}
+        {showMoney && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-amber-800">Margin Overlay (Contractor Only)</span>
@@ -1327,6 +1332,7 @@ export default function BuildQuote() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Save Template Modal */}

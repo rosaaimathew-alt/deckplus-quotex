@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
+import StatCard from '../components/StatCard'
 import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
 import { MenuChip, QuickPicks, SwitchChip, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
+import { headlineNumbers } from '../lib/headline'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import { withSavedDesign } from '../lib/designSnapshot'
+import DesignShareToggle from '../components/DesignShareToggle'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
   contractNumberFor,
@@ -14,10 +17,10 @@ import {
   Bell, Trash2, X, CheckCircle, AlertCircle, Clock, TrendingUp,
   DollarSign, FileText, Plus, ChevronDown, ChevronUp, MessageSquare,
   Phone, Mail, Send, Users, BarChart2, Columns, List, Award, ThumbsDown,
-  Eye, Copy, GitBranch, FileSignature, ChevronLeft, ChevronRight, ShoppingCart,
+  Eye, Copy, GitBranch, FileSignature, ShoppingCart,
   GitMerge, Unlink, Search, MoreHorizontal, Link2, UserCheck,
 } from 'lucide-react'
-import { getPeriodRange, shiftPeriod, isCurrentPeriod } from '../periodUtils'
+import { getPeriodRange, shiftPeriod } from '../periodUtils'
 import { wonRevenueOf } from '../contractTotal'
 
 // Group proposals into root → revisions trees
@@ -88,8 +91,7 @@ function ActivityView({ proposals }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 max-w-2xl">
-      <p className="text-sm font-semibold text-gray-800 mb-1">Proposal Activity</p>
-      <p className="text-xs text-gray-400 mb-4">Every time a customer opens a proposal — newest first.</p>
+      <p className="text-sm font-semibold text-gray-800 mb-4">Opened by customers, newest first</p>
       {events === null ? (
         <p className="text-xs text-gray-400 italic py-6 text-center">Loading activity…</p>
       ) : events.length === 0 ? (
@@ -99,19 +101,6 @@ function ActivityView({ proposals }) {
       )}
     </div>
   )
-}
-
-// Collapse proposal groups to client-level outcomes for analytics
-function clientOutcomes(proposals) {
-  const groups = buildGroups(proposals)
-  return groups.map(({ root, revisions }) => {
-    const all = [root, ...revisions]
-    const isWon = all.some(p => p.status === 'Won')
-    // Archived = superseded revision of a won deal; neutral, not a loss.
-    const live = all.filter(p => p.status !== 'Archived')
-    const isLost = !isWon && live.length > 0 && live.every(p => p.status === 'Lost')
-    return { all, isWon, isLost }
-  })
 }
 
 const fmt = (n) =>
@@ -379,6 +368,7 @@ function ActivityLog({ proposal, groupProposals }) {
 
       {/* Shareable tracked link — create once, paste into any email */}
       <div className="mb-2">
+        <DesignShareToggle proposalId={proposal.id} className="mb-1.5" />
         {!linkUrl ? (
           <button onClick={makeLink} disabled={linkBusy}
             className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50">
@@ -692,6 +682,16 @@ function bestInGroup(all) {
 const apptDate = (p) => p?.createdAt || p?.sentAt || p?.closedAt || null
 
 // The sales rep who created a proposal, by name, for office/admin views.
+// Periods for the Numbers strip on the proposal list.
+const STATS_PERIODS = [
+  { id: 'this-month',   label: 'This Month' },
+  { id: 'last-month',   label: 'Last Month' },
+  { id: 'this-quarter', label: 'This Quarter' },
+  { id: 'last-quarter', label: 'Last Quarter' },
+  { id: 'this-year',    label: 'This Year' },
+  { id: 'all-time',     label: 'All Time' },
+]
+
 const repName = (members, id) => {
   const m = (members || []).find(x => x.id === id)
   return m ? (m.displayName || (m.email || '').split('@')[0]) : ''
@@ -1011,11 +1011,15 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
 }
 
 // ── Analytics View ─────────────────────────────────────────────────────────
-function AnalyticsView({ proposals: allProposals }) {
-  const [period,  setPeriod]  = useState('year')
-  const [refDate, setRefDate] = useState(new Date())
-  const { start: pStart, end: pEnd, label: pLabel } = getPeriodRange(period, refDate)
-  const isCurrent = isCurrentPeriod(period, refDate)
+// Same "Period ▾" picker as the rest of the app.
+const WL_PERIODS = [
+  ['this-month', 'This Month'], ['last-month', 'Last Month'], ['this-quarter', 'This Quarter'],
+  ['last-quarter', 'Last Quarter'], ['this-year', 'This Year'], ['last-year', 'Last Year'],
+]
+function AnalyticsView({ proposals: allProposals, periodKey = 'this-year' }) {
+  const [which, period] = periodKey.split('-')
+  const refDate = which === 'last' ? shiftPeriod(period, new Date(), -1) : new Date()
+  const { start: pStart, end: pEnd } = getPeriodRange(period, refDate)
 
   const proposals = allProposals.filter(p => {
     if (!p.createdAt) return false
@@ -1023,23 +1027,17 @@ function AnalyticsView({ proposals: allProposals }) {
     return d >= pStart && d <= pEnd
   })
 
-  const won    = proposals.filter(p => p.status === 'Won')
+  // Revenue, win rate, average job and pipeline: the same rules as Home and
+  // Overview (lib/headline.js)
+  const h      = headlineNumbers(allProposals, pStart, pEnd)
+  const won    = h.won
   const lost   = proposals.filter(p => p.status === 'Lost')
-  // Open pipeline: each client's latest version only
-  const active = latestIterations(allProposals).filter(p => ['Sent', 'Followed Up', 'Negotiating'].includes(p.status))
+  const wonClients    = h.wonClients
+  const notWonClients = h.clients.filter(g => !wonClients.includes(g))
+  const winRate = h.winRate !== null ? Math.round(h.winRate) : null
+  const uniqueClients = h.clients.length
 
-  // Win rate always all-time so client grouping is never broken by period filter
-  const outcomes      = clientOutcomes(allProposals)
-  const wonClients    = outcomes.filter(o => o.isWon)
-  const notWonClients = outcomes.filter(o => !o.isWon)
-  const winRate = outcomes.length > 0
-    ? Math.round((wonClients.length / outcomes.length) * 100)
-    : null
-  const uniqueClients = outcomes.length
-
-  const avgWon = won.length > 0
-    ? won.reduce((s, p) => s + wonRevenueOf(p), 0) / won.length
-    : null
+  const avgWon = h.avgJob
   const avgLost = lost.length > 0
     ? lost.reduce((s, p) => s + (p.total || 0), 0) / lost.length
     : null
@@ -1051,8 +1049,8 @@ function AnalyticsView({ proposals: allProposals }) {
     ? Math.round(closeTimes.reduce((a, b) => a + b, 0) / closeTimes.length)
     : null
 
-  const pipelineValue = active.reduce((s, p) => s + (p.total || 0), 0)
-  const wonRevenue = won.reduce((s, p) => s + wonRevenueOf(p), 0)
+  const pipelineValue = h.pipeline
+  const wonRevenue = h.wonRevenue
 
   // Win/Loss reason breakdown — only count proposals currently in Won or Lost status
   // (a proposal previously marked Lost then changed back to Sent still has winLossReason set)
@@ -1077,57 +1075,12 @@ function AnalyticsView({ proposals: allProposals }) {
 
   return (
     <div className="space-y-6">
-      {/* Period picker */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
-          {['month', 'quarter', 'year'].map(p => (
-            <button key={p} onClick={() => { setPeriod(p); setRefDate(new Date()) }}
-              className={`px-3 py-1.5 capitalize transition-colors ${period === p ? 'bg-[var(--brand-600)] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-              {p === 'month' ? 'Month' : p === 'quarter' ? 'Quarter' : 'Year'}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => setRefDate(shiftPeriod(period, refDate, -1))}
-            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
-            <ChevronLeft size={15} />
-          </button>
-          <span className="text-sm font-semibold text-gray-700 px-1 min-w-[120px] text-center">{pLabel}</span>
-          <button onClick={() => setRefDate(shiftPeriod(period, refDate, 1))}
-            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
-            <ChevronRight size={15} />
-          </button>
-        </div>
-        {!isCurrent && (
-          <button onClick={() => setRefDate(new Date())}
-            className="text-xs text-[var(--brand-600)] hover:underline">
-            Back to current
-          </button>
-        )}
-      </div>
-
       {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Win Rate</p>
-          <p className="text-3xl font-bold text-gray-900">{winRate !== null ? `${winRate}%` : '—'}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{wonClients.length}W / {notWonClients.length} not won · {uniqueClients} clients</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Avg Deal (Won)</p>
-          <p className="text-3xl font-bold text-gray-900">{avgWon !== null ? fmtShort(avgWon) : '—'}</p>
-          <p className="text-xs text-gray-400 mt-0.5">vs {avgLost !== null ? fmtShort(avgLost) : '—'} avg lost</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Avg Days to Close</p>
-          <p className="text-3xl font-bold text-gray-900">{avgDaysToClose !== null ? avgDaysToClose : '—'}</p>
-          <p className="text-xs text-gray-400 mt-0.5">from sent → won</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Won Revenue</p>
-          <p className="text-3xl font-bold text-green-600">${fmt(wonRevenue)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">${fmt(pipelineValue)} open pipeline</p>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Win rate" value={winRate !== null ? `${winRate}%` : '—'} sub={`${wonClients.length} of ${uniqueClients} clients signed · ${notWonClients.length} not yet`} />
+        <StatCard label="Average won job" value={avgWon !== null ? fmtShort(avgWon) : '—'} sub={`vs ${avgLost !== null ? fmtShort(avgLost) : '—'} average lost`} />
+        <StatCard label="Days to close" value={avgDaysToClose !== null ? avgDaysToClose : '—'} sub="sent → won, on average" />
+        <StatCard label="Won revenue" value={`$${fmt(wonRevenue)}`} sub={`$${fmt(pipelineValue)} open pipeline`} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -1196,11 +1149,15 @@ function AnalyticsView({ proposals: allProposals }) {
 
 // Status filters: four everyday picks; the individual stages live under "More".
 const OPEN_STATUSES = ['Draft', 'Sent', 'Followed Up', 'Negotiating']
-const QUICK_STATUS = ['All', 'Open', 'Won', 'Lost']
-const MORE_STATUS  = ['Draft', 'Sent', 'Followed Up', 'Negotiating', 'MIA', 'Archived']
+// Everyday picks: Open (anything not decided yet), Sent (with the customer),
+// Won. The rest — All, Lost and each single status — live under "More".
+const QUICK_STATUS = ['Open', 'Sent', 'Won']
+const MORE_STATUS  = ['All', 'Lost', 'Draft', 'Followed Up', 'Negotiating', 'MIA', 'Archived']
+const WITH_CUSTOMER = ['Sent', 'Followed Up', 'Negotiating']
 function matchesStatus(p, f) {
   if (!f || f === 'All') return true
   if (f === 'Open') return OPEN_STATUSES.includes(p.status)
+  if (f === 'Sent') return WITH_CUSTOMER.includes(p.status)
   return p.status === f
 }
 
@@ -1208,7 +1165,7 @@ function matchesStatus(p, f) {
 // Inside the Sales destination the hub picks the view (list / pipeline /
 // activity) and this page hides its own title and tab switcher. `initialStatus`
 // pre-filters the list (e.g. links from Home's "needs attention").
-export default function ProposalTracker({ view, initialStatus } = {}) {
+export default function ProposalTracker({ view, initialStatus, initialQuery = '', initialOpens = false } = {}) {
   const {
     updateProposalStatus, setWinLossReason,
     addReminder, dismissReminder,
@@ -1222,7 +1179,11 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
 
   const [ownTab, setTab] = useState('list')
   const tab = view || ownTab
-  const [filterStatus, setFilterStatus] = useState(initialStatus || 'All')
+  const [filterStatus, setFilterStatus] = useState(initialStatus || (view && view !== 'list' ? 'All' : 'Open'))
+  // Search by client, email, phone or address (this used to be the Clients tab)
+  const [query, setQuery] = useState(initialQuery)
+  // Who opened what, newest first (this used to be the Opens tab)
+  const [showOpens, setShowOpens] = useState(initialOpens)
   const [periodFilter, setPeriodFilter] = useState('this-year')
   const [statsHidden, setStatsHidden] = useState(() => {
     // Collapsed by default — only expanded if the user explicitly chose to show it.
@@ -1234,6 +1195,12 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
     return n
   })
   const [winLossTarget, setWinLossTarget] = useState(null)
+  const searched = React.useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return proposals
+    return proposals.filter(p => [p.client, p.email, p.phone, p.address].some(v => String(v || '').toLowerCase().includes(q)))
+  }, [proposals, query])
+  const [wlPeriod, setWlPeriod] = useState('this-year')
   const [reminderProposalId, setReminderProposalId] = useState(null)
   const [reminderDate, setReminderDate] = useState('')
   const [reminderFreq, setReminderFreq] = useState('once')
@@ -1363,7 +1330,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
 
       {/* One quiet filter row: everyday status picks, the rest in "More",
           and the view / numbers toggles on the right. */}
-      <div className="flex items-center gap-2 flex-wrap mb-4">
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
         <div className={`${view ? 'hidden' : 'flex'} gap-1 bg-gray-100 rounded-lg p-1 mr-1`}>
           {TABS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setTab(id)}
@@ -1372,7 +1339,16 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
             </button>
           ))}
         </div>
+        {/* Whose deals — always first, on the left */}
+        {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
         {tab === 'list' && (
+          <label className="flex items-center gap-2 h-9 text-sm min-w-0">
+            <Search size={14} className="text-gray-400 shrink-0" />
+            <input className="w-36 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+              placeholder="Search clients" value={query} onChange={e => setQuery(e.target.value)} aria-label="Search clients" />
+          </label>
+        )}
+        {tab === 'list' && !showOpens && (
           <>
             <QuickPicks value={QUICK_STATUS.includes(filterStatus) ? filterStatus : null} onChange={setFilterStatus}
               options={QUICK_STATUS.map(s => ({ value: s, label: s, count: statusCount(s) }))} />
@@ -1380,20 +1356,33 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
               onChange={setFilterStatus} options={MORE_STATUS.map(s => ({ value: s, label: s, count: statusCount(s) }))} />
           </>
         )}
-        <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+        <div className="ml-auto flex items-center gap-x-5 gap-y-1 flex-wrap">
           {dueCount > 0 && (
-            <span className="flex items-center gap-1.5 h-8 px-3 rounded-full bg-amber-50 border border-amber-200 text-xs font-medium text-amber-800">
-              <Bell size={13} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
+            <span className="flex items-center gap-1.5 h-9 text-sm font-medium text-amber-700">
+              <Bell size={14} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due
             </span>
           )}
-          {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           {tab === 'list' && (
+            <button type="button" onClick={() => setShowOpens(v => !v)} aria-pressed={showOpens} title="When customers opened their proposals"
+              className={`flex items-center gap-1.5 h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${showOpens ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+              <Eye size={14} /> Opens
+            </button>
+          )}
+          {tab === 'list' && !showOpens && (
             <SwitchChip label="Numbers" checked={!statsHidden} onChange={toggleStats} title="Show totals for a period" />
+          )}
+          {tab === 'list' && !showOpens && !statsHidden && (
+            <MenuChip label="Period" value={periodFilter} onChange={setPeriodFilter} align="right"
+              options={STATS_PERIODS.map(({ id, label }) => ({ value: id, label }))} />
+          )}
+          {tab === 'analytics' && (
+            <MenuChip label="Period" value={wlPeriod} onChange={setWlPeriod} align="right"
+              options={WL_PERIODS.map(([value, label]) => ({ value, label }))} />
           )}
         </div>
       </div>
       {/* Stats strip */}
-      {!statsHidden && tab === 'list' && (() => {
+      {!statsHidden && tab === 'list' && !showOpens && (() => {
         const now = new Date()
         const inPeriod = (p) => {
           const d = new Date(p.closedAt || p.createdAt || p.sentAt || Date.now())
@@ -1410,15 +1399,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
           if (periodFilter === 'this-year')   return d.getFullYear() === now.getFullYear()
           return true
         }
-        const PERIODS = [
-          { id: 'this-month',   label: 'This Month' },
-          { id: 'last-month',   label: 'Last Month' },
-          { id: 'this-quarter', label: 'This Quarter' },
-          { id: 'last-quarter', label: 'Last Quarter' },
-          { id: 'this-year',    label: 'This Year' },
-          { id: 'all-time',     label: 'All Time' },
-        ]
-        const periodLabel   = PERIODS.find(x => x.id === periodFilter)?.label || 'All Time'
+        const periodLabel   = STATS_PERIODS.find(x => x.id === periodFilter)?.label || 'All Time'
         const inPeriodAll   = proposals.filter(inPeriod)               // every proposal in the period
         const rootsInPeriod = inPeriodAll.filter(p => !p.parentId)     // unique estimates (no revisions)
         const wonInPeriod = proposals.filter(p => p.status === 'Won' && inPeriod(p))
@@ -1428,45 +1409,25 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
         // Open pipeline: each client's latest version only, not every revision
         const pipeline    = latestIterations(proposals).filter(p => ['Sent','Followed Up','Negotiating'].includes(p.status)).reduce((s, p) => s + (p.total || 0), 0)
         const stats = [
-          { label: 'Won Revenue', value: `$${fmt(wonRevenue)}`, icon: DollarSign, color: 'text-green-500' },
-          { label: 'Open Pipeline', value: `$${fmt(pipeline)}`, icon: TrendingUp, color: 'text-green-600' },
-          { label: 'Jobs Won', value: wonInPeriod.length, icon: CheckCircle, color: 'text-[var(--brand-400)]' },
+          { label: 'Won revenue', value: `$${fmt(wonRevenue)}` },
+          { label: 'Open pipeline', value: `$${fmt(pipeline)}` },
+          { label: 'Jobs won', value: wonInPeriod.length },
         ]
         return (
           <>
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Numbers · {periodLabel}</p>
-            <MenuChip label="Period" value={periodFilter} onChange={setPeriodFilter} align="right"
-              options={PERIODS.map(({ id, label }) => ({ value: id, label }))} />
-          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            {/* Total Proposals — shows unique clients, total proposals as sub */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-1.5 mb-1">
-                <FileText size={14} className="text-[var(--brand-500)]" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Total Proposals</span>
-              </div>
-              <p className="text-xl font-bold text-gray-900">{rootsInPeriod.length}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{inPeriodAll.length} incl. revisions · {periodLabel}</p>
-            </div>
-            {stats.map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Icon size={14} className={color} />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">{label}</span>
-                </div>
-                <p className="text-xl font-bold text-gray-900">{value}</p>
-              </div>
-            ))}
+            <StatCard label="Total proposals" value={rootsInPeriod.length} sub={`${inPeriodAll.length} incl. revisions · ${periodLabel}`} />
+            {stats.map(({ label, value }) => <StatCard key={label} label={label} value={value} />)}
           </div>
           </>
         )
       })()}
 
       {/* Tab content */}
-      {tab === 'list' && (
+      {tab === 'list' && showOpens && <ActivityView proposals={searched} />}
+      {tab === 'list' && !showOpens && (
         <ListView
-          proposals={proposals}
+          proposals={searched}
           filterStatus={filterStatus}
           onStatusChange={handleStatusChange}
           onReminderOpen={openReminder}
@@ -1487,7 +1448,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
         <ActivityView proposals={proposals} />
       )}
       {tab === 'analytics' && (
-        <AnalyticsView proposals={proposals} />
+        <AnalyticsView proposals={proposals} periodKey={wlPeriod} />
       )}
 
       {/* A la Carte Item Selection Modal */}
@@ -1544,7 +1505,7 @@ export default function ProposalTracker({ view, initialStatus } = {}) {
                     setALaCarteProposal(null)
                     launchContract(aLaCarteProposal, selected, true)
                   }}
-                  className="flex-1 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                  className="flex-1 py-2 rounded-xl bg-[var(--brand-600)] text-white text-sm font-semibold hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors"
                 >
                   Build Contract →
                 </button>

@@ -1,14 +1,20 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useStore, contractNumberFor } from '../store'
 import { DEMO } from '../demo'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
 import JobFinancials from '../components/JobFinancials'
 import JobPriceList from '../components/JobPriceList'
 import PermitsTab from '../components/PermitsTab'
+import JobSubsTab from '../components/JobSubsTab'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
+import { useNav, useJobMoney } from '../nav'
+import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
+import { useJobCostOf } from '../lib/jobCost'
+import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'
+import { QuickPicks } from '../components/FilterBar'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -180,7 +186,7 @@ const STAGE_TEMPLATES = {
   ],
 }
 
-const JOB_TYPE_OPTIONS = [
+export const JOB_TYPE_OPTIONS = [
   'Porch Conversion',
   'Deck (New)',
   'Deck (Resurface / Rebuild)',
@@ -1203,7 +1209,7 @@ function WarrantyTab({ proposal }) {
 const PM_STANDARD = [
   { label: 'Schedule deposit — @ sign contract',            pct: 0.20 },
   { label: 'Start payment — Material drop / Framing Start', pct: 0.30 },
-  { label: 'Roof Completion',                               pct: 0.40 },
+  { label: 'Pre-Paint Payment',                             pct: 0.40 },
   { label: 'Paint Applied',                                 pct: 0.05 },
   { label: 'Substantial completion payment',                pct: 0.05 },
 ]
@@ -1457,6 +1463,7 @@ function PaymentReminderModal({ proposal, onClose }) {
 // ── Close-Out Modal ──────────────────────────────────────────────────────────
 function CloseOutModal({ proposal, onClose }) {
   const { toggleJobStage, updateJobData, saveJobCosts } = useStore()
+  const money = useJobMoney()   // off: no profit entry at close-out
   const draft = proposal.contractDraft || {}
   const contractNum = draft.contractNum || contractNumberFor(proposal.id)
   const projectTypes = (draft.projectTypes || []).join(', ') || ''
@@ -1465,7 +1472,15 @@ function CloseOutModal({ proposal, onClose }) {
   const revenue = contractTotalOf(proposal) + approvedChangeOrderTotal(proposal)
 
   const [completionDate, setCompletionDate] = useState(today())
-  const [profit, setProfit] = useState('')   // total profit $ achieved (optional, manual)
+  // Costs already recorded (Money's POs and bills, job receipts) — not counting
+  // an older hand-entered total, which this close-out replaces.
+  const costOf = useJobCostOf()
+  const fin = costOf(proposal)
+  const legacy = useStore(s => s.jobCosts?.[proposal.id])
+  const legacyCost = ['materials', 'labor', 'subcontractors', 'other'].reduce((t, k) => t + (Number(legacy?.[k]) || 0), 0)
+  const recordedCost = Math.max(0, fin.actualCost - legacyCost)
+  // Starts at what the books say; the PM can still correct it
+  const [profit, setProfit] = useState(() => (recordedCost > 0 ? String(Math.round(revenue - recordedCost)) : ''))   // total profit $ achieved
   const [sendEmail, setSendEmail] = useState(true)
   const [closing, setClosing] = useState(false)
   const [error, setError] = useState('')
@@ -1479,11 +1494,13 @@ function CloseOutModal({ proposal, onClose }) {
     setClosing(true); setError('')
     try {
       updateJobData(proposal.id, { completionDate, closedAt: new Date().toISOString() })
-      // If a profit was entered, record it so it flows to the Profitability tracker.
-      // The tracker computes profit as revenue − costs, so we store cost = revenue − profit.
+      // If a profit was entered, record the cost the books don't already
+      // have (revenue - profit - recorded costs), so Insights › Profit shows
+      // exactly this profit without counting the POs and bills twice.
       if (profit !== '' && !Number.isNaN(Number(profit))) {
         const p = Number(profit)
-        saveJobCosts(proposal.id, { other: Math.max(0, revenue - p), enteredProfit: p, source: 'manual-closeout' })
+        const gap = Math.max(0, revenue - p - recordedCost)
+        if (gap > 0 || legacy) saveJobCosts(proposal.id, { other: gap, enteredProfit: p, source: 'manual-closeout' })
       }
       toggleJobStage(proposal.id, 'payment')
       toggleJobStage(proposal.id, 'closed')
@@ -1534,10 +1551,11 @@ function CloseOutModal({ proposal, onClose }) {
           </div>
 
           {/* Profit achieved — optional, feeds the Profitability tracker */}
+          {money && (
           <div className="border border-gray-200 rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-gray-700">Profit on this job <span className="font-normal text-gray-400">(optional)</span></label>
-              <span className="text-xs text-gray-400">Revenue ${fmtDol(revenue)}</span>
+              <span className="text-xs text-gray-400">Revenue ${fmtDol(revenue)}{recordedCost > 0 ? ` · costs on file $${fmtDol(recordedCost)}` : ''}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1553,6 +1571,7 @@ function CloseOutModal({ proposal, onClose }) {
             </div>
             <p className="text-[11px] text-gray-400 mt-1.5">Enter either one — it logs to your Profitability metrics. Leave blank to skip.</p>
           </div>
+          )}
 
           <label className="flex items-center gap-3 cursor-pointer">
             <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)}
@@ -1617,102 +1636,44 @@ function buildCloseOutHtml({ client, contractNum, address, projectType, completi
 </body></html>`
 }
 
-// ── Receipts tab — per-job receipt files, stored in Google Drive ────────────
-// ── Costs / Job P&L tab — see components/JobFinancials.jsx ──────────────────
-
-
-function ReceiptsTab({ proposal }) {
-  const { updateJobData } = useStore()
-  const receipts = proposal.jobData?.receipts || []
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState('')
-  const fileRef = useRef(null)
-  const contractNum = proposal.contractDraft?.contractNum || contractNumberFor(proposal.id)
-
-  const onFiles = async (e) => {
-    const files = [...(e.target.files || [])]
-    if (!files.length) return
-    setUploading(true); setError('')
-    try {
-      const added = []
-      for (const file of files) {
-        const base64 = await new Promise((resolve, reject) => {
-          const r = new FileReader()
-          r.onload = () => resolve(String(r.result).split(',')[1])
-          r.onerror = reject
-          r.readAsDataURL(file)
-        })
-        const res = await fetch('/api/drive/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pdfBase64: base64,
-            fileName: `Receipt-${contractNum}-${Date.now()}-${file.name}`,
-            mimeType: file.type || 'application/octet-stream',
-          }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Upload failed')
-        added.push({ id: data.fileId || `${Date.now()}${Math.random()}`, name: file.name, link: data.driveLink, mimeType: file.type, uploadedAt: new Date().toISOString() })
-      }
-      updateJobData(proposal.id, { receipts: [...receipts, ...added] })
-    } catch (err) {
-      setError(/token|auth|not connected|401|drive/i.test(err.message) ? 'Connect Google Drive in Settings first, then try again.' : err.message)
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
-  }
-
-  const remove = (id) => updateJobData(proposal.id, { receipts: receipts.filter(r => r.id !== id) })
-
+// ── Money tab: everything the job costs and brings in, one switch away ──────
+function JobMoneyTab({ proposal, books, costCount }) {
+  const parts = [
+    { value: 'budget', label: 'Budget' },
+    { value: 'costs', label: 'Costs', count: costCount || null },
+    { value: 'pricelist', label: 'Price list' },
+    ...(books ? [{ value: 'transactions', label: 'Invoices, POs & bills' }] : []),
+  ]
+  const [part, setPart] = useState('budget')
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <p className="text-sm font-semibold text-gray-800">Receipts</p>
-          <p className="text-xs text-gray-400">{receipts.length} file{receipts.length !== 1 ? 's' : ''} · stored in your Google Drive</p>
-        </div>
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple onChange={onFiles} className="hidden" />
-        <button onClick={() => fileRef.current?.click()} disabled={uploading}
-          className="flex items-center gap-1.5 px-3 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-50 transition-colors">
-          {uploading ? <Loader size={14} className="animate-spin" /> : <Plus size={14} />}
-          {uploading ? 'Uploading…' : 'Add receipt'}
-        </button>
-      </div>
-
-      {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
-      {receipts.length === 0 ? (
-        <div className="text-center py-8 text-sm text-gray-400 border border-dashed border-gray-200 rounded-xl">
-          No receipts yet. Add photos or PDFs of receipts for this job.
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {receipts.map(r => (
-            <div key={r.id} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg group">
-              <FileText size={15} className="text-gray-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-800 truncate">{r.name}</p>
-                <p className="text-[11px] text-gray-400">{fmtDate(r.uploadedAt)}</p>
-              </div>
-              {r.link && <a href={r.link} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--brand-600)] hover:underline shrink-0">View</a>}
-              <button onClick={() => { if (window.confirm('Remove this receipt from the job? (The file stays in your Drive.)')) remove(r.id) }}
-                className="text-gray-300 hover:text-red-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="space-y-4">
+      <div className="border-b border-gray-200"><QuickPicks value={part} onChange={setPart} options={parts} /></div>
+      {part === 'budget' && <BudgetTab proposal={proposal} />}
+      {part === 'costs' && <JobFinancials proposal={proposal} />}
+      {part === 'pricelist' && <JobPriceList proposal={proposal} />}
+      {part === 'transactions' && books && <JobTransactions proposal={proposal} />}
     </div>
   )
 }
 
 // ── Job Card ────────────────────────────────────────────────────────────────
-function JobCard({ proposal }) {
+function JobCard({ proposal, jobMoney = null, focus = false }) {
   const { toggleJobStage, updateJobData } = useStore()
   const allExpenses = useStore(s => s.expenses)
-  const [expanded, setExpanded] = useState(false)
-  const [tab, setTab] = useState('stages')
+  const setProposalPm = useStore(s => s.setProposalPm)
+  const members = useStore(s => s.members)
+  const canAssignPm = useStore(s => s.role === 'manager')
+  const pmOptions = (members || []).filter(m => m.role === 'pm' || m.id === proposal.pmId)
+  const pmName = (members || []).find(m => m.id === proposal.pmId)
+  const pmLabel = pmName ? (pmName.displayName || pmName.email || '').split(' ')[0] : ''
+  const { tabsOf } = useNav()
+  const money = useJobMoney()   // off: no Budget / Price list / Costs / Receipts (Settings › Team › Access)
+  // Invoices, POs and bills: office / admin with the Money pages and job money on.
+  const books = money && tabsOf('money').some(t => t.key !== 'vendors')
+  const [expanded, setExpanded] = useState(focus)
+  const [tab, setTab] = useState(focus && books ? 'summary' : 'stages')
+  const cardRef = useRef(null)
+  useEffect(() => { if (focus) cardRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }, [focus])
   const [editingNote, setEditingNote] = useState(false)
   const [noteText, setNoteText] = useState(proposal.jobData?.notes || '')
   const [showReminder, setShowReminder] = useState(false)
@@ -1734,7 +1695,7 @@ function JobCard({ proposal }) {
   const coCount       = (jobData.changeOrders || []).length
   const openWarranty  = (jobData.warrantyItems || []).filter(w => w.status === 'Open').length
   const logCount      = (jobData.dailyLogs || []).length
-  const receiptCount  = (jobData.receipts || []).length
+  const docCount      = jobDocuments(proposal, money).length
   const costCount     = (allExpenses || []).filter(e => e.jobId === proposal.id).length
   const showPermits   = !!permitAccess && permitTracked(proposal)
   const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0, needsPick: false }
@@ -1742,16 +1703,21 @@ function JobCard({ proposal }) {
 
   const saveNote = () => { updateJobData(proposal.id, { notes: noteText }); setEditingNote(false) }
 
+  // Subs booked on this job: PMs and the office (reps can't read sub tasks).
+  const showSubs   = useStore(s => s.role !== 'sales')
+  const jobTasks   = (useStore(s => s.subTasks) || []).filter(t => t && String(t.proposalId) === String(proposal.id))
+
   const TABS = [
+    ...(books ? [{ key: 'summary', label: 'Summary' }] : []),
     { key: 'stages',  label: 'Stages' },
     ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0) ? ` (${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0)})` : ''}` }] : []),
-    { key: 'budget',  label: 'Budget' },
-    { key: 'pricelist', label: 'Price list' },
-    { key: 'costs',   label: `Costs${costCount ? ` (${costCount})` : ''}` },
+    // Budget, costs, price list and the job's invoices / POs / bills: one Money tab
+    ...(money ? [{ key: 'money', label: 'Money' }] : []),
+    ...(showSubs ? [{ key: 'subs', label: `Subs${jobTasks.length ? ` (${jobTasks.length})` : ''}` }] : []),
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
     { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
-    { key: 'receipts',label: `Receipts${receiptCount ? ` (${receiptCount})` : ''}` },
+    { key: 'documents', label: `Documents${docCount ? ` (${docCount})` : ''}` },
   ]
 
   // One soft-pill status system for the card badge.
@@ -1764,14 +1730,14 @@ function JobCard({ proposal }) {
         : { label: 'Not Started', cls: 'bg-gray-100 text-gray-600' }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden transition-all">
+    <div ref={cardRef} className={`bg-white rounded-xl border shadow-sm overflow-hidden transition-all scroll-mt-4 ${focus ? 'border-[var(--brand-400)] ring-2 ring-[var(--brand-100)]' : 'border-gray-200'}`}>
       {/* Header — click anywhere on the row (e.g. the name) to expand the full job */}
       <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors"
         onClick={() => setExpanded(e => !e)}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900 text-sm">{proposal.client}</span>
-            {proposal.imported && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Imported{proposal.imported.pm ? ` · PM ${proposal.imported.pm}` : ''}</span>}
+            {proposal.imported && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Imported{proposal.imported.pm && !proposal.pmId ? ` · PM ${proposal.imported.pm}` : ''}</span>}
             {openWarranty > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> {openWarranty} warranty</span>}
             {permitFlags.failed > 0 && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Failed inspection</span>}
             {permitFlags.needsPick && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1"><AlertTriangle size={11} /> Pick permit</span>}
@@ -1782,20 +1748,28 @@ function JobCard({ proposal }) {
             {proposal.imported
               ? <>{proposal.address}{proposal.imported.permit ? <> · <span className="font-mono">{proposal.imported.permit}</span></> : null}</>
               : <>{projectTypes} · ${fmt(contractTotalOf(proposal))} · <span className="font-mono">{contractNum}</span></>}
+            {pmLabel && <> · PM {pmLabel}</>}
           </p>
         </div>
 
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusPill.cls}`}>{statusPill.label}</span>
-
-        <div className="relative w-10 h-10 shrink-0">
-          <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-            <circle cx="18" cy="18" r="15.9" fill="none"
-              stroke={isClosed ? '#10b981' : pct > 0 ? '#3b82f6' : '#d1d5db'}
-              strokeWidth="3" strokeDasharray={`${pct} ${100 - pct}`} strokeLinecap="round" />
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-gray-600">{pct}%</span>
-        </div>
+        {jobMoney && (
+          <div className="hidden lg:flex items-center gap-8 shrink-0 text-right mr-4">
+            <div className="w-28"><p className="text-[10px] uppercase tracking-wider text-gray-400">Revenue</p><p className="text-sm font-semibold text-gray-900">{money0(jobMoney.revenue)}</p><p className="text-[10px] text-gray-400">{money0(jobMoney.invoiced)} invoiced</p></div>
+            {/* Cost and profit: the same numbers as Insights › Profit (lib/jobCost.js) */}
+            <div className="w-28"><p className="text-[10px] uppercase tracking-wider text-gray-400">Cost</p><p className="text-sm font-semibold text-gray-900">{jobMoney.fin.hasCosts ? money0(jobMoney.fin.actualCost) : '—'}</p><p className="text-[10px] text-gray-400">{jobMoney.fin.hasCosts ? `${money0(jobMoney.committedByType.materials || 0)} materials` : 'no costs yet'}</p></div>
+            <div className="w-28"><p className="text-[10px] uppercase tracking-wider text-gray-400">Profit</p><p className={`text-sm font-semibold ${jobMoney.fin.hasCosts && jobMoney.fin.profit < 0 ? 'text-red-600' : 'text-gray-900'}`}>{jobMoney.fin.hasCosts ? money0(jobMoney.fin.profit) : '—'}</p>{jobMoney.fin.hasCosts && jobMoney.fin.margin != null ? <p className="text-[10px] text-gray-400">{Math.round(jobMoney.fin.margin)}% margin</p> : null}</div>
+          </div>
+        )}
+        {/* One progress figure: "8 of 15 steps" with a thin bar; a pill only
+            when it says something (closed, or the job type isn't picked). */}
+        {isClosed || noType
+          ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusPill.cls}`}>{statusPill.label}</span>
+          : (
+            <div className="w-24 shrink-0 text-right" title={`${pct}% of the steps done`}>
+              <p className="text-xs font-medium text-gray-600">{done} of {stages.length} steps</p>
+              <div className="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden"><div className="h-full rounded-full bg-[var(--brand-500)]" style={{ width: `${pct}%` }} /></div>
+            </div>
+          )}
 
         {!isClosed && (
           <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
@@ -1853,6 +1827,17 @@ function JobCard({ proposal }) {
               <input type="date" value={jobData.targetDate || ''}
                 onChange={e => updateJobData(proposal.id, { targetDate: e.target.value })}
                 className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            </div>
+            {/* Who runs the job: that PM sees it in their jobs and Field mode.
+                The office assigns; a PM sees it but can't change it. */}
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Project Manager</label>
+              <select value={proposal.pmId || ''} disabled={!canAssignPm} aria-label="Project manager"
+                onChange={e => setProposalPm(proposal.id, e.target.value || null)}
+                className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white min-w-[11rem] focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:bg-gray-50 disabled:text-gray-600">
+                <option value="">Not assigned</option>
+                {pmOptions.map(m => <option key={m.id} value={m.id}>{m.displayName || m.email}</option>)}
+              </select>
             </div>
           </div>
 
@@ -1952,13 +1937,13 @@ function JobCard({ proposal }) {
               </div>
             )}
             {tab === 'permits' && showPermits && <PermitsTab proposal={proposal} stages={stages} readOnly={permitAccess !== 'edit'} />}
-            {tab === 'budget'  && <BudgetTab proposal={proposal} />}
-            {tab === 'pricelist' && <JobPriceList proposal={proposal} />}
-            {tab === 'costs'   && <JobFinancials proposal={proposal} />}
+            {tab === 'money' && money && <JobMoneyTab proposal={proposal} books={books} costCount={costCount} />}
+            {tab === 'subs' && showSubs && <JobSubsTab proposal={proposal} />}
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}
-            {tab === 'receipts'&& <ReceiptsTab proposal={proposal} />}
+            {tab === 'summary' && books && <JobSummary proposal={proposal} />}
+            {tab === 'documents' && <JobDocuments proposal={proposal} showReceipts={money} />}
           </div>
         </div>
       )}
@@ -1970,6 +1955,15 @@ function JobCard({ proposal }) {
 
 export default function Jobs() {
   const proposals = useStore(s => s.proposals)
+  const invoices  = useStore(s => s.invoices)
+  const purchases = useStore(s => s.purchases)
+  const bills     = useStore(s => s.bills)
+  const { tabsOf } = useNav()
+  const showMoney = useJobMoney() && tabsOf('money').some(t => t.key !== 'vendors')
+  const costOf = useJobCostOf()
+  const moneyIdx  = useMemo(() => (showMoney ? booksIndex({ invoices, purchases, bills }) : null), [showMoney, invoices, purchases, bills])
+  const [params] = useSearchParams()
+  const focusId = params.get('job')
   const [filter, setFilter] = useState('active')
   const [query,  setQuery]  = useState('')
   const [stageFilter, setStageFilter] = useState(null)   // current-stage chip (from the old Scheduler view)
@@ -2014,6 +2008,7 @@ export default function Jobs() {
     return [...map.entries()].sort((a, b) => b[1] - a[1])
   })()
   const filtered = wonJobs.filter(p => {
+    if (focusId) return String(p.id) === focusId
     const phase = phaseOf(p)
     if (stageFilter && (phase === 'closed' || currentStageOf(p) !== stageFilter)) return false
     if (permitAccess && permitsOnly && !permitTracked(p)) return false
@@ -2040,27 +2035,19 @@ export default function Jobs() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="qx-hide-embedded flex items-center justify-between mb-5 gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Job Management</h1>
+          <h1 className="qx-title text-xl sm:text-2xl font-bold text-gray-900">Job Management</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Stages · Change orders · Daily logs · Warranty</p>
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 self-start">
-          {[
-            { key: 'all',         label: 'All',         count: counts.all },
-            { key: 'active',      label: 'Active',      count: counts.active },
-            { key: 'in-progress', label: 'In Progress', count: counts['in-progress'] },
-            { key: 'not-started', label: 'Not Started', count: counts['not-started'] },
-            { key: 'closed',      label: 'Closed',      count: counts.closed },
-          ].map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filter === f.key ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}>
-              {f.label} <span className="ml-1 text-gray-400">{f.count}</span>
-            </button>
-          ))}
+        <div className="overflow-x-auto qx-scroll-x -mx-1 px-1">
+          <QuickPicks value={filter} onChange={setFilter} options={[
+            { value: 'active',      label: 'Active',      count: counts.active },
+            { value: 'not-started', label: 'Not started', count: counts['not-started'] },
+            { value: 'closed',      label: 'Closed',      count: counts.closed },
+            { value: 'all',         label: 'All',         count: counts.all },
+          ]} />
         </div>
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-52">
           <Search size={13} className="text-gray-400 shrink-0" />
@@ -2096,7 +2083,7 @@ export default function Jobs() {
       )}
 
       {stageGroups.length > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap mb-4 -mt-1">
+        <div className="hidden sm:flex items-center gap-1.5 flex-wrap mb-4 -mt-1">
           <span className="text-xs font-medium text-gray-500 mr-1">Current stage:</span>
           {stageGroups.map(([label, n]) => (
             <button key={label} onClick={() => setStageFilter(stageFilter === label ? null : label)}
@@ -2125,7 +2112,8 @@ export default function Jobs() {
       )}
 
       <div className="space-y-3">
-        {filtered.map(p => <JobCard key={p.id} proposal={p} />)}
+        {focusId && <a href="?tab=jobs" className="inline-block text-xs text-[var(--brand-700)] hover:underline mb-1">← All jobs</a>}
+        {filtered.map(p => <JobCard key={p.id} proposal={p} focus={String(p.id) === focusId} jobMoney={moneyIdx ? { ...jobMoneyFromIndex(p, moneyIdx), fin: costOf(p) } : null} />)}
       </div>
     </div>
   )

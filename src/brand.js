@@ -77,8 +77,32 @@ function isLight(hex) {
 // Apply the full brand theme. `opts.sidebar` sets the nav background
 // independently of the primary color (so e.g. a charcoal sidebar can pair with
 // a brass accent). `opts.accent` overrides the secondary highlight color.
-export function applyBrandStyles(primaryHex, opts = {}) {
+// Deck Plus orange (from the logo): notification numbers unless set otherwise.
+export const DP_ORANGE = '#ea7a24'
+export const DEFAULT_BACKGROUND = '#ebe5d8'       // .qx-ground in index.css
+export const DEFAULT_BACKGROUND_DARK = '#1c1c20'
+
+// The applyBrandStyles options for a saved branding record.
+export const brandOptions = (b = {}) => ({
+  sidebar: b.sidebarColor || null, sidebarDark: b.sidebarDark || null, accent: b.accentColor || null,
+  background: b.backgroundColor || null, backgroundDark: b.backgroundDark || null, badge: b.badgeColor || null,
+})
+
+// The last brand applied is remembered on this device, so the login page and
+// the first paint use the company colors instead of a default blue.
+const BRAND_CACHE = 'qx_brand_cache'
+export function applyCachedBrand() {
+  try {
+    const c = JSON.parse(localStorage.getItem(BRAND_CACHE) || 'null')
+    if (c && c.primary) applyBrandStyles(c.primary, c.opts || {}, { remember: false })
+  } catch { /* nothing cached / private mode */ }
+}
+
+export function applyBrandStyles(primaryHex, opts = {}, { remember = true } = {}) {
+  if (remember) { try { localStorage.setItem(BRAND_CACHE, JSON.stringify({ primary: primaryHex, opts })) } catch { /* private mode */ } }
   const p = generatePalette(primaryHex || FREE_PRIMARY_COLOR)
+  const badge         = opts.badge || DP_ORANGE
+  const badgeText     = isLight(badge) ? '#1f1300' : '#ffffff'
   const sidebar       = opts.sidebar || p[700]
   const sidebarBorder = darken(sidebar, 0.08)
   const sidebarHover  = isLight(sidebar) ? darken(sidebar, 0.08) : p[600]
@@ -102,12 +126,38 @@ export function applyBrandStyles(primaryHex, opts = {}) {
       --accent:         ${accent};
       --sidebar:        ${sidebar};
       --sidebar-border: ${sidebarBorder};
+      --badge:          ${badge};
+      --badge-text:     ${badgeText};
+    }
+    /* Notification numbers (menu, tabs, needs-attention) */
+    .qx-badge { background-color: var(--badge); color: var(--badge-text); }
+    /* Page background, editable in Settings › Branding (screen only) */
+    @media screen {
+      ${opts.background ? `.qx-ground { background-color: ${opts.background}; }
+      :root {
+        --qx-soft:      color-mix(in srgb, ${opts.background} 96%, #000);
+        --qx-soft-2:    color-mix(in srgb, ${opts.background} 92%, #000);
+        --qx-line:      color-mix(in srgb, ${opts.background} 86%, #000);
+        --qx-line-soft: color-mix(in srgb, ${opts.background} 91%, #000);
+      }` : ''}
+      ${opts.backgroundDark ? `html.dark .qx-ground, html.dark body { background-color: ${opts.backgroundDark}; }` : ''}
     }
     .brand-nav-inactive        { color: ${navText}; }
     .brand-nav-inactive:hover  { background-color: ${sidebarHover}; color: #fff; }
     .brand-nav-active          { background-color: #fff; color: ${p[700]}; }
     .brand-badge               { color: ${p[700]}; }
     .brand-footer              { color: ${navText}; }
+    ${opts.sidebarDark ? (() => {
+      // Dark mode's own sidebar (Settings › Branding › Colors for: Dark mode)
+      const sd = opts.sidebarDark
+      const textD = isLight(sd) ? '#1f2937' : p[100]
+      return `@media screen {
+      html.dark { --sidebar: ${sd}; --sidebar-border: ${darken(sd, 0.08)}; }
+      html.dark .brand-nav-inactive       { color: ${textD}; }
+      html.dark .brand-nav-inactive:hover { background-color: ${isLight(sd) ? darken(sd, 0.08) : p[600]}; color: #fff; }
+      html.dark .brand-footer             { color: ${textD}; }
+    }`
+    })() : ''}
     .brand-bg-light            { background-color: ${p[50]}; }
 
     /* Make the app's hard-coded blue follow the brand color, app-wide. */

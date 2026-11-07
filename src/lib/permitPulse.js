@@ -5,7 +5,7 @@
 // at 8 AM and 1 PM (and right away for jobs never checked), or by "Check county now".
 import { useStore } from '../store'
 import { getStages } from '../pages/Jobs'
-import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty } from './permitTracking'
+import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty, closeIfFinaled } from './permitTracking'
 import { isJob } from './attention'
 import { countyOf, gradeRun, sendConnectionAlert } from './permitHealth'
 
@@ -31,13 +31,38 @@ function withNotes(result, prev) {
   }
 }
 
+// A fetch that throws (instead of answering) means this browser lost the
+// connection: the phone locked, the app was switched away from, or the wifi
+// dropped. That says nothing about the county site, so it must never mark a
+// county as down. Wait until the screen is back, try once more, and if it
+// still can't connect, stop the run (the next screen or check picks it up).
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+async function whenVisible() {
+  if (typeof document === 'undefined' || !document.hidden) return
+  await new Promise(res => {
+    const on = () => { if (!document.hidden) { document.removeEventListener('visibilitychange', on); res() } }
+    document.addEventListener('visibilitychange', on)
+  })
+}
+async function postBatch(body) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetch('/api/permit-pulse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+    } catch {
+      if (attempt >= 1) { const lost = new Error('The app lost its connection during the check'); lost.interrupted = true; throw lost }
+      await whenVisible()
+      await sleep(2000)
+    }
+  }
+}
+
 // ids: only these jobs (e.g. one job's "Check now"); otherwise every tracked job.
 export async function runPermitPulse({ ids, onProgress } = {}) {
   const { proposals, setCountyPermit } = useStore.getState()
   const jobs = proposals
     .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
     .filter(p => !ids || ids.includes(p.id))
-  let done = 0, failed = 0, lastError = null
+  let done = 0, failed = 0, lastError = null, interrupted = false
   // Per county: jobs whose county site was read, and jobs where it wasn't
   const stats = {}
   const tally = (p, ok, error) => {
@@ -48,10 +73,8 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
     const batch = jobs.slice(i, i + BATCH)
     let results = {}
     try {
-      const res = await fetch('/api/permit-pulse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      await whenVisible()
+      const res = await postBatch(JSON.stringify({
           jobs: batch.map(p => ({
             id: p.id,
             address: p.address,
@@ -62,12 +85,13 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
             record: (String(p.imported?.permit || '').toUpperCase().match(/\b[A-Z]{1,5}-?(?:[A-Z]{2,5}-)?\d{2,4}-\d{3,7}\b/) || [])[0] || '',
             knownNotes: Object.keys(knownNotes(p.countyPermit)),
           })),
-        }),
-      })
+        }))
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error || `The permit check failed (${res.status})`)
       results = body.results || {}
     } catch (e) {
+      // Our own connection dropped: stop here without blaming any county.
+      if (e.interrupted) { interrupted = true; lastError = e; break }
       // Keep going with the rest; these jobs are tried again on the next check
       failed += batch.length
       lastError = e
@@ -81,11 +105,14 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
       tally(p, !r.siteError, r.error)
       // Keep the last good reading if this check failed, with the error on top.
       const prev = useStore.getState().proposals.find(x => x.id === p.id)?.countyPermit
+      // (siteError stays on it so the 10-minute tick tries it again.)
       const next = r.error && !r.needsPick && prev?.permits?.length
-        ? { ...prev, error: r.error, checkedAt: r.checkedAt }
+        ? { ...prev, error: r.error, siteError: !!r.siteError, checkedAt: r.checkedAt }
         : withNotes(r, prev)
       const stageKeys = (getStages(p) || []).map(s => s.key)
       setCountyPermit(p.id, next, r.permits ? countyPassedStages({ countyPermit: next }, stageKeys) : [])
+      // Every final passed: off the board and into Closed jobs
+      if (r.permits?.length && !r.error) closeIfFinaled(p.id, useStore.getState)
       done++
     }
     onProgress?.({ done, failed, total: jobs.length })
@@ -93,16 +120,17 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
   }
   useStore.getState().setPermitPulseProgress?.(null)
   if (!done && lastError) { lastError.stats = stats; throw lastError }   // nothing worked at all — tell the person who asked
-  return { done, failed, total: jobs.length, stats }
+  return { done, failed, total: jobs.length, stats, interrupted }
 }
 
 // Tracked jobs the county site has never been read for (e.g. just imported),
-// or whose last read failed on the site's end (slow or down) before we had any
-// result — tried again on the next 10-minute tick instead of the next 8 AM / 1 PM.
+// or whose last read failed on the site's end (slow or down) — tried again on
+// the next 10-minute tick instead of the next 8 AM / 1 PM, so one slow answer
+// (and the county alert it raised) clears as soon as the site answers again.
 export function uncheckedJobIds() {
   return useStore.getState().proposals
     .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
-    .filter(p => !p.countyPermit || (p.countyPermit.siteError && !p.countyPermit.permits?.length))
+    .filter(p => !p.countyPermit || p.countyPermit.siteError)
     .map(p => p.id)
 }
 
@@ -134,8 +162,11 @@ export async function startPulse(by, { force = false } = {}) {
   setPermitPulse({ ...(permitPulse || {}), startedAt: new Date().toISOString(), by })
   try {
     const out = await runPermitPulse()
-    const { stats, ...last } = out
-    setPermitPulse({ ...(useStore.getState().permitPulse || {}), lastRunAt: new Date().toISOString(), by, last })
+    const { stats, interrupted, ...last } = out
+    // Cut short by our own connection: grade only the counties actually read,
+    // and leave lastRunAt alone so the next screen finishes the check.
+    if (interrupted) setPermitPulse({ ...(useStore.getState().permitPulse || {}), startedAt: null })
+    else setPermitPulse({ ...(useStore.getState().permitPulse || {}), lastRunAt: new Date().toISOString(), by, last })
     recordHealth(stats)
     return out
   } catch (e) {

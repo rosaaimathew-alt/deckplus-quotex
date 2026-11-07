@@ -4,6 +4,7 @@ import { Printer, Copy, ArrowLeft, CheckCircle, Send, X, Loader, Link2 } from 'l
 import { useStore } from '../store'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import { withSavedDesign } from '../lib/designSnapshot'
+import DesignShareToggle from '../components/DesignShareToggle'
 import { DEFAULT_BRAND_COLOR } from '../brand'
 import { toCanvas } from 'html-to-image'
 import jsPDF from 'jspdf'
@@ -306,6 +307,7 @@ export default function ProposalView() {
         >
           <Printer size={14} /> Print / Save PDF
         </button>
+        <DesignShareToggle proposalId={proposalIdRef.current ?? data?.id ?? null} className="px-1" />
         <button
           onClick={handleGetLink}
           disabled={gettingLink}
@@ -413,7 +415,7 @@ export default function ProposalView() {
         <div className="bg-white px-10 py-7">
           <div className="flex justify-between items-start gap-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight" style={{ color: blue }}>PROPOSAL</h1>
+              <h1 className="qx-title text-2xl font-bold tracking-tight" style={{ color: blue }}>PROPOSAL</h1>
               <p className="text-sm mt-1 text-black">{today}</p>
               {expirationFormatted && (
                 <p className="text-sm mt-0.5 font-medium text-black">Valid Until: {expirationFormatted}</p>

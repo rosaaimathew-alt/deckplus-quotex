@@ -4,6 +4,9 @@ import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdB
 import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
+import { appRoleOf } from './roles'
+import { newSubTaskId } from './lib/subTasks'
+import { newDrawId } from './lib/subDraws'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 // Real data lives in Supabase as one row per record (see src/supabase.js).
@@ -130,6 +133,12 @@ export function normalizeBranding(b) {
     sidebarColor: b.sidebarColor || '#26262b',     // charcoal default when unset
     accentColor: b.accentColor ?? null,
     plan: b.plan || 'enterprise',
+    // Appearance the whole team opens with (admin / office, Settings › Branding)
+    theme: b.theme === 'dark' ? 'dark' : 'light',
+    backgroundColor: b.backgroundColor || null,   // page background, light mode (null = built-in)
+    backgroundDark: b.backgroundDark || null,     // page background, dark mode
+    badgeColor: b.badgeColor || null,             // notification numbers (null = DP orange)
+    sidebarDark: b.sidebarDark || null,           // sidebar in dark mode (null = same as light)
   }
 }
 
@@ -629,6 +638,8 @@ export const useStore = create(
               activities: [],
               reminders: [],
               isHistorical: true,
+              // Owned by whoever logs them: the database only saves a rep's own deals.
+              ownerId: currentUserId(),
             }
           })
           return { proposals: [...s.proposals, ...newProposals], nextProposalId: id }
@@ -669,6 +680,8 @@ export const useStore = create(
                 activities: [],
                 reminders: [],
                 isHistorical: true,
+                // Owned by whoever logs it: the database only saves a rep's own deals.
+                ownerId: currentUserId(),
               },
             ],
             nextProposalId: id + 1,
@@ -915,14 +928,14 @@ export const useStore = create(
 
       // A job sold outside the app, added so its permits and inspections can be
       // tracked. Status 'Imported' keeps it out of every sales number.
-      addOffPlatformJob: ({ client, address, pm, jobType, permit, county, jurisdiction = '' }) => {
+      addOffPlatformJob: ({ client, address, pm, pmId = null, jobType, permit, county, jurisdiction = '' }) => {
         const id = get().nextProposalId
         const now = new Date().toISOString()
         set((s) => ({
           nextProposalId: id + 1,
           proposals: [{
             id, client, address, status: 'Imported', statusChangedAt: now, createdAt: now,
-            ownerId: null, pmId: null, total: 0, lines: [], reminders: [], activities: [], jobData: {},
+            ownerId: null, pmId: pmId || null, total: 0, lines: [], reminders: [], activities: [], jobData: {},
             imported: { source: 'Added by office', pm, jobType, permit, county, jurisdiction, importedAt: now, addedBy: s.me?.displayName || s.me?.email || '' },
           }, ...s.proposals],
         }))
@@ -1107,6 +1120,61 @@ export const useStore = create(
       deleteSubcontractor: (id) =>
         set((s) => ({ subcontractors: s.subcontractors.filter((s) => s.id !== id) })),
 
+      // ── Sub tasks (a sub booked for one service on one job; lib/subTasks) ─
+      subTasks: [],
+
+      addSubTask: (task) => {
+        const id = task.id || newSubTaskId()
+        set((s) => ({
+          subTasks: [...(s.subTasks || []), {
+            status: 'booked', ...task, id,
+            bookedBy: task.bookedBy || s.me?.displayName || s.me?.email || '',
+            createdAt: new Date().toISOString(),
+          }],
+        }))
+        return id
+      },
+
+      updateSubTask: (id, changes) =>
+        set((s) => ({ subTasks: (s.subTasks || []).map((t) => (t.id === id ? { ...t, ...changes } : t)) })),
+
+      // Moves a task to a status and stamps when (and by whom) it got there.
+      setSubTaskStatus: (id, status) =>
+        set((s) => ({
+          subTasks: (s.subTasks || []).map((t) => t.id !== id ? t : {
+            ...t, status,
+            statusDates: { ...(t.statusDates || {}), [status]: { at: new Date().toISOString(), by: s.me?.displayName || s.me?.email || '' } },
+          }),
+        })),
+
+      // A job photo (lib/taskPhotos) on a sub task. Photos are only ever added.
+      addSubTaskPhoto: (id, photo) =>
+        set((s) => ({ subTasks: (s.subTasks || []).map((t) => (t.id === id ? { ...t, photos: [...(t.photos || []), photo] } : t)) })),
+
+      // ── Agreed amounts on sub bookings (one record per task, id = task id) ─
+      subTerms: [],
+      setAgreedAmount: (taskId, amount) =>
+        set((s) => {
+          const list = s.subTerms || []
+          const id = String(taskId)
+          return { subTerms: list.some(t => String(t.id) === id)
+            ? list.map(t => (String(t.id) === id ? { ...t, agreedAmount: amount } : t))
+            : [...list, { id, agreedAmount: amount }] }
+        }),
+
+      // ── Sub draw invoices (lib/subDraws) ─────────────────────────────────
+      subDraws: [],
+      addSubDraw: (draw) => {
+        const id = draw.id || newDrawId()
+        set((s) => ({ subDraws: [...(s.subDraws || []), { ...draw, id, submittedAt: new Date().toISOString(), submittedBy: s.me?.displayName || s.me?.email || '' }] }))
+        return id
+      },
+      updateSubDraw: (id, changes) =>
+        set((s) => ({ subDraws: (s.subDraws || []).map((d) => (d.id === id ? { ...d, ...changes } : d)) })),
+
+      deleteSubTask: (id) =>
+        set((s) => ({ subTasks: (s.subTasks || []).filter((t) => t.id !== id) })),
+
       // ── Standalone change orders (contracts signed outside QuoteX) ────────
       standaloneChangeOrders: [],
 
@@ -1234,6 +1302,63 @@ export const useStore = create(
       deleteExpense: (id) =>
         set((s) => ({ expenses: s.expenses.filter((e) => e.id !== id), tombstones: [...(s.tombstones || []), `expense:${id}`] })),
 
+      // ── Books: vendors, purchase orders, bills, invoices (src/lib/books.js) ──
+      // Ids are Date.now()·1000 + random so two office logins never collide.
+      vendors: [],
+      purchases: [],
+      bills: [],
+      invoices: [],
+      addVendor: (v) => {
+        const rec = { id: Date.now() * 1000 + Math.floor(Math.random() * 1000), createdAt: new Date().toISOString(), active: true, ...v }
+        set((s) => ({ vendors: [...s.vendors, rec] }))
+        return rec
+      },
+      updateVendor: (id, changes) =>
+        set((s) => ({ vendors: s.vendors.map((v) => (v.id === id ? { ...v, ...changes } : v)) })),
+      deleteVendor: (id) =>
+        set((s) => ({ vendors: s.vendors.filter((v) => v.id !== id) })),
+      addPurchase: (po) => {
+        const rec = { id: Date.now() * 1000 + Math.floor(Math.random() * 1000), createdAt: new Date().toISOString(), status: 'open', ...po }
+        set((s) => ({ purchases: [rec, ...s.purchases] }))
+        return rec
+      },
+      updatePurchase: (id, changes) =>
+        set((s) => ({ purchases: s.purchases.map((p) => (p.id === id ? { ...p, ...changes, updatedAt: new Date().toISOString() } : p)) })),
+      deletePurchase: (id) =>
+        set((s) => ({ purchases: s.purchases.filter((p) => p.id !== id) })),
+      addBill: (b) => {
+        const rec = { id: Date.now() * 1000 + Math.floor(Math.random() * 1000), createdAt: new Date().toISOString(), payments: [], ...b }
+        set((s) => ({ bills: [rec, ...s.bills] }))
+        return rec
+      },
+      updateBill: (id, changes) =>
+        set((s) => ({ bills: s.bills.map((b) => (b.id === id ? { ...b, ...changes, updatedAt: new Date().toISOString() } : b)) })),
+      deleteBill: (id) =>
+        set((s) => ({ bills: s.bills.filter((b) => b.id !== id) })),
+      addBillPayment: (billId, payment) =>
+        set((s) => ({ bills: s.bills.map((b) => (b.id === billId
+          ? { ...b, payments: [...(b.payments || []), { id: Date.now(), ...payment }], updatedAt: new Date().toISOString() }
+          : b)) })),
+      removeBillPayment: (billId, paymentId) =>
+        set((s) => ({ bills: s.bills.map((b) => (b.id === billId
+          ? { ...b, payments: (b.payments || []).filter((p) => p.id !== paymentId) }
+          : b)) })),
+      addInvoice: (inv) => {
+        const rec = { id: Date.now() * 1000 + Math.floor(Math.random() * 1000), createdAt: new Date().toISOString(), status: 'sent', ...inv }
+        set((s) => ({ invoices: [rec, ...s.invoices] }))
+        return rec
+      },
+      updateInvoice: (id, changes) =>
+        set((s) => ({ invoices: s.invoices.map((i) => (i.id === id ? { ...i, ...changes, updatedAt: new Date().toISOString() } : i)) })),
+      deleteInvoice: (id) =>
+        set((s) => ({
+          invoices: s.invoices.filter((i) => i.id !== id),
+          // Its payments stay on the job as plain payments received.
+          proposals: s.proposals.map((p) => ((p.jobData?.paymentsReceived || []).some((x) => x.invoiceId === id)
+            ? { ...p, jobData: { ...p.jobData, paymentsReceived: p.jobData.paymentsReceived.map((x) => (x.invoiceId === id ? { ...x, invoiceId: null } : x)) } }
+            : p)),
+        })),
+
       // ── One-click follow-up email templates ──────────────────────────────────
       emailTemplates: DEFAULT_EMAIL_TEMPLATES,
       addEmailTemplate: (t) =>
@@ -1341,7 +1466,7 @@ export const useStore = create(
       members: [],                  // everyone in the org, for the PM picker
       // office/admin: whose numbers the dashboard and pipeline show — 'mine'
       // (default) or 'everyone' (the whole organization). Remembered per browser.
-      officeView: (() => { try { return localStorage.getItem('qx_office_view') || 'mine' } catch { return 'mine' } })(),
+      officeView: (() => { try { return localStorage.getItem('qx_office_view') || 'everyone' } catch { return 'everyone' } })(),   // office / admin start on All
       contractPrefix: 'DP',
       // The company's signature on file (office/admin adopt it in Settings) and
       // the welcome email a customer gets once the contract is fully signed.
@@ -1397,8 +1522,8 @@ if (DEMO && typeof window !== 'undefined') {
 // ── Org bootstrap (rows architecture) ────────────────────────────────────────
 // After sign-in: load every row this user may see (RLS decides), put it in the
 // store in the store's own shape, then arm the adapter so changes flow both
-// ways. Membership role → app role: rep→sales, pm→pm, office/admin→manager.
-const ROLE_MAP = { rep: 'sales', pm: 'pm', office: 'manager', admin: 'manager' }
+// ways. Membership role → app role (roles.js appRoleOf): rep→sales, pm→pm,
+// paint→paint (Field mode only), office/admin→manager.
 const SETTINGS_DEFAULTS = () => ({
   projectTypes: ['Open Deck', 'Screen Porches', 'Eze-Breeze Porches', 'Open Porches', 'Porch Conversions', 'Sunrooms', 'Hardscapes'],
   catalogCategories: ['Fencing', 'Gates', 'Demo', 'Materials', 'Labor', 'Framing', 'Concrete', 'Electrical',
@@ -1420,14 +1545,17 @@ export function bootstrapOrg() {
   if (DEMO) return Promise.resolve()
   if (_booting) return _booting
   _booting = (async () => {
-    const { orgId, me, members, settings, collections } = await loadOrg()
+    const { orgId, me, members, settings, collections, missingTables } = await loadOrg()
     const merged = { ...SETTINGS_DEFAULTS(), ...settings, branding: normalizeBranding(settings.branding) }
     const cols   = { ...collections, catalog: stripDeckItems(collections.catalog || []) }
-    useStore.setState({ ...cols, ...merged, orgId, me, members, role: ROLE_MAP[me.role] || 'manager', orgLoaded: true })
+    // Everyone opens in the company's chosen appearance (light / dark); the
+    // header toggle switches it for this visit only.
+    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).some(t => !t.startsWith('sub_')) })
     armAdapter(useStore, orgId, settings)
     // A brand-new org gets the built-in email templates once; the adapter
-    // writes them as rows because they arrive after arming.
-    if (!(collections.emailTemplates || []).length) useStore.setState({ emailTemplates: DEFAULT_EMAIL_TEMPLATES })
+    // writes them as rows because they arrive after arming. (Not for the paint
+    // PM: they can't read templates, so an empty list doesn't mean a new org.)
+    if (me.role !== 'paint' && me.role !== 'sub' && !(collections.emailTemplates || []).length) useStore.setState({ emailTemplates: DEFAULT_EMAIL_TEMPLATES })
     // Reserve an id block so this session never mints an id another rep has.
     try {
       const start = await reserveIdBlock()

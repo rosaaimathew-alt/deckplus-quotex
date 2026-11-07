@@ -4,7 +4,8 @@
 // proposal's own builder inputs (see src/lib/designLink.js).
 import { useMemo, useState } from 'react'
 import { Search, PenTool } from 'lucide-react'
-import { useStore } from '../store'
+import { useScopedProposals } from '../lib/proposalScope'
+import { RepToggle } from '../components/FilterBar'
 import { designSummary, editorUrl, hasDesign } from '../lib/designLink'
 
 const STATUS_TONE = {
@@ -14,7 +15,9 @@ const STATUS_TONE = {
 }
 
 export default function Designs() {
-  const proposals = useStore(s => s.proposals)
+  // Office / admin pick whose designs: one sales rep, or All (same choice as
+  // the other Sales tabs).
+  const { proposals, canChoose, reps, repId, setRep } = useScopedProposals({ includeImported: true })
   const [q, setQ] = useState('')
 
   const rows = useMemo(() => {
@@ -30,20 +33,19 @@ export default function Designs() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm text-gray-500">3D renderings and floor plans for every porch, deck and patio quoted in QuoteX.</p>
-        <div className="flex items-center gap-2 flex-wrap">
-          <label className="relative">
-            <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search client or address"
-              aria-label="Search designs" className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg w-64 max-w-full" />
-          </label>
-          {/* Free-form editor: draw decks, stair runs and landings anywhere, with live 3D */}
-          <a href="/design-editor.html" target="_blank" rel="noopener"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)]">
-            <PenTool size={15} /> Design editor
-          </a>
-        </div>
+      {/* One flat line like every other list: whose designs and search on the left, the editor on the right */}
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200">
+        {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
+        <label className="flex items-center gap-2 h-9 text-sm min-w-0">
+          <Search size={14} className="text-gray-400 shrink-0" />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search client or address" aria-label="Search designs"
+            className="w-48 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none" />
+        </label>
+        {/* Free-form editor: draw decks, stair runs and landings anywhere, with live 3D */}
+        <a href="/design-editor.html" target="_blank" rel="noopener"
+          className="ml-auto flex items-center gap-1.5 px-3 h-8 my-0.5 rounded-lg text-sm font-medium text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)] whitespace-nowrap">
+          <PenTool size={15} /> Design editor
+        </a>
       </div>
 
       {rows.length === 0 ? (

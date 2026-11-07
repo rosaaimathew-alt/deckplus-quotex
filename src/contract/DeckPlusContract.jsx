@@ -385,8 +385,12 @@ function renderScopeLines(allLines = [], renderBold = (t) => t) {
       : <p key={line.id ?? i} className="dp-pre">{renderBold(display)}</p>
   })
 }
-function ScopePages({ values, scopeLines, projectSummary, total, payments, scopeSlot, renderBold }) {
-  const priced = scopeLines.filter(l => (l.name || '').trim() || Number(l.price) > 0)
+// Below the scope: the payment schedule only (no itemized prices). The % column
+// is for the office (showPaymentPct, set by the contract editor) and is
+// screen-only (no-print): it never reaches a print, a PDF (Drive upload) or
+// the customer's signing page / signed copy, which show each payment and its
+// amount only.
+function ScopePages({ values, scopeLines, projectSummary, total, payments, scopeSlot, renderBold, showPaymentPct }) {
   return (
     <section className="dp-page dp-scope">
       <div className="dp-formhead">
@@ -411,21 +415,12 @@ function ScopePages({ values, scopeLines, projectSummary, total, payments, scope
         {scopeSlot ? <div className="no-print">{scopeSlot}</div> : null}
         <div className={scopeSlot ? 'print-only dp-scope-lines' : 'dp-scope-lines'}>{renderScopeLines(scopeLines, renderBold)}</div>
       </div>
-      {priced.length > 0 && (
-        <table className="dp-grid dp-pricing dp-scope-prices dp-mt-lg">
-          <thead><tr><th>ITEM</th><th className="dp-price">PRICE</th></tr></thead>
-          <tbody>
-            {priced.map((l, i) => <tr key={l.id ?? i}><td>{(l.name || '').toUpperCase()}</td><td className="dp-price">{Number(l.price) < 0 ? `−$${fmt(-l.price)}` : `$${fmt(l.price)}`}</td></tr>)}
-            <tr className="dp-total"><td>INVESTMENT TOTAL</td><td className="dp-price">${fmt(total)}</td></tr>
-          </tbody>
-        </table>
-      )}
       {payments.length > 0 && (
-        <table className="dp-grid dp-pricing dp-scope-prices dp-mt">
-          <thead><tr><th>PAYMENT SCHEDULE</th><th className="dp-price">%</th><th className="dp-price">AMOUNT</th></tr></thead>
+        <table className="dp-grid dp-pricing dp-scope-prices dp-mt-lg">
+          <thead><tr><th>PAYMENT SCHEDULE</th>{showPaymentPct && <th className="dp-price dp-office-only no-print" title="Office only — not on the customer's copy, prints or PDFs">% · OFFICE ONLY</th>}<th className="dp-price">AMOUNT</th></tr></thead>
           <tbody>
-            {payments.map((p, i) => <tr key={i}><td>{p.label}</td><td className="dp-price">{Math.round(p.pct * 100)}%</td><td className="dp-price">${fmt(p.amount)}</td></tr>)}
-            <tr className="dp-total"><td>TOTAL</td><td className="dp-price">100%</td><td className="dp-price">${fmt(total)}</td></tr>
+            {payments.map((p, i) => <tr key={i}><td>{p.label}</td>{showPaymentPct && <td className="dp-price dp-office-only no-print">{Math.round(p.pct * 100)}%</td>}<td className="dp-price">${fmt(p.amount)}</td></tr>)}
+            <tr className="dp-total"><td>TOTAL</td>{showPaymentPct && <td className="dp-price dp-office-only no-print">100%</td>}<td className="dp-price">${fmt(total)}</td></tr>
           </tbody>
         </table>
       )}
@@ -438,7 +433,7 @@ export default function DeckPlusContract({
   values = {}, checks = {}, packet = [],
   scopeLines = [], projectSummary = '', total = 0, payments = [],
   editable = false, onValue, onCheck, renderSig, renderSigDate, renderInit,
-  scopeSlot = null, renderBold, includeScope = true,
+  scopeSlot = null, renderBold, includeScope = true, showPaymentPct = false,
   innerRef, className = '', style,
 }) {
   const ctx = makeCtx({ values, checks, editable, onValue, onCheck, renderSig, renderSigDate, renderInit })
@@ -457,7 +452,7 @@ export default function DeckPlusContract({
       {includeScope && (
         <>
           <PageBreak />
-          <ScopePages values={values} scopeLines={scopeLines} projectSummary={projectSummary} total={total} payments={payments} scopeSlot={scopeSlot} renderBold={renderBold} />
+          <ScopePages values={values} scopeLines={scopeLines} projectSummary={projectSummary} total={total} payments={payments} scopeSlot={scopeSlot} renderBold={renderBold} showPaymentPct={showPaymentPct} />
         </>
       )}
       {forms.map(f => (

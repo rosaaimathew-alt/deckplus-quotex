@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { verifyToken, canSeeRecord } from '../_auth.js'
+import { verifyToken, verifyStaff, canSeeRecord } from '../_auth.js'
 import { getKV } from '../_kv.js'
 import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, verifyRecord } from '../_esign.js'
 import { isMailerConfigured } from '../_mailer.js'
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   const bearer = header.startsWith('Bearer ') ? header.slice(7) : (req.headers['x-qx-token'] || null)
   let staff = null
   if (isAdminAction) {
-    staff = await verifyToken(bearer)
+    staff = await verifyStaff(bearer)
     if (!staff) return res.status(401).json({ error: 'Unauthorized' })
   }
 

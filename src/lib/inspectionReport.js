@@ -159,7 +159,7 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
       <th>Job</th><th>Inspections</th><th>This week</th><th>Next inspection</th><th>Last note on file</th>
     </tr></thead>
     <tbody>
-      ${groups.map(g => `<tr class="pmrow"><td colspan="5">PM ${esc(g.pm)} · ${g.rows.length} job${g.rows.length === 1 ? '' : 's'}</td></tr>${g.rows.map(rowHtml).join('')}`).join('')}
+      ${groups.map(g => `<tr class="pmrow"><td colspan="5">${g.pm === 'not assigned' ? 'No PM assigned' : `PM ${esc(g.pm)}`} · ${g.rows.length} job${g.rows.length === 1 ? '' : 's'}</td></tr>${g.rows.map(rowHtml).join('')}`).join('')}
     </tbody>
   </table>
   <div class="legend">✓ passed · ✗ failed / inaccessible / partial (latest result) · ◷ scheduled at the county · – cancelled.

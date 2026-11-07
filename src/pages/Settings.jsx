@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Upload, Trash2, CheckCircle, RefreshCw, Palette, Building2, Eye, Download, FolderOpen, AlertTriangle, CloudUpload, HardDrive, Wifi, WifiOff, Lock, Sparkles, Mail } from 'lucide-react'
+import { Upload, Trash2, CheckCircle, RefreshCw, Palette, Building2, Download, FolderOpen, AlertTriangle, CloudUpload, HardDrive, Wifi, WifiOff, Lock, Sparkles, Mail, Sun, Moon } from 'lucide-react'
 import { useStore } from '../store'
-import { extractDominantColor, generatePalette, applyBrandStyles, DEFAULT_BRAND_COLOR, FREE_PRIMARY_COLOR, FREE_SIDEBAR_COLOR, BRAND_PRESETS } from '../brand'
+import { extractDominantColor, applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR, FREE_PRIMARY_COLOR, FREE_SIDEBAR_COLOR, BRAND_PRESETS, DP_ORANGE, DEFAULT_BACKGROUND, DEFAULT_BACKGROUND_DARK } from '../brand'
 import { canCustomizeBranding, PLAN_ORDER, PLAN_META } from '../plans'
 import { ROLE_ORDER, ROLE_META } from '../roles'
 import { DEMO } from '../demo'
@@ -22,46 +22,6 @@ const PRESET_COLORS = [
   { label: 'Charcoal',    hex: '#1f2937' },
   { label: 'Navy',        hex: '#1e3a5f' },
 ]
-
-function SidebarPreview({ companyName, tagline, logo, color, sidebar }) {
-  const palette = generatePalette(color || DEFAULT_BRAND_COLOR)
-  const bg = sidebar || palette[700]
-  // Pick readable text on the sidebar background
-  const lum = (() => {
-    const h = bg.replace('#', '')
-    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
-    return (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  })()
-  const navText = lum > 0.62 ? '#1f2937' : palette[100]
-  return (
-    <div
-      className="rounded-xl overflow-hidden shadow-lg w-48 shrink-0"
-      style={{ backgroundColor: bg }}
-    >
-      {/* Logo area */}
-      <div className="px-4 py-4 border-b flex flex-col items-center" style={{ borderColor: 'rgba(255,255,255,0.14)' }}>
-        {logo
-          ? <img src={logo} alt="logo" className="h-12 object-contain" />
-          : <p className="text-lg font-black tracking-widest leading-tight" style={{ color: lum > 0.62 ? '#1f2937' : '#fff' }}>{companyName || 'QUOTEX'}</p>}
-      </div>
-      {/* Nav items preview */}
-      <div className="py-3 px-2 space-y-0.5">
-        {['Dashboard', 'Build Quote', 'Proposal Tracker', 'Contracts'].map((item, i) => (
-          <div
-            key={item}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium"
-            style={i === 0 ? { backgroundColor: '#fff', color: palette[700] } : { color: navText }}
-          >
-            {item}
-          </div>
-        ))}
-      </div>
-      <div className="px-4 py-2.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.14)' }}>
-        <p className="text-xs" style={{ color: navText }}>© 2025 {companyName || 'QUOTEX'}</p>
-      </div>
-    </div>
-  )
-}
 
 // ── Connect email: each person's own sending mailbox ─────────────────────────
 // Pick a provider, enter the address + an app password; the server logs in to
@@ -224,7 +184,7 @@ function EmailConnectCard() {
           )}
           <div className="flex gap-2">
             <button onClick={connect} disabled={!!busy || !f.email || !f.password}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-40">
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--brand-600)] text-white text-sm font-medium hover:bg-[var(--brand-700)] disabled:opacity-40">
               <Mail size={15} /> {busy === 'connect' ? 'Testing the login…' : mine ? 'Save & test' : 'Connect & test'}
             </button>
             {editing && <button onClick={() => { setEditing(false); setError('') }} className="px-4 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Cancel</button>}
@@ -499,6 +459,17 @@ export default function Settings() {
   const [primaryColor, setPrimaryColor] = useState(branding.primaryColor || DEFAULT_BRAND_COLOR)
   const [sidebarColor, setSidebarColor] = useState(branding.sidebarColor || FREE_SIDEBAR_COLOR)
   const [accentColor, setAccentColor]   = useState(branding.accentColor || '')
+  // Appearance: what the whole team opens with, page backgrounds, badge color
+  const [appTheme, setAppTheme]         = useState(branding.theme === 'dark' ? 'dark' : 'light')
+  const [bgColor, setBgColor]           = useState(branding.backgroundColor || '')
+  const [bgDark, setBgDark]             = useState(branding.backgroundDark || '')
+  const [badgeColor, setBadgeColor]     = useState(branding.badgeColor || '')
+  const [sidebarDark, setSidebarDark]   = useState(branding.sidebarDark || '')   // '' = same as light
+  const setTheme = useStore(s => s.setTheme)
+  // Which mode's colors the pickers below edit (and preview). Light and dark
+  // each keep their own sidebar and page background.
+  const [editMode, setEditMode] = useState(() => (useStore.getState().theme === 'dark' ? 'dark' : 'light'))
+  const previewMode = (m) => { setEditMode(m); applyTheme(m === 'dark') }
   const [extracting, setExtracting]     = useState(false)
   const [saved, setSaved]               = useState(false)
   const fileRef = useRef()
@@ -512,9 +483,11 @@ export default function Settings() {
   const canBrand   = canCustomizeBranding(plan) && canManage
 
   // Keep preview in sync
+  const brandOpts = () => ({ sidebar: sidebarColor, sidebarDark: sidebarDark || null, accent: accentColor || null, background: bgColor || null, backgroundDark: bgDark || null, badge: badgeColor || null })
   useEffect(() => {
-    applyBrandStyles(primaryColor, { sidebar: sidebarColor, accent: accentColor || null })
-  }, [primaryColor, sidebarColor, accentColor])
+    applyBrandStyles(primaryColor, brandOpts())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryColor, sidebarColor, sidebarDark, accentColor, bgColor, bgDark, badgeColor])
 
   const handleLogoUpload = async (file) => {
     if (!file) return
@@ -534,15 +507,19 @@ export default function Settings() {
   }
 
   const handleSave = () => {
-    updateBranding({ companyName, tagline, gcName: gcName.trim(), licenseNo: licenseNo.trim(), logo, primaryColor, sidebarColor, accentColor: accentColor || null })
-    applyBrandStyles(primaryColor, { sidebar: sidebarColor, accent: accentColor || null })
+    updateBranding({ companyName, tagline, gcName: gcName.trim(), licenseNo: licenseNo.trim(), logo, primaryColor, sidebarColor, accentColor: accentColor || null,
+      theme: appTheme, backgroundColor: bgColor || null, backgroundDark: bgDark || null, badgeColor: badgeColor || null, sidebarDark: sidebarDark || null })
+    applyBrandStyles(primaryColor, brandOpts())
+    setTheme(appTheme); applyTheme(appTheme === 'dark'); setEditMode(appTheme)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
   const handleReset = () => {
     // Reset to the standard-tier charcoal & brass identity
-    updateBranding({ companyName: 'QUOTEX', tagline: 'Smart Contractor Pricing', logo: null, primaryColor: FREE_PRIMARY_COLOR, sidebarColor: FREE_SIDEBAR_COLOR, accentColor: null })
+    updateBranding({ companyName: 'QUOTEX', tagline: 'Smart Contractor Pricing', logo: null, primaryColor: FREE_PRIMARY_COLOR, sidebarColor: FREE_SIDEBAR_COLOR, accentColor: null,
+      theme: 'light', backgroundColor: null, backgroundDark: null, badgeColor: null, sidebarDark: null })
+    setAppTheme('light'); setBgColor(''); setBgDark(''); setBadgeColor(''); setSidebarDark(''); setTheme('light'); previewMode('light')
     setCompanyName('QUOTEX')
     setTagline('Smart Contractor Pricing')
     setLogo(null)
@@ -553,9 +530,10 @@ export default function Settings() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
+  // A preset sets the buttons color and the sidebar of the mode being edited.
   const applyPreset = (preset) => {
     setPrimaryColor(preset.primary)
-    setSidebarColor(preset.sidebar)
+    if (editMode === 'dark') setSidebarDark(preset.sidebar); else setSidebarColor(preset.sidebar)
     setSaved(false)
   }
 
@@ -704,11 +682,25 @@ export default function Settings() {
                 <h3 className="font-semibold text-gray-800 text-sm">Theme Colors</h3>
               </div>
 
-              {/* Preset theme combos (primary + sidebar) */}
+              {/* Which mode the pickers edit. Light and dark each keep their own
+                  sidebar and page background; buttons, accent and the
+                  notification numbers are shared. Picking a tab previews it. */}
+              <p className="text-xs font-medium text-gray-500 mb-2">Colors for</p>
+              <div className="inline-flex rounded-lg border border-gray-200 p-0.5 mb-4" role="tablist" aria-label="Colors for">
+                {[['light', 'Light mode'], ['dark', 'Dark mode']].map(([key, label]) => (
+                  <button key={key} type="button" role="tab" aria-selected={editMode === key} onClick={() => previewMode(key)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${editMode === key ? 'bg-[var(--brand-600)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                    {key === 'dark' ? <Moon size={14} /> : <Sun size={14} />} {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Preset theme combos (primary + this mode's sidebar) */}
               <p className="text-xs font-medium text-gray-500 mb-2">Preset themes</p>
               <div className="grid grid-cols-4 gap-2 mb-5">
                 {BRAND_PRESETS.map(preset => {
-                  const active = primaryColor === preset.primary && sidebarColor === preset.sidebar
+                  const modeSidebar = editMode === 'dark' ? (sidebarDark || sidebarColor) : sidebarColor
+                  const active = primaryColor === preset.primary && modeSidebar === preset.sidebar
                   return (
                     <button
                       key={preset.label}
@@ -728,24 +720,53 @@ export default function Settings() {
               {/* Individual color pickers */}
               <div className="space-y-3">
                 {[
-                  { label: 'Primary / buttons', value: primaryColor, set: setPrimaryColor },
-                  { label: 'Sidebar', value: sidebarColor, set: setSidebarColor },
-                  { label: 'Accent (optional)', value: accentColor || primaryColor, set: setAccentColor },
-                ].map(({ label, value, set }) => (
+                  ...(editMode === 'dark' ? [
+                    { label: 'Sidebar (dark mode)', value: sidebarDark || sidebarColor, set: setSidebarDark, reset: sidebarDark && (() => setSidebarDark('')), resetLabel: 'same as light' },
+                    { label: 'Page background (dark mode)', value: bgDark || DEFAULT_BACKGROUND_DARK, set: setBgDark, reset: bgDark && (() => setBgDark('')) },
+                  ] : [
+                    { label: 'Sidebar (light mode)', value: sidebarColor, set: setSidebarColor },
+                    { label: 'Page background (light mode)', value: bgColor || DEFAULT_BACKGROUND, set: setBgColor, reset: bgColor && (() => setBgColor('')) },
+                  ]),
+                  { label: 'Primary / buttons (both modes)', value: primaryColor, set: setPrimaryColor },
+                  { label: 'Accent, optional (both modes)', value: accentColor || primaryColor, set: setAccentColor },
+                  { label: 'Notification numbers (both modes)', value: badgeColor || DP_ORANGE, set: setBadgeColor, reset: badgeColor && (() => setBadgeColor('')) },
+                ].map(({ label, value, set, reset, resetLabel }) => (
                   <div key={label} className="flex items-center gap-3">
                     <input
                       type="color"
                       value={value}
                       onChange={e => { set(e.target.value); setSaved(false) }}
+                      aria-label={label}
                       className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5 shrink-0"
                     />
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-gray-700">{label}</p>
-                      <p className="text-xs text-gray-400 font-mono">{value}</p>
+                      <p className="text-xs text-gray-400 font-mono">{value}{reset && <button type="button" onClick={() => { reset(); setSaved(false) }} className="ml-2 font-sans underline hover:text-gray-600">{resetLabel || 'default'}</button>}</p>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Which mode the whole team opens in. Only the default: the
+                  colors above are kept for both modes either way. */}
+              <p className="text-xs font-medium text-gray-500 mt-5 mb-2">Team opens in</p>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Team opens in">
+                {[['light', 'Light', bgColor || DEFAULT_BACKGROUND, '#ffffff', sidebarColor], ['dark', 'Dark', bgDark || DEFAULT_BACKGROUND_DARK, '#26262b', sidebarDark || sidebarColor]].map(([key, label, ground, card, side]) => (
+                  <button key={key} type="button" role="radio" aria-checked={appTheme === key}
+                    onClick={() => { setAppTheme(key); setSaved(false) }}
+                    className={`rounded-lg border p-2 text-left transition-all ${appTheme === key ? 'ring-2 ring-offset-1 ring-[var(--brand-500)] border-transparent' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <div className="h-14 rounded-md p-2 flex gap-1.5" style={{ backgroundColor: ground }}>
+                      <span className="w-3 rounded-sm" style={{ backgroundColor: side }} />
+                      <span className="flex-1 rounded-sm flex items-end p-1" style={{ backgroundColor: card }}>
+                        <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: primaryColor }} />
+                        <span className="ml-auto text-[9px] font-bold rounded-full px-1 leading-tight" style={{ backgroundColor: badgeColor || DP_ORANGE, color: '#fff' }}>3</span>
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold mt-1.5" style={{ color: appTheme === key ? 'var(--brand-700)' : undefined }}>{label} mode</p>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1.5">Everyone opens the app in this mode. The sun / moon button at the top still switches it for one person, until they reload. Each mode keeps its own colors.</p>
             </div>
           ) : canManage ? (
             <div className="bg-gray-50 rounded-xl border border-dashed border-gray-300 p-5 text-center">
@@ -776,9 +797,10 @@ export default function Settings() {
           </div>
           )}
 
-          {/* ── Workspace ──────────────────────────────────────────── */}
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Workspace</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* ── Workspace (demo only: the role switcher and plan picker mean
+              nothing to a company running its own copy) ─────────────── */}
+          {DEMO && <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Workspace</h3>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 empty:hidden">
             {/* Role switcher: demo only — real roles come from the org membership */}
             {/* Role / view */}
             {DEMO && (
@@ -789,7 +811,8 @@ export default function Settings() {
               </div>
               <p className="text-xs text-gray-400 mb-4">Switches the whole app between the Sales, Project Manager, and Manager experiences.</p>
               <div className="grid grid-cols-3 gap-2">
-                {ROLE_ORDER.map(key => {
+                {/* Paint PM is Field mode only, with no way back — not a demo view */}
+                {ROLE_ORDER.filter(key => key !== 'paint').map(key => {
                   const active = role === key
                   return (
                     <button
@@ -806,8 +829,8 @@ export default function Settings() {
             </div>
             )}
 
-            {/* Plan / subscription tier (org setting: office/admin only) */}
-            {canManage && (
+            {/* Plan / subscription tier (demo only) */}
+            {DEMO && canManage && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles size={16} className="text-gray-400" />
@@ -861,23 +884,6 @@ export default function Settings() {
           <DataManagement />
         </div>
 
-        {/* Right: live preview */}
-        <div className="w-56 shrink-0">
-          <div className="sticky top-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Eye size={14} className="text-gray-400" />
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Live Preview</p>
-            </div>
-            <SidebarPreview
-              companyName={companyName}
-              tagline={tagline}
-              logo={logo}
-              color={primaryColor}
-              sidebar={sidebarColor}
-            />
-            <p className="text-xs text-gray-400 mt-3 text-center">Reflects across the whole platform</p>
-          </div>
-        </div>
 
       </div>
     </div>

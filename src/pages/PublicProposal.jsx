@@ -66,7 +66,7 @@ export default function PublicProposal() {
       <div style={{ ...card, background: '#fff', color: INK }}>
         <div style={{ background: '#fff', padding: '28px 32px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: accent, letterSpacing: '-0.02em' }}>PROPOSAL</h1>
+            <h1 className="qx-title" style={{ margin: 0, fontSize: 24, fontWeight: 700, color: accent, letterSpacing: '-0.02em' }}>PROPOSAL</h1>
             {estimateDate && <p style={{ margin: '6px 0 0', fontSize: 13, color: INK }}>{estimateDate}</p>}
             {expiry && <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 600, color: INK }}>Valid Until: {expiry}</p>}
             {s.contractNum ? <p style={{ margin: '2px 0 0', fontSize: 12, color: INK }}>{s.contractNum}</p> : null}
@@ -99,8 +99,8 @@ export default function PublicProposal() {
                   <p style={sectionLabel}>Your Design</p>
                   <a href={src} target="_blank" rel="noopener" style={{ fontSize: 12, fontWeight: 600, color: accent }}>Open full screen</a>
                 </div>
-                <iframe title="Your design: floor plan and 3D view" src={src} loading="lazy"
-                  style={{ width: '100%', height: 460, border: `1px solid ${LINE}`, borderRadius: 10, display: 'block', background: '#f7f8f6' }} />
+                <iframe title="Your design: 3D view and floor plan" src={src} loading="lazy"
+                  style={{ width: '100%', height: 920, border: `1px solid ${LINE}`, borderRadius: 10, display: 'block', background: '#f7f8f6' }} />
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: SOFT }}>Drag the 3D view to look around. Sizes and options follow this proposal.</p>
               </div>
             )

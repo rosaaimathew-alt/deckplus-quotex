@@ -65,7 +65,30 @@ export async function requireAuth(req, res) {
     res.status(401).json({ error: 'Unauthorized — please sign in again.' })
     return null
   }
+  if (await isFieldOnly(token, payload)) {
+    res.status(403).json({ error: FIELD_ONLY })
+    return null
+  }
   return payload
+}
+
+// ── Field-only accounts ──────────────────────────────────────────────────────
+// The paint PM (role 'paint') uses Field mode's paint screens and nothing else;
+// Field mode calls no API. So a paint login gets no staff API at all: no
+// email, AI, Drive, permits, contract links or mailbox settings. The same goes
+// for a sub's login (role 'sub'): the sub app calls no staff API either.
+const FIELD_ONLY = 'This account is for Field mode only.'
+async function isFieldOnly(token, user) {
+  const role = await staffRole(token, user)
+  return role === 'paint' || role === 'sub'
+}
+
+// For handlers that check the token themselves (sign, co, google-auth): the
+// signed-in staff member, or null for no / bad token or a Field-only account.
+export async function verifyStaff(token) {
+  const user = await verifyToken(token)
+  if (!user) return null
+  return (await isFieldOnly(token, user)) ? null : user
 }
 
 // ── Who may look at a record ─────────────────────────────────────────────────

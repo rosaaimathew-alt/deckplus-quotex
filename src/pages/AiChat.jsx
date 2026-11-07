@@ -37,11 +37,11 @@ User: "What's my most expensive item?"
 Response: Your most expensive item is Double Drive Gate at $680/EA.`
 
 const SUGGESTIONS = [
-  'Raise all Fencing prices by 10%',
+  'Raise all Trex decking prices by 10%',
   'Add "supply and install" to every description that doesn\'t have it',
   'Change all items without a description to a professional one',
-  'Lower all Labor prices by 5%',
-  'Set all Roofing items to use LS unit',
+  'Lower all railing prices by 5%',
+  'Set all screen porch items to use LS unit',
   'What\'s my most expensive item in each category?',
   'Increase all prices under $50 by $5',
   'Standardize all category names to match the allowed list',
@@ -209,7 +209,7 @@ function CatalogStats({ catalog }) {
   )
 }
 
-export default function AiChat() {
+export default function AiChat({ inline = false }) {
   const catalog = useStore(s => s.catalog)
   const updateCatalogItem = useStore(s => s.updateCatalogItem)
 
@@ -301,7 +301,7 @@ export default function AiChat() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-17rem)] min-h-[460px] overflow-hidden bg-gray-50 sm:m-6 sm:rounded-2xl border border-gray-200">
+    <div className={`flex h-[calc(100dvh-17rem)] min-h-[460px] overflow-hidden bg-gray-50 sm:rounded-2xl border border-gray-200 ${inline ? 'rounded-2xl' : 'sm:m-6'}`}>
       {/* Left sidebar — stats + suggestions */}
       <div className="hidden lg:flex w-64 shrink-0 flex-col gap-4 p-4 border-r border-gray-200 bg-white overflow-y-auto">
         <div>
@@ -376,7 +376,7 @@ export default function AiChat() {
               ref={inputRef}
               rows={2}
               className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-              placeholder='e.g. "Raise all Roofing prices by 15%" or "Add supply and install to every description"'
+              placeholder='e.g. "Raise all railing prices by 15%" or "Add supply and install to every description"'
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => {

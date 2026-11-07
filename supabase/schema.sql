@@ -21,7 +21,7 @@ create table if not exists orgs (
 create table if not exists org_members (
   user_id      uuid not null references auth.users(id) on delete cascade,
   org_id       uuid not null references orgs(id) on delete cascade,
-  role         text not null check (role in ('rep','pm','office','admin')),
+  role         text not null check (role in ('rep','pm','paint','office','admin')),
   display_name text,
   email        text,
   created_at   timestamptz not null default now(),
@@ -53,7 +53,8 @@ create or replace function record_tables() returns text[] language sql immutable
   select array[
     'proposals','catalog_items','templates','scope_templates','payment_schedules',
     'email_templates','finance_cards','subcontractors','standalone_change_orders',
-    'planned_projects','todos','checklists','expenses','job_costs'
+    'planned_projects','todos','checklists','expenses','job_costs',
+    'vendors','purchases','bills','invoices'   -- books.sql: office/admin only
   ]
 $$;
 
@@ -164,6 +165,8 @@ create policy settings_write on org_settings for all
 
 -- Proposals: a rep sees and edits only their own deals; a PM only the deals
 -- they are assigned to; office and admin see and edit every deal in the org.
+-- The paint PM sees every won / imported job and nothing else, and may change
+-- only the paint side of a job (trigger in paint_role.sql).
 -- Because the database filters the rows, a rep's dashboard is "mine" and the
 -- office's is "everyone" with no filtering code in the app.
 drop policy if exists proposals_select on proposals;
@@ -173,29 +176,39 @@ drop policy if exists proposals_update on proposals;
 create policy proposals_select on proposals for select using (
   org_id = auth_org() and (
        auth_role() in ('office','admin')
-    or (auth_role() = 'rep' and owner_id = auth.uid())
-    or (auth_role() = 'pm'  and pm_id    = auth.uid())
+    or (auth_role() = 'rep'   and owner_id = auth.uid())
+    or (auth_role() = 'pm'    and pm_id    = auth.uid())
+    or (auth_role() = 'paint' and status in ('Won','Imported') and deleted_at is null)
   )
 );
 create policy proposals_insert on proposals for insert with check (
-  org_id = auth_org() and (auth_role() in ('office','admin') or nullif(data->>'ownerId','')::uuid = auth.uid())
+  org_id = auth_org()
+  and auth_role() is distinct from 'paint'
+  and (auth_role() in ('office','admin') or nullif(data->>'ownerId','')::uuid = auth.uid())
 );
 create policy proposals_update on proposals for update using (
   org_id = auth_org() and (
        auth_role() in ('office','admin')
-    or (auth_role() = 'rep' and owner_id = auth.uid())
-    or (auth_role() = 'pm'  and pm_id    = auth.uid())
+    or (auth_role() = 'rep'   and owner_id = auth.uid())
+    or (auth_role() = 'pm'    and pm_id    = auth.uid())
+    or (auth_role() = 'paint' and status in ('Won','Imported') and deleted_at is null)
   )
-) with check (org_id = auth_org());
+) with check (
+  org_id = auth_org()
+  and (auth_role() is distinct from 'paint' or status in ('Won','Imported'))
+);
 
--- Every other collection is shared across the org (catalog, templates, todos…).
+-- Every other collection is shared across the org (catalog, templates, todos…)
+-- — except with the paint PM, who only works won jobs in Field mode.
 do $$
 declare t text;
 begin
   foreach t in array record_tables() loop
     if t <> 'proposals' then
       execute format('drop policy if exists %I on %I', t || '_org_all', t);
-      execute format('create policy %I on %I for all using (org_id = auth_org()) with check (org_id = auth_org())', t || '_org_all', t);
+      execute format($p$create policy %I on %I for all
+        using (org_id = auth_org() and auth_role() is distinct from 'paint')
+        with check (org_id = auth_org() and auth_role() is distinct from 'paint')$p$, t || '_org_all', t);
     end if;
   end loop;
 end $$;

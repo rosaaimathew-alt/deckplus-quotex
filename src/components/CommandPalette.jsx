@@ -64,7 +64,7 @@ export default function CommandPalette({ onClose, destinations = [], actions = [
         const s = Math.max(score(name, query), [p.email, p.phone, p.address].some(v => score(v, query)) ? 1 : 0)
         if (!s) continue
         seen.add(name.toLowerCase())
-        out.push({ kind: 'Client', key: `p:${p.id}`, label: name, hint: `${p.status || ''} · ${money(p.total)}${p.address ? ' · ' + p.address : ''}`, icon: User, dot: STATUS_DOT[p.status], to: `/sales?tab=clients&q=${encodeURIComponent(name)}`, s })
+        out.push({ kind: 'Client', key: `p:${p.id}`, label: name, hint: `${p.status || ''} · ${money(p.total)}${p.address ? ' · ' + p.address : ''}`, icon: User, dot: STATUS_DOT[p.status], to: `/sales?tab=proposals&q=${encodeURIComponent(name)}`, s })
         if (seen.size >= 6) break
       }
       // Catalog items

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, ListChecks, Wallet, ClipboardList, Wrench } from 'lucide-react'
+import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, ListChecks, Wallet, ClipboardList, Wrench, Smartphone } from 'lucide-react'
 import { Component, useEffect, useMemo, useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import PMHome from './pages/PMHome'
@@ -17,18 +17,22 @@ import ContractViewFull from './pages/ContractViewFull'
 import PublicProposal from './pages/PublicProposal'
 import Legal from './pages/Legal'
 import EsignCertificate from './pages/EsignCertificate'
-import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub } from './pages/hubs/Hubs'
+import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub, MoneyHub } from './pages/hubs/Hubs'
+import OfficeHome from './pages/OfficeHome'
 import CommandPalette from './components/CommandPalette'
 import PermitPulse from './components/PermitPulse'
 import AuthGuard, { logout } from './components/AuthGuard'
 import { useStore, bootstrapOrg } from './store'
-import { applyBrandStyles, applyTheme, DEFAULT_BRAND_COLOR } from './brand'
+import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from './brand'
 import { canAccessRoute, landingRoute } from './plans'
 import { canRoleAccess, roleLanding } from './roles'
 import { useNav, LEGACY_REDIRECTS } from './nav'
 import { nextReminderDate, contractStatusOf, isJobClosed } from './lib/attention'
 import { TodoDock } from './components/TodoPanel'
 import { DEMO, DEMO_BASENAME, resetDemo } from './demo'
+import FieldApp from './field/FieldApp'
+import SubApp from './sub/SubApp'
+import { useFieldHome, useIsPhone, canUseField, setViewPref, readViewPref } from './field/fieldMode'
 
 const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
 
@@ -63,9 +67,14 @@ function BootGate({ children }) {
 }
 
 // Home depends on role: project managers plan from the job calendar.
+// Office logins get the office manager home (anyone can preview it at /?home=office).
 function RoleHome() {
   const role = useStore(s => s.role || 'manager')
-  return role === 'pm' ? <PMHome /> : <Dashboard />
+  const me = useStore(s => s.me)
+  const location = useLocation()
+  if (role === 'pm') return <PMHome />
+  if (role === 'manager' && (me?.role === 'office' || new URLSearchParams(location.search).get('home') === 'office')) return <OfficeHome />
+  return <Dashboard />
 }
 
 // Blocks a route the current plan OR role can't reach, redirecting home.
@@ -120,10 +129,35 @@ function NavItem({ d, badge, onClick }) {
       <Icon size={19} className="shrink-0" />
       <span className="flex-1 truncate">{d.label}</span>
       {badge > 0 && (
-        <span className="bg-amber-400 text-[#1f1300] text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center leading-none">{badge > 99 ? '99+' : badge}</span>
+        <span className="qx-badge text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center leading-none">{badge > 99 ? '99+' : badge}</span>
       )}
     </NavLink>
   )
+}
+
+// Phone field mode vs. the full app. /field/* is always field mode; '/' is
+// field mode on a PM's phone (unless they switched to the full app); every
+// other address — and every desktop — gets the full app, so emailed links
+// and bookmarks keep working everywhere.
+function ShellSwitch() {
+  const location = useLocation()
+  const fieldHome = useFieldHome()
+  const role = useStore(s => s.role)
+  const path = location.pathname
+  // The paint PM only ever gets Field mode — at every address, on every
+  // device — so typing /sales or /settings can't reach the full app.
+  if (role === 'paint') return <FieldApp />
+  // A sub only ever gets the sub app (src/sub), the same way.
+  if (role === 'sub') return <SubApp />
+  if (path === '/field' || path.startsWith('/field/')) {
+    // The phone home-screen app used to open at /field for everyone. Field mode
+    // is the PM's screen: anyone else lands in the full app, unless they picked
+    // Field mode themselves on this phone.
+    if (role === 'pm' || (canUseField(role) && readViewPref() === 'field')) return <FieldApp />
+    return <Navigate to="/" replace />
+  }
+  if (path === '/' && fieldHome) return <FieldApp />
+  return <AppShell />
 }
 
 // ── App Shell ────────────────────────────────────────────────────────────────
@@ -141,6 +175,8 @@ function AppShell() {
 
   const { destinations, can, role } = useNav()
   const badges = useBadges()
+  const isPhone = useIsPhone()
+  const showFieldSwitch = isPhone && canUseField(role)
   const isDark = theme === 'dark'
   const closeSidebar = () => setSidebarOpen(false)
   const autoExpireStaleSent = useStore(s => s.autoExpireStaleSent)
@@ -150,11 +186,8 @@ function AppShell() {
   useEffect(() => { autoExpireStaleSent() }, [autoExpireStaleSent])
 
   useEffect(() => {
-    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, {
-      sidebar: branding?.sidebarColor || null,
-      accent:  branding?.accentColor  || null,
-    })
-  }, [branding?.primaryColor, branding?.sidebarColor, branding?.accentColor])
+    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, brandOptions(branding || {}))
+  }, [branding])
 
   useEffect(() => { applyTheme(isDark) }, [isDark])
 
@@ -185,7 +218,7 @@ function AppShell() {
     if (canQuote) a.push({ label: 'New quote', hint: 'Build a proposal from your catalog', keywords: 'create estimate proposal build', icon: Plus, to: '/quote' })
     if (can('/finance')) a.push({ label: 'Add an expense', hint: 'Insights › Expenses', keywords: 'card spend receipt statement', icon: Wallet, to: '/insights?tab=expenses' })
     if (can('/jobs')) a.push({ label: 'Log a daily report', hint: 'Projects › Jobs — open a job, then Daily Log', keywords: 'daily log crew weather', icon: ClipboardList, to: '/projects?tab=jobs' })
-    if (can('/subs')) a.push({ label: 'Add a subcontractor', hint: 'Projects › Subcontractors', keywords: 'sub crew coi', icon: Wrench, to: '/projects?tab=crews' })
+    if (can('/subs')) a.push({ label: 'Add a subcontractor', hint: 'Money › Vendors', keywords: 'sub crew coi vendor', icon: Wrench, to: '/money?tab=vendors' })
     a.push({ label: isDark ? 'Switch to light mode' : 'Switch to dark mode', keywords: 'theme dark light', icon: isDark ? Sun : Moon, run: () => setTheme(isDark ? 'light' : 'dark') })
     a.push({ label: 'Settings', hint: 'Branding, email account, backups', keywords: 'branding logo colors email backup', icon: SettingsIcon, to: '/settings' })
     return a
@@ -236,11 +269,13 @@ function AppShell() {
         </nav>
 
         <div className="px-3 pb-2 space-y-1">
-          <button onClick={() => { setPaletteOpen(true); closeSidebar() }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm brand-nav-inactive">
-            <Search size={17} /> <span className="flex-1 text-left">Search</span>
-            <kbd className="text-[10px] opacity-60 border border-current rounded px-1">Ctrl K</kbd>
-          </button>
+          {showFieldSwitch && (
+            <button onClick={() => { setViewPref('field'); closeSidebar(); navigate('/field') }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold brand-nav-inactive">
+              <Smartphone size={17} /> <span className="flex-1 text-left">Field mode</span>
+            </button>
+          )}
+          {/* Search lives in the top bar (and Ctrl K) — no second copy here */}
           <NavLink to="/settings" onClick={closeSidebar}
             className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${isActive ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
             <SettingsIcon size={17} /> <span>Settings</span>
@@ -301,6 +336,7 @@ function AppShell() {
             <Route path="/projects"  element={<GatedDestination dkey="projects"><ProjectsHub /></GatedDestination>} />
             <Route path="/insights"  element={<GatedDestination dkey="insights"><InsightsHub /></GatedDestination>} />
             <Route path="/catalog"   element={<GatedDestination dkey="catalog"><CatalogHub /></GatedDestination>} />
+            <Route path="/money"     element={<GatedDestination dkey="money"><MoneyHub /></GatedDestination>} />
             <Route path="/inbox"     element={<Navigate to="/" replace />} />
             <Route path="/quote"     element={<Gated path="/quote"><BuildQuote /></Gated>} />
             <Route path="/proposal"  element={<Gated path="/proposal"><ProposalView /></Gated>} />
@@ -347,7 +383,7 @@ function MobileTab({ d, badge }) {
       className={({ isActive }) => `relative flex-1 flex flex-col items-center justify-center py-2 ${isActive ? 'text-[var(--brand-700)]' : 'text-gray-500'}`}>
       <Icon size={20} />
       <span className="text-[10px] font-medium mt-0.5">{d.label}</span>
-      {badge > 0 && <span className="absolute top-1 right-1/2 translate-x-4 bg-amber-400 text-[#1f1300] text-[9px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badge}</span>}
+      {badge > 0 && <span className="absolute top-1 right-1/2 translate-x-4 qx-badge text-[9px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badge}</span>}
     </NavLink>
   )
 }
@@ -407,7 +443,7 @@ export default function App() {
         <Route path="/legal/:doc"  element={<Legal />} />
         <Route path="/co/:token"   element={<SignBoundary><COSignPage /></SignBoundary>} />
         <Route path="/view/:recordId" element={<SignBoundary><ContractViewFull /></SignBoundary>} />
-        <Route path="*"            element={<AuthGuard><AppBoundary><BootGate><AppShell /></BootGate></AppBoundary></AuthGuard>} />
+        <Route path="*"            element={<AuthGuard><AppBoundary><BootGate><ShellSwitch /></BootGate></AppBoundary></AuthGuard>} />
       </Routes>
     </BrowserRouter>
   )

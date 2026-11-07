@@ -31,7 +31,7 @@ export default function NeedsAttention({ items, limit = 5, title = 'Needs your a
     <section className="bg-white rounded-xl border border-gray-200 overflow-hidden" aria-label={title}>
       <div className="px-5 py-3.5 flex items-center gap-2">
         <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <span className="text-[11px] font-semibold rounded-full px-1.5 min-w-[18px] text-center bg-amber-400 text-white">{items.length}</span>
+        <span className="text-[11px] font-semibold rounded-full px-1.5 min-w-[18px] text-center qx-badge">{items.length}</span>
       </div>
       <ul className="border-t border-gray-100 divide-y divide-gray-100">
         {shown.map(it => {

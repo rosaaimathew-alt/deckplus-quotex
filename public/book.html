@@ -196,7 +196,15 @@
       letter-spacing: .04em; text-transform: uppercase; background: var(--accent-soft); color: var(--accent); }
     .hp { position: absolute; left: -9999px; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-  </style>
+  
+  /* Dropdown arrow tucked in from the right edge (same as the app, index.css) */
+  select:not([multiple]):not([size]) {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important; background-position: right 0.6rem center !important; background-size: 1rem !important;
+    padding-right: 2rem !important;
+  }
+</style>
 </head>
 <body>
   <div class="page">
@@ -607,7 +615,11 @@
         if (!res.ok) throw new Error(data.error)
         showBooking(data.booking, f, false)
         track('booked')
-        parent.postMessage({ type: 'rr-booked', start: data.booking.start }, '*')
+        // The website gets a bare "a booking happened" signal for its own ad
+        // conversions: no name, contact, time or rep. (Preview mode, ?demo,
+        // sends it too, so the website's tracking can be tested without
+        // putting a fake appointment on anyone's calendar.)
+        parent.postMessage({ type: 'rr-booked' }, '*')
       } catch (e) {
         error(e.message || 'Booking failed. Please try again.')
       } finally {

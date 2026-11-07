@@ -1,7 +1,8 @@
 import { useState, useRef, Fragment } from 'react'
+import { QuickPicks, MenuChip } from '../components/FilterBar'
 import {
   Search, Edit2, Eye, Trash2, Plus, Check, X, GripVertical,
-  ChevronDown, ChevronRight, LayoutList, Rows3,
+  ChevronDown, ChevronRight,
   Sparkles, Loader, MoveRight, Settings2, Pencil, Lock, Unlock,
 } from 'lucide-react'
 import { useStore, PORCH_COMPONENT_DEFAULTS } from '../store'
@@ -524,10 +525,8 @@ function FormulasView() {
     updateCustom: useStore(s => s.updateDeckCustomComponent), removeCustom: useStore(s => s.removeDeckCustomComponent),
     locked: useStore(s => s.deckFormulaLocked), setLocked: useStore(s => s.setDeckFormulaLocked),
     scopeTemplate: useStore(s => s.deckScopeTemplate), setScopeTemplate: useStore(s => s.setDeckScopeTemplate),
-    footerNote: 'The Deck Builder prices from the Deck price-list items in this catalog (Deck, Steps, Landing, railing, fascia, skirting, paint and add-ons) — change a price on the item and the builder uses it. Components added here show on every deck quote with a quantity the rep fills in.',
     scopeTitle: 'Open Deck — standard scope of work',
     scopeSubtitle: 'Materials & methods on every open-deck quote. One bullet per line — the builder adds size, decking, railing, stairs & fascia automatically.',
-    scopeHint: 'Put your always-included framing here (footers, posts & beams, joist size & spacing, framing tape). Per-quote selections are appended automatically.',
   }
   // Porch slices
   const porch = {
@@ -537,10 +536,8 @@ function FormulasView() {
     updateCustom: useStore(s => s.updatePorchCustomComponent), removeCustom: useStore(s => s.removePorchCustomComponent),
     locked: useStore(s => s.porchFormulaLocked), setLocked: useStore(s => s.setPorchFormulaLocked),
     scopeTemplate: useStore(s => s.porchScopeTemplate), setScopeTemplate: useStore(s => s.setPorchScopeTemplate),
-    footerNote: 'These rates feed the Porch Conversion builder — it counts windows, columns, transoms & doors from the width, depth & wall height you enter.',
     scopeTitle: 'Porch Conversion — standard scope of work',
     scopeSubtitle: 'Materials & methods on every Eze-Breeze porch quote. One bullet per line — the builder adds the window/column counts, transoms & doors automatically.',
-    scopeHint: 'Put your always-included work here (columns & plates, window install, paint/seal/refinish). The window, transom and door counts are appended automatically.',
   }
   return (
     <div className="space-y-6">
@@ -553,7 +550,7 @@ function FormulasView() {
 
 function FormulaCard({ title, defaults, rates, setRate, customComponents, addCustom, updateCustom, removeCustom,
                       locked, setLocked, scopeTemplate, setScopeTemplate, isManager,
-                      footerNote, scopeTitle, scopeSubtitle, scopeHint }) {
+                      scopeTitle, scopeSubtitle }) {
   const canEdit = isManager || !locked   // sales can only touch pricing while it's unlocked
   const [open, setOpen] = useState(true)
   const [newComp, setNewComp] = useState({ label: '', unit: 'EA', rate: '', cost: '' })
@@ -684,9 +681,6 @@ function FormulaCard({ title, defaults, rates, setRate, customComponents, addCus
 
       {open && (
         <>
-          <p className="text-xs text-gray-400 px-1 leading-relaxed">
-            {footerNote} Lock the formula so salespeople quote with your pricing and can't change it.
-          </p>
 
           {/* Standard scope of work — the customer-facing build description */}
           <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
@@ -703,7 +697,6 @@ function FormulaCard({ title, defaults, rates, setRate, customComponents, addCus
                 placeholder="One scope bullet per line…"
                 className={`w-full text-sm rounded-lg px-3 py-2 leading-relaxed focus:outline-none resize-y ${canEdit ? 'border border-gray-300 focus:ring-2 focus:ring-[var(--brand-200)]' : 'border border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed'}`}
               />
-              <p className="text-xs text-gray-400 mt-2">Tip: {scopeHint}</p>
             </div>
           </div>
         </>
@@ -800,73 +793,48 @@ export default function ItemCatalog({ mode: forcedMode } = {}) {
   return (
     <div className="p-6">
       {/* Top-level sections (hidden when the Catalog destination picks the mode) */}
-      <div className={`${forcedMode ? 'hidden' : 'flex'} bg-gray-100 rounded-lg p-1 mb-4 w-fit`}>
-        <button onClick={() => setMode('catalog')}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'catalog' ? 'bg-white text-[var(--brand-700)] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-          <LayoutList size={14} /> Items
-        </button>
-        <button onClick={() => setMode('formulas')}
-          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'formulas' ? 'bg-white text-[var(--brand-700)] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-          <Settings2 size={14} /> Builder rates
-        </button>
-      </div>
+      {!forcedMode && (
+        <div className="border-b border-gray-200 mb-4">
+          <QuickPicks value={mode} onChange={setMode}
+            options={[{ value: 'catalog', label: 'Items' }, { value: 'formulas', label: 'Builder rates' }]} />
+        </div>
+      )}
 
       {mode === 'formulas' ? (
         <>
-          <div className="mb-4">
-            <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-0.5">Builder rates</h2>
-            <p className="text-sm text-gray-500">Manager-set pricing the builders use — set the rates, then lock them so sales must follow.</p>
+          <div className="qx-hide-embedded mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 mb-0.5">Builder rates</h2>
           </div>
           <FormulasView />
         </>
       ) : (
       <>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div>
-          <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-0.5">Item Catalog</h2>
-          <p className="text-sm text-gray-500">{catalog.length} items · AI-learned pricing from your estimates</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* View toggle */}
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setView('table')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'table' ? 'bg-white text-[var(--brand-700)] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <Rows3 size={14} /> Table
-            </button>
-            <button
-              onClick={() => setView('sections')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === 'sections' ? 'bg-white text-[var(--brand-700)] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <LayoutList size={14} /> Sections
-            </button>
-          </div>
-
-          {/* AI suggest */}
-          <button
-            onClick={handleAiSuggest}
-            disabled={suggesting}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 bg-white text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
+      <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-3">Item Catalog</h2>
+      {/* One flat line: search and categories left, view and actions right */}
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
+        <label className="flex items-center gap-2 h-9 text-sm text-gray-500 min-w-0">
+          <Search size={14} className="text-gray-400 shrink-0" />
+          <input className="w-40 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+            placeholder={`Search ${catalog.length} items`} value={search} onChange={e => setSearch(e.target.value)} />
+        </label>
+        {view === 'table' && (
+          <QuickPicks value={catFilter} onChange={setCatFilter} options={cats.map(c => ({ value: c, label: c }))} />
+        )}
+        <div className="ml-auto flex items-center gap-x-5 gap-y-1 flex-wrap">
+          <MenuChip label="View" value={view} onChange={setView} align="right"
+            options={[{ value: 'table', label: 'Table' }, { value: 'sections', label: 'Sections' }]} />
+          <button onClick={handleAiSuggest} disabled={suggesting}
+            className="flex items-center gap-1.5 h-9 text-sm font-medium text-gray-500 hover:text-gray-800 disabled:opacity-50 transition-colors whitespace-nowrap">
             {suggesting ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {suggesting ? 'Analyzing…' : 'AI Suggest'}
+            {suggesting ? 'Analyzing…' : 'AI suggest'}
           </button>
-
-          <button
-            onClick={() => setManagingCats(true)}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 bg-white text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-            title="Manage categories"
-          >
+          <button onClick={() => setManagingCats(true)} title="Manage categories"
+            className="flex items-center gap-1.5 h-9 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap">
             <Settings2 size={14} /> Categories
           </button>
-
-          <button
-            onClick={() => setAddingNew(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)]"
-          >
-            <Plus size={15} /> Add Item
+          <button onClick={() => setAddingNew(true)}
+            className="flex items-center gap-1.5 px-3 h-8 my-0.5 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)] whitespace-nowrap">
+            <Plus size={15} /> Add item
           </button>
         </div>
       </div>
@@ -888,42 +856,6 @@ export default function ItemCatalog({ mode: forcedMode } = {}) {
           onApply={handleApplySuggestions}
           onDismiss={() => setSuggestions(null)}
         />
-      )}
-
-      {/* Filters (table view) */}
-      {view === 'table' && (
-        <div className="flex gap-3 mb-4 flex-wrap">
-          <div className="relative flex-1 min-w-40">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)]"
-              placeholder="Search items..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-1 flex-wrap">
-            {cats.map(c => (
-              <button key={c} onClick={() => setCatFilter(c)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${catFilter === c ? 'bg-[var(--brand-600)] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Search for sections view */}
-      {view === 'sections' && (
-        <div className="relative mb-4">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] bg-white"
-            placeholder="Search items..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
       )}
 
       {/* Content */}

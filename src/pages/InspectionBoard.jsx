@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
+import { QuickPicks, MenuChip, SwitchChip } from '../components/FilterBar'
 import { DEMO } from '../demo'
 import { getStages } from './Jobs'
 import PermitsTab from '../components/PermitsTab'
@@ -8,7 +9,7 @@ import { startPulse, runPermitPulse } from '../lib/permitPulse'
 import { locateAddress } from '../lib/permitFees'
 import {
   usePermitAccess, permitTracked, BOARD_COLUMNS, boardCells, countyFinaled, inspectionLabel, INSPECTION_TYPES,
-  jobCounty, jobJurisdiction, countyConnected, CONNECTED_COUNTIES,
+  jobCounty, jobJurisdiction, countyConnected, CONNECTED_COUNTIES, closeIfFinaled,
 } from '../lib/permitTracking'
 import { Search, X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck, Printer, Plus, Trash2, Pencil } from 'lucide-react'
 import { buildWeeklyReportHtml } from '../lib/inspectionReport'
@@ -40,9 +41,11 @@ function Cell({ cell, title }) {
 
 // A job sold outside the app, added so the office can track its permits.
 // It's stored with status 'Imported', which every sales number leaves out.
-function AddJobModal({ pms, onClose, onAdded }) {
+function AddJobModal({ onClose, onAdded }) {
   const addOffPlatformJob = useStore(s => s.addOffPlatformJob)
-  const [f, setF] = useState({ client: '', street: '', city: '', zip: '', state: 'NC', jurisdiction: '', pm: '', jobType: '', permit: '' })
+  const members = useStore(s => s.members)
+  const pmMembers = (members || []).filter(m => m.role === 'pm')
+  const [f, setF] = useState({ client: '', street: '', city: '', zip: '', state: 'NC', jurisdiction: '', pmId: '', jobType: '', permit: '' })
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
   const address = [f.street.trim(), f.city.trim(), `${f.state} ${f.zip.trim()}`.trim()].filter(Boolean).join(', ')
@@ -54,7 +57,7 @@ function AddJobModal({ pms, onClose, onAdded }) {
     if (!/^\d{5}$/.test(f.zip.trim())) return setErr('Add the 5-digit ZIP code. The county is looked up by it.')
     if (!county) return setErr("That ZIP isn't in a county the app knows yet. Tell whoever looks after the app which county it's in.")
     const id = addOffPlatformJob({
-      client: f.client.trim(), address, pm: f.pm.trim(), jobType: f.jobType.trim(),
+      client: f.client.trim(), address, pm: '', pmId: f.pmId || null, jobType: f.jobType.trim(),
       permit: f.permit.trim().toUpperCase(), county, jurisdiction: f.jurisdiction,
     })
     onAdded(id)
@@ -111,8 +114,10 @@ function AddJobModal({ pms, onClose, onAdded }) {
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className={label}>PM</label>
-            <input className={input} value={f.pm} onChange={set('pm')} list="qx-pm-list" placeholder="B" />
-            <datalist id="qx-pm-list">{pms.map(x => <option key={x} value={x} />)}</datalist>
+            <select className={input} value={f.pmId} onChange={set('pmId')} aria-label="Project manager">
+              <option value="">Not assigned</option>
+              {pmMembers.map(m => <option key={m.id} value={m.id}>{m.displayName || m.email}</option>)}
+            </select>
           </div>
           <div className="col-span-2">
             <label className={label}>Job type</label>
@@ -199,6 +204,8 @@ function OfficeResultForm({ proposal, connected }) {
   const save = () => {
     updateJobData(proposal.id, { officeInspections: [...list, { ...f, id: `o${Date.now()}`, by: me?.displayName || me?.email || '' }] })
     setF(blank); setOpen(false)
+    // A passed final that finishes the job moves it to Closed jobs
+    if (f.code === 'FI') closeIfFinaled(proposal.id, useStore.getState)
   }
   const remove = (id) => updateJobData(proposal.id, { officeInspections: list.filter(o => o.id !== id) })
   const input = 'text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white'
@@ -273,6 +280,7 @@ function NextCell({ proposal, edit }) {
 
 export default function InspectionBoard() {
   const proposals = useStore(s => s.proposals)
+  const members = useStore(s => s.members)
   const permitPulse = useStore(s => s.permitPulse)
   const progress = useStore(s => s.permitPulseProgress)
   const me = useStore(s => s.me)
@@ -280,7 +288,8 @@ export default function InspectionBoard() {
   const [query, setQuery] = useState('')
   const [pm, setPm] = useState('')
   const [countyFilter, setCountyFilter] = useState('')
-  const [attention, setAttention] = useState(false)
+  // One "show" pick instead of separate count chips and a Needs-attention box
+  const [show, setShow] = useState('all')
   const [hideFinaled, setHideFinaled] = useState(false)
   const [open, setOpen] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -296,9 +305,13 @@ export default function InspectionBoard() {
     const type = p.imported?.jobType || p.jobData?.projectTypeOverride
       || [...(p.contractDraft?.projectTypes || p.projectTypes || [])].join(', ')
       || building?.description || ''
-    return { p, cells, failed, problem, building, type, pm: p.imported?.pm || '', finaled: countyFinaled(p),
+    // The PM the job is assigned to (Jobs › Project Manager); the spreadsheet's
+    // letter only for a job nobody has been assigned to yet.
+    const pmMember = p.pmId ? (members || []).find(m => m.id === p.pmId) : null
+    const pmName = pmMember ? (pmMember.displayName || pmMember.email || '').split(' ')[0] : (p.imported?.pm || '')
+    return { p, cells, failed, problem, building, type, pm: pmName, finaled: countyFinaled(p),
       county: jobCounty(p), jurisdiction: jobJurisdiction(p), connected: countyConnected(p) }
-  }).sort((a, b) => String(a.p.client || '').localeCompare(String(b.p.client || ''))), [proposals])
+  }).sort((a, b) => String(a.p.client || '').localeCompare(String(b.p.client || ''))), [proposals, members])
 
   const pms = [...new Set(jobs.map(j => j.pm).filter(Boolean))].sort()
   const counties = [...new Set(jobs.map(j => j.county).filter(Boolean))].sort()
@@ -309,7 +322,10 @@ export default function InspectionBoard() {
   const shown = jobs.filter(j => {
     if (pm && j.pm !== pm) return false
     if (countyFilter && j.county !== countyFilter) return false
-    if (attention && !j.failed && !j.problem) return false
+    if (show === 'failed' && !j.failed) return false
+    if (show === 'sched' && !(Object.values(j.cells).some(c => c.state === 'sched') || j.p.jobData?.nextInspection?.code)) return false
+    if (show === 'pick' && j.problem !== 'Pick permit') return false
+    if (show === 'missing' && j.problem !== 'Not found') return false
     if (hideFinaled && j.finaled) return false
     if (query) {
       const q = query.toLowerCase()
@@ -356,89 +372,92 @@ export default function InspectionBoard() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Inspections</h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {jobs.length} ongoing job{jobs.length === 1 ? '' : 's'} · county site {permitPulse?.lastRunAt
+      {/* Quiet status line: when the county was read, and the three actions */}
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-sm">
+        <p className="text-xs text-gray-500">
+          {progress
+            ? <span className="inline-flex items-center gap-1.5 text-blue-700"><Loader size={12} className="animate-spin" /> Reading the county site… {progress.done} of {progress.total}</span>
+            : <>County site {permitPulse?.lastRunAt
               ? `checked ${new Date(permitPulse.lastRunAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-              : 'not checked yet'} · checks at 8 AM and 1 PM
-          </p>
-          {progress && (
-            <p className="text-xs text-blue-700 mt-1 inline-flex items-center gap-1.5">
-              <Loader size={12} className="animate-spin" /> Reading the county site… {progress.done} of {progress.total} jobs
-            </p>
+              : 'not checked yet'} · checks at 8 AM and 1 PM</>}
+        </p>
+        {msg && <span className="text-xs text-gray-600">{msg}</span>}
+        <div className="ml-auto flex items-center gap-x-5">
+          {access === 'edit' && !DEMO && (
+            <button onClick={checkNow} disabled={busy} className="inline-flex items-center gap-1.5 h-8 font-medium text-gray-500 hover:text-gray-800 disabled:opacity-50 whitespace-nowrap">
+              {busy ? <Loader size={14} className="animate-spin" /> : <RefreshCw size={14} />} {busy ? 'Checking…' : 'Check now'}
+            </button>
           )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
           {access === 'edit' && (
-            <button onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-gray-300">
-              <Plus size={13} /> Add job
+            <button onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 h-8 font-medium text-gray-500 hover:text-gray-800 whitespace-nowrap">
+              <Plus size={14} /> Add job
             </button>
           )}
           <button onClick={printReport} disabled={!shown.length}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[var(--brand-600)] text-white hover:opacity-90 disabled:opacity-40">
-            <Printer size={13} /> Print weekly report
+            className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg bg-[var(--brand-600)] text-white font-medium hover:bg-[var(--brand-700)] disabled:opacity-40 whitespace-nowrap">
+            <Printer size={14} /> Weekly report
           </button>
-        {access === 'edit' && !DEMO && (
-          <div className="flex items-center gap-2">
-            {msg && <span className="text-xs text-gray-600">{msg}</span>}
-            <button onClick={checkNow} disabled={busy}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-gray-300 disabled:opacity-50">
-              {busy ? <Loader size={13} className="animate-spin" /> : <RefreshCw size={13} />} {busy ? 'Checking the county site…' : 'Check county now'}
-            </button>
-          </div>
-        )}
         </div>
       </div>
 
-      {connectionAlerts(permitPulse, { hasJobs: jobs.length > 0 }).map(a => (
-        <div key={a.key} className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-          {a.stale ? (
-            <div><b>Inspections haven't been checked since {new Date(a.since).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.</b> The board may be out of date. {access === 'edit' ? 'Click "Check county now", and if it fails tell whoever looks after the app.' : 'Let the office know.'}</div>
-          ) : (
-            <div>
-              <b>{a.county} inspection results aren't coming through</b>{a.since ? ` since ${new Date(a.since).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}: the county site couldn't be read for {a.failed} of {a.total} job{a.total === 1 ? '' : 's'}. Those rows may be out of date; check the county site directly for anything urgent.
-              {a.error && <div className="text-xs text-red-700/80 mt-1">What the check saw: {a.error}</div>}
-            </div>
+      {/* Connection problems: one short line, details on tap — not a box per county */}
+      {(() => {
+        const alerts = connectionAlerts(permitPulse, { hasJobs: jobs.length > 0 })
+        const down = alerts.filter(x => !x.stale)
+        const stale = alerts.find(x => x.stale)
+        const when = (iso) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        const names = down.map(x => x.county)
+        const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]
+        const since = down.map(x => x.since).filter(Boolean).sort()[0]
+        if (!down.length && !stale) return null
+        return (
+          <details className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <summary className="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              <AlertTriangle size={15} className="shrink-0" />
+              <span className="min-w-0 flex-1">
+                {down.length > 0 && <><b>{list}</b> not reading{since ? ` since ${when(since)}` : ''}. </>}
+                {stale && <><b>Not checked since {when(stale.since)}.</b> </>}
+                <span className="text-red-700/80">Rows may be out of date.</span>
+              </span>
+              {access === 'edit' && !DEMO && (
+                <button type="button" onClick={(e) => { e.preventDefault(); checkNow() }} disabled={busy}
+                  className="shrink-0 font-medium underline underline-offset-2 disabled:opacity-50">{busy ? 'Checking…' : 'Check now'}</button>
+              )}
+            </summary>
+            {down.length > 0 && (
+              <ul className="mt-2 pl-6 space-y-0.5 text-xs text-red-700/90">
+                {down.map(x => <li key={x.key}>{x.county}: {x.failed} of {x.total} job{x.total === 1 ? '' : 's'} not read{x.error ? ` (${x.error})` : ''}</li>)}
+              </ul>
+            )}
+          </details>
+        )
+      })()}
+
+      {/* One flat line: search, what to show (with counts), then county / PM */}
+      <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200">
+        <label className="flex items-center gap-2 h-9 text-sm min-w-0">
+          <Search size={14} className="text-gray-400 shrink-0" />
+          <input className="w-40 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+            placeholder="Search jobs or permits" aria-label="Search jobs or permits" value={query} onChange={e => setQuery(e.target.value)} />
+        </label>
+        <QuickPicks value={show} onChange={setShow} options={[
+          { value: 'all', label: 'All', count: jobs.length },
+          ...(counts.failed ? [{ value: 'failed', label: 'Failed', count: counts.failed }] : []),
+          ...(counts.sched ? [{ value: 'sched', label: 'Scheduled', count: counts.sched }] : []),
+          ...(counts.pick ? [{ value: 'pick', label: 'Pick a permit', count: counts.pick }] : []),
+          ...(counts.missing ? [{ value: 'missing', label: 'Not on county site', count: counts.missing }] : []),
+        ]} />
+        <div className="ml-auto flex items-center gap-x-5 gap-y-1 flex-wrap">
+          {counties.length > 1 && (
+            <MenuChip label="County" placeholder="All counties" value={countyFilter || null} onChange={v => setCountyFilter(v || '')} align="right"
+              options={[{ value: '', label: 'All counties' }, ...counties.map(c => ({ value: c, label: `${c}${CONNECTED_COUNTIES.includes(c) ? '' : ' (by hand)'}` }))]} />
           )}
+          {pms.length > 0 && (
+            <MenuChip label="PM" placeholder="All PMs" value={pm || null} onChange={v => setPm(v || '')} align="right"
+              options={[{ value: '', label: 'All PMs' }, ...pms.map(x => ({ value: x, label: x }))]} />
+          )}
+          <SwitchChip label="Hide finaled" checked={hideFinaled} onChange={setHideFinaled} title="Hide jobs the county has finaled" />
         </div>
-      ))}
-
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-100">{counts.failed} with a failed inspection</span>
-        <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">{counts.sched} scheduled</span>
-        {counts.pick > 0 && <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-100">{counts.pick} need a permit picked</span>}
-        {counts.missing > 0 && <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200">{counts.missing} not found on the county site</span>}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-64">
-          <Search size={13} className="text-gray-400 shrink-0" />
-          <input className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
-            placeholder="Client, address, job type or permit #…" value={query} onChange={e => setQuery(e.target.value)} />
-          {query && <button onClick={() => setQuery('')} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>}
-        </div>
-        {counties.length > 1 && (
-          <select value={countyFilter} onChange={e => setCountyFilter(e.target.value)} className="qx-select text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
-            <option value="">All counties</option>
-            {counties.map(c => <option key={c} value={c}>{c}{CONNECTED_COUNTIES.includes(c) ? '' : ' (by hand)'}</option>)}
-          </select>
-        )}
-        {pms.length > 0 && (
-          <select value={pm} onChange={e => setPm(e.target.value)} className="qx-select text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
-            <option value="">All PMs</option>
-            {pms.map(x => <option key={x} value={x}>PM {x}</option>)}
-          </select>
-        )}
-        <label className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-          <input type="checkbox" checked={attention} onChange={e => setAttention(e.target.checked)} /> Needs attention
-        </label>
-        <label className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-          <input type="checkbox" checked={hideFinaled} onChange={e => setHideFinaled(e.target.checked)} /> Hide finaled at county
-        </label>
       </div>
 
       {/* Fits the screen — no sideways scrolling. On wide screens each job is one
@@ -518,7 +537,7 @@ export default function InspectionBoard() {
         })}
       </div>
 
-      {adding && <AddJobModal pms={pms} onClose={() => setAdding(false)} onAdded={onAdded} />}
+      {adding && <AddJobModal onClose={() => setAdding(false)} onAdded={onAdded} />}
 
       <p className="text-[11px] text-gray-400 flex items-center gap-1.5">
         <ShieldCheck size={12} /> ✓ green passed · ✗ red failed / inaccessible / partial (latest result) · ◷ blue scheduled at the county · – gray cancelled. Hover a cell for the result.

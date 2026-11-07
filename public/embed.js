@@ -11,8 +11,12 @@
  *   data-font-size="16" data-radius="0" data-btn-radius="0" data-btn-transform="uppercase"
  *   data-btn-tracking="1" data-title="none" (hide the heading)
  *   data-compact="1"  just the scheduler: no logo/side panel, no card border
- * The iframe grows to fit its content; a 'rr-booked' message is re-dispatched
- * on window as a CustomEvent so you can fire analytics/conversion pixels.
+ * The iframe grows to fit its content. When someone books, a bare 'rr-booked'
+ * event (no name, contact, time or rep) is dispatched on window so the website
+ * can fire its own ad conversion pixels. Nothing else about the booking, or
+ * about the app, reaches the website. Only Deck Plus's own sites may show the
+ * calendar (vercel.json frame-ancestors). To test the website's tracking
+ * without a real appointment, add data-demo="1" (preview mode).
  */
 (function () {
   var script = document.currentScript
@@ -38,6 +42,6 @@
   window.addEventListener('message', function (e) {
     if (e.origin !== origin || e.source !== frame.contentWindow || !e.data) return
     if (e.data.type === 'rr-height') frame.style.height = e.data.height + 'px'
-    if (e.data.type === 'rr-booked') window.dispatchEvent(new CustomEvent('rr-booked', { detail: e.data }))
+    if (e.data.type === 'rr-booked') window.dispatchEvent(new CustomEvent('rr-booked'))
   })
 })()

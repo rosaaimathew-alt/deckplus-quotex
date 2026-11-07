@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Users, Copy, X, KeyRound, CheckCircle2, UserMinus } from 'lucide-react'
+import { Users, Copy, X, KeyRound, CheckCircle2, UserMinus, SlidersHorizontal } from 'lucide-react'
 import { useStore } from '../store'
-import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword } from '../supabase'
+import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword, setMemberRole, setMemberPermissions } from '../supabase'
+import { permissionGroups, departmentAllows } from '../permissions'
 import { DEMO } from '../demo'
 
 // ── Settings › Team ──────────────────────────────────────────────────────────
@@ -11,10 +12,12 @@ import { DEMO } from '../demo'
 const ROLES = [
   { key: 'rep',    label: 'Sales',           blurb: 'Proposals, pipeline, contracts' },
   { key: 'pm',     label: 'Project Manager', blurb: 'Jobs, subs, scheduling' },
+  { key: 'paint',  label: 'Paint PM',        blurb: 'Paint queue, schedule and touch-ups' },
   { key: 'office', label: 'Office',          blurb: 'Everything, plus settings' },
   { key: 'admin',  label: 'Admin',           blurb: 'Everything, plus the team' },
 ]
-const roleLabel = (k) => ROLES.find(r => r.key === k)?.label || k
+// Subs are invited from Money › Vendors (their login is tied to the sub), not here.
+const roleLabel = (k) => (k === 'sub' ? 'Sub (sub app)' : ROLES.find(r => r.key === k)?.label || k)
 const inputCls = 'w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-200)]'
 const linkFor = (code) => `${window.location.origin}/signup?code=${code}`
 
@@ -43,6 +46,29 @@ export function TeamCard() {
     } catch (e) { setError(e.message) }
     setRemoving('')
   }
+
+  // Change someone's role. Admin: anyone but yourself (never the last admin).
+  // Office: non-admins, to a non-admin role. The database checks the same.
+  const [changing, setChanging] = useState('')   // user id whose role is saving
+  const canChangeRole = (m) => !DEMO && m.id !== me?.id && m.role !== 'sub' && (isAdmin || m.role !== 'admin')
+    && !(m.role === 'admin' && adminCount <= 1)
+  const changeRole = async (m, next) => {
+    if (next === m.role) return
+    const label = roleLabel(next)
+    const extra = next === 'paint' ? '\n\nPaint PM only gets the phone paint screens (Queue, Schedule, Touch-ups) and won jobs.' : ''
+    if (!window.confirm(`Change ${m.displayName || m.email} to ${label}?${extra}\n\nThey'll see the change the next time they open the app.`)) return
+    setChanging(m.id); setError('')
+    try {
+      await setMemberRole(m.id, next)
+      useStore.setState(s => ({ members: (s.members || []).map(x => x.id === m.id ? { ...x, role: next } : x) }))
+    } catch (e) { setError(e.message) }
+    setChanging('')
+  }
+
+  // Admin: switch sections off for one person (Access). Not yourself, and not
+  // the paint PM (Field mode only — nothing to switch).
+  const [accessFor, setAccessFor] = useState('')
+  const canAccess = (m) => isAdmin && !DEMO && m.id !== me?.id && m.role !== 'paint' && m.role !== 'sub'
 
   // Admin: a new temporary password for someone who's locked out (no email needed).
   const [resetting, setResetting] = useState('')
@@ -166,9 +192,25 @@ export function TeamCard() {
         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">On the team ({members.length})</p>
         <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
           {members.map(m => (
-            <div key={m.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+            <div key={m.id}>
+            <div className="flex items-center gap-3 px-3 py-2 text-sm">
               <p className="flex-1 min-w-0 truncate text-gray-800">{m.displayName || m.email}<span className="text-gray-400"> · {m.email}</span></p>
-              <span className="text-xs text-gray-500">{roleLabel(m.role)}{m.id === me?.id ? ' (you)' : ''}</span>
+              {canChangeRole(m) ? (
+                <select value={m.role} disabled={!!changing} onChange={e => changeRole(m, e.target.value)}
+                  aria-label={`Role for ${m.displayName || m.email}`}
+                  className="text-xs text-gray-600 border border-gray-200 rounded px-1.5 py-1 bg-white disabled:opacity-50">
+                  {ROLES.filter(r => isAdmin || r.key !== 'admin').map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                </select>
+              ) : (
+                <span className="text-xs text-gray-500">{roleLabel(m.role)}{m.id === me?.id ? ' (you)' : ''}</span>
+              )}
+              {canAccess(m) && (
+                <button onClick={() => setAccessFor(a => a === m.id ? '' : m.id)} aria-expanded={accessFor === m.id}
+                  title={`Choose what ${m.displayName || m.email} can see`}
+                  className={`flex items-center gap-1 text-xs rounded px-2 py-1 ${accessFor === m.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-100'}`}>
+                  <SlidersHorizontal size={13} /> Access{Object.keys(m.permissions || {}).length ? ` (${Object.keys(m.permissions).length} off)` : ''}
+                </button>
+              )}
               {canReset(m) && (
                 <button onClick={() => resetPw(m)} disabled={!!resetting} title={`Give ${m.displayName || m.email} a new temporary password`}
                   className="flex items-center gap-1 text-xs text-gray-600 hover:bg-gray-100 rounded px-2 py-1 disabled:opacity-50">
@@ -182,8 +224,72 @@ export function TeamCard() {
                 </button>
               )}
             </div>
+            {accessFor === m.id && <AccessPanel member={m} onClose={() => setAccessFor('')} />}
+            </div>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Settings › Team › Access ─────────────────────────────────────────────────
+// One person's switches. Ticked = they have it. Sections their department
+// doesn't include are greyed out (change their role for those). Saved as the
+// switched-off keys; the database enforces the money ones (permissions.sql).
+function AccessPanel({ member, onClose }) {
+  const plan = useStore(s => s.branding?.plan || 'enterprise')
+  const allows = departmentAllows(plan, member.role)
+  const groups = permissionGroups()
+  const [off, setOff] = useState(() => ({ ...(member.permissions || {}) }))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const name = member.displayName || member.email
+  const toggle = (key) => setOff(o => { const n = { ...o }; if (n[key] === false) delete n[key]; else n[key] = false; return n })
+
+  const save = async () => {
+    setSaving(true); setError('')
+    try {
+      const r = await setMemberPermissions(member.id, off)
+      const saved = r?.permissions || off
+      useStore.setState(s => ({ members: (s.members || []).map(x => x.id === member.id ? { ...x, permissions: saved } : x) }))
+      onClose()
+    } catch (e) { setError(e.message) }
+    setSaving(false)
+  }
+
+  return (
+    <div className="mx-3 mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm" role="region" aria-label={`Access for ${name}`}>
+      <p className="text-xs text-gray-500 mb-3">
+        Untick what <b className="text-gray-700">{name}</b> shouldn't see. It disappears from their menu; money is also locked in the database.
+        They'll see the change the next time they open the app.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {groups.map(g => (
+          <div key={g.label}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">{g.label}</p>
+            {g.items.map(it => {
+              const possible = allows(it)
+              return (
+                <label key={it.key} title={possible ? it.hint : `Not part of their department (${roleLabel(member.role)})`}
+                  className={`flex items-start gap-2 py-0.5 ${possible ? 'cursor-pointer text-gray-700' : 'text-gray-300 cursor-not-allowed'}`}>
+                  <input type="checkbox" className="mt-0.5" disabled={!possible}
+                    checked={possible && off[it.key] !== false} onChange={() => toggle(it.key)}
+                    aria-label={`${g.label}: ${it.label}`} />
+                  <span>{it.label}{it.key === 'job.money' && <span className="block text-[11px] text-gray-400 leading-snug">{it.hint}</span>}</span>
+                </label>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      <div className="flex items-center gap-2 mt-3">
+        <button onClick={save} disabled={saving}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)] disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save access'}
+        </button>
+        <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs text-gray-600 hover:bg-gray-100">Cancel</button>
       </div>
     </div>
   )
@@ -219,7 +325,7 @@ export function PasswordCard() {
         {msg && <p className="text-xs text-emerald-700">{msg}</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
         <button type="submit" disabled={!ok || busy}
-          className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors">
+          className="px-4 py-2 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
           {busy ? 'Saving…' : 'Change password'}
         </button>
       </div>
