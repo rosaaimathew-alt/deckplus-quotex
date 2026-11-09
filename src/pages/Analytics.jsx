@@ -953,7 +953,7 @@ export default function Analytics() {
     const now = new Date()
     const matchesPeriod = (dateStr) => {
       if (statsPeriod === 'all') return true
-      const d = new Date(dateStr || Date.now())
+      const d = new Date(dateStr || now)
       const y = d.getFullYear(), q = Math.floor(d.getMonth() / 3)
       if (statsPeriod === 'this-month')   return y === now.getFullYear() && d.getMonth() === now.getMonth()
       if (statsPeriod === 'this-quarter') return y === now.getFullYear() && q === Math.floor(now.getMonth() / 3)
@@ -1031,7 +1031,7 @@ export default function Analytics() {
     // only counts realized Won contracts — a signed-but-not-yet-tagged deal is a win
     // but not recognized revenue yet — so the graph's sales total matches the cards.
     proposals.filter(p => p.status === 'Won' || p.contractDraft?.signed === true).forEach(p => {
-      const m = find(new Date(p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt || Date.now()))
+      const m = find(new Date(p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt || now))
       if (!m) return
       m.jobCount += 1
       if (p.status !== 'Won') return   // signed-only deals: count as a win, not revenue
@@ -1046,7 +1046,7 @@ export default function Analytics() {
     proposals.filter(p => !p.parentId || !ids.has(p.parentId)).forEach(root => {
       const group = [root, ...proposals.filter(p => p.parentId === root.id)]
       if (!group.some(p => p.status !== 'Archived' && p.status !== 'Draft')) return
-      const m = find(new Date(root.createdAt || root.sentAt || root.closedAt || Date.now()))
+      const m = find(new Date(root.createdAt || root.sentAt || root.closedAt || now))
       if (m) m.apptCount += 1
     })
     return months
