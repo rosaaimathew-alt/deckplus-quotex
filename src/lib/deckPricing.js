@@ -86,7 +86,7 @@ export const DECK_ITEMS = {
   cortexPvc:   { item: 'TimberTech PVC cortex (UP TO 15 STEPS)',              rate: 693 },
   high:        { item: "Deck above 8' high - add",                            rate: 5 },
   freestand:   { item: 'Free standing deck',                                  rate: 5 },
-  lvl:         { item: 'PT LVL (Framing) LF',                                 rate: 50 },
+  lvl:         { item: 'LVL (Framing) LF',                                 rate: 50 },
   hottub:      { item: 'Reinforce deck for hot tub/porch',                    rate: 2000 },
   bracePlate:  { item: 'Engineered metal bracing plate/per post (add letter)', rate: 750 },
   braceLetter: { item: 'Engineered metal bracing LETTER',                     rate: 1250 },
