@@ -67,7 +67,7 @@ export const PORCH_BUILD_DEFAULTS = {
   // Structural add-ons
   freestanding_add:   R('Freestanding structure add',                      'SF', 7,    'structure'),
   deck_over_8:        R('Deck above 8′ high add',                          'SF', 5,    'structure'),
-  pt_lvl:             R('PT LVL framing (porch depth)',                     'LF', 50,   'structure'),
+  pt_lvl:             R('PT LVL framing',                                   'LF', 50,   'structure'),
   lvl_engineering:    R('Engineer letter (LVL projects & semi-vaulted roofs)', 'LS', 1800, 'structure'),
   gable_over_19:      R('Gable / semi-vaulted wider than 19′ add',         'LS', 1000, 'structure'),
   hip_roof:           R('Hip roof',                                         'LS', 3000, 'structure'),
@@ -132,10 +132,10 @@ export const PORCH_BUILD_DEFAULTS = {
   tile:                 R('Tile flooring only',                             'SF', 29,   'flooring', { floor: true }),
   tile_deck:            R('Tile flooring on deck',                          'SF', 36,   'flooring', { floor: true }),
   tile_membrane:        R('Tile with plywood / membrane upgrade',           'SF', 44,   'flooring', { floor: true }),
-  concrete_4:           R('Concrete 4″',                                    'SF', 17,   'flooring', { concrete: true }),
-  concrete_small:       R('Concrete slab under 200 SF',                     'SF', 30,   'flooring', { concrete: true }),
-  concrete_reinforced:  R('Reinforced concrete 4″ (mesh / underlayment)',   'SF', 20,   'flooring', { concrete: true }),
-  concrete_access:      R('Concrete + hill / driveway / house access',      'SF', 20,   'flooring', { concrete: true }),
+  concrete_4:           R('Concrete 4″',                                    'SF', 20,   'flooring', { concrete: true }),
+  concrete_small:       R('Concrete slab under 200 SF',                     'SF', 35,   'flooring', { concrete: true }),
+  concrete_reinforced:  R('Reinforced concrete 4″ (mesh / underlayment)',   'SF', 25,   'flooring', { concrete: true }),
+  concrete_access:      R('Concrete + hill / driveway / house access',      'SF', 25,   'flooring', { concrete: true }),
 
   // Steps & landings — every deck collection, $/SF like the deck tool
   ...DECK_STEP_ROWS,
@@ -358,6 +358,7 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   doorWall: 'side',                     // sunroom: doors on the side walls by the house, or 'front'
   glassEnds: 0,                         // gable roofs only
   hotTub: false, wrap: false, cricket: false, seedStraw: false, bracingPosts: 0,
+  lvlLf: null,                          // PT LVL length (LF); null = auto (see suggestedLvlLf)
   paintPorch: false,
   flooring: null,                       // one flooring key or null
   concrete: null,                       // one concrete key or null (patio only)
@@ -377,6 +378,15 @@ export const boardLF = (sf) => sf * (12 / BOARD_FACE_IN)
 export function exposedPerimeterFt(inp) {
   const W = n(inp.width), D = n(inp.depth)
   return inp.tie === 'free' ? 2 * (W + D) : W + 2 * D
+}
+
+// PT LVL length the builder suggests: the porch depth plus 2′ for a wall
+// connection, or plus 8′ for a roof-to-roof connection. Only gable and hip
+// roofs take an LVL by default; a freestanding porch takes the depth alone.
+export const LVL_EXTRA_FT = { wall: 2, roof: 8, free: 0 }
+export function suggestedLvlLf(inp, roof) {
+  if (roof !== 'gable' && roof !== 'hip') return 0
+  return n(inp.depth) + (LVL_EXTRA_FT[inp.tie] ?? 0)
 }
 
 // Build the priced line list from the rep's inputs and the org's rate table.
@@ -407,13 +417,19 @@ export function computePorchBuild(input, ratesIn) {
   if (tie === 'free') add('freestanding_add', area)
   if (inp.floor === 'deck' && n(inp.deckHeightFt) > 8) add('deck_over_8', area)
 
-  // Roof style: gable and hip take a PT LVL and engineering; every semi-vaulted
-  // roof takes the engineering ($1,000).
-  if (roof === 'gable' || roof === 'hip') {
-    add('pt_lvl', D, 'porch depth')
-    add('lvl_engineering', 1)
-  }
-  if (roof === 'semivault') add('lvl_engineering', 1, 'semi-vaulted roof')
+  // Roof style: gable and hip take a PT LVL and the engineer letter; every
+  // semi-vaulted roof takes the letter. The rep can change the LVL length in
+  // Structural add-ons (blank = the suggestion); any LVL takes the letter.
+  const lvlAuto = suggestedLvlLf(inp, roof)
+  const lvlSet  = inp.lvlLf !== null && inp.lvlLf !== undefined && inp.lvlLf !== ''
+  const lvlLf   = lvlSet ? Math.max(0, n(inp.lvlLf)) : lvlAuto
+  const lvlNote = lvlSet ? 'length set by rep'
+    : tie === 'wall' ? 'porch depth + 2′ wall connection'
+    : tie === 'roof' ? 'porch depth + 8′ roof-to-roof'
+    : 'porch depth'
+  add('pt_lvl', lvlLf, lvlNote)
+  if (lvlLf > 0 || roof === 'gable' || roof === 'hip') add('lvl_engineering', 1)
+  else if (roof === 'semivault') add('lvl_engineering', 1, 'semi-vaulted roof')
   // Same over-19′ flat fee for gable and semi-vaulted roofs
   if ((roof === 'gable' || roof === 'semivault') && W > 19) add('gable_over_19', 1)
   if (roof === 'hip') {
@@ -519,7 +535,7 @@ export function computePorchBuild(input, ratesIn) {
   // both sides of the steps, and each landing's three open sides.
   const railStepLF = stepColl && risers > 0 ? 2 * runOutForSteps(risers) : 0
   const railLandingLF = landingColl ? n(inp.landings.count) * landingFasciaFt(4, 4) : 0
-  return { lines, groups, total, cost, area, roof, layout, risers, railStepLF, railLandingLF,
+  return { lines, groups, total, cost, area, roof, layout, lvlAuto, lvlLf, risers, railStepLF, railLandingLF,
     fasciaLF: exposedPerimeterFt(inp) + stepFasciaLF + landingFasciaLF, fasciaDeckLF: exposedPerimeterFt(inp), fasciaStepLF: stepFasciaLF, fasciaLandingLF: landingFasciaLF }
 }
 

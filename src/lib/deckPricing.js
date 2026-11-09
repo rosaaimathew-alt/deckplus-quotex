@@ -13,21 +13,22 @@ export const TREAD_IN = 11               // tread depth → run-out for the stai
 // `redeck` is the Re-Deck item (includes demo / reset of existing joists).
 export const DECK_COLLECTIONS = [
   { key: 'PT',                       group: 'Wood',            fam: 'PT',                                 rate: 33,   steps: true,  landing: true,  redeck: { item: 'PT Re-Deck (includes demo only)', rate: 18 },  fascia: null },
-  { key: 'Trex ENHANCE',             group: 'Trex',            fam: 'Trex ENHANCE',                       rate: 48.4, steps: true,  landing: true,  redeck: { item: 'Trex Enhance Re-Deck', rate: 31.9 },          fascia: 'trex' },
-  { key: 'Trex TRANSCEND',           group: 'Trex',            fam: 'Trex TRANSCEND',                     rate: 61.6, steps: true,  landing: true,  redeck: { item: 'Trex Transcend Re-Deck', rate: 42.9 },        fascia: 'trex' },
-  { key: 'Trex LINEAGE',             group: 'Trex',            fam: 'Trex LINEAGE',                       rate: 61.6, steps: true,  landing: true,  redeck: { item: 'Trex Lineage Re-Deck', rate: 47.3 },          fascia: 'trex' },
-  { key: 'Trex SIGNATURE',           group: 'Trex',            fam: 'Trex SIGNATURE',                     rate: 73.7, steps: true,  landing: true,  redeck: null,                                                    fascia: 'trexsig' },
-  { key: 'TimberTech PRIME/+',       group: 'TimberTech',      fam: 'TimberTech PRIME/+',                 rate: 50.82, steps: true,  landing: true,  redeck: { item: 'TimberTech Prime+ Re-Deck', rate: 36.96 },     fascia: 'ttc' },
-  { key: 'TimberTech TERRAIN/+',     group: 'TimberTech',      fam: 'TimberTech TERRAIN/+',               rate: 55.44, steps: true,  landing: true,  redeck: { item: 'TimberTech Terrain+ Re-Deck', rate: 39.27 },   fascia: 'ttc' },
-  { key: 'TimberTech RESERVE',       group: 'TimberTech',      fam: 'TimberTech RESERVE',                 rate: 58.91, steps: true,  landing: true,  redeck: { item: 'TimberTech Reserve Re-Deck', rate: 45.05 },    fascia: 'ttc' },
-  { key: 'TimberTech HARVEST PVC',   group: 'TimberTech PVC',  fam: 'TimberTech HARVEST PVC',             rate: 65.84, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech LANDMARK PVC',  group: 'TimberTech PVC',  fam: 'TimberTech LANDMARK PVC',            rate: 65.84, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech VINTAGE PVC',   group: 'TimberTech PVC',  fam: 'TimberTech VINTAGE PVC',             rate: 69.3,   steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'Trex ENHANCE',             group: 'Trex',            fam: 'Trex ENHANCE',                       rate: 48, steps: true,  landing: true,  redeck: { item: 'Trex Enhance Re-Deck', rate: 31.9 },          fascia: 'trex' },
+  { key: 'Trex SELECT',              group: 'Trex',            fam: 'Trex SELECT',                        rate: 52, steps: true,  landing: true,  redeck: null,                                                    fascia: 'trex' },
+  { key: 'Trex TRANSCEND',           group: 'Trex',            fam: 'Trex TRANSCEND',                     rate: 61, steps: true,  landing: true,  redeck: { item: 'Trex Transcend Re-Deck', rate: 42.9 },        fascia: 'trex' },
+  { key: 'Trex LINEAGE',             group: 'Trex',            fam: 'Trex LINEAGE',                       rate: 61, steps: true,  landing: true,  redeck: { item: 'Trex Lineage Re-Deck', rate: 47.3 },          fascia: 'trex' },
+  { key: 'Trex SIGNATURE',           group: 'Trex',            fam: 'Trex SIGNATURE',                     rate: 73, steps: true,  landing: true,  redeck: null,                                                    fascia: 'trexsig' },
+  { key: 'TimberTech PRIME/+',       group: 'TimberTech',      fam: 'TimberTech PRIME/+',                 rate: 48, steps: true,  landing: true,  redeck: { item: 'TimberTech Prime+ Re-Deck', rate: 36.96 },     fascia: 'ttc' },
+  { key: 'TimberTech TERRAIN/+',     group: 'TimberTech',      fam: 'TimberTech TERRAIN/+',               rate: 52, steps: true,  landing: true,  redeck: { item: 'TimberTech Terrain+ Re-Deck', rate: 39.27 },   fascia: 'ttc' },
+  { key: 'TimberTech RESERVE',       group: 'TimberTech',      fam: 'TimberTech RESERVE',                 rate: 56, steps: true,  landing: true,  redeck: { item: 'TimberTech Reserve Re-Deck', rate: 45.05 },    fascia: 'ttc' },
+  { key: 'TimberTech HARVEST PVC',   group: 'TimberTech PVC',  fam: 'TimberTech HARVEST PVC',             rate: 63, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech LANDMARK PVC',  group: 'TimberTech PVC',  fam: 'TimberTech LANDMARK PVC',            rate: 63, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech VINTAGE PVC',   group: 'TimberTech PVC',  fam: 'TimberTech VINTAGE PVC',             rate: 68,   steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
   { key: 'TimberTech PVC MULTI WIDTH 7.25"/3.5"', group: 'TimberTech PVC', fam: 'TimberTech PVC MULTI WIDTH 7.25"/3.5"', rate: 73.5, steps: false, landing: true,  redeck: null, fascia: 'ttp' },
   { key: 'TimberTech PVC 2" MAX',    group: 'TimberTech PVC',  fam: 'TimberTech PVC 2" MAX',              rate: 81.9,   steps: true,  landing: false, redeck: null, fascia: 'ttp' },
   { key: 'TimberTech PVC 3.5" (NARROW)', group: 'TimberTech PVC', fam: 'TimberTech PVC 3.5" (NARROW)',    rate: 81.9,   steps: false, landing: true,  redeck: null, fascia: 'ttp' },
   { key: 'TimberTech PVC 7.25" (WIDE)',  group: 'TimberTech PVC', fam: 'TimberTech PVC 7.25" (WIDE)',     rate: 84,   steps: false, landing: true,  redeck: null, fascia: 'ttp' },
-  { key: 'TimberTech VINTAGE T&G',   group: 'TimberTech PVC',  fam: 'TimberTech VINTAGE T&G',             rate: 84.32, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
+  { key: 'TimberTech VINTAGE T&G',   group: 'TimberTech PVC',  fam: 'TimberTech VINTAGE T&G',             rate: 80, steps: true,  landing: true,  redeck: null, fascia: 'ttp' },
 ]
 
 // Rails — $ per LF.
@@ -35,15 +36,16 @@ export const DECK_RAILS = [
   { key: 'None' },
   { key: '2x2 pickets wood rail',                           rate: 17 },
   { key: 'Hybrid Railing / wood cap',                       rate: 19 },
-  { key: 'Hybrid Railing / trex cap',                       rate: 30.8 },
-  { key: 'Trex Transcend Railing',                          rate: 170.5, trex: true },
+  { key: 'Hybrid Railing / trex cap',                       rate: 31 },
+  { key: 'Trex Transcend Railing',                          rate: 170, trex: true },
   { key: 'Trex Select Railing WHITE ONLY',                  rate: 121,   trex: true },
   { key: 'Trex Select Alum. Railing',                       rate: 112,   trex: true },
   { key: 'Trex Select Alum. Railing BETWEEN POSTS ONLY',    rate: 82,    trex: true },
   { key: 'Trex SIGNATURE Alum. Railing',                    rate: 142,   trex: true },
   { key: 'Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY', rate: 86,    trex: true },
-  { key: 'TimberTech Alum. Railing',                        rate: 152.46 },
-  { key: 'TimberTech Railing BETWEEN POSTS ONLY',           rate: 82.01 },
+  { key: 'TimberTech Alum. Railing',                        rate: 145 },
+  { key: 'TimberTech Railing BETWEEN POSTS ONLY',           rate: 78 },
+  { key: 'TimberTech IRX Cable Rail',                       rate: 158 },
   { key: 'Iron Rod Railing LF',                             rate: 0, custom: true },   // "Custom" on the sheet
 ]
 export const BRONZE_BALUSTERS = { item: 'BRONZE balusters (special order) ADD LF', rate: 6 }
@@ -115,7 +117,7 @@ export function matchCollection(label) {
   const rules = [
     [/vintage.*(t&g|tongue)/, 'TimberTech VINTAGE T&G'], [/multi/, 'TimberTech PVC MULTI WIDTH 7.25"/3.5"'],
     [/2"? ?max|\bmax\b/, 'TimberTech PVC 2" MAX'], [/narrow|3\.5/, 'TimberTech PVC 3.5" (NARROW)'], [/wide|7\.25/, 'TimberTech PVC 7.25" (WIDE)'],
-    [/transcend/, 'Trex TRANSCEND'], [/lineage/, 'Trex LINEAGE'], [/signature/, 'Trex SIGNATURE'], [/enhance/, 'Trex ENHANCE'],
+    [/\bselect\b/, 'Trex SELECT'], [/transcend/, 'Trex TRANSCEND'], [/lineage/, 'Trex LINEAGE'], [/signature/, 'Trex SIGNATURE'], [/enhance/, 'Trex ENHANCE'],
     [/prime/, 'TimberTech PRIME/+'], [/terrain/, 'TimberTech TERRAIN/+'], [/reserve/, 'TimberTech RESERVE'],
     [/harvest/, 'TimberTech HARVEST PVC'], [/landmark/, 'TimberTech LANDMARK PVC'], [/vintage/, 'TimberTech VINTAGE PVC'],
     [/pressure|pine|\bpt\b|2x6|wood/, 'PT'],
