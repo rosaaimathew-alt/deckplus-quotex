@@ -18,8 +18,9 @@ import {
   DollarSign, FileText, Plus, ChevronDown, ChevronUp, MessageSquare,
   Phone, Mail, Send, Users, BarChart2, Columns, List, Award, ThumbsDown,
   Eye, Copy, GitBranch, FileSignature, ShoppingCart,
-  GitMerge, Unlink, Search, MoreHorizontal, Link2, UserCheck, Archive,
+  GitMerge, Unlink, Search, MoreHorizontal, Link2, Archive, ReceiptText,
 } from 'lucide-react'
+import JobPriceList from '../components/JobPriceList'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
 import { wonRevenueOf } from '../contractTotal'
 
@@ -698,7 +699,8 @@ const repName = (members, id) => {
 }
 
 function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onOpen, onRevise, onGenerateContract, showRep }) {
-  const { deleteProposal, detachProposal, mergeProposalGroups, members, setProposalPm } = useStore()
+  const { deleteProposal, detachProposal, mergeProposalGroups, members } = useStore()
+  const [priceListFor, setPriceListFor] = useState(null)
   const me = useStore(s => s.me)
   const allProposals = useStore(s => s.proposals)
   // Archive / delete only while the client keeps another live proposal, so every
@@ -836,12 +838,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                 { label: 'Merge into client', icon: GitMerge, onClick: onMerge },
                 ...(altCount > 0 ? [{ label: 'Detach', icon: Unlink, onClick: () => onDetach(p.id) }] : []),
                 ...(p.status === 'Won' ? [{ label: 'Generate Contract', icon: FileSignature, onClick: () => onGenerateContract(p) }] : []),
-                // Assign one of the org's PMs to this deal (the PM then sees the job); pick again to unassign.
-                ...(members || []).filter(m => m.role === 'pm').map(m => ({
-                  label: `${p.pmId === m.id ? '✓ ' : ''}PM: ${m.displayName || m.email}`,
-                  icon: UserCheck,
-                  onClick: () => setProposalPm(p.id, p.pmId === m.id ? null : m.id),
-                })),
+                { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) },
                 ...((p.status === 'Sent' || p.status === 'Followed Up') && p.email ? [{ label: 'Send Follow-up', icon: Send, onClick: () => setFollowUpProposal(p) }] : []),
                 ...removeItems(p),
               ]} />
@@ -862,6 +859,17 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       {followUpProposal && <FollowUpModal proposal={followUpProposal} onClose={() => setFollowUpProposal(null)} />}
+      {priceListFor && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto" onClick={() => setPriceListFor(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Price list — {priceListFor.client || 'No name'}</h3>
+              <button onClick={() => setPriceListFor(null)} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+            </div>
+            <div className="p-5"><JobPriceList proposal={priceListFor} /></div>
+          </div>
+        </div>
+      )}
       {mergeSource && (
         <MergeModal
           sourceGroup={mergeSource}
@@ -937,6 +945,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                           <RowMenu items={[
                             { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(alt) },
                             { label: 'Revise', icon: Copy, onClick: () => onRevise(alt) },
+                            { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(alt) },
                             { label: 'Detach', icon: Unlink, onClick: () => handleDetach(alt.id) },
                             ...removeItems(alt),
                           ]} />
