@@ -7,6 +7,7 @@ import DeckPlusContract from '../contract/DeckPlusContract'
 import { PACKET_FORMS } from '../contract/deckPlusAgreement'
 import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, requiredSignFields, STATES, COUNTIES } from '../contract/contractFields'
 import { locateAddress } from '../lib/permitFees'
+import { dropUnsold, unsoldUpgrades } from '../lib/scopeUpgrades'
 import { specPrefill } from '../contract/specPrefill'
 import { scopeLinesFor, normalizeScope, remapEdit, draftOf, scopeEdits, applyLearned, learnedHints, linePrice } from '../lib/scopeLearning'
 import { mergeLines } from '../lib/hiddenLines'
@@ -543,10 +544,13 @@ export default function ContractView() {
       }
       const seen = new Set()
       const relevant = heads.flatMap(findRelevant).filter(ex => { if (seen.has(ex.id)) return false; seen.add(ex.id); return true }).slice(0, 10)
-      const styleContext = relevant.length > 0
-        ? `\n\nIMPORTANT — You have written scope bullets for this contractor before. Study these EXACT past examples and match the writing style, line breaks, indentation, and level of detail PRECISELY:\n\n${relevant.map(ex => `[${ex.itemName}]\n${ex.bulletText}`).join('\n\n')}\n\nWrite the new bullets in this SAME style.`
+      // Past contracts teach wording only. Lines naming an upgrade this quote doesn't
+      // have (T&G ceiling, Cox columns…) are taken out before the AI sees them.
+      const relevantClean = relevant.map(ex => ({ ...ex, bulletText: dropUnsold(ex.bulletText, itemList) })).filter(ex => ex.bulletText.trim())
+      const styleContext = relevantClean.length > 0
+        ? `\n\nIMPORTANT — You have written scope bullets for this contractor before. Study these past examples and match the writing style, line breaks, indentation, and level of detail:\n\n${relevantClean.map(ex => `[${ex.itemName}]\n${ex.bulletText}`).join('\n\n')}\n\nWrite the new bullets in this SAME style. The examples are for wording only: describe only what is in this proposal's items — never carry over materials, upgrades or options (ceilings, columns, beams, lights…) from the examples.`
         : ''
-      const hints = learnedHints(scopeExamples, heads.map(h => h.item))
+      const hints = learnedHints(scopeExamples, heads.map(h => h.item)).map(h => dropUnsold(h, itemList)).filter(h => h.includes('usually'))
       const editContext = hints.length ? `\n\nThe contractor's reps consistently edit scope wording for these items — follow these preferences:\n${hints.join('\n')}` : ''
       const res = await fetch('/api/ai-chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -560,7 +564,8 @@ export default function ContractView() {
       const aiData  = await res.json()
       const bullets = (aiData.text || '').split('\n').map(l => l.replace(/^[-•*\d.]+\s*/, '').trim()).filter(Boolean)
       let next = scopeLines.filter(l => !l.isDiscount)
-      heads.forEach((h, i) => { if (bullets[i]) next = replaceItemText(next, h.item, bullets[i]) })
+      // A bullet that names an upgrade not on this quote is not used; the item keeps its own wording.
+      heads.forEach((h, i) => { if (bullets[i] && !unsoldUpgrades(bullets[i], itemList).length) next = replaceItemText(next, h.item, bullets[i]) })
       setScopeLines(startScope(next, 'ai'))
     } catch (err) { setAiError(err.message) } finally { setIsGenerating(false) }
   }

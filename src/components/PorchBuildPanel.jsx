@@ -239,6 +239,15 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           </Field>
         </div>
         <div className="sm:max-w-sm"><Check label="Roof cricket" price={money(rates.roof_cricket.rate)} checked={inp.cricket} onChange={v => set({ cricket: v })} /></div>
+        {inp.type === 'open' && (
+          <label className="flex items-center gap-2 text-sm text-gray-700 sm:max-w-sm">
+            <span>8″×8″ column upgrade</span>
+            <input type="number" min="0" aria-label="8″×8″ column upgrade (columns)" className="w-16 text-sm border border-gray-300 rounded-md px-2 py-1 text-right"
+              value={inp.extras?.col_8x8 ?? ''} placeholder="0"
+              onChange={e => { const ex = { ...(inp.extras || {}) }; if (e.target.value === '' || Number(e.target.value) === 0) delete ex.col_8x8; else ex.col_8x8 = e.target.value; set({ extras: ex }) }} />
+            <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">{money(rates.col_8x8.rate)}/column</span>
+          </label>
+        )}
         {optionPicker('roofceiling', 'Roof & ceiling upgrades')}
       </Card>
 

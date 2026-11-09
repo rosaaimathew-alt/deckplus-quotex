@@ -10,6 +10,8 @@
 //    item and adds lines they keep adding (applyLearned), and
 //  • AI Suggest is told the same (learnedHints).
 
+import { unsoldUpgrades } from './scopeUpgrades'
+
 const n = (v) => Number(v) || 0
 
 // "-- Install 4x4 posts." → "install 4x4 posts" (for comparing lines).
@@ -135,9 +137,12 @@ export function learnedFor(examples = [], itemKey) {
   return { remove, add, contracts: exs.length }
 }
 
-// A new contract's starting scope with the learned edits made.
+// A new contract's starting scope with the learned edits made. A learned line
+// is never added when it brings in an upgrade (T&G, Cox columns…) that isn't
+// on this quote: upgrades come in as their own priced line.
 // Returns { lines, applied: [{ itemName, removed: [...], added: [...] }] }.
 export function applyLearned(lines = [], examples = []) {
+  const quoteText = lines.map(l => `${l.name || ''}\n${l.text || ''}`).join('\n')
   const applied = []
   const record = (item) => {
     let r = applied.find(a => a.item === item)
@@ -159,7 +164,7 @@ export function applyLearned(lines = [], examples = []) {
     const lr = l.item && learned.get(l.item)
     if (!lr?.add.length || kept.slice(idx + 1).some(x => x.item === l.item)) return
     const have = new Set(kept.filter(x => x.item === l.item).map(x => normUnit(x.text)))
-    lr.add.filter(t => !have.has(normUnit(t))).forEach((t, k) => {
+    lr.add.filter(t => !have.has(normUnit(t)) && !unsoldUpgrades(t, quoteText).length).forEach((t, k) => {
       out.push({ id: `${l.id}+${k}`, name: '', price: 0, text: t, item: l.item })
       record(l.item).added.push(t)
     })

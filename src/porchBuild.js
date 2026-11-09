@@ -81,6 +81,7 @@ export const PORCH_BUILD_DEFAULTS = {
   // Enclosure
   screeneze_upcharge: R('ScreenEze screens',                               'SF', 3,    'enclosure'),
   lam_column_pkg:     R('6×6 laminated COX column package',                 'LS', 2000, 'enclosure'),
+  col_8x8:            R('8″×8″ column upgrade (open porch)',                'EA', 350,  'structure', { option: true }),
   eze_window:         R('Eze-Breeze window unit (new porch)',               'EA', 530,  'enclosure'),   // $700 is the conversion tool's rate
   eze_transom:        R('Eze-Breeze transom (wall over 100″)',              'EA', 130,  'enclosure'),
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
@@ -520,6 +521,7 @@ export function computePorchBuild(input, ratesIn) {
   for (const [k, q] of Object.entries(inp.extras || {})) {
     if (!rates[k]?.option) continue
     if (k === 'flat_ceiling' && roof === 'hip') continue
+    if (k === 'col_8x8' && inp.type !== 'open') continue   // open porches only (screen / Eze-Breeze take Cox columns)
     add(k, n(q))
   }
 
@@ -584,6 +586,7 @@ const ROOF_WORDS = { shed: 'Shed roof', gable: 'A-Frame gable roof', semivault: 
 
 // One priced line → its scope wording
 export function porchLineScope(l, inp, result, catalog) {
+  if (l.key === 'col_8x8') return `Upgrade ${countWords(l.qty)} columns to 8”x8” solid wood columns, wrapped with Miratec.`
   const name = PORCH_CATALOG_NAMES[l.key]
   const fallback = `${l.label}${l.unit === 'EA' && l.qty > 1 ? ` (${l.qty})` : ''}.`
   if (!name) return fallback
@@ -647,6 +650,8 @@ export function buildPorchScope(input, result, templates, catalog = []) {
     if (!t) continue
     ;(groups[l.group] = groups[l.group] || []).push(t)
   }
+  // Ply-bead is the standard ceiling; a T&G ceiling upgrade replaces it.
+  if (result.lines.some(l => l.key === 'tg_ceiling' && n(l.qty) > 0)) structure = structure.split('\n').filter(s => !/ply\s*-?\s*bead/i.test(s)).join('\n')
   groups.structure = [structure, ...(groups.structure || [])]
   const byGroup = Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, [...new Set(v)].join('\n')]))
   const order = ['structure', 'enclosure', 'roofceiling', 'finishes', 'flooring', 'stepsrail', 'electrical']
