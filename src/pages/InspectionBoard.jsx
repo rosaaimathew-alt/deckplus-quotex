@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useStore, canDeleteProposals } from '../store'
+import { useStore, canDeleteProposal } from '../store'
 import { QuickPicks, MenuChip, SwitchChip } from '../components/FilterBar'
 import { DEMO } from '../demo'
 import { getStages } from './Jobs'
@@ -342,7 +342,6 @@ export default function InspectionBoard() {
 
   const company = useStore(s => s.branding?.companyName)
   const deleteProposal = useStore(s => s.deleteProposal)
-  const canDelete = canDeleteProposals(me)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState(null)
   const onAdded = (id) => {
@@ -525,7 +524,7 @@ export default function InspectionBoard() {
                         <button onClick={() => setEditing(j.p.id)} className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800">
                           <Pencil size={11} /> Edit job (address, permit #, county, PM)
                         </button>
-                        {canDelete && <button onClick={() => { if (window.confirm(`Remove ${j.p.client} from the inspections board?`)) { deleteProposal(j.p.id); setOpen(null) } }}
+                        {canDeleteProposal(me, proposals, j.p.id) && <button onClick={() => { if (window.confirm(`Remove ${j.p.client} from the inspections board?`)) { deleteProposal(j.p.id); setOpen(null) } }}
                           className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-600">
                           <Trash2 size={11} /> Remove this job from the board
                         </button>}

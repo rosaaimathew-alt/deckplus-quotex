@@ -5,6 +5,7 @@ import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
 import { appRoleOf } from './roles'
+import { clientGroups } from './lib/proposalGroups'
 import { newSubTaskId } from './lib/subTasks'
 import { newDrawId } from './lib/subDraws'
 
@@ -153,8 +154,19 @@ export const LOSS_REASONS = [
 
 export const ACTIVITY_TYPES = ['Call', 'Follow-up', 'Meeting', 'Email', 'Objection', 'Note']
 
-// Only an admin (Manager / Owner) can delete a proposal; everyone else archives it.
+// A client counts in win rate and conversion while at least one of their
+// proposals isn't archived (src/lib/headline.js). So a proposal can be archived,
+// or deleted by anyone but an admin, only while the client keeps another
+// proposal that isn't archived: alternatives clear off the dashboard and
+// pipeline, the customer stays. Their last one is marked Lost, not removed.
 export const canDeleteProposals = (me) => DEMO || me?.role === 'admin'
+export function clientKeepsAnother(proposals, id) {
+  const group = clientGroups(proposals).find(g => g.all.some(p => p.id === id))
+  return !!group && group.all.some(p => p.id !== id && p.status !== 'Archived')
+}
+export function canDeleteProposal(me, proposals, id) {
+  return canDeleteProposals(me) || clientKeepsAnother(proposals, id)
+}
 
 export const useStore = create(
   persist(
@@ -737,7 +749,7 @@ export const useStore = create(
         })),
 
       deleteProposal: (id) => {
-        if (!canDeleteProposals(get().me)) return
+        if (!canDeleteProposal(get().me, get().proposals, id)) return
         set((s) => ({
           proposals: s.proposals.filter((p) => p.id !== id),
           // Tombstone so the delete survives the union merge (and propagates to

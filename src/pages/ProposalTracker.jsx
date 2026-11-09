@@ -11,7 +11,7 @@ import { withSavedDesign } from '../lib/designSnapshot'
 import DesignShareToggle from '../components/DesignShareToggle'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
-  contractNumberFor, canDeleteProposals,
+  contractNumberFor, canDeleteProposal, clientKeepsAnother,
 } from '../store'
 import {
   Bell, Trash2, X, CheckCircle, AlertCircle, Clock, TrendingUp,
@@ -699,11 +699,13 @@ const repName = (members, id) => {
 
 function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onOpen, onRevise, onGenerateContract, showRep }) {
   const { deleteProposal, detachProposal, mergeProposalGroups, members, setProposalPm } = useStore()
-  const canDelete = canDeleteProposals(useStore(s => s.me))
-  // Sales reps archive; only an admin can delete.
+  const me = useStore(s => s.me)
+  const allProposals = useStore(s => s.proposals)
+  // Archive / delete only while the client keeps another live proposal, so every
+  // customer stays counted (an admin can still delete anything).
   const removeItems = (x) => [
-    ...(x.status !== 'Archived' ? [{ label: 'Archive', icon: Archive, onClick: () => onStatusChange(x, 'Archived') }] : []),
-    ...(canDelete ? [{ label: 'Delete', icon: Trash2, onClick: () => { if (window.confirm(`Delete ${x.client || 'this proposal'}? This can't be undone.`)) deleteProposal(x.id) }, danger: true }] : []),
+    ...(x.status !== 'Archived' && clientKeepsAnother(allProposals, x.id) ? [{ label: 'Archive', icon: Archive, onClick: () => onStatusChange(x, 'Archived') }] : []),
+    ...(canDeleteProposal(me, allProposals, x.id) ? [{ label: 'Delete', icon: Trash2, onClick: () => { if (window.confirm(`Delete ${x.client || 'this proposal'}? This can't be undone.`)) deleteProposal(x.id) }, danger: true }] : []),
   ]
   const branding = useStore(s => s.branding)
   const setProposalViewToken = useStore(s => s.setProposalViewToken)

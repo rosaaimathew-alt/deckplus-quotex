@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import StatCard from '../components/StatCard'
-import { useStore, canDeleteProposals } from '../store'
+import { useStore, canDeleteProposals, canDeleteProposal } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { MenuChip, QuickPicks, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
@@ -275,7 +275,8 @@ const BULK_EMPTY = { count: '70', status: 'Lost', startDate: '2026-01-01', endDa
 function PastJobPanel() {
   const { proposals, projectTypes: PROJECT_TYPES, importHistoricalJob, bulkImportHistoricalProposals, deleteProposal,
           importHistory2024_2025, clearHistory2024_2025, historyImported } = useStore()
-  const canDelete = canDeleteProposals(useStore(s => s.me))
+  const me = useStore(s => s.me)
+  const canDelete = canDeleteProposals(me)
   const [open, setOpen] = useState(false)
   const [tab, setTab]   = useState('won')   // 'won' | 'nonwon'
   const [form, setForm] = useState(EMPTY_FORM)
@@ -418,7 +419,7 @@ function PastJobPanel() {
                             {new Date(p.closedAt || p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                           <span className="text-sm font-semibold text-gray-700">${Number(p.total).toLocaleString()}</span>
-                          {canDelete && <button onClick={() => deleteProposal(p.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity">
+                          {canDeleteProposal(me, proposals, p.id) && <button onClick={() => deleteProposal(p.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity">
                             <Trash2 size={13} />
                           </button>}
                         </div>
