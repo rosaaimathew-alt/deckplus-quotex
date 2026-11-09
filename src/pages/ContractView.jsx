@@ -6,6 +6,7 @@ import { DEMO } from '../demo'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import { PACKET_FORMS } from '../contract/deckPlusAgreement'
 import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, requiredSignFields, STATES, COUNTIES } from '../contract/contractFields'
+import { locateAddress } from '../lib/permitFees'
 import { specPrefill } from '../contract/specPrefill'
 import { scopeLinesFor, normalizeScope, remapEdit, draftOf, scopeEdits, applyLearned, learnedHints, linePrice } from '../lib/scopeLearning'
 import { mergeLines } from '../lib/hiddenLines'
@@ -124,7 +125,8 @@ function getMilestoneSet(key, projectTag, total) {
 // document). Grouped the way the rep thinks about them.
 const FILLIN_GROUPS = [
   { title: 'Dates', fields: [['effectiveDate', 'Agreement date'], ['dateSold', 'Date sold'], ['startDate', 'Start date (PM)']] },
-  { title: 'Customer', fields: [['clientName', 'Client name'], ['clientPhone', 'Phone'], ['clientEmail', 'Email'], ['propertyAddress', 'Property address'], ['county', 'County'], ['subdivision', 'Subdivision']] },
+  { title: 'Customer', fields: [['clientName', 'Client name'], ['clientPhone', 'Phone'], ['clientEmail', 'Email'], ['propertyAddress', 'Property address'], ['county', 'County']] },
+  { title: 'Property', lookup: true, fields: [['subdivision', 'Subdivision'], ['beds', 'Beds'], ['baths', 'Baths'], ['waterProvider', 'Water provider'], ['energyProvider', 'Energy provider'], ['gasProvider', 'Gas provider']] },
   { title: 'Project', fields: [['contractNum', 'Contract #'], ['jobName', 'Job name (spec sheets)'], ['projectName', 'Project name (site conditions)'], ['projectType', 'Project type'], ['designConsultant', 'Design consultant'], ['releaseSubject', 'Release of liability — relating to'], ['capitalImprovement', 'E-589CI — capital improvement']] },
   { title: 'Payment (clause 3)', fields: [['contractTotal', 'Contract total'], ['contractTotalWords', 'Total in words'], ['pay1', 'Upon contract signature'], ['pay2', 'The day job starts'], ['pay3', 'Middle payment'], ['pay3Label', 'Middle payment label'], ['pay4', 'After 1st punch list']] },
 ]
@@ -177,6 +179,7 @@ export default function ContractView() {
   const saveContractDraft         = useStore(s => s.saveContractDraft)
   const scopeExamples             = useStore(s => s.scopeExamples)
   const saveScopeExamples         = useStore(s => s.saveScopeExamples)
+  const setProposalPropertyInfo   = useStore(s => s.setProposalPropertyInfo)
   const scopeTemplates            = useStore(s => s.scopeTemplates)
   const saveScopeTemplate         = useStore(s => s.saveScopeTemplate)
   const deleteScopeTemplate       = useStore(s => s.deleteScopeTemplate)
@@ -254,6 +257,7 @@ export default function ContractView() {
   const companySignature = useStore(s => s.companySignature)
   const [linkLoading, setLinkLoading]     = useState(false)
   const [copiedRole, setCopiedRole]       = useState('')
+  const [propLookup, setPropLookup]       = useState('')   // '' | 'busy' | error text
 
   useEffect(() => {
     const raw = sessionStorage.getItem('contract')
@@ -312,6 +316,32 @@ export default function ContractView() {
     }
   }, [])
 
+  // Subdivision, beds/baths and the utility providers, looked up once per
+  // address when the contract is drafted and saved on the proposal.
+  const lookupProperty = async () => {
+    const address = data?.address?.trim()
+    if (!address || !data?.proposalId || DEMO) return
+    setPropLookup('busy')
+    try {
+      const res = await fetch('/api/ai-chat?task=property', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, county: locateAddress(address).county }),
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok || !out.info) throw new Error(out.error || `Property lookup failed (${res.status}).`)
+      setProposalPropertyInfo(data.proposalId, { ...out.info, address, lookedUpAt: new Date().toISOString() })
+      setPropLookup('')
+    } catch (err) { setPropLookup(err.message || 'Property lookup failed.') }
+  }
+  useEffect(() => {
+    if (!data?.proposalId || !data.address) return
+    const p = proposals.find(x => x.id === data.proposalId)
+    if (p?.contractDraft?.signed) return
+    if (p?.propertyInfo?.address === data.address.trim()) return
+    lookupProperty()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once per job address; the result is saved on the proposal
+  }, [data?.proposalId, data?.address])
+
   if (!data) {
     return (
       <div className="p-8 text-center text-gray-400">
@@ -339,8 +369,9 @@ export default function ContractView() {
   const specCount   = Object.keys(spec.checks).length + Object.keys(spec.values).length
   const hasElectrical = spec.hasElectrical || (scopeLines || []).some(l => /electric|outlet|light|fan|switch|wiring/i.test(`${l.name} ${l.text}`))
   const saleDate    = proposal?.closedAt || proposal?.statusChangedAt || null
-  const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, overrides: spec.values })
-  const values      = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, overrides: { ...spec.values, ...fieldOverrides } })
+  const property    = proposal?.propertyInfo?.address === (data.address || '').trim() ? proposal.propertyInfo : null
+  const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, property, overrides: spec.values })
+  const values      = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, property, overrides: { ...spec.values, ...fieldOverrides } })
   const packetKeys  = packet ?? defaultPacket({ projectTypes, scopeLines, hasElectrical, state: values.jobState, county: values.county })
   const effectiveChecks = { ...autoChecks({ projectTypes }), ...spec.checks, ...checks }
 
@@ -813,7 +844,12 @@ export default function ContractView() {
             <div className="px-5 pb-5 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               {FILLIN_GROUPS.map(g => (
                 <div key={g.title}>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{g.title}</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    {g.title}
+                    {g.lookup && !DEMO && (propLookup === 'busy'
+                      ? <span className="normal-case tracking-normal font-normal text-gray-400 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Looking up…</span>
+                      : <button onClick={lookupProperty} title={propLookup || 'Search county records and utilities for this address'} className={`normal-case tracking-normal font-normal flex items-center gap-1 ${propLookup ? 'text-red-500' : 'text-blue-600 hover:text-blue-700'}`}><RotateCcw size={11} /> {propLookup ? 'Lookup failed — retry' : 'Look up again'}</button>)}
+                  </p>
                   <div className="space-y-1.5">
                     {g.fields.map(([name, label]) => {
                       const overridden = fieldOverrides[name] !== undefined && fieldOverrides[name] !== '' && name !== 'contractNum'
@@ -830,7 +866,7 @@ export default function ContractView() {
                 </div>
               ))}
               <div className="md:col-span-2 bg-blue-50 rounded-lg px-3 py-2 text-xs text-blue-700">
-                Every other blank (notes, providers, beds/baths, spec-sheet details…) and every checkbox can be filled right on the document below — yellow fields are editable. The contract wording itself is locked.
+                Every other blank (notes, spec-sheet details…) and every checkbox can be filled right on the document below — yellow fields are editable. The contract wording itself is locked.
               </div>
             </div>
           )}

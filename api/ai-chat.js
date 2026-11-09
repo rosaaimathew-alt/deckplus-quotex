@@ -14,6 +14,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireAuth } from './_auth.js'
 import { houseHandler } from './_house.js'
+import { propertyHandler } from './_property.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -56,6 +57,8 @@ export default async function handler(req, res) {
   // Design editor: match the customer's house from a photo (api/_house.js). Lives here because
   // Vercel's Hobby plan is at its 12-function limit.
   if (req.query?.task === 'house') return houseHandler(req, res)
+  // Contract packet: subdivision, beds/baths and utility providers for the job address (api/_property.js).
+  if (req.query?.task === 'property') return propertyHandler(req, res)
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!(await requireAuth(req, res))) return
 
