@@ -11,14 +11,14 @@ import { withSavedDesign } from '../lib/designSnapshot'
 import DesignShareToggle from '../components/DesignShareToggle'
 import {
   useStore, PROPOSAL_STATUSES, WIN_REASONS, LOSS_REASONS, ACTIVITY_TYPES,
-  contractNumberFor,
+  contractNumberFor, canDeleteProposal, clientKeepsAnother,
 } from '../store'
 import {
   Bell, Trash2, X, CheckCircle, AlertCircle, Clock, TrendingUp,
   DollarSign, FileText, Plus, ChevronDown, ChevronUp, MessageSquare,
   Phone, Mail, Send, Users, BarChart2, Columns, List, Award, ThumbsDown,
   Eye, Copy, GitBranch, FileSignature, ShoppingCart,
-  GitMerge, Unlink, Search, MoreHorizontal, Link2, UserCheck,
+  GitMerge, Unlink, Search, MoreHorizontal, Link2, UserCheck, Archive,
 } from 'lucide-react'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
 import { wonRevenueOf } from '../contractTotal'
@@ -699,6 +699,14 @@ const repName = (members, id) => {
 
 function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onOpen, onRevise, onGenerateContract, showRep }) {
   const { deleteProposal, detachProposal, mergeProposalGroups, members, setProposalPm } = useStore()
+  const me = useStore(s => s.me)
+  const allProposals = useStore(s => s.proposals)
+  // Archive / delete only while the client keeps another live proposal, so every
+  // customer stays counted (an admin can still delete anything).
+  const removeItems = (x) => [
+    ...(x.status !== 'Archived' && clientKeepsAnother(allProposals, x.id) ? [{ label: 'Archive', icon: Archive, onClick: () => onStatusChange(x, 'Archived') }] : []),
+    ...(canDeleteProposal(me, allProposals, x.id) ? [{ label: 'Delete', icon: Trash2, onClick: () => { if (window.confirm(`Delete ${x.client || 'this proposal'}? This can't be undone.`)) deleteProposal(x.id) }, danger: true }] : []),
+  ]
   const branding = useStore(s => s.branding)
   const setProposalViewToken = useStore(s => s.setProposalViewToken)
 
@@ -835,7 +843,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                   onClick: () => setProposalPm(p.id, p.pmId === m.id ? null : m.id),
                 })),
                 ...((p.status === 'Sent' || p.status === 'Followed Up') && p.email ? [{ label: 'Send Follow-up', icon: Send, onClick: () => setFollowUpProposal(p) }] : []),
-                { label: 'Delete', icon: Trash2, onClick: () => deleteProposal(p.id), danger: true },
+                ...removeItems(p),
               ]} />
             </div>
           </td>
@@ -930,7 +938,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                             { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(alt) },
                             { label: 'Revise', icon: Copy, onClick: () => onRevise(alt) },
                             { label: 'Detach', icon: Unlink, onClick: () => handleDetach(alt.id) },
-                            { label: 'Delete', icon: Trash2, onClick: () => deleteProposal(alt.id), danger: true },
+                            ...removeItems(alt),
                           ]} />
                         </div>
                       </td>

@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
 import StatCard from '../components/StatCard'
-import { useStore } from '../store'
+import { useStore, canDeleteProposals, canDeleteProposal } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { MenuChip, QuickPicks, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
@@ -275,6 +275,8 @@ const BULK_EMPTY = { count: '70', status: 'Lost', startDate: '2026-01-01', endDa
 function PastJobPanel() {
   const { proposals, projectTypes: PROJECT_TYPES, importHistoricalJob, bulkImportHistoricalProposals, deleteProposal,
           importHistory2024_2025, clearHistory2024_2025, historyImported } = useStore()
+  const me = useStore(s => s.me)
+  const canDelete = canDeleteProposals(me)
   const [open, setOpen] = useState(false)
   const [tab, setTab]   = useState('won')   // 'won' | 'nonwon'
   const [form, setForm] = useState(EMPTY_FORM)
@@ -354,8 +356,8 @@ function PastJobPanel() {
           ) : (
             <div className="mb-4 flex items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex-wrap">
               <p className="text-sm text-green-800">✓ 2024–2025 history loaded — 93 jobs and 783 appointments are in your analytics.</p>
-              <button onClick={() => { if (window.confirm('Remove ALL imported 2024–2025 history (jobs + appointments)? This can’t be undone.')) clearHistory2024_2025() }}
-                className="text-xs text-gray-500 hover:text-red-600 shrink-0">Undo import</button>
+              {canDelete && <button onClick={() => { if (window.confirm('Remove ALL imported 2024–2025 history (jobs + appointments)? This can’t be undone.')) clearHistory2024_2025() }}
+                className="text-xs text-gray-500 hover:text-red-600 shrink-0">Undo import</button>}
             </div>
           )}
 
@@ -417,9 +419,9 @@ function PastJobPanel() {
                             {new Date(p.closedAt || p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                           <span className="text-sm font-semibold text-gray-700">${Number(p.total).toLocaleString()}</span>
-                          <button onClick={() => deleteProposal(p.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity">
+                          {canDeleteProposal(me, proposals, p.id) && <button onClick={() => deleteProposal(p.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity">
                             <Trash2 size={13} />
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     ))}
@@ -479,7 +481,7 @@ function PastJobPanel() {
                   <p className="text-xs text-gray-500">
                     <strong className="text-gray-700">{lostHistorical.length}</strong> non-win historical proposals logged
                   </p>
-                  <button
+                  {canDelete && <button
                     onClick={() => {
                       if (window.confirm(`Delete all ${lostHistorical.length} bulk-added non-win proposals? This can't be undone.`)) {
                         lostHistorical.forEach(p => deleteProposal(p.id))
@@ -488,7 +490,7 @@ function PastJobPanel() {
                     className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
                   >
                     <Trash2 size={11} /> Remove all
-                  </button>
+                  </button>}
                 </div>
               )}
             </>
@@ -951,7 +953,7 @@ export default function Analytics() {
     const now = new Date()
     const matchesPeriod = (dateStr) => {
       if (statsPeriod === 'all') return true
-      const d = new Date(dateStr || Date.now())
+      const d = new Date(dateStr || now)
       const y = d.getFullYear(), q = Math.floor(d.getMonth() / 3)
       if (statsPeriod === 'this-month')   return y === now.getFullYear() && d.getMonth() === now.getMonth()
       if (statsPeriod === 'this-quarter') return y === now.getFullYear() && q === Math.floor(now.getMonth() / 3)
@@ -1029,7 +1031,7 @@ export default function Analytics() {
     // only counts realized Won contracts — a signed-but-not-yet-tagged deal is a win
     // but not recognized revenue yet — so the graph's sales total matches the cards.
     proposals.filter(p => p.status === 'Won' || p.contractDraft?.signed === true).forEach(p => {
-      const m = find(new Date(p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt || Date.now()))
+      const m = find(new Date(p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt || now))
       if (!m) return
       m.jobCount += 1
       if (p.status !== 'Won') return   // signed-only deals: count as a win, not revenue
@@ -1044,7 +1046,7 @@ export default function Analytics() {
     proposals.filter(p => !p.parentId || !ids.has(p.parentId)).forEach(root => {
       const group = [root, ...proposals.filter(p => p.parentId === root.id)]
       if (!group.some(p => p.status !== 'Archived' && p.status !== 'Draft')) return
-      const m = find(new Date(root.createdAt || root.sentAt || root.closedAt || Date.now()))
+      const m = find(new Date(root.createdAt || root.sentAt || root.closedAt || now))
       if (m) m.apptCount += 1
     })
     return months
