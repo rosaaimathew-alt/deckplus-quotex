@@ -89,7 +89,7 @@ export const COUNTIES = {
 
 // Values the packet fills in on its own when the contract is generated. The
 // sales rep can overwrite any of them; `overrides` wins where set.
-export function autoContractValues({ data = {}, total = 0, payments = [], projectTypes = [], contractNum = '', me = null, saleDate = null, specialInstructions = '', directions = '', projectSummary = '', overrides = {} }) {
+export function autoContractValues({ data = {}, total = 0, payments = [], projectTypes = [], contractNum = '', me = null, saleDate = null, specialInstructions = '', directions = '', projectSummary = '', property = null, overrides = {} }) {
   const today = new Date()
   const client = data.client || ''
   const types = (projectTypes || []).join(', ')
@@ -123,10 +123,20 @@ export function autoContractValues({ data = {}, total = 0, payments = [], projec
     designConsultant:   data.salesperson || me?.displayName || '',
     specialInstructions,
     directions,
+    // Looked up from the address when the contract is drafted (api/_property.js).
+    ...propertyValues(property),
   }
   const out = { ...auto }
   for (const [k, v] of Object.entries(overrides || {})) if (v !== undefined && v !== null && v !== '') out[k] = v
   if (overrides.contractNum) out.contractNumDigits = contractNumDigits(overrides.contractNum)
+  return out
+}
+
+// The job-info blanks a property lookup fills (subdivision, beds, baths, providers).
+export const PROPERTY_KEYS = ['subdivision', 'beds', 'baths', 'waterProvider', 'energyProvider', 'gasProvider']
+function propertyValues(property) {
+  const out = {}
+  for (const k of PROPERTY_KEYS) if (property?.[k]) out[k] = String(property[k])
   return out
 }
 

@@ -1482,6 +1482,12 @@ export const useStore = create(
       setWelcomeEmail: (v) => set({ welcomeEmail: v }),
       setOfficeView: (v) => { try { localStorage.setItem('qx_office_view', v) } catch { /* private mode */ } set({ officeView: v }) },
       // A rep assigns one of the org's PMs to a deal; that PM then sees the job.
+      // Subdivision, beds/baths and utility providers looked up for the job address (contract packet).
+      setProposalPropertyInfo: (id, propertyInfo) =>
+        set((s) => ({
+          proposals: s.proposals.map((p) => (p.id === id ? { ...p, propertyInfo } : p)),
+        })),
+
       setProposalPm: (id, pmId) =>
         set((s) => ({
           proposals: s.proposals.map((p) => (p.id === id ? { ...p, pmId: pmId || null } : p)),
