@@ -398,7 +398,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
           {extra('demoDeck', 'Demo deck & steps', 'SF')}
           {extra('demoConc', 'Demo concrete', 'SF')}
           {extra('footings', 'Undermined footings', 'EA')}
-          {extra('lvl', 'PT LVL framing', 'LF')}
+          {extra('lvl', 'LVL framing', 'LF')}
           {extra('hottub', 'Hot tub reinforcement', 'EA')}
           {extra('bracePlate', 'Bracing plates (per post)', 'EA')}
           {extra('braceLetter', 'Bracing engineer letter', 'EA')}

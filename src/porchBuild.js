@@ -67,7 +67,7 @@ export const PORCH_BUILD_DEFAULTS = {
   // Structural add-ons
   freestanding_add:   R('Freestanding structure add',                      'SF', 7,    'structure'),
   deck_over_8:        R('Deck above 8′ high add',                          'SF', 5,    'structure'),
-  pt_lvl:             R('PT LVL framing',                                   'LF', 50,   'structure'),
+  pt_lvl:             R('LVL framing',                                      'LF', 50,   'structure'),
   lvl_engineering:    R('Engineer letter (LVL projects & semi-vaulted roofs)', 'LS', 1800, 'structure'),
   gable_over_19:      R('Gable / semi-vaulted wider than 19′ add',         'LS', 1000, 'structure'),
   hip_roof:           R('Hip roof',                                         'LS', 3000, 'structure'),
@@ -358,7 +358,7 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   doorWall: 'side',                     // sunroom: doors on the side walls by the house, or 'front'
   glassEnds: 0,                         // gable roofs only
   hotTub: false, wrap: false, cricket: false, seedStraw: false, bracingPosts: 0,
-  lvlLf: null,                          // PT LVL length (LF); null = auto (see suggestedLvlLf)
+  lvlLf: null,                          // LVL length (LF); null = auto (see suggestedLvlLf)
   paintPorch: false,
   flooring: null,                       // one flooring key or null
   concrete: null,                       // one concrete key or null (patio only)
@@ -380,7 +380,7 @@ export function exposedPerimeterFt(inp) {
   return inp.tie === 'free' ? 2 * (W + D) : W + 2 * D
 }
 
-// PT LVL length the builder suggests: the porch depth plus 2′ for a wall
+// LVL length the builder suggests: the porch depth plus 2′ for a wall
 // connection, or plus 8′ for a roof-to-roof connection. Only gable and hip
 // roofs take an LVL by default; a freestanding porch takes the depth alone.
 export const LVL_EXTRA_FT = { wall: 2, roof: 8, free: 0 }
@@ -417,7 +417,7 @@ export function computePorchBuild(input, ratesIn) {
   if (tie === 'free') add('freestanding_add', area)
   if (inp.floor === 'deck' && n(inp.deckHeightFt) > 8) add('deck_over_8', area)
 
-  // Roof style: gable and hip take a PT LVL and the engineer letter; every
+  // Roof style: gable and hip take an LVL and the engineer letter; every
   // semi-vaulted roof takes the letter. The rep can change the LVL length in
   // Structural add-ons (blank = the suggestion); any LVL takes the letter.
   const lvlAuto = suggestedLvlLf(inp, roof)
@@ -553,7 +553,7 @@ export const PORCH_CATALOG_NAMES = {
   base_screen_wall_patio: 'ScreenEze Wall Tie on patio',  base_screen_roof_patio: 'ScreenEze Roof Tie on patio',
   base_open_wall_deck: 'Open Wall Tie on PT Deck', base_open_roof_deck: 'Open Roof Tie on PT Deck',
   base_open_wall_patio: 'Open Wall Tie on Patio',  base_open_roof_patio: 'Open Roof Tie on Patio',
-  freestanding_add: 'Freestanding Structure ADD', pt_lvl: 'PT LVL (Framing) LF', lvl_engineering: 'LVL Engineering (for all LVL projects)',
+  freestanding_add: 'Freestanding Structure ADD', pt_lvl: 'LVL (Framing) LF', lvl_engineering: 'LVL Engineering (for all LVL projects)',
   hot_tub_reinforce: 'Reinforce deck for hot tub/porch', bracing_letter: 'Engineered metal bracing LETTER', seed_straw: 'Seed and straw',
   lam_column_pkg: '6x6 lam column package', eze_window: 'EzeBreeze', eze_transom: 'Transom',
   door_tradewinds: 'Larsen Tradewinds Door', door_savannah: 'Larsen Savannah Door', door_savannah_pet: 'Larsen Savannah Pet Door',
