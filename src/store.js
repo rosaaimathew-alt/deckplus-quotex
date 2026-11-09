@@ -153,6 +153,9 @@ export const LOSS_REASONS = [
 
 export const ACTIVITY_TYPES = ['Call', 'Follow-up', 'Meeting', 'Email', 'Objection', 'Note']
 
+// Only an admin (Manager / Owner) can delete a proposal; everyone else archives it.
+export const canDeleteProposals = (me) => DEMO || me?.role === 'admin'
+
 export const useStore = create(
   persist(
     (set, get) => ({
@@ -727,19 +730,21 @@ export const useStore = create(
 
       // Undo the historical import (remove every isHistorical proposal + reset the flag).
       clearHistory2024_2025: () =>
-        set((s) => ({
+        canDeleteProposals(get().me) && set((s) => ({
           proposals: s.proposals.filter(p => !p.isHistorical),
           historyImported: false,
           tombstones: [...(s.tombstones || []), ...s.proposals.filter(p => p.isHistorical).map(p => `proposal:${p.id}`)],
         })),
 
-      deleteProposal: (id) =>
+      deleteProposal: (id) => {
+        if (!canDeleteProposals(get().me)) return
         set((s) => ({
           proposals: s.proposals.filter((p) => p.id !== id),
           // Tombstone so the delete survives the union merge (and propagates to
           // other users) instead of being resurrected from the server copy.
           tombstones: [...(s.tombstones || []), `proposal:${id}`],
-        })),
+        }))
+      },
 
       // ── Manual grouping controls ─────────────────────────────────────────
       // Pull a single proposal out of its group so it stands alone as its own
@@ -806,7 +811,7 @@ export const useStore = create(
         }),
 
       clearAllProposals: () =>
-        set((s) => ({ proposals: [], nextProposalId: 1, tombstones: [...(s.tombstones || []), ...s.proposals.map(p => `proposal:${p.id}`)] })),
+        canDeleteProposals(get().me) && set((s) => ({ proposals: [], nextProposalId: 1, tombstones: [...(s.tombstones || []), ...s.proposals.map(p => `proposal:${p.id}`)] })),
 
       saveContractDraft: (proposalId, draft) =>
         set((s) => ({
