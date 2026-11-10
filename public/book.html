@@ -428,7 +428,7 @@
     const keyToDate = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d) }
     const fmtTime = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     const fmtDay = (d) => d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
-    let state = { rep: null, byDay: new Map(), day: null, start: null, month: null, minutes: 30 }
+    let state = { rep: null, byDay: new Map(), day: null, start: null, month: null, minutes: 30, loadedAt: 0 }
 
     function show(section) {
       $('loading').hidden = true
@@ -442,6 +442,30 @@
     }
     function error(text) { $('error').textContent = text || ''; $('error').hidden = !text; resize() }
 
+    // Whose turn it is and their open times, as the server just worked them out
+    // from the rotation and the rep's Google Calendar.
+    function applyData(data) {
+      state.loadedAt = Date.now()
+      state.rep = data.rep
+      state.minutes = data.slotMinutes || 30
+      $('duration').textContent = state.minutes % 60 === 0 ? `${state.minutes / 60} hr` : state.minutes > 60 ? `${Math.floor(state.minutes / 60)} hr ${state.minutes % 60} min` : `${state.minutes} min`
+      if (data.meetingTitle) $('title').textContent = data.meetingTitle
+      if (data.meetingTitle) $('cTitle').textContent = data.meetingTitle
+      $('cMeta').textContent = [$('duration').textContent, 'At your home', data.rep && `with ${data.rep.name}`].filter(Boolean).join(' · ')
+      if (data.rep) {
+        $('repFact').hidden = false
+        $('repName').textContent = `with ${data.rep.name}`
+        $('repInitial').textContent = data.rep.name[0]
+      }
+      state.byDay = new Map()
+      for (const iso of data.slots) {
+        const d = new Date(iso)
+        const k = dayKey(d)
+        if (!state.byDay.has(k)) state.byDay.set(k, [])
+        state.byDay.get(k).push(d)
+      }
+    }
+
     async function load(notice) {
       error(notice)
       for (const id of ['pick', 'details', 'done']) $(id).hidden = true
@@ -450,24 +474,7 @@
         const res = await api('GET')
         const data = res.data
         if (!res.ok) throw new Error(data.error)
-        state.rep = data.rep
-        state.minutes = data.slotMinutes || 30
-        $('duration').textContent = state.minutes % 60 === 0 ? `${state.minutes / 60} hr` : state.minutes > 60 ? `${Math.floor(state.minutes / 60)} hr ${state.minutes % 60} min` : `${state.minutes} min`
-        if (data.meetingTitle) $('title').textContent = data.meetingTitle
-        if (data.meetingTitle) $('cTitle').textContent = data.meetingTitle
-        $('cMeta').textContent = [$('duration').textContent, 'At your home', data.rep && `with ${data.rep.name}`].filter(Boolean).join(' · ')
-        if (data.rep) {
-          $('repFact').hidden = false
-          $('repName').textContent = `with ${data.rep.name}`
-          $('repInitial').textContent = data.rep.name[0]
-        }
-        state.byDay = new Map()
-        for (const iso of data.slots) {
-          const d = new Date(iso)
-          const k = dayKey(d)
-          if (!state.byDay.has(k)) state.byDay.set(k, [])
-          state.byDay.get(k).push(d)
-        }
+        applyData(data)
         if (!data.rep || !state.byDay.size) {
           $('loading').textContent = 'No times are open right now. Please call us at (704) 993-7696 and we will get you scheduled.'
           return resize()
@@ -484,6 +491,58 @@
         error(e.message || 'Could not load times. Please refresh the page.')
       }
     }
+
+    // Re-check before the visitor relies on what's on screen: on their first
+    // click, on a day click once the data is 30s old, on Next, and when they
+    // come back to the tab. Re-asks the server whose turn it is and re-reads
+    // that rep's Google Calendar. If the rep changed or the picked time is gone,
+    // the picker shows the fresh times and says so instead of carrying on.
+    let refreshing = null
+    function refresh(force) {
+      if (DEMO) return Promise.resolve(null)
+      if (refreshing) return refreshing
+      if (!force && Date.now() - state.loadedAt < 30_000) return Promise.resolve(null)
+      refreshing = (async () => {
+        try {
+          const res = await api('GET')
+          if (!res.ok) return null
+          const prevRep = state.rep?.id, prevStart = state.start ? +state.start : null
+          applyData(res.data)
+          const repChanged = !!prevRep && res.data.rep?.id !== prevRep
+          if (!state.byDay.has(state.day)) state.day = null
+          const kept = !repChanged && prevStart && (state.byDay.get(state.day) || []).find(d => +d === prevStart)
+          state.start = kept || null
+          return { repChanged, lost: !!prevStart && !kept }
+        } catch { return null } finally { refreshing = null }
+      })()
+      return refreshing
+    }
+    // Show the result of a refresh. Returns true if the visitor has to pick again.
+    function afterRefresh(r) {
+      if (!r) return false
+      if (!state.rep || !state.byDay.size) { load(); return true }
+      if (r.repChanged) {
+        state.day = null
+        error(`The calendar just updated: the next available consultant is ${state.rep.name}. Here are ${state.rep.name}'s open times.`)
+      } else if (r.lost) {
+        error(`That time just filled up on ${state.rep.name}'s calendar. Please pick another time.`)
+      }
+      if (!state.day) {
+        const d = keyToDate(state.byDay.keys().next().value)
+        state.month = new Date(d.getFullYear(), d.getMonth(), 1)
+      }
+      render()
+      return r.repChanged || r.lost
+    }
+    let interacted = false
+    $('pick').addEventListener('pointerdown', () => {
+      if (interacted) return
+      interacted = true
+      refresh(true).then(afterRefresh)
+    }, { capture: true })
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !$('pick').hidden && Date.now() - state.loadedAt > 30_000) refresh(true).then(afterRefresh)
+    })
 
     function render() {
       const m = state.month
@@ -508,7 +567,9 @@
           b.classList.add('open')
           b.setAttribute('aria-pressed', String(k === state.day))
           b.setAttribute('aria-label', fmtDay(keyToDate(k)) + ', times available')
-          b.onclick = () => {
+          b.onclick = async () => {
+            if (afterRefresh(await refresh(!interacted || Date.now() - state.loadedAt > 30_000))) return
+            if (!state.byDay.has(k)) return render()
             state.day = k; state.start = null; render(); track('day', `${k}|${state.byDay.get(k).length}`)
             if (window.innerWidth < 1000 && !COMPACT) $('times').scrollIntoView({ behavior: 'smooth', block: 'start' })
           }
@@ -550,7 +611,11 @@
     $('prevMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1); render() }
     $('nextMonth').onclick = () => { state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1); render() }
 
-    function goDetails() {
+    async function goDetails() {
+      const next = $('continue'); if (next) { next.disabled = true; next.textContent = 'Checking…' }
+      const r = await refresh(true)
+      if (afterRefresh(r)) return
+      if (!state.start) return render()
       track('form')
       error()
       show('details')
@@ -610,7 +675,7 @@
         })
         const data = res.data
         if (data.code === 'already_booked') return showBooking(data.existing, f, true)
-        if (res.status === 409) return load(data.error)
+        if (res.status === 409) { state.start = null; return load(data.error) }
         if (data.fields) { showFieldErrors(data.fields); throw new Error(data.error) }
         if (!res.ok) throw new Error(data.error)
         showBooking(data.booking, f, false)
