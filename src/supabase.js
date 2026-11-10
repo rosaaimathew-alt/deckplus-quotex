@@ -187,7 +187,9 @@ async function fetchAll(table, orgId) {
     const { data, error } = await supabase
       .from(table).select('id, data')
       .eq('org_id', orgId).is('deleted_at', null)
-      .order('updated_at', { ascending: false })
+      // id breaks ties: rows saved in one batch share an updated_at, and without a
+      // tiebreaker the pages can overlap or skip rows.
+      .order('updated_at', { ascending: false }).order('id', { ascending: true })
       .range(from, from + PAGE - 1)
     if (error) throw error
     rows.push(...(data || []))
