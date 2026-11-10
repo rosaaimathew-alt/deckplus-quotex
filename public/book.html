@@ -615,6 +615,7 @@
       const next = $('continue'); if (next) { next.disabled = true; next.textContent = 'Checking…' }
       const r = await refresh(true)
       if (afterRefresh(r)) return
+      if (!r) render()   // the re-check didn't run (demo, or the server didn't answer): put the Next button back
       if (!state.start) return render()
       track('form')
       error()
