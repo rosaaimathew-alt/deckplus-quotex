@@ -368,8 +368,16 @@ export default async function handler(req, res) {
       return res.status(410).json({ error: `This signing link has been replaced by a newer one. Please use the most recent link from ${companyName}, or contact us for a new one.`, code: 'superseded' })
     }
 
+    // Once every party has signed, the link is closed: it still opens, but only
+    // says the agreement is signed. No contract, signatures or audit trail — the
+    // office sends the customer their signed copy.
+    const closed = record.status === 'signed'
+    const closedBody = { closed: true, status: 'signed', alreadySigned: true, role: link.role, companyName,
+      message: `Please reach out to ${companyName} for a signed copy of your agreement.` }
+
     // Audit trail for a party who has signed, to print with their signed copy.
     if (req.method === 'GET' && req.query.certificate) {
+      if (closed) return res.status(403).json({ error: closedBody.message, code: 'closed' })
       if (!record.signatures?.[link.role]) return res.status(403).json({ error: 'Sign first to see the audit trail.' })
       const report = await verifyRecord({ recordType: 'contract', recordId, record, doc: record.contractData, emailOnFile: record.signerEmails?.client })
       return res.json({ ...report, contractNum: record.contractNum, createdAt: record.createdAt, createdBy: record.createdBy || null, status: record.status,
@@ -379,7 +387,9 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       // Every open is logged. The office checking a link is marked as staff.
       const viewer = bearer ? await verifyToken(bearer) : null
-      await logEventSafe(requestContext(req), { ...logBase, event: viewer ? 'staff_viewed' : 'opened', docHash, detail: viewer ? { staff: viewer.email } : null })
+      await logEventSafe(requestContext(req), { ...logBase, event: viewer ? 'staff_viewed' : 'opened', docHash,
+        detail: viewer || closed ? { ...(viewer ? { staff: viewer.email } : {}), ...(closed ? { closed: true } : {}) } : null })
+      if (closed) return res.json(closedBody)
       const { verified } = await otpStatus(kv, token)
       return res.json({
         role:         link.role,
@@ -402,6 +412,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+      if (closed) return res.status(409).json({ error: `This agreement is already signed. ${closedBody.message}`, code: 'closed' })
       const body = req.body || {}
       const ctx = requestContext(req, body.device)
 

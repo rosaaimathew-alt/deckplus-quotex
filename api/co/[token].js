@@ -99,10 +99,18 @@ export default async function handler(req, res) {
     const logBase     = { recordType: 'change_order', recordId, role: link.role }
     const companyName = record.coData?.branding?.companyName || process.env.COMPANY_NAME || 'Deck Plus'
 
+    // Once both parties have signed, the link is closed: it still opens, but
+    // only says the change order is signed.
+    const closed = record.status === 'signed'
+    const closedBody = { closed: true, status: 'signed', alreadySigned: true, role: link.role, companyName,
+      message: `Please reach out to ${companyName} for a signed copy of your agreement.` }
+
     if (req.method === 'GET') {
       // Every open is logged. The office checking a link is marked as staff.
       const viewer = bearer ? await verifyToken(bearer) : null
-      await logEventSafe(requestContext(req), { ...logBase, event: viewer ? 'staff_viewed' : 'opened', docHash, detail: viewer ? { staff: viewer.email } : null })
+      await logEventSafe(requestContext(req), { ...logBase, event: viewer ? 'staff_viewed' : 'opened', docHash,
+        detail: viewer || closed ? { ...(viewer ? { staff: viewer.email } : {}), ...(closed ? { closed: true } : {}) } : null })
+      if (closed) return res.json(closedBody)
       const { verified } = await otpStatus(kv, token)
       return res.json({
         role: link.role,
@@ -123,6 +131,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+      if (closed) return res.status(409).json({ error: `This change order is already signed. ${closedBody.message}`, code: 'closed' })
       const body = req.body || {}
       const ctx = requestContext(req, body.device)
 

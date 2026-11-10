@@ -6,6 +6,7 @@ import { changeOrderIntro } from '../contract/deckPlusAgreement'
 import EsignDisclosureGate from '../components/EsignDisclosureGate'
 import EsignAdopt from '../components/EsignAdopt'
 import { logStep } from '../lib/esignConsent'
+import SignedClosed from '../components/SignedClosed'
 
 const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -70,6 +71,8 @@ export default function COSignPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to submit')
       setDone(true)
+      // Both parties have signed: the link is closed from here on.
+      if (data.allSigned) setRecord(prev => ({ closed: true, status: 'signed', message: `Please reach out to ${prev?.coData?.branding?.companyName || 'Deck Plus'} for a signed copy of your agreement.` }))
     } catch (e) {
       alert(e.message)
     } finally {
@@ -90,6 +93,9 @@ export default function COSignPage() {
       </div>
     </div>
   )
+
+  // Signed by both parties: the link only says so.
+  if (record?.closed) return <SignedClosed justSigned={done} name={printedName} message={record.message} />
 
   const { role, coData: d, signatures = {}, alreadySigned, esign, docHash } = record
   const logo        = d?.branding?.logo || null
