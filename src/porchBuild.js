@@ -68,7 +68,8 @@ export const PORCH_BUILD_DEFAULTS = {
   freestanding_add:   R('Freestanding structure add',                      'SF', 7,    'structure'),
   deck_over_8:        R('Deck above 8′ high add',                          'SF', 5,    'structure'),
   pt_lvl:             R('LVL framing',                                      'LF', 50,   'structure'),
-  lvl_engineering:    R('Engineer letter (LVL projects & semi-vaulted roofs)', 'LS', 1800, 'structure'),
+  lvl_engineering:    R('Engineer letter',                                  'LS', 1000, 'structure'),
+  undermined_footings:R('Undermined footings',                              'EA', 750,  'structure'),
   gable_over_19:      R('Gable / semi-vaulted wider than 19′ add',         'LS', 1000, 'structure'),
   hip_roof:           R('Hip roof',                                         'LS', 3000, 'structure'),
   hot_tub_reinforce:  R('Reinforce deck for hot tub / porch',               'LS', 2000, 'structure'),
@@ -360,6 +361,8 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   glassEnds: 0,                         // gable roofs only
   hotTub: false, wrap: false, cricket: false, seedStraw: false, bracingPosts: 0,
   lvlLf: null,                          // LVL length (LF); null = auto (see suggestedLvlLf)
+  engLetter: null,                      // engineer letter; null = auto (any LVL, or a gable / hip / semi-vaulted roof)
+  footings: 0,                          // undermined footings (count)
   paintPorch: false,
   flooring: null,                       // one flooring key or null
   concrete: null,                       // one concrete key or null (patio only)
@@ -418,9 +421,10 @@ export function computePorchBuild(input, ratesIn) {
   if (tie === 'free') add('freestanding_add', area)
   if (inp.floor === 'deck' && n(inp.deckHeightFt) > 8) add('deck_over_8', area)
 
-  // Roof style: gable and hip take an LVL and the engineer letter; every
-  // semi-vaulted roof takes the letter. The rep can change the LVL length in
-  // Structural add-ons (blank = the suggestion); any LVL takes the letter.
+  // Roof style: gable and hip take an LVL; the rep can change the LVL length in
+  // Structural add-ons (blank = the suggestion). The engineer letter is its own
+  // line: on by default with any LVL or a gable, hip or semi-vaulted roof, and
+  // the rep can tick or untick it.
   const lvlAuto = suggestedLvlLf(inp, roof)
   const lvlSet  = inp.lvlLf !== null && inp.lvlLf !== undefined && inp.lvlLf !== ''
   const lvlLf   = lvlSet ? Math.max(0, n(inp.lvlLf)) : lvlAuto
@@ -429,8 +433,9 @@ export function computePorchBuild(input, ratesIn) {
     : tie === 'roof' ? 'porch depth + 8′ roof-to-roof'
     : 'porch depth'
   add('pt_lvl', lvlLf, lvlNote)
-  if (lvlLf > 0 || roof === 'gable' || roof === 'hip') add('lvl_engineering', 1)
-  else if (roof === 'semivault') add('lvl_engineering', 1, 'semi-vaulted roof')
+  const letterAuto = lvlLf > 0 || roof === 'gable' || roof === 'hip' || roof === 'semivault'
+  const letterOn = inp.engLetter === null || inp.engLetter === undefined ? letterAuto : !!inp.engLetter
+  if (letterOn) add('lvl_engineering', 1)
   // Same over-19′ flat fee for gable and semi-vaulted roofs
   if ((roof === 'gable' || roof === 'semivault') && W > 19) add('gable_over_19', 1)
   if (roof === 'hip') {
@@ -471,6 +476,7 @@ export function computePorchBuild(input, ratesIn) {
   if ((roof === 'gable' || roof === 'semivault') && n(inp.glassEnds) > 0) add('glass_gable_end', n(inp.glassEnds))
 
   // Structural toggles
+  add('undermined_footings', Math.floor(n(inp.footings)))
   if (inp.hotTub) add('hot_tub_reinforce', 1)
   if (n(inp.bracingPosts) > 0) { add('bracing_plate', n(inp.bracingPosts)); add('bracing_letter', 1) }
   if (inp.wrap) add('porch_wrap', 1)
@@ -537,7 +543,7 @@ export function computePorchBuild(input, ratesIn) {
   // both sides of the steps, and each landing's three open sides.
   const railStepLF = stepColl && risers > 0 ? 2 * runOutForSteps(risers) : 0
   const railLandingLF = landingColl ? n(inp.landings.count) * landingFasciaFt(4, 4) : 0
-  return { lines, groups, total, cost, area, roof, layout, lvlAuto, lvlLf, risers, railStepLF, railLandingLF,
+  return { lines, groups, total, cost, area, roof, layout, lvlAuto, lvlLf, letterAuto, letterOn, risers, railStepLF, railLandingLF,
     fasciaLF: exposedPerimeterFt(inp) + stepFasciaLF + landingFasciaLF, fasciaDeckLF: exposedPerimeterFt(inp), fasciaStepLF: stepFasciaLF, fasciaLandingLF: landingFasciaLF }
 }
 
@@ -556,6 +562,7 @@ export const PORCH_CATALOG_NAMES = {
   base_open_wall_deck: 'Open Wall Tie on PT Deck', base_open_roof_deck: 'Open Roof Tie on PT Deck',
   base_open_wall_patio: 'Open Wall Tie on Patio',  base_open_roof_patio: 'Open Roof Tie on Patio',
   freestanding_add: 'Freestanding Structure ADD', pt_lvl: 'LVL (Framing) LF', lvl_engineering: 'LVL Engineering (for all LVL projects)',
+  undermined_footings: 'Undermined footings (extra concrete /soil removal)',
   hot_tub_reinforce: 'Reinforce deck for hot tub/porch', bracing_letter: 'Engineered metal bracing LETTER', seed_straw: 'Seed and straw',
   lam_column_pkg: '6x6 lam column package', eze_window: 'EzeBreeze', eze_transom: 'Transom',
   door_tradewinds: 'Larsen Tradewinds Door', door_savannah: 'Larsen Savannah Door', door_savannah_pet: 'Larsen Savannah Pet Door',
