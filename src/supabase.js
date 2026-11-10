@@ -181,20 +181,45 @@ const TABLE_TO_KEY = Object.fromEntries(
 
 // ── Load ─────────────────────────────────────────────────────────────────────
 const PAGE = 1000
+// How many rows each table had on the last load, so the next load can ask for
+// every page at once instead of finding out one page at a time.
+const COUNTS_KEY = 'qx_row_counts'
+let _rowCounts = {}
+try { _rowCounts = JSON.parse(localStorage.getItem(COUNTS_KEY) || '{}') || {} } catch { _rowCounts = {} }
+
+async function fetchPage(table, orgId, page, withCount) {
+  const { data, error, count } = await supabase
+    .from(table).select('id, data', withCount ? { count: 'exact' } : undefined)
+    .eq('org_id', orgId).is('deleted_at', null)
+    // id breaks ties: rows saved in one batch share an updated_at, and without a
+    // tiebreaker the pages can overlap or skip rows.
+    .order('updated_at', { ascending: false }).order('id', { ascending: true })
+    .range(page * PAGE, page * PAGE + PAGE - 1)
+  // A page past the end of the table is just an empty page.
+  if (error && page > 0 && (error.code === 'PGRST103' || /range not satisfiable/i.test(error.message || ''))) return { rows: [], count: null }
+  if (error) throw error
+  return { rows: data || [], count: withCount ? count : null }
+}
+
+// Every row of a table. Pages load side by side, not one after another: the
+// first page says how many rows there are, and the page count from last time
+// is asked for up front.
 async function fetchAll(table, orgId) {
-  const rows = []
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from(table).select('id, data')
-      .eq('org_id', orgId).is('deleted_at', null)
-      // id breaks ties: rows saved in one batch share an updated_at, and without a
-      // tiebreaker the pages can overlap or skip rows.
-      .order('updated_at', { ascending: false }).order('id', { ascending: true })
-      .range(from, from + PAGE - 1)
-    if (error) throw error
-    rows.push(...(data || []))
-    if (!data || data.length < PAGE) break
+  const key = `${orgId}:${table}`
+  const guess = Math.max(1, Math.ceil((Number(_rowCounts[key]) || 0) / PAGE))
+  const pages = await Promise.all(Array.from({ length: guess }, (_, i) => fetchPage(table, orgId, i, i === 0)))
+  const total = pages[0].count
+  const need = total == null ? 0 : Math.ceil(total / PAGE)
+  if (need > pages.length) {
+    const from = pages.length
+    pages.push(...await Promise.all(Array.from({ length: need - from }, (_, i) => fetchPage(table, orgId, from + i, false))))
   }
+  // No row count from the server: keep going while pages come back full.
+  while (total == null && pages[pages.length - 1].rows.length === PAGE) pages.push(await fetchPage(table, orgId, pages.length, false))
+  const seen = new Set(), rows = []
+  for (const pg of pages) for (const r of pg.rows) { if (!seen.has(r.id)) { seen.add(r.id); rows.push(r) } }
+  _rowCounts[key] = rows.length
+  try { localStorage.setItem(COUNTS_KEY, JSON.stringify(_rowCounts)) } catch { /* private window: counts are only a speed-up */ }
   return rows
 }
 
@@ -222,22 +247,24 @@ export async function loadOrg() {
   ])
 
   const collections = {}
-  await Promise.all(Object.entries(RECORD_TABLES).map(async ([key, table]) => {
-    try {
+  await Promise.all([
+    ...Object.entries(RECORD_TABLES).map(async ([key, table]) => {
+      try {
+        const rows = await fetchAll(table, orgId)
+        collections[key] = rows.map(r => r.data)
+        _missing.delete(table)
+      } catch (e) {
+        if (!OPTIONAL_TABLES.has(table) || !isMissingTable(e)) throw e
+        console.warn(`[quotex] table ${table} is not in this database yet (run supabase/${table === 'sub_task_terms' ? 'sub_draws' : table.startsWith('sub_') ? table : 'books'}.sql)`)
+        _missing.add(table)
+        collections[key] = []
+      }
+    }),
+    ...Object.entries(MAP_TABLES).map(async ([key, table]) => {
       const rows = await fetchAll(table, orgId)
-      collections[key] = rows.map(r => r.data)
-      _missing.delete(table)
-    } catch (e) {
-      if (!OPTIONAL_TABLES.has(table) || !isMissingTable(e)) throw e
-      console.warn(`[quotex] table ${table} is not in this database yet (run supabase/${table === 'sub_task_terms' ? 'sub_draws' : table.startsWith('sub_') ? table : 'books'}.sql)`)
-      _missing.add(table)
-      collections[key] = []
-    }
-  }))
-  for (const [key, table] of Object.entries(MAP_TABLES)) {
-    const rows = await fetchAll(table, orgId)
-    collections[key] = Object.fromEntries(rows.map(r => [r.id, r.data]))
-  }
+      collections[key] = Object.fromEntries(rows.map(r => [r.id, r.data]))
+    }),
+  ])
 
   return {
     orgId,
