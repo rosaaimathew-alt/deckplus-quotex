@@ -170,12 +170,11 @@ function alreadyBooked(res, b) {
 // sending "test lead" bookings). Refused quietly, like any failed booking.
 const BLOCKED_DOMAINS = ['reachunited.com']
 const BLOCKED_NAMES = /reach\s*united/i
-const BLOCKED_PHONES = ['(704) 993-7696']
+// (Not by phone: their test booking used Deck Plus's own office number.)
 function blockedLead(lead) {
   const domain = lead.email.split('@')[1] || ''
   return BLOCKED_DOMAINS.some(d => domain === d || domain.endsWith(`.${d}`))
     || BLOCKED_NAMES.test(`${lead.first_name} ${lead.last_name} ${lead.notes}`)
-    || BLOCKED_PHONES.includes(lead.phone)
 }
 
 async function book(req, res) {
@@ -186,7 +185,10 @@ async function book(req, res) {
   if (!body.repId || Number.isNaN(startMs)) return res.status(400).json({ error: 'Please pick a time.' })
   const { lead, errors } = validateLead(body)
   if (errors) return res.status(400).json({ error: 'Please complete the highlighted fields.', fields: errors })
-  if (blockedLead(lead)) return res.status(400).json({ error: "We couldn't book that time online. Please call us to schedule." })
+  if (blockedLead(lead)) {
+    await refused(body, 'Blocked by the Reach United filter (their email domain or name).')
+    return res.status(400).json({ error: "We couldn't book that time online. Please call us to schedule." })
+  }
   const name = `${lead.first_name} ${lead.last_name}`
   const { email, phone } = lead
   const notes = lead.notes || null
@@ -194,17 +196,25 @@ async function book(req, res) {
 
   // One upcoming appointment per person: don't take a second one (or use up a turn).
   const prior = await existingBooking(lead)
-  if (prior) return alreadyBooked(res, prior)
+  if (prior) {
+    await refused(body, `This customer already has an appointment (${fmtWhen(prior.starts_at, 'America/New_York', 'UTC')} with ${prior.rr_reps?.name}), so nothing new was booked. The screen showed them that existing appointment.`)
+    return alreadyBooked(res, prior)
+  }
 
   const { rep, settings } = await loadTurn()
-  if (!rep) return res.status(409).json({ error: 'No one is taking bookings right now.', code: 'no_active_reps' })
+  if (!rep) {
+    await refused(body, 'No salesperson is active in the rotation, so the booking could not be made.')
+    return res.status(409).json({ error: 'No one is taking bookings right now.', code: 'no_active_reps' })
+  }
   if (rep.id !== body.repId) {
+    await refused(body, `Another customer booked while this one was choosing, so the turn moved to ${rep.name}. The calendar reloaded with ${rep.name}'s times.`)
     return res.status(409).json({ error: 'That time was just taken — here are the latest openings.', code: 'turn_changed' })
   }
 
   // The chosen start must still be one of the turn-holder's open slots.
   const busy = await repBusy(rep, settings)
   if (!computeSlots(rep, settings, busy).includes(startMs)) {
+    await refused(body, `That time was no longer open on ${rep.name}'s calendar when they submitted (something was added to the calendar, or it's now inside the buffer or notice window).`)
     return res.status(409).json({ error: 'That time is no longer available — please pick another.', code: 'slot_taken' })
   }
 
@@ -218,10 +228,17 @@ async function book(req, res) {
   if (error) {
     if (error.message?.includes('already_booked')) {
       const b = await existingBooking(lead)
-      if (b) return alreadyBooked(res, b)
+      if (b) {
+        await refused(body, `This customer already has an appointment (${fmtWhen(b.starts_at, 'America/New_York', 'UTC')} with ${b.rr_reps?.name}), so nothing new was booked.`)
+        return alreadyBooked(res, b)
+      }
     }
     const code = ['turn_changed', 'slot_taken', 'no_active_reps'].find(c => error.message?.includes(c))
-    if (code) return res.status(409).json({ error: 'That time was just taken — here are the latest openings.', code })
+    if (code) {
+      await refused(body, code === 'slot_taken' ? `That time had just been booked on ${rep.name}'s calendar.`
+        : code === 'turn_changed' ? 'Another customer booked at the same moment, so the turn moved on.' : 'No salesperson is active in the rotation.')
+      return res.status(409).json({ error: 'That time was just taken — here are the latest openings.', code })
+    }
     throw error
   }
 
@@ -326,6 +343,18 @@ async function alertOffice({ subject, html, throttle }) {
     console.error('Alert failed:', err.message)
   }
 }
+
+// Every booking that doesn't go through emails the office: who, what they
+// picked, and why it was refused, so someone can call them.
+function refusedBookingAlert(body, reason) {
+  const a = failedBookingAlert(body, null)
+  return {
+    subject: `Booking NOT completed: ${clean(body?.firstName, 60)} ${clean(body?.lastName, 60)}`.trim(),
+    html: a.html.replace(/<p>Someone tried[\s\S]*?<\/p>/, `<p>Someone tried to book on the website calendar and <b>no new appointment was created</b>.</p><p><b>Why:</b> ${esc(reason)}</p><p>Please follow up with them:</p>`)
+      .replace(/<p style="color:#6b7280;font-size:12px">Error:[\s\S]*?<\/p>/, ''),
+  }
+}
+const refused = (body, reason) => alertOffice(refusedBookingAlert(body, reason))
 
 function failedBookingAlert(body, err) {
   const b = body || {}
