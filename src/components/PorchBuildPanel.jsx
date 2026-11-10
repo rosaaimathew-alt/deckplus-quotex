@@ -234,7 +234,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
           <Field label="Roof connection" hint={inp.tie === 'free' ? 'Freestanding (Structural add-ons).' : undefined}>
             <Seg options={PORCH_TIES.filter(t => t.key !== 'free')} value={inp.tie} onChange={v => set({ tie: v })} disabledKeys={inp.tie === 'free' ? ['wall', 'roof'] : []} />
           </Field>
-          <Field label="Roof style" hint={inp.tie === 'free' ? 'Freestanding: gable or semi-vaulted.' : result.roof === 'gable' || result.roof === 'hip' ? 'Adds an LVL (length in Structural add-ons) + the engineer letter.' : result.roof === 'semivault' ? 'Adds the engineer letter; over 19′ wide adds the flat fee.' : undefined}>
+          <Field label="Roof style" hint={inp.tie === 'free' ? 'Freestanding: gable or semi-vaulted.' : result.roof === 'gable' || result.roof === 'hip' ? 'Adds an LVL (length in Structural add-ons) and the engineer letter.' : result.roof === 'semivault' ? 'Adds the engineer letter; over 19′ wide adds the flat fee.' : undefined}>
             <Seg options={PORCH_ROOFS} value={result.roof} onChange={v => set({ roof: v })} disabledKeys={inp.tie === 'free' ? ['shed', 'hip'] : []} />
           </Field>
         </div>
@@ -358,7 +358,13 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             {inp.lvlLf != null && inp.lvlLf !== '' && (
               <button type="button" onClick={() => set({ lvlLf: null })} className="text-xs text-[var(--brand-700)] hover:underline">Auto ({result.lvlAuto || 0})</button>
             )}
-            <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">{money(rates.pt_lvl.rate)}/LF + letter</span>
+            <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">{money(rates.pt_lvl.rate)}/LF</span>
+          </label>
+          <Check label="Engineer letter" price={money(rates.lvl_engineering.rate)} checked={result.letterOn} onChange={v => set({ engLetter: v })} />
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <span>Undermined footings</span>
+            <input type="number" min="0" aria-label="Undermined footings" className="w-16 text-sm border border-gray-300 rounded-md px-2 py-1 text-right" value={inp.footings ?? 0} onChange={e => set({ footings: e.target.value })} />
+            <span className="ml-auto text-xs text-gray-400 whitespace-nowrap">{money(rates.undermined_footings.rate)} each</span>
           </label>
         </div>
       </Card>
