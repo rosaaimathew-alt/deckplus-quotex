@@ -11,8 +11,7 @@ export const WELCOME_EMAIL_DEFAULT = {
     '',
     'Our team will be in touch shortly to go over the next steps and scheduling.',
     '',
-    'You can view or download your signed contract any time here:',
-    '{signedCopyLink}',
+    'We will send you a signed copy of your agreement.',
     '',
     'If you have any questions, just reply to this email.',
     '',
@@ -20,4 +19,4 @@ export const WELCOME_EMAIL_DEFAULT = {
     'The {companyName} Team',
   ].join('\n'),
 }
-export const WELCOME_PLACEHOLDERS = ['{firstName}', '{clientName}', '{companyName}', '{contractNum}', '{signedCopyLink}']
+export const WELCOME_PLACEHOLDERS = ['{firstName}', '{clientName}', '{companyName}', '{contractNum}']

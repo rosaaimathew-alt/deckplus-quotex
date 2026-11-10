@@ -9,6 +9,7 @@ import { logStep } from '../lib/esignConsent'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import SignedContractDoc from '../components/SignedContractDoc'
 import SignedAuditTrail from '../components/SignedAuditTrail'
+import SignedClosed from '../components/SignedClosed'
 import { downloadContractPdf, signedContractFileName } from '../lib/contractPdf'
 import { requiredSignFields, effectivePacket, ROLE_LABELS, fmtShortDate } from '../contract/contractFields'
 import { changeOrderIntro } from '../contract/deckPlusAgreement'
@@ -22,6 +23,7 @@ import { changeOrderIntro } from '../contract/deckPlusAgreement'
 const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const ROLE_LABEL = { client: 'Client', builder: 'Deck Plus', gc: 'General Contractor' }
 const today = () => fmtShortDate(new Date())
+
 
 export default function SignPage() {
   const { token } = useParams()
@@ -114,6 +116,8 @@ export default function SignPage() {
       if (!res.ok) throw new Error(result.error)
       setShowFinalize(false)
       setDone(true)
+      // Every party has signed: the link is closed from here on.
+      if (result.allSigned) { setRecord(prev => ({ closed: true, status: 'signed', message: `Please reach out to ${prev?.contractData?.branding?.companyName || 'Deck Plus'} for a signed copy of your agreement.` })); return }
       // Reload so the signed copy below shows every signature, including this one.
       fetch(`/api/sign/${token}`).then(r => r.ok ? r.json() : null).then(fresh => { if (fresh && !fresh.error) setRecord(fresh) }).catch(() => {})
     } catch (err) {
@@ -147,9 +151,11 @@ export default function SignPage() {
     </div>
   )
 
-  // After signing (or on re-opening a signed link): the confirmation, then the
-  // signed contract itself and its audit trail, with Print / Save PDF — so a
-  // printed copy is never blank.
+  // Signed by every party: the link only says so.
+  if (record?.closed) return <SignedClosed justSigned={done} name={printedName} message={record.message} />
+
+  // After signing (or on re-opening a link this party signed while the other
+  // party hasn't yet): the confirmation, then the contract and its audit trail.
   if (done || record?.alreadySigned) {
     const isContract = record?.contractData?.dp && record?.contractData?.type !== 'change-order'
     const bothSigned = record?.status === 'signed'
