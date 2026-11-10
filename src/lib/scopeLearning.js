@@ -10,7 +10,7 @@
 //    item and adds lines they keep adding (applyLearned), and
 //  • AI Suggest is told the same (learnedHints).
 
-import { unsoldUpgrades } from './scopeUpgrades'
+import { unsoldUpgrades, dropUnsold } from './scopeUpgrades'
 
 const n = (v) => Number(v) || 0
 
@@ -170,6 +170,47 @@ export function applyLearned(lines = [], examples = []) {
     })
   })
   return { lines: out, applied }
+}
+
+// An item's lines replaced with new text: the first line keeps the item's
+// name and price, the rest follow it.
+export function replaceItemText(lines, item, text) {
+  const rows = String(text || '').split('\n')
+  const out = []
+  for (const l of lines) {
+    if (l.item !== item) { out.push(l); continue }
+    if (!l.head) continue
+    out.push({ ...l, text: rows[0], textless: false })
+    rows.slice(1).forEach((t, k) => out.push({ id: `${l.id}~${k + 1}`, name: '', price: 0, text: t, item }))
+  }
+  return out
+}
+
+// "Fill from Past Contracts": each item takes the wording of its closest past
+// contract. A past contract is wording only — its lines naming an upgrade that
+// isn't on this quote (T&G ceiling, Cox columns…) are never copied in.
+// Returns { lines, leftOut: [upgrade names] }.
+export function fillFromPast(lines = [], library = [], quoteText = '') {
+  const lib = (library || []).filter(ex => ex.bulletText?.trim())
+  const newest = (a, b) => new Date(b.savedAt) - new Date(a.savedAt)
+  const score = (itemName, ex) => {
+    const a = (itemName || '').toLowerCase(), b = (ex.itemName || '').toLowerCase()
+    if (a === b) return 100
+    const words = a.split(/\s+/).filter(w => w.length > 2)
+    return words.filter(w => b.includes(w)).length / Math.max(words.length, 1)
+  }
+  const leftOut = new Set()
+  let next = lines.filter(l => !l.isDiscount)
+  for (const head of next.filter(l => l.head)) {
+    const same = lib.filter(ex => ex.itemKey && ex.itemKey === head.item).sort(newest)[0]
+    const best = same || lib.map(ex => ({ ex, s: score(head.name, ex) })).filter(({ s }) => s > 0)
+      .sort((a, b) => (b.s !== a.s ? b.s - a.s : newest(a.ex, b.ex)))[0]?.ex
+    if (!best) continue
+    unsoldUpgrades(best.bulletText, quoteText).forEach(u => leftOut.add(u))
+    const text = dropUnsold(best.bulletText, quoteText)
+    if (text.trim()) next = replaceItemText(next, head.item, text)
+  }
+  return { lines: next, leftOut: [...leftOut] }
 }
 
 // For AI Suggest: what reps change on these items, in words.
