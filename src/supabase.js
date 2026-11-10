@@ -196,15 +196,36 @@ async function fetchPage(table, orgId, page, withCount) {
     .order('updated_at', { ascending: false }).order('id', { ascending: true })
     .range(page * PAGE, page * PAGE + PAGE - 1)
   // A page past the end of the table is just an empty page.
-  if (error && page > 0 && (error.code === 'PGRST103' || /range not satisfiable/i.test(error.message || ''))) return { rows: [], count: null }
+  if (error && (error.code === 'PGRST103' || /range not satisfiable/i.test(error.message || ''))) return { rows: [], count: null }
   if (error) throw error
   return { rows: data || [], count: withCount ? count : null }
 }
 
+// One page after another until a short page — slower, but asks nothing new of the server.
+async function fetchAllInTurn(table, orgId) {
+  const rows = []
+  for (let page = 0; ; page++) {
+    const { rows: got } = await fetchPage(table, orgId, page, false)
+    rows.push(...got)
+    if (got.length < PAGE) return rows
+  }
+}
+
 // Every row of a table. Pages load side by side, not one after another: the
 // first page says how many rows there are, and the page count from last time
-// is asked for up front.
+// is asked for up front. If that fails for any reason other than the table not
+// existing, the table is loaded one page after another instead.
 async function fetchAll(table, orgId) {
+  try {
+    return await fetchAllTogether(table, orgId)
+  } catch (e) {
+    if (isMissingTable(e)) throw e
+    console.warn(`[quotex] ${table}: loading pages together failed (${e?.message || e}); loading them in turn`)
+    return fetchAllInTurn(table, orgId)
+  }
+}
+
+async function fetchAllTogether(table, orgId) {
   const key = `${orgId}:${table}`
   const guess = Math.max(1, Math.ceil((Number(_rowCounts[key]) || 0) / PAGE))
   const pages = await Promise.all(Array.from({ length: guess }, (_, i) => fetchPage(table, orgId, i, i === 0)))
