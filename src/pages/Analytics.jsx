@@ -4,7 +4,7 @@ import { useStore, canDeleteProposals, canDeleteProposal } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { MenuChip, QuickPicks, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
-import { headlineNumbers } from '../lib/headline'
+import { headlineNumbers, isSale, isImportedSale, saleDateOf, saleValueOf } from '../lib/headline'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from '../historicalData'
 import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
 
@@ -965,7 +965,7 @@ export default function Analytics() {
     const h = headlineNumbers(proposals, ...periodBounds(statsPeriod))
     const won = h.won
     // 'Archived' is a superseded revision — neutral, never counted as a loss.
-    const lost = proposals.filter(p => p.status !== 'Won' && p.status !== 'Archived' && matchesPeriod(p.createdAt || p.sentAt || p.closedAt))
+    const lost = proposals.filter(p => p.status !== 'Won' && p.status !== 'Archived' && p.status !== 'Imported' && matchesPeriod(p.createdAt || p.sentAt || p.closedAt))
     const apptCount = h.clients.length
     const wonAppts = h.wonClients.length
     const winRate = h.winRate ?? 0
@@ -981,7 +981,7 @@ export default function Analytics() {
       types.forEach(t => {
         if (!typeMap[t]) typeMap[t] = { count: 0, revenue: 0 }
         typeMap[t].count += 1
-        typeMap[t].revenue += wonRevenueOf(p) / types.length
+        typeMap[t].revenue += saleValueOf(p) / types.length
       })
     })
     const typeRows = Object.entries(typeMap)
@@ -1030,27 +1030,35 @@ export default function Analytics() {
     // Win COUNT = tagged Won OR signed (matches the win-rate card). REVENUE, though,
     // only counts realized Won contracts — a signed-but-not-yet-tagged deal is a win
     // but not recognized revenue yet — so the graph's sales total matches the cards.
-    proposals.filter(p => p.status === 'Won' || p.contractDraft?.signed === true).forEach(p => {
-      const m = find(new Date(p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt || now))
+    proposals.filter(p => isSale(p) || (p.status !== 'Imported' && p.contractDraft?.signed === true)).forEach(p => {
+      const m = find(new Date(saleDateOf(p) || now))
       if (!m) return
       m.jobCount += 1
-      if (p.status !== 'Won') return   // signed-only deals: count as a win, not revenue
-      const rev = wonRevenueOf(p)
+      if (!isSale(p)) return   // signed-only deals: count as a win, not revenue
+      const rev = saleValueOf(p)
       m.total += rev
       const types = p.contractDraft?.projectTypes?.length ? p.contractDraft.projectTypes : p.projectTypes?.length ? p.projectTypes : ['Other']
       types.forEach(t => { m.byType[t] = (m.byType[t] || 0) + rev / types.length })
     })
     // Appointments = root opportunities that were actually sent (archived + never-
     // sent drafts excluded), by created date — matches the card's denominator.
-    const ids = new Set(proposals.map(p => p.id))
-    proposals.filter(p => !p.parentId || !ids.has(p.parentId)).forEach(root => {
-      const group = [root, ...proposals.filter(p => p.parentId === root.id)]
+    // Imported jobs were never appointments here.
+    const estimated = proposals.filter(p => p.status !== 'Imported')
+    const ids = new Set(estimated.map(p => p.id))
+    estimated.filter(p => !p.parentId || !ids.has(p.parentId)).forEach(root => {
+      const group = [root, ...estimated.filter(p => p.parentId === root.id)]
       if (!group.some(p => p.status !== 'Archived' && p.status !== 'Draft')) return
       const m = find(new Date(root.createdAt || root.sentAt || root.closedAt || now))
       if (m) m.apptCount += 1
     })
     return months
   }, [proposals, statsPeriod])
+
+  // The heat map: a Knowify sale shows as a won job at its sold value; other
+  // imported jobs (history with no sale on record) stay off the map.
+  const mapProposals = useMemo(() => proposals
+    .filter(p => p.status !== 'Imported' || isImportedSale(p))
+    .map(p => (isImportedSale(p) ? { ...p, status: 'Won', total: saleValueOf(p), closedAt: saleDateOf(p) } : p)), [proposals])
 
   const toggleType = type => {
     setActiveTypes(prev => {
@@ -1158,7 +1166,7 @@ export default function Analytics() {
           </div>
           {showHeatMap ? <ChevronUp size={15} className="text-gray-400" /> : <ChevronDown size={15} className="text-gray-400" />}
         </button>
-        {showHeatMap && <div className="mt-3"><SalesHeatMap proposals={proposals} /></div>}
+        {showHeatMap && <div className="mt-3"><SalesHeatMap proposals={mapProposals} /></div>}
       </div>
 
       {/* Won Jobs by Project Type — collapsed by default */}
