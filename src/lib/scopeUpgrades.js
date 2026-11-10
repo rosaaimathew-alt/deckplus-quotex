@@ -16,7 +16,7 @@ export const UPGRADES = [
   ['Shiplap',          /ship\s?lap/i],
   ['TV wall',          /\btv\s+wall/i],
   ['Cox columns',      /\bcox\b|lam(?:inated)?\.?\s+(?:cox\s+)?column/i],
-  ['8×8 columns',      /\b8\s*[”"″']?\s*[x×]\s*8\b/i],
+  ['8×8 columns',      /\b8\s*[”"″']?\s*[x×]\s*8\b[^.\n]{0,25}(?:column|post)|(?:column|post)[^.\n]{0,25}\b8\s*[”"″']?\s*[x×]\s*8\b/i],
   ['Box steps',        /box\s+step/i],
   ['Privacy wall',     /privacy\s+wall/i],
   ['Lattice',          /lattice/i],
