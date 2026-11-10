@@ -67,8 +67,9 @@ export const PORCH_BUILD_DEFAULTS = {
   // Structural add-ons
   freestanding_add:   R('Freestanding structure add',                      'SF', 7,    'structure'),
   deck_over_8:        R('Deck above 8′ high add',                          'SF', 5,    'structure'),
-  pt_lvl:             R('PT LVL framing (porch depth)',                     'LF', 50,   'structure'),
-  lvl_engineering:    R('Engineer letter (LVL projects & semi-vaulted roofs)', 'LS', 1800, 'structure'),
+  pt_lvl:             R('LVL framing',                                      'LF', 50,   'structure'),
+  lvl_engineering:    R('Engineer letter',                                  'LS', 1000, 'structure'),
+  undermined_footings:R('Undermined footings',                              'EA', 750,  'structure'),
   gable_over_19:      R('Gable / semi-vaulted wider than 19′ add',         'LS', 1000, 'structure'),
   hip_roof:           R('Hip roof',                                         'LS', 3000, 'structure'),
   hot_tub_reinforce:  R('Reinforce deck for hot tub / porch',               'LS', 2000, 'structure'),
@@ -81,6 +82,7 @@ export const PORCH_BUILD_DEFAULTS = {
   // Enclosure
   screeneze_upcharge: R('ScreenEze screens',                               'SF', 3,    'enclosure'),
   lam_column_pkg:     R('6×6 laminated COX column package',                 'LS', 2000, 'enclosure'),
+  col_8x8:            R('8″×8″ column upgrade (open porch)',                'EA', 350,  'structure', { option: true }),
   eze_window:         R('Eze-Breeze window unit (new porch)',               'EA', 530,  'enclosure'),   // $700 is the conversion tool's rate
   eze_transom:        R('Eze-Breeze transom (wall over 100″)',              'EA', 130,  'enclosure'),
   door_tradewinds:    R('Larsen Tradewinds door',                           'EA', 750,  'enclosure', { door: true }),
@@ -132,10 +134,10 @@ export const PORCH_BUILD_DEFAULTS = {
   tile:                 R('Tile flooring only',                             'SF', 29,   'flooring', { floor: true }),
   tile_deck:            R('Tile flooring on deck',                          'SF', 36,   'flooring', { floor: true }),
   tile_membrane:        R('Tile with plywood / membrane upgrade',           'SF', 44,   'flooring', { floor: true }),
-  concrete_4:           R('Concrete 4″',                                    'SF', 17,   'flooring', { concrete: true }),
-  concrete_small:       R('Concrete slab under 200 SF',                     'SF', 30,   'flooring', { concrete: true }),
-  concrete_reinforced:  R('Reinforced concrete 4″ (mesh / underlayment)',   'SF', 20,   'flooring', { concrete: true }),
-  concrete_access:      R('Concrete + hill / driveway / house access',      'SF', 20,   'flooring', { concrete: true }),
+  concrete_4:           R('Concrete 4″',                                    'SF', 20,   'flooring', { concrete: true }),
+  concrete_small:       R('Concrete slab under 200 SF',                     'SF', 35,   'flooring', { concrete: true }),
+  concrete_reinforced:  R('Reinforced concrete 4″ (mesh / underlayment)',   'SF', 25,   'flooring', { concrete: true }),
+  concrete_access:      R('Concrete + hill / driveway / house access',      'SF', 25,   'flooring', { concrete: true }),
 
   // Steps & landings — every deck collection, $/SF like the deck tool
   ...DECK_STEP_ROWS,
@@ -358,6 +360,9 @@ export const PORCH_BUILD_INPUT_DEFAULTS = {
   doorWall: 'side',                     // sunroom: doors on the side walls by the house, or 'front'
   glassEnds: 0,                         // gable roofs only
   hotTub: false, wrap: false, cricket: false, seedStraw: false, bracingPosts: 0,
+  lvlLf: null,                          // LVL length (LF); null = auto (see suggestedLvlLf)
+  engLetter: null,                      // engineer letter; null = auto (any LVL, or a gable / hip / semi-vaulted roof)
+  footings: 0,                          // undermined footings (count)
   paintPorch: false,
   flooring: null,                       // one flooring key or null
   concrete: null,                       // one concrete key or null (patio only)
@@ -377,6 +382,15 @@ export const boardLF = (sf) => sf * (12 / BOARD_FACE_IN)
 export function exposedPerimeterFt(inp) {
   const W = n(inp.width), D = n(inp.depth)
   return inp.tie === 'free' ? 2 * (W + D) : W + 2 * D
+}
+
+// LVL length the builder suggests: the porch depth plus 2′ for a wall
+// connection, or plus 8′ for a roof-to-roof connection. Only gable and hip
+// roofs take an LVL by default; a freestanding porch takes the depth alone.
+export const LVL_EXTRA_FT = { wall: 2, roof: 8, free: 0 }
+export function suggestedLvlLf(inp, roof) {
+  if (roof !== 'gable' && roof !== 'hip') return 0
+  return n(inp.depth) + (LVL_EXTRA_FT[inp.tie] ?? 0)
 }
 
 // Build the priced line list from the rep's inputs and the org's rate table.
@@ -407,13 +421,21 @@ export function computePorchBuild(input, ratesIn) {
   if (tie === 'free') add('freestanding_add', area)
   if (inp.floor === 'deck' && n(inp.deckHeightFt) > 8) add('deck_over_8', area)
 
-  // Roof style: gable and hip take a PT LVL and engineering; every semi-vaulted
-  // roof takes the engineering ($1,000).
-  if (roof === 'gable' || roof === 'hip') {
-    add('pt_lvl', D, 'porch depth')
-    add('lvl_engineering', 1)
-  }
-  if (roof === 'semivault') add('lvl_engineering', 1, 'semi-vaulted roof')
+  // Roof style: gable and hip take an LVL; the rep can change the LVL length in
+  // Structural add-ons (blank = the suggestion). The engineer letter is its own
+  // line: on by default with any LVL or a gable, hip or semi-vaulted roof, and
+  // the rep can tick or untick it.
+  const lvlAuto = suggestedLvlLf(inp, roof)
+  const lvlSet  = inp.lvlLf !== null && inp.lvlLf !== undefined && inp.lvlLf !== ''
+  const lvlLf   = lvlSet ? Math.max(0, n(inp.lvlLf)) : lvlAuto
+  const lvlNote = lvlSet ? 'length set by rep'
+    : tie === 'wall' ? 'porch depth + 2′ wall connection'
+    : tie === 'roof' ? 'porch depth + 8′ roof-to-roof'
+    : 'porch depth'
+  add('pt_lvl', lvlLf, lvlNote)
+  const letterAuto = lvlLf > 0 || roof === 'gable' || roof === 'hip' || roof === 'semivault'
+  const letterOn = inp.engLetter === null || inp.engLetter === undefined ? letterAuto : !!inp.engLetter
+  if (letterOn) add('lvl_engineering', 1)
   // Same over-19′ flat fee for gable and semi-vaulted roofs
   if ((roof === 'gable' || roof === 'semivault') && W > 19) add('gable_over_19', 1)
   if (roof === 'hip') {
@@ -454,6 +476,7 @@ export function computePorchBuild(input, ratesIn) {
   if ((roof === 'gable' || roof === 'semivault') && n(inp.glassEnds) > 0) add('glass_gable_end', n(inp.glassEnds))
 
   // Structural toggles
+  add('undermined_footings', Math.floor(n(inp.footings)))
   if (inp.hotTub) add('hot_tub_reinforce', 1)
   if (n(inp.bracingPosts) > 0) { add('bracing_plate', n(inp.bracingPosts)); add('bracing_letter', 1) }
   if (inp.wrap) add('porch_wrap', 1)
@@ -504,6 +527,7 @@ export function computePorchBuild(input, ratesIn) {
   for (const [k, q] of Object.entries(inp.extras || {})) {
     if (!rates[k]?.option) continue
     if (k === 'flat_ceiling' && roof === 'hip') continue
+    if (k === 'col_8x8' && inp.type !== 'open') continue   // open porches only (screen / Eze-Breeze take Cox columns)
     add(k, n(q))
   }
 
@@ -519,7 +543,7 @@ export function computePorchBuild(input, ratesIn) {
   // both sides of the steps, and each landing's three open sides.
   const railStepLF = stepColl && risers > 0 ? 2 * runOutForSteps(risers) : 0
   const railLandingLF = landingColl ? n(inp.landings.count) * landingFasciaFt(4, 4) : 0
-  return { lines, groups, total, cost, area, roof, layout, risers, railStepLF, railLandingLF,
+  return { lines, groups, total, cost, area, roof, layout, lvlAuto, lvlLf, letterAuto, letterOn, risers, railStepLF, railLandingLF,
     fasciaLF: exposedPerimeterFt(inp) + stepFasciaLF + landingFasciaLF, fasciaDeckLF: exposedPerimeterFt(inp), fasciaStepLF: stepFasciaLF, fasciaLandingLF: landingFasciaLF }
 }
 
@@ -537,7 +561,8 @@ export const PORCH_CATALOG_NAMES = {
   base_screen_wall_patio: 'ScreenEze Wall Tie on patio',  base_screen_roof_patio: 'ScreenEze Roof Tie on patio',
   base_open_wall_deck: 'Open Wall Tie on PT Deck', base_open_roof_deck: 'Open Roof Tie on PT Deck',
   base_open_wall_patio: 'Open Wall Tie on Patio',  base_open_roof_patio: 'Open Roof Tie on Patio',
-  freestanding_add: 'Freestanding Structure ADD', pt_lvl: 'PT LVL (Framing) LF', lvl_engineering: 'LVL Engineering (for all LVL projects)',
+  freestanding_add: 'Freestanding Structure ADD', pt_lvl: 'LVL (Framing) LF', lvl_engineering: 'LVL Engineering (for all LVL projects)',
+  undermined_footings: 'Undermined footings (extra concrete /soil removal)',
   hot_tub_reinforce: 'Reinforce deck for hot tub/porch', bracing_letter: 'Engineered metal bracing LETTER', seed_straw: 'Seed and straw',
   lam_column_pkg: '6x6 lam column package', eze_window: 'EzeBreeze', eze_transom: 'Transom',
   door_tradewinds: 'Larsen Tradewinds Door', door_savannah: 'Larsen Savannah Door', door_savannah_pet: 'Larsen Savannah Pet Door',
@@ -568,6 +593,7 @@ const ROOF_WORDS = { shed: 'Shed roof', gable: 'A-Frame gable roof', semivault: 
 
 // One priced line → its scope wording
 export function porchLineScope(l, inp, result, catalog) {
+  if (l.key === 'col_8x8') return `Upgrade ${countWords(l.qty)} columns to 8”x8” solid wood columns, wrapped with Miratec.`
   const name = PORCH_CATALOG_NAMES[l.key]
   const fallback = `${l.label}${l.unit === 'EA' && l.qty > 1 ? ` (${l.qty})` : ''}.`
   if (!name) return fallback
@@ -631,6 +657,8 @@ export function buildPorchScope(input, result, templates, catalog = []) {
     if (!t) continue
     ;(groups[l.group] = groups[l.group] || []).push(t)
   }
+  // Ply-bead is the standard ceiling; a T&G ceiling upgrade replaces it.
+  if (result.lines.some(l => l.key === 'tg_ceiling' && n(l.qty) > 0)) structure = structure.split('\n').filter(s => !/ply\s*-?\s*bead/i.test(s)).join('\n')
   groups.structure = [structure, ...(groups.structure || [])]
   const byGroup = Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, [...new Set(v)].join('\n')]))
   const order = ['structure', 'enclosure', 'roofceiling', 'finishes', 'flooring', 'stepsrail', 'electrical']

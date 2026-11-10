@@ -1,4 +1,5 @@
 import { useStore } from '../store'
+import { isImportedSale } from './headline'
 
 // ── Whose deals: one rep, or the whole organization ─────────────────────────
 // A rep's store only ever holds their own deals (the database decides). Office
@@ -26,6 +27,8 @@ export function useScopedProposals({ includeImported = false } = {}) {
   return {
     // Jobs imported from the office's sheet aren't proposals — keep them out of sales views
     proposals: (repId ? all.filter(p => p.ownerId === repId) : all).filter(p => includeImported || p.status !== 'Imported'),
+    // Sales made in Knowify, for the headline totals (lib/headline.js)
+    sales: (repId ? all.filter(p => p.ownerId === repId) : all).filter(isImportedSale),
     canChoose, reps, repId, me,
     mineOnly: !!repId && repId === me?.id,
     repName: repId ? (reps.find(r => r.id === repId)?.name || '') : '',

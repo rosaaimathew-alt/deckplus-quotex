@@ -6,8 +6,10 @@ import { DEMO } from '../demo'
 import DeckPlusContract from '../contract/DeckPlusContract'
 import { PACKET_FORMS } from '../contract/deckPlusAgreement'
 import { PACKET_VERSION, autoContractValues, autoChecks, defaultPacket, requiredSignFields, STATES, COUNTIES } from '../contract/contractFields'
+import { locateAddress } from '../lib/permitFees'
+import { dropUnsold, unsoldUpgrades } from '../lib/scopeUpgrades'
 import { specPrefill } from '../contract/specPrefill'
-import { scopeLinesFor, normalizeScope, remapEdit, draftOf, scopeEdits, applyLearned, learnedHints, linePrice } from '../lib/scopeLearning'
+import { scopeLinesFor, normalizeScope, remapEdit, draftOf, scopeEdits, applyLearned, learnedHints, linePrice, replaceItemText, fillFromPast } from '../lib/scopeLearning'
 import { mergeLines } from '../lib/hiddenLines'
 import { buildContractPdf, downloadScopePdf, scopeFileName } from '../lib/contractPdf'
 
@@ -124,7 +126,8 @@ function getMilestoneSet(key, projectTag, total) {
 // document). Grouped the way the rep thinks about them.
 const FILLIN_GROUPS = [
   { title: 'Dates', fields: [['effectiveDate', 'Agreement date'], ['dateSold', 'Date sold'], ['startDate', 'Start date (PM)']] },
-  { title: 'Customer', fields: [['clientName', 'Client name'], ['clientPhone', 'Phone'], ['clientEmail', 'Email'], ['propertyAddress', 'Property address'], ['county', 'County'], ['subdivision', 'Subdivision']] },
+  { title: 'Customer', fields: [['clientName', 'Client name'], ['clientPhone', 'Phone'], ['clientEmail', 'Email'], ['propertyAddress', 'Property address'], ['county', 'County']] },
+  { title: 'Property', lookup: true, fields: [['subdivision', 'Subdivision'], ['beds', 'Beds'], ['baths', 'Baths'], ['waterProvider', 'Water provider'], ['energyProvider', 'Energy provider'], ['gasProvider', 'Gas provider']] },
   { title: 'Project', fields: [['contractNum', 'Contract #'], ['jobName', 'Job name (spec sheets)'], ['projectName', 'Project name (site conditions)'], ['projectType', 'Project type'], ['designConsultant', 'Design consultant'], ['releaseSubject', 'Release of liability — relating to'], ['capitalImprovement', 'E-589CI — capital improvement']] },
   { title: 'Payment (clause 3)', fields: [['contractTotal', 'Contract total'], ['contractTotalWords', 'Total in words'], ['pay1', 'Upon contract signature'], ['pay2', 'The day job starts'], ['pay3', 'Middle payment'], ['pay3Label', 'Middle payment label'], ['pay4', 'After 1st punch list']] },
 ]
@@ -177,6 +180,7 @@ export default function ContractView() {
   const saveContractDraft         = useStore(s => s.saveContractDraft)
   const scopeExamples             = useStore(s => s.scopeExamples)
   const saveScopeExamples         = useStore(s => s.saveScopeExamples)
+  const setProposalPropertyInfo   = useStore(s => s.setProposalPropertyInfo)
   const scopeTemplates            = useStore(s => s.scopeTemplates)
   const saveScopeTemplate         = useStore(s => s.saveScopeTemplate)
   const deleteScopeTemplate       = useStore(s => s.deleteScopeTemplate)
@@ -205,8 +209,10 @@ export default function ContractView() {
   const [draftSource, setDraftSource] = useState('proposal')
   // Edits learned from past contracts that were made to the starting scope (with undo).
   const [learnedApplied, setLearnedApplied] = useState(null)
+  // Upgrades a past contract or template named that this quote doesn't have (not copied in).
+  const [leftOut, setLeftOut] = useState([])
   const startScope = (raw, source = 'proposal') => {
-    setScopeDraft(draftOf(raw)); setDraftSource(source)
+    setScopeDraft(draftOf(raw)); setDraftSource(source); setLeftOut([])
     if (source !== 'proposal') { setLearnedApplied(null); return raw }
     const { lines, applied } = applyLearned(raw, useStore.getState().scopeExamples || [])
     setLearnedApplied(applied.length ? { applied, raw } : null)
@@ -254,6 +260,7 @@ export default function ContractView() {
   const companySignature = useStore(s => s.companySignature)
   const [linkLoading, setLinkLoading]     = useState(false)
   const [copiedRole, setCopiedRole]       = useState('')
+  const [propLookup, setPropLookup]       = useState('')   // '' | 'busy' | error text
 
   useEffect(() => {
     const raw = sessionStorage.getItem('contract')
@@ -312,6 +319,32 @@ export default function ContractView() {
     }
   }, [])
 
+  // Subdivision, beds/baths and the utility providers, looked up once per
+  // address when the contract is drafted and saved on the proposal.
+  const lookupProperty = async () => {
+    const address = data?.address?.trim()
+    if (!address || !data?.proposalId || DEMO) return
+    setPropLookup('busy')
+    try {
+      const res = await fetch('/api/ai-chat?task=property', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, county: locateAddress(address).county }),
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok || !out.info) throw new Error(out.error || `Property lookup failed (${res.status}).`)
+      setProposalPropertyInfo(data.proposalId, { ...out.info, address, lookedUpAt: new Date().toISOString() })
+      setPropLookup('')
+    } catch (err) { setPropLookup(err.message || 'Property lookup failed.') }
+  }
+  useEffect(() => {
+    if (!data?.proposalId || !data.address) return
+    const p = proposals.find(x => x.id === data.proposalId)
+    if (p?.contractDraft?.signed) return
+    if (p?.propertyInfo?.address === data.address.trim()) return
+    lookupProperty()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once per job address; the result is saved on the proposal
+  }, [data?.proposalId, data?.address])
+
   if (!data) {
     return (
       <div className="p-8 text-center text-gray-400">
@@ -339,8 +372,9 @@ export default function ContractView() {
   const specCount   = Object.keys(spec.checks).length + Object.keys(spec.values).length
   const hasElectrical = spec.hasElectrical || (scopeLines || []).some(l => /electric|outlet|light|fan|switch|wiring/i.test(`${l.name} ${l.text}`))
   const saleDate    = proposal?.closedAt || proposal?.statusChangedAt || null
-  const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, overrides: spec.values })
-  const values      = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, overrides: { ...spec.values, ...fieldOverrides } })
+  const property    = proposal?.propertyInfo?.address === (data.address || '').trim() ? proposal.propertyInfo : null
+  const autoValues  = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, property, overrides: spec.values })
+  const values      = autoContractValues({ data, total, payments, projectTypes, contractNum, me, saleDate, projectSummary, property, overrides: { ...spec.values, ...fieldOverrides } })
   const packetKeys  = packet ?? defaultPacket({ projectTypes, scopeLines, hasElectrical, state: values.jobState, county: values.county })
   const effectiveChecks = { ...autoChecks({ projectTypes }), ...spec.checks, ...checks }
 
@@ -464,38 +498,21 @@ export default function ContractView() {
   // ── Scope of Work drafting (from the proposal's line items) ────────────
   const addLine = () => setScopeLines(prev => [...prev, { id: Date.now(), name: '', text: '' }])
 
-  // An item's lines replaced with new text: the first line keeps the item's
-  // name and price, the rest follow it.
-  const replaceItemText = (lines, item, text) => {
-    const rows = String(text || '').split('\n')
-    const out = []
-    for (const l of lines) {
-      if (l.item !== item) { out.push(l); continue }
-      if (!l.head) continue
-      out.push({ ...l, text: rows[0], textless: false })
-      rows.slice(1).forEach((t, k) => out.push({ id: `${l.id}~${k + 1}`, name: '', price: 0, text: t, item }))
-    }
-    return out
+  // Everything this quote sold. Scope wording from anywhere else (past contracts,
+  // templates) never brings in an upgrade that isn't in here.
+  const quoteText = (data?.lines || []).map(l => `${l.name || ''}\n${l.description || ''}`).join('\n')
+  const onQuote = (bullets) => {
+    const kept = bullets.filter(b => !unsoldUpgrades(b, quoteText).length)
+    return { kept, out: [...new Set(bullets.flatMap(b => unsoldUpgrades(b, quoteText)))] }
   }
+  // In the scope right now but not sold on this quote — however it got there.
+  const notOnQuote = unsoldUpgrades(scopeLines.filter(l => !l.isDiscount).map(l => l.text || '').join('\n'), quoteText)
 
   const fillFromPastContracts = () => {
-    const library = scopeExamples.filter(ex => ex.bulletText?.trim())
-    if (!library.length) return
-    const newest = (a, b) => new Date(b.savedAt) - new Date(a.savedAt)
-    const score = (itemName, ex) => {
-      const a = (itemName || '').toLowerCase(), b = (ex.itemName || '').toLowerCase()
-      if (a === b) return 100
-      const words = a.split(/\s+/).filter(w => w.length > 2)
-      return words.filter(w => b.includes(w)).length / Math.max(words.length, 1)
-    }
-    let next = scopeLines.filter(l => !l.isDiscount)
-    for (const head of next.filter(l => l.head)) {
-      const same = library.filter(ex => ex.itemKey && ex.itemKey === head.item).sort(newest)[0]
-      const best = same || library.map(ex => ({ ex, s: score(head.name, ex) })).filter(({ s }) => s > 0)
-        .sort((a, b) => (b.s !== a.s ? b.s - a.s : newest(a.ex, b.ex)))[0]?.ex
-      if (best) next = replaceItemText(next, head.item, best.bulletText)
-    }
-    setScopeLines(startScope(next, 'past'))
+    if (!scopeExamples.some(ex => ex.bulletText?.trim())) return
+    const { lines, leftOut: out } = fillFromPast(scopeLines, scopeExamples, quoteText)
+    setScopeLines(startScope(lines, 'past'))
+    setLeftOut(out)
   }
 
   const generateSuggestions = async () => {
@@ -512,10 +529,13 @@ export default function ContractView() {
       }
       const seen = new Set()
       const relevant = heads.flatMap(findRelevant).filter(ex => { if (seen.has(ex.id)) return false; seen.add(ex.id); return true }).slice(0, 10)
-      const styleContext = relevant.length > 0
-        ? `\n\nIMPORTANT — You have written scope bullets for this contractor before. Study these EXACT past examples and match the writing style, line breaks, indentation, and level of detail PRECISELY:\n\n${relevant.map(ex => `[${ex.itemName}]\n${ex.bulletText}`).join('\n\n')}\n\nWrite the new bullets in this SAME style.`
+      // Past contracts teach wording only. Lines naming an upgrade this quote doesn't
+      // have (T&G ceiling, Cox columns…) are taken out before the AI sees them.
+      const relevantClean = relevant.map(ex => ({ ...ex, bulletText: dropUnsold(ex.bulletText, itemList) })).filter(ex => ex.bulletText.trim())
+      const styleContext = relevantClean.length > 0
+        ? `\n\nIMPORTANT — You have written scope bullets for this contractor before. Study these past examples and match the writing style, line breaks, indentation, and level of detail:\n\n${relevantClean.map(ex => `[${ex.itemName}]\n${ex.bulletText}`).join('\n\n')}\n\nWrite the new bullets in this SAME style. The examples are for wording only: describe only what is in this proposal's items — never carry over materials, upgrades or options (ceilings, columns, beams, lights…) from the examples.`
         : ''
-      const hints = learnedHints(scopeExamples, heads.map(h => h.item))
+      const hints = learnedHints(scopeExamples, heads.map(h => h.item)).map(h => dropUnsold(h, itemList)).filter(h => h.includes('usually'))
       const editContext = hints.length ? `\n\nThe contractor's reps consistently edit scope wording for these items — follow these preferences:\n${hints.join('\n')}` : ''
       const res = await fetch('/api/ai-chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -529,7 +549,8 @@ export default function ContractView() {
       const aiData  = await res.json()
       const bullets = (aiData.text || '').split('\n').map(l => l.replace(/^[-•*\d.]+\s*/, '').trim()).filter(Boolean)
       let next = scopeLines.filter(l => !l.isDiscount)
-      heads.forEach((h, i) => { if (bullets[i]) next = replaceItemText(next, h.item, bullets[i]) })
+      // A bullet that names an upgrade not on this quote is not used; the item keeps its own wording.
+      heads.forEach((h, i) => { if (bullets[i] && !unsoldUpgrades(bullets[i], itemList).length) next = replaceItemText(next, h.item, bullets[i]) })
       setScopeLines(startScope(next, 'ai'))
     } catch (err) { setAiError(err.message) } finally { setIsGenerating(false) }
   }
@@ -556,6 +577,8 @@ export default function ContractView() {
         </div>
       </div>
       {aiError && <div className="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{aiError}</div>}
+      {notOnQuote.length > 0 && <div className="mb-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded px-3 py-2" style={{ fontFamily: 'system-ui, sans-serif' }}>Not on this quote: {notOnQuote.join(', ')}</div>}
+      {leftOut.length > 0 && <div className="mb-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2" style={{ fontFamily: 'system-ui, sans-serif' }}>Left out, not on this quote: {leftOut.join(', ')}</div>}
       {learnedApplied && (
         <div className="mb-2 text-xs text-purple-800 bg-purple-50 border border-purple-200 rounded px-3 py-2" style={{ fontFamily: 'system-ui, sans-serif' }}>
           <div className="flex items-start justify-between gap-3">
@@ -813,7 +836,12 @@ export default function ContractView() {
             <div className="px-5 pb-5 border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               {FILLIN_GROUPS.map(g => (
                 <div key={g.title}>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{g.title}</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    {g.title}
+                    {g.lookup && !DEMO && (propLookup === 'busy'
+                      ? <span className="normal-case tracking-normal font-normal text-gray-400 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Looking up…</span>
+                      : <button onClick={lookupProperty} title={propLookup || 'Search county records and utilities for this address'} className={`normal-case tracking-normal font-normal flex items-center gap-1 ${propLookup ? 'text-red-500' : 'text-blue-600 hover:text-blue-700'}`}><RotateCcw size={11} /> {propLookup ? 'Lookup failed — retry' : 'Look up again'}</button>)}
+                  </p>
                   <div className="space-y-1.5">
                     {g.fields.map(([name, label]) => {
                       const overridden = fieldOverrides[name] !== undefined && fieldOverrides[name] !== '' && name !== 'contractNum'
@@ -830,7 +858,7 @@ export default function ContractView() {
                 </div>
               ))}
               <div className="md:col-span-2 bg-blue-50 rounded-lg px-3 py-2 text-xs text-blue-700">
-                Every other blank (notes, providers, beds/baths, spec-sheet details…) and every checkbox can be filled right on the document below — yellow fields are editable. The contract wording itself is locked.
+                Every other blank (notes, spec-sheet details…) and every checkbox can be filled right on the document below — yellow fields are editable. The contract wording itself is locked.
               </div>
             </div>
           )}
@@ -887,20 +915,23 @@ export default function ContractView() {
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => {
                         // Items keep their names and prices (as rows with no text); the template's bullets become the scope.
+                        const { kept, out } = onQuote(t.bullets)
                         setScopeLines(startScope([
                           ...scopeLines.filter(l => !l.isDiscount && (l.head || l.textless)).map(l => ({ ...l, text: '', textless: true })),
-                          ...t.bullets.map((txt, i) => ({ id: `${Date.now()}-t${i}`, name: '', price: 0, text: txt, item: null })),
+                          ...kept.map((txt, i) => ({ id: `${Date.now()}-t${i}`, name: '', price: 0, text: txt, item: null })),
                         ], 'template'))
+                        setLeftOut(out)
                         setShowScopeTemplates(false)
                       }}
                       className="flex-1 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700">Replace scope</button>
-                    <button onClick={() => { setScopeLines(prev => [...prev, ...t.bullets.map((txt, i) => ({ id: Date.now() + i + 1000, name: '', price: 0, text: txt }))]); setShowScopeTemplates(false) }}
+                    <button onClick={() => { const { kept, out } = onQuote(t.bullets); setScopeLines(prev => [...prev, ...kept.map((txt, i) => ({ id: Date.now() + i + 1000, name: '', price: 0, text: txt }))]); setLeftOut(out); setShowScopeTemplates(false) }}
                       className="flex-1 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-50">Append to scope</button>
                     <button onClick={() => {
                         const normalize = s => s.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim()
                         const currentNorm = scopeLines.map(l => normalize(l.text))
-                        const missing = t.bullets.filter(b => b.trim()).filter(b => { const bn = normalize(b); return !currentNorm.some(cn => cn.includes(bn) || bn.includes(cn)) }).map(txt => ({ txt, checked: true }))
-                        setMergeModal({ template: t, missing }); setShowScopeTemplates(false)
+                        const { kept, out } = onQuote(t.bullets)
+                        const missing = kept.filter(b => b.trim()).filter(b => { const bn = normalize(b); return !currentNorm.some(cn => cn.includes(bn) || bn.includes(cn)) }).map(txt => ({ txt, checked: true }))
+                        setMergeModal({ template: t, missing }); setLeftOut(out); setShowScopeTemplates(false)
                       }}
                       className="w-full py-1.5 border border-green-300 text-green-700 text-xs font-medium rounded-lg hover:bg-green-50">Merge missing bullets</button>
                   </div>

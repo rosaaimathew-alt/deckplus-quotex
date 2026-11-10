@@ -5,6 +5,7 @@ import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
 import { appRoleOf } from './roles'
+import { clientGroups } from './lib/proposalGroups'
 import { newSubTaskId } from './lib/subTasks'
 import { newDrawId } from './lib/subDraws'
 
@@ -152,6 +153,20 @@ export const LOSS_REASONS = [
 ]
 
 export const ACTIVITY_TYPES = ['Call', 'Follow-up', 'Meeting', 'Email', 'Objection', 'Note']
+
+// A client counts in win rate and conversion while at least one of their
+// proposals isn't archived (src/lib/headline.js). So a proposal can be archived,
+// or deleted by anyone but an admin, only while the client keeps another
+// proposal that isn't archived: alternatives clear off the dashboard and
+// pipeline, the customer stays. Their last one is marked Lost, not removed.
+export const canDeleteProposals = (me) => DEMO || me?.role === 'admin'
+export function clientKeepsAnother(proposals, id) {
+  const group = clientGroups(proposals).find(g => g.all.some(p => p.id === id))
+  return !!group && group.all.some(p => p.id !== id && p.status !== 'Archived')
+}
+export function canDeleteProposal(me, proposals, id) {
+  return canDeleteProposals(me) || clientKeepsAnother(proposals, id)
+}
 
 export const useStore = create(
   persist(
@@ -727,19 +742,21 @@ export const useStore = create(
 
       // Undo the historical import (remove every isHistorical proposal + reset the flag).
       clearHistory2024_2025: () =>
-        set((s) => ({
+        canDeleteProposals(get().me) && set((s) => ({
           proposals: s.proposals.filter(p => !p.isHistorical),
           historyImported: false,
           tombstones: [...(s.tombstones || []), ...s.proposals.filter(p => p.isHistorical).map(p => `proposal:${p.id}`)],
         })),
 
-      deleteProposal: (id) =>
+      deleteProposal: (id) => {
+        if (!canDeleteProposal(get().me, get().proposals, id)) return
         set((s) => ({
           proposals: s.proposals.filter((p) => p.id !== id),
           // Tombstone so the delete survives the union merge (and propagates to
           // other users) instead of being resurrected from the server copy.
           tombstones: [...(s.tombstones || []), `proposal:${id}`],
-        })),
+        }))
+      },
 
       // ── Manual grouping controls ─────────────────────────────────────────
       // Pull a single proposal out of its group so it stands alone as its own
@@ -806,7 +823,7 @@ export const useStore = create(
         }),
 
       clearAllProposals: () =>
-        set((s) => ({ proposals: [], nextProposalId: 1, tombstones: [...(s.tombstones || []), ...s.proposals.map(p => `proposal:${p.id}`)] })),
+        canDeleteProposals(get().me) && set((s) => ({ proposals: [], nextProposalId: 1, tombstones: [...(s.tombstones || []), ...s.proposals.map(p => `proposal:${p.id}`)] })),
 
       saveContractDraft: (proposalId, draft) =>
         set((s) => ({
@@ -1482,6 +1499,12 @@ export const useStore = create(
       setWelcomeEmail: (v) => set({ welcomeEmail: v }),
       setOfficeView: (v) => { try { localStorage.setItem('qx_office_view', v) } catch { /* private mode */ } set({ officeView: v }) },
       // A rep assigns one of the org's PMs to a deal; that PM then sees the job.
+      // Subdivision, beds/baths and utility providers looked up for the job address (contract packet).
+      setProposalPropertyInfo: (id, propertyInfo) =>
+        set((s) => ({
+          proposals: s.proposals.map((p) => (p.id === id ? { ...p, propertyInfo } : p)),
+        })),
+
       setProposalPm: (id, pmId) =>
         set((s) => ({
           proposals: s.proposals.map((p) => (p.id === id ? { ...p, pmId: pmId || null } : p)),

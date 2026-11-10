@@ -5,9 +5,9 @@
 // the Catalog); these numbers are only the fallback.
 
 export const UDC_STYLES = [
-  { key: 'flat',  label: 'Flat / smooth', catalogName: 'Under Deck Ceiling (UDC) FLAT/SMOOTH (Porch & Deck)', rate: 41.44 },
-  { key: 'bead',  label: 'Bead board',    catalogName: 'Under Deck Ceiling (UDC) BEAD BOARD (Porch & Deck)',  rate: 44.8 },
-  { key: 'faux',  label: 'Faux wood',     catalogName: 'Under Deck Ceiling (UDC) FAUX WOOD (Porch & Deck)',   rate: 49.28 },
+  { key: 'flat',  label: 'Flat / smooth', catalogName: 'Under Deck Ceiling (UDC) FLAT/SMOOTH (Porch & Deck)', rate: 42 },
+  { key: 'bead',  label: 'Bead board',    catalogName: 'Under Deck Ceiling (UDC) BEAD BOARD (Porch & Deck)',  rate: 45 },
+  { key: 'faux',  label: 'Faux wood',     catalogName: 'Under Deck Ceiling (UDC) FAUX WOOD (Porch & Deck)',   rate: 50 },
 ]
 
 export const UDC_ELECTRICAL = [
