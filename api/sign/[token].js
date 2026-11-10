@@ -10,6 +10,43 @@ export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
 const ROLES = ['client', 'builder', 'gc']
 
+// A contract has one live set of signing links. When new links are made for a
+// job, the links made earlier for that same job stop working (a copy that is
+// already fully signed is left alone), so nobody can open or sign a replaced
+// version. Contract numbers can be shared (every packet starts at
+// "<prefix>-0000"), so an earlier record only counts when it is for this job.
+async function supersedeEarlier(kv, { proposalId, contractNum, recordId }) {
+  if (proposalId == null) return []
+  const idxKey = `signs-by-proposal:${proposalId}`
+  const listed = await kv.get(idxKey)
+  const known = Array.isArray(listed) ? listed : []
+  const ids = new Set(known)
+  const byNum = contractNum ? await kv.get(`sign-by-contract:${contractNum}`) : null
+  if (typeof byNum === 'string') ids.add(byNum)
+  ids.delete(recordId)
+  const replaced = []
+  for (const id of ids) {
+    const rec = await kv.get(`sign:${id}`)
+    if (!rec || rec.status === 'signed' || rec.status === 'superseded') continue
+    if (String(rec.contractData?.proposalId) !== String(proposalId)) continue
+    await kv.set(`sign:${id}`, { ...rec, status: 'superseded', supersededBy: recordId, supersededAt: Date.now() })
+    replaced.push(id)
+  }
+  await kv.set(idxKey, [...new Set([...known, recordId])])
+  return replaced
+}
+
+// The newest record in a chain of replaced ones.
+async function latestRecord(kv, recordId) {
+  let id = recordId, rec = await kv.get(`sign:${id}`)
+  for (let hop = 0; rec?.status === 'superseded' && rec.supersededBy && hop < 10; hop++) {
+    const next = await kv.get(`sign:${rec.supersededBy}`)
+    if (!next) break
+    id = rec.supersededBy; rec = next
+  }
+  return { recordId: id, rec }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   const token = req.query.token
@@ -116,11 +153,19 @@ export default async function handler(req, res) {
         kv.set(`link:${roleTokens[role]}`, { recordId, role })
       ))
 
+      // Earlier links for this job stop working (read before the contract-number pointer moves).
+      let replaced = []
+      try { replaced = await supersedeEarlier(kv, { proposalId: contractData?.proposalId, contractNum, recordId }) }
+      catch (err) { console.error('Could not retire earlier signing links:', err.message) }
+
       if (contractNum) {
         await kv.set(`sign-by-contract:${contractNum}`, recordId)
       }
       await logEventSafe(requestContext(req), { recordType: 'contract', recordId, event: 'link_created', signerEmail: staff?.email, docHash,
-        detail: { contractNum: contractNum || '', createdBy: staff?.email || null, roles: ROLES } })
+        detail: { contractNum: contractNum || '', createdBy: staff?.email || null, roles: ROLES, ...(replaced.length ? { replaces: replaced } : {}) } })
+      for (const id of replaced) {
+        await logEventSafe(requestContext(req), { recordType: 'contract', recordId: id, event: 'superseded', signerEmail: staff?.email, detail: { replacedBy: recordId } })
+      }
 
       // Signed for the company already, when the office has turned that on.
       let autoSigned = false
@@ -251,9 +296,12 @@ export default async function handler(req, res) {
 
     // ── Recover signing links from a record: /api/sign/recover-<recordId> ──
     if (token.startsWith('recover-') && req.method === 'GET') {
-      const recordId = token.slice('recover-'.length)
-      const rec = await kv.get(`sign:${recordId}`)
-      if (!rec) return res.status(404).json({ error: 'Record not found' })
+      const asked = token.slice('recover-'.length)
+      const first = await kv.get(`sign:${asked}`)
+      if (!first) return res.status(404).json({ error: 'Record not found' })
+      if (!(await canSeeRecord(bearer, staff, { createdBy: first.createdBy, proposalId: first.contractData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own contracts.' })
+      // Replaced links are dead: give back the live set for the same job.
+      const { recordId, rec } = await latestRecord(kv, asked)
       if (!(await canSeeRecord(bearer, staff, { createdBy: rec.createdBy, proposalId: rec.contractData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own contracts.' })
       if (!rec.roleTokens) return res.status(404).json({ error: 'No role tokens stored — this record predates link recovery support' })
 
@@ -279,6 +327,10 @@ export default async function handler(req, res) {
 
       const rec = await kv.get(`sign:${recordId}`)
       if (!rec) return res.status(404).json({ error: 'Signing record not found' })
+      // Contract numbers can be shared (every packet starts at "<prefix>-0000"),
+      // so the record has to be for the job that is asking — never another customer's.
+      const recJob = rec.contractData?.proposalId
+      if (recJob != null && String(recJob) !== String(req.query.proposalId ?? '')) return res.status(404).json({ error: 'No signing record found for this contract' })
       if (!(await canSeeRecord(bearer, staff, { createdBy: rec.createdBy, proposalId: rec.contractData?.proposalId }))) return res.status(403).json({ error: 'You can only view your own contracts.' })
       if (!rec.roleTokens) return res.status(404).json({ error: 'No role tokens stored in this record' })
 
@@ -309,6 +361,12 @@ export default async function handler(req, res) {
     const emailOnFile = record.signerEmails?.[link.role] || (link.role === 'client' ? (record.contractData?.dp?.values?.clientEmail || record.contractData?.email || '') : '')
     const logBase   = { recordType: 'contract', recordId, role: link.role }
     const companyName = record.contractData?.branding?.companyName || process.env.COMPANY_NAME || 'Deck Plus'
+
+    // A replaced link shows nothing and can't be signed.
+    if (record.status === 'superseded') {
+      if (req.method === 'GET') await logEventSafe(requestContext(req), { ...logBase, event: 'opened_replaced_link', docHash })
+      return res.status(410).json({ error: `This signing link has been replaced by a newer one. Please use the most recent link from ${companyName}, or contact us for a new one.`, code: 'superseded' })
+    }
 
     // Audit trail for a party who has signed, to print with their signed copy.
     if (req.method === 'GET' && req.query.certificate) {

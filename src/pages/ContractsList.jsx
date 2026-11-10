@@ -215,7 +215,7 @@ export default function ContractsList({ initialFilter } = {}) {
         url = `/api/sign/recover-${draft.signRecordId}`
       } else {
         const contractNum = draft.contractNum || contractNumberFor(p.id)
-        url = `/api/sign/lookup-${encodeURIComponent(contractNum)}`
+        url = `/api/sign/lookup-${encodeURIComponent(contractNum)}?proposalId=${encodeURIComponent(p.id)}`
       }
       const res  = await fetch(url)
       const data = await res.json()
@@ -268,8 +268,8 @@ export default function ContractsList({ initialFilter } = {}) {
         const contractNum = draft.contractNum || contractNumberFor(p.id)
         // The stored record id when there is one, otherwise the contract number.
         const best = draft.signRecordId
-          ? (await probe(`/api/sign/record-${draft.signRecordId}`)) || (await probe(`/api/sign/lookup-${encodeURIComponent(contractNum)}`))
-          : await probe(`/api/sign/lookup-${encodeURIComponent(contractNum)}`)
+          ? (await probe(`/api/sign/record-${draft.signRecordId}`)) || (await probe(`/api/sign/lookup-${encodeURIComponent(contractNum)}?proposalId=${encodeURIComponent(p.id)}`))
+          : await probe(`/api/sign/lookup-${encodeURIComponent(contractNum)}?proposalId=${encodeURIComponent(p.id)}`)
         if (cancelled || !best) continue
         if (best.status === 'signed' || best.clientSigned) {
           setRemote(prev => ({ ...prev, [p.id]: best }))
