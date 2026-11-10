@@ -67,7 +67,7 @@ const LinkBtn = ({ onClick, children }) => (
 export default function Dashboard() {
   const navigate   = useNavigate()
   // Office / admin: your own deals by default, one rep's, or the whole organization's.
-  const { proposals, canChoose, reps, repId, mineOnly, repName, setRep } = useScopedProposals()
+  const { proposals, sales, canChoose, reps, repId, mineOnly, repName, setRep } = useScopedProposals()
   const jobCosts   = useStore(s => s.jobCosts) || {}
   const { can, role } = useNav()
   const me = useStore(s => s.me)
@@ -83,7 +83,7 @@ export default function Dashboard() {
 
   // ── Numbers (same rules as before / as Insights) ─────────────────────────
   // The same numbers as Insights (lib/headline.js)
-  const h          = headlineNumbers(proposals, pStart, pEnd)
+  const h          = headlineNumbers(proposals, pStart, pEnd, sales)
   const outcomes   = h.clients
   const wonClients = h.wonClients
   const won        = h.won

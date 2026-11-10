@@ -1033,7 +1033,7 @@ const WL_PERIODS = [
   ['this-month', 'This Month'], ['last-month', 'Last Month'], ['this-quarter', 'This Quarter'],
   ['last-quarter', 'Last Quarter'], ['this-year', 'This Year'], ['last-year', 'Last Year'],
 ]
-function AnalyticsView({ proposals: allProposals, periodKey = 'this-year' }) {
+function AnalyticsView({ proposals: allProposals, sales = [], periodKey = 'this-year' }) {
   const [which, period] = periodKey.split('-')
   const refDate = which === 'last' ? shiftPeriod(period, new Date(), -1) : new Date()
   const { start: pStart, end: pEnd } = getPeriodRange(period, refDate)
@@ -1046,7 +1046,7 @@ function AnalyticsView({ proposals: allProposals, periodKey = 'this-year' }) {
 
   // Revenue, win rate, average job and pipeline: the same rules as Home and
   // Overview (lib/headline.js)
-  const h      = headlineNumbers(allProposals, pStart, pEnd)
+  const h      = headlineNumbers(allProposals, pStart, pEnd, sales)
   const won    = h.won
   const lost   = proposals.filter(p => p.status === 'Lost')
   const wonClients    = h.wonClients
@@ -1192,7 +1192,7 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
 
   // Who sees what is decided by the database (a rep's store only ever holds
   // their own deals). The office additionally gets a Mine / Everyone toggle.
-  const { proposals, canChoose, reps, repId, setRep } = useScopedProposals()
+  const { proposals, sales, canChoose, reps, repId, setRep } = useScopedProposals()
 
   const [ownTab, setTab] = useState('list')
   const tab = view || ownTab
@@ -1465,7 +1465,7 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
         <ActivityView proposals={proposals} />
       )}
       {tab === 'analytics' && (
-        <AnalyticsView proposals={proposals} periodKey={wlPeriod} />
+        <AnalyticsView proposals={proposals} sales={sales} periodKey={wlPeriod} />
       )}
 
       {/* A la Carte Item Selection Modal */}
