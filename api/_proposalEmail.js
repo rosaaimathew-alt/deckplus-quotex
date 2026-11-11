@@ -18,12 +18,13 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => (
 const tidy = (v) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80)
 
 // Signature fields as plain single-line text. `given` wins over `saved`, which
-// wins over the defaults; a field `given` as '' is left out on purpose.
+// wins over the defaults. A blank box never wipes what is saved: a signature
+// always goes out complete.
 export function signatureOf(given, saved, fallbackName = '') {
   const out = {}
   for (const k of FIELDS) {
-    const g = given && typeof given === 'object' && k in given ? tidy(given[k]) : null
-    out[k] = g !== null ? g : tidy(saved?.[k] ?? SIGNATURE_DEFAULTS[k] ?? '')
+    const g = given && typeof given === 'object' ? tidy(given[k]) : ''
+    out[k] = g || tidy(saved?.[k]) || SIGNATURE_DEFAULTS[k] || ''
   }
   if (!out.name) out.name = tidy(fallbackName)
   return out
