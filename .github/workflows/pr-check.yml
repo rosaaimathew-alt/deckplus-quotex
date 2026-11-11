@@ -39,7 +39,7 @@ jobs:
           OUT="$RUNNER_TEMP"
           npx eslint $FILES -f json -o "$OUT/after.json" || true
           git checkout -q "$BASE"
-          EXISTING=$(for f in $FILES; do [ -f "$f" ] && echo "$f"; done)
+          EXISTING=$(for f in $FILES; do if [ -f "$f" ]; then echo "$f"; fi; done)
           if [ -n "$EXISTING" ]; then npx eslint $EXISTING -f json -o "$OUT/before.json" || true; else echo '[]' > "$OUT/before.json"; fi
           git checkout -q -
           cd "$OUT" && node -e '

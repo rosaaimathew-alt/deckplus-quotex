@@ -40,3 +40,17 @@ export const needsInspection = (t) => (statusKey(t) === 'near' || statusKey(t) =
 // The name to show for a task's sub: the live record if it's still there,
 // else the name saved on the task when it was booked.
 export const subNameOf = (t, subs) => (subs || []).find(s => String(s.id) === String(t.subId))?.name || t.subName || 'Sub'
+
+// When the PM changes a booking the sub has already been given, stamp when and
+// what, so the sub's phone can mark the job "Updated" and say why
+// (changedAt / changeNote). Returns {} when nothing the sub reads changed.
+const CHANGE_LABELS = [
+  ['title', 'service'], ['startDate', 'dates'], ['endDate', 'dates'], ['notes', 'notes'],
+  ['electrical', 'electrical items'], ['inspectionDate', 'inspection date'],
+]
+export function changeStamp(task, changes, now = new Date().toISOString()) {
+  // nothing, '' and an empty list all mean "not set"
+  const plain = (v) => (v == null || v === '' || (Array.isArray(v) && !v.length) ? 'null' : JSON.stringify(v))
+  const what = [...new Set(CHANGE_LABELS.filter(([k]) => k in changes && plain(task?.[k]) !== plain(changes[k])).map(([, label]) => label))]
+  return what.length ? { changedAt: now, changeNote: what.join(', ') } : {}
+}

@@ -10,6 +10,7 @@ import { drawnOn, money, agreedOf } from '../lib/subDraws'
 import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
 import { ELECTRICAL_ITEM_NAMES, electricalItemsOf, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
+import { changeStamp } from '../lib/subTasks'
 
 const fmt = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
 const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-300,#93c5fd)]'
@@ -126,6 +127,7 @@ export default function JobSubsTab({ proposal }) {
                 <p className="text-sm font-semibold text-gray-900">{t.title}</p>
                 <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
                   <span>{subNameOf(t, subs)}{t.crewName ? ` · ${t.crewName}` : ''}</span>
+                  {!t.crewName && sub?.hasCrew && st !== 'done' && <span className="font-semibold text-amber-700">No technician yet</span>}
                   {sub?.phone && <a href={`tel:${sub.phone}`} className="flex items-center gap-0.5 hover:underline"><Phone size={11} /> {sub.phone}</a>}
                   {(t.startDate || t.endDate) && (
                     <span className="flex items-center gap-0.5"><CalendarDays size={11} /> {fmt(t.startDate) || '?'}{t.endDate ? ` – ${fmt(t.endDate)}` : ''}</span>
@@ -142,7 +144,7 @@ export default function JobSubsTab({ proposal }) {
             </div>
             {editingId === t.id
               ? <EditBooking task={t} electrical={isElectricalBooking(t, sub)} contractItems={electricalItemsOf(proposal.contractDraft?.dp?.values)}
-                  onSave={(changes) => { updateSubTask(t.id, changes); setEditingId(null) }} onCancel={() => setEditingId(null)} />
+                  onSave={(changes) => { updateSubTask(t.id, { ...changes, ...changeStamp(t, changes) }); setEditingId(null) }} onCancel={() => setEditingId(null)} />
               : <>
                   {t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
                   {(t.electrical || []).length > 0 && (
@@ -167,7 +169,7 @@ export default function JobSubsTab({ proposal }) {
                 <span className={`font-semibold ${t.inspectionDate ? 'text-gray-700' : 'text-amber-700'}`}>
                   {t.inspectionDate ? 'Inspection' : 'Schedule the inspection'}
                 </span>
-                <input type="date" value={t.inspectionDate || ''} onChange={e => updateSubTask(t.id, { inspectionDate: e.target.value || null })}
+                <input type="date" value={t.inspectionDate || ''} onChange={e => updateSubTask(t.id, { inspectionDate: e.target.value || null, ...changeStamp(t, { inspectionDate: e.target.value || null }) })}
                   className="text-xs border border-gray-200 rounded-lg px-2 py-1" />
               </label>
             )}

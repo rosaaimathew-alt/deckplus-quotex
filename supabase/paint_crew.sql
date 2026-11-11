@@ -116,7 +116,8 @@ create policy job_photos_add on storage.objects for insert to authenticated with
 
 -- 5. What a painter needs to know about the job: the colors, the notes for
 --    the painter and the open touch-ups, next to the electrical answers and
---    the checklist the sub app already gets. Still no prices.
+--    the checklist the sub app already gets (with the dates set for stages
+--    still to come, so a sub can see when their part is due). Still no prices.
 create or replace function public.sub_job_sheet(p_task_id text)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare my_org uuid := public.auth_org(); r text := public.auth_role(); t public.sub_tasks; p public.proposals; d jsonb; vals jsonb; jd jsonb; pt jsonb;
@@ -135,6 +136,7 @@ begin
   return jsonb_build_object(
     'electrical', (select coalesce(jsonb_object_agg(key, value), '{}'::jsonb) from jsonb_each(vals) where key like 'elecQty\_%' or key like 'elecOther%'),
     'completedStages', coalesce(jd->'completedStages', '[]'::jsonb),
+    'stageDates', case when jsonb_typeof(jd->'stageDates') = 'object' then jd->'stageDates' else '{}'::jsonb end,
     'projectTypeOverride', jd->'projectTypeOverride',
     'projectTypes', coalesce(d->'projectTypes', '[]'::jsonb),
     'hasWindows', (coalesce(d->'scopeBullets', '[]'::jsonb)::text || coalesce(d->'scopeLines', '[]'::jsonb)::text) ~* 'window|glass|enclos',
