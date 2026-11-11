@@ -10,13 +10,13 @@ import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Download, Filter, Star, Upload, FileText, X, Package, Smartphone, CheckCircle2 } from 'lucide-react'
 import { useStore } from '../../store'
-import { createSubInvite } from '../../supabase'
+import { createSubInvite, setUpVendorAsSub } from '../../supabase'
 import { DEMO } from '../../demo'
 import { useNav, useJobMoney } from '../../nav'
 import { dataUrlToBytes, downloadZip } from '../../lib/zip'
 import {
   VENDOR_TYPES, DOC_KEYS, vendorTypeLabel, docStatus, vendorDocProblems, money, todayISO, billBalance,
-  billStatus, poIsLive, downloadCsv,
+  billStatus, poIsLive, downloadCsv, allVendors,
 } from '../../lib/books'
 import { SearchBox, usePaged, Th, sortRows, Modal, Field, useVendorList, Empty, inputCls, btnPrimary, PageHead, PopButton, FilterGroup, btnHead } from './ui'
 
@@ -31,7 +31,7 @@ const DOC_CLS = {
 // in Filters finds.
 const BADGE_ORDER = ['gl', 'w9', 'wc']
 
-const TRADES = ['Electrical', 'Plumbing', 'HVAC', 'Concrete / Footings', 'Roofing', 'Framing', 'Painting', 'Landscaping', 'General Labor', 'Other']
+const TRADES = ['Electrical', 'Plumbing', 'HVAC', 'Concrete / Footings', 'Roofing', 'Framing', 'Carpentry', 'Painting', 'Landscaping', 'General Labor', 'Other']
 const MAX_COI_BYTES = 8 * 1024 * 1024 // 8 MB per file
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
 const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
@@ -108,6 +108,31 @@ function SubAppAccess({ sub }) {
   )
 }
 
+// A sub that came over from Knowify is filed as a vendor: it can't be invited
+// to the sub app or booked on a job until it's on the subs list. One press
+// moves it there with its POs and bills (supabase/sub_promote.sql).
+function SubAppSetUp({ vendor, onMoved }) {
+  const canInvite = useStore(s => s.role === 'manager')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  if (!canInvite) return null
+  const setUp = async () => {
+    setBusy(true); setError('')
+    try {
+      if (DEMO) throw new Error('Turned off in the demo.')
+      await setUpVendorAsSub(vendor.id)
+      onMoved?.(vendor.id)
+    } catch (e) { setError(e.message); setBusy(false) }
+  }
+  return (
+    <div className="rounded-xl border border-gray-200 p-3 space-y-2">
+      <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5"><Smartphone size={14} /> Sub app</p>
+      <button type="button" onClick={setUp} disabled={busy} className={btnPrimary}>{busy ? 'Setting up…' : 'Set up for the sub app'}</button>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
 // A sub's certificate files and incident log — saved as you go.
 function SubExtras({ sub }) {
   const updateSubcontractor = useStore(s => s.updateSubcontractor)
@@ -176,7 +201,7 @@ function DocBadges({ v }) {
   )
 }
 
-function VendorModal({ entry, onClose, subsOnly }) {
+function VendorModal({ entry, onClose, onMoved, subsOnly }) {
   const addVendor = useStore(s => s.addVendor)
   const updateVendor = useStore(s => s.updateVendor)
   const deleteVendor = useStore(s => s.deleteVendor)
@@ -249,6 +274,7 @@ function VendorModal({ entry, onClose, subsOnly }) {
         ))}
       </div>
       {wasSub && <SubAppAccess sub={rec} />}
+      {entry && !wasSub && rec.type === 'sub' && <SubAppSetUp vendor={rec} onMoved={onMoved} />}
       {wasSub && <SubExtras sub={rec} />}
       <Field label="Notes"><textarea rows={2} value={f.notes} onChange={e => set({ notes: e.target.value })} className={inputCls} /></Field>
       <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={f.active} onChange={e => set({ active: e.target.checked })} /> Active</label>
@@ -382,7 +408,9 @@ export default function Vendors() {
           </table>
         </div>
       )}
-      {editing && <VendorModal entry={editing === 'new' ? null : editing} subsOnly={subsOnly} onClose={() => setEditing(null)} />}
+      {/* Just set up for the sub app: reopen it as the sub it now is, with the Invite box */}
+      {editing && <VendorModal key={editing === 'new' ? 'new' : editing.ref} entry={editing === 'new' ? null : editing} subsOnly={subsOnly} onClose={() => setEditing(null)}
+        onMoved={(id) => setEditing(allVendors([], useStore.getState().subcontractors).find(v => v.ref === `s:${id}`) || null)} />}
     </div>
   )
 }
