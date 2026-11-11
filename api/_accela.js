@@ -59,8 +59,8 @@ export function recordUrl([id1, id2, id3], site = MECK) {
 // apart, and a busy
 // answer is waited out and asked again (as long as the check has time left)
 // instead of being reported as the county site being down.
-const MAX_IN_FLIGHT = 3
-const GAP_MS = 200          // between one request starting and the next
+const MAX_IN_FLIGHT = 2
+const GAP_MS = 350          // between one request starting and the next
 const BUSY = new Set([429, 503])
 const BUSY_WAITS = [1500, 3000, 6000]
 let inFlight = 0

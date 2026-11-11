@@ -9,6 +9,7 @@ import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { drawnOn, money, agreedOf } from '../lib/subDraws'
 import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
+import { ELECTRICAL_ITEM_NAMES, electricalItemsOf, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
 
 const fmt = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
 const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-300,#93c5fd)]'
@@ -140,8 +141,16 @@ export default function JobSubsTab({ proposal }) {
               </div>
             </div>
             {editingId === t.id
-              ? <EditBooking task={t} onSave={(changes) => { updateSubTask(t.id, changes); setEditingId(null) }} onCancel={() => setEditingId(null)} />
-              : t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
+              ? <EditBooking task={t} electrical={isElectricalBooking(t, sub)} contractItems={electricalItemsOf(proposal.contractDraft?.dp?.values)}
+                  onSave={(changes) => { updateSubTask(t.id, changes); setEditingId(null) }} onCancel={() => setEditingId(null)} />
+              : <>
+                  {t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
+                  {(t.electrical || []).length > 0 && (
+                    <ul className="text-xs text-gray-600" aria-label="Electrical items">
+                      {t.electrical.map((it, i) => <li key={i}>{it.qty ? `${it.qty} × ` : ''}{it.label}</li>)}
+                    </ul>
+                  )}
+                </>}
             {isOffice && <AgreedLine key={`${t.id}-${agreedOf(t.id, terms)}`} task={t} agreed={agreedOf(t.id, terms) || null} draws={draws} onSave={(v) => setAgreedAmount(t.id, v)} />}
             {missingTodaysPhotos(t) && <p className="text-xs font-semibold text-red-600">No photos from the sub today</p>}
             <PhotoDays task={t} />
@@ -171,9 +180,17 @@ export default function JobSubsTab({ proposal }) {
 
 // Correct a booking after it's made: the service, its dates and the notes the
 // sub reads. The sub's phone shows the change right away.
-function EditBooking({ task, onSave, onCancel }) {
+// An electrical booking also carries the list of electrical items the
+// electricians see on their phone. It starts from the job's contract when the
+// contract was made here; otherwise it's typed in. There is always one empty
+// line to add the next item; an item with its wording cleared is dropped on Save.
+function EditBooking({ task, electrical = false, contractItems = [], onSave, onCancel }) {
   const [f, setF] = useState({ title: task.title || '', startDate: task.startDate || '', endDate: task.endDate || '', notes: task.notes || '' })
+  const [items, setItems] = useState(() => ((task.electrical || []).length ? task.electrical : contractItems).map(it => ({ label: it.label || '', qty: it.qty || '' })))
   const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
+  const blank = (r) => !r.label.trim() && !r.qty.trim()
+  const rows = items.length && blank(items[items.length - 1]) ? items : [...items, { label: '', qty: '' }]
+  const setItem = (i, k, v) => setItems(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
   const lbl = 'block text-xs font-medium text-gray-600 mb-1'
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
@@ -195,8 +212,22 @@ function EditBooking({ task, onSave, onCancel }) {
         <label className={lbl}>Notes for the sub</label>
         <textarea rows={2} value={f.notes} onChange={set('notes')} className={`${inputCls} resize-none`} aria-label="Notes for the sub" />
       </div>
+      {electrical && (
+        <div>
+          <label className={lbl}>Electrical items</label>
+          <datalist id="electrical-item-names">{ELECTRICAL_ITEM_NAMES.map(n => <option key={n} value={n} />)}</datalist>
+          <div className="space-y-1.5">
+            {rows.map((r, i) => (
+              <div key={i} className="grid grid-cols-[1fr_64px] gap-2">
+                <input value={r.label} list="electrical-item-names" onChange={e => setItem(i, 'label', e.target.value)} placeholder={i === rows.length - 1 ? 'Add an item…' : ''} className={inputCls} aria-label={`Electrical item ${i + 1}`} />
+                <input value={r.qty} inputMode="numeric" onChange={e => setItem(i, 'qty', e.target.value)} placeholder="Qty" className={`${inputCls} text-center`} aria-label={`Electrical item ${i + 1} quantity`} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="flex gap-2">
-        <button onClick={() => onSave({ title: f.title.trim(), startDate: f.startDate || null, endDate: f.endDate || null, notes: f.notes.trim() })} disabled={!f.title.trim()}
+        <button onClick={() => onSave({ title: f.title.trim(), startDate: f.startDate || null, endDate: f.endDate || null, notes: f.notes.trim(), ...(electrical ? { electrical: cleanElectricalItems(items) } : {}) })} disabled={!f.title.trim()}
           className="flex-1 py-1.5 text-xs rounded-lg font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)] disabled:opacity-40">Save</button>
         <button onClick={onCancel} className="flex-1 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Cancel</button>
       </div>
