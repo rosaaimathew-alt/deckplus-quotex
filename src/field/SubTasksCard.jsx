@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Plus, HardHat, Phone, CalendarDays } from 'lucide-react'
 import { useStore } from '../store'
 import { BookSubForm } from '../components/JobSubsTab'
-import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, needsInspection, subNameOf, tasksForJob } from '../lib/subTasks'
+import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, needsInspection, subNameOf, tasksForJob, changeStamp } from '../lib/subTasks'
 import { Card, dayLabel, telUrl } from './shared'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { PhotoDays } from '../components/TaskPhotos'
@@ -52,6 +52,9 @@ export default function SubTasksCard({ proposal }) {
                   </span>
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_PILL[st]}`}>{statusLabel(t)}</span>
                 </button>
+                {!t.crewName && sub?.hasCrew && st !== 'done' && (
+                  <p className="px-3 pb-3 -mt-1 text-sm font-medium text-amber-700">No technician yet</p>
+                )}
                 {flag && open !== t.id && (
                   <p className="px-3 pb-3 -mt-1 text-sm font-medium text-amber-800">Schedule the inspection</p>
                 )}
@@ -74,7 +77,7 @@ export default function SubTasksCard({ proposal }) {
                       <label className="flex items-center gap-3 h-12 px-3 rounded-xl border border-gray-200 bg-white">
                         <CalendarDays size={18} className="text-gray-500 shrink-0" />
                         <span className="text-sm text-gray-600 shrink-0">Inspection</span>
-                        <input type="date" value={t.inspectionDate || ''} onChange={e => updateSubTask(t.id, { inspectionDate: e.target.value || null })}
+                        <input type="date" value={t.inspectionDate || ''} onChange={e => updateSubTask(t.id, { inspectionDate: e.target.value || null, ...changeStamp(t, { inspectionDate: e.target.value || null }) })}
                           className="flex-1 min-w-0 bg-transparent text-base text-gray-900 text-right outline-none" />
                       </label>
                     )}

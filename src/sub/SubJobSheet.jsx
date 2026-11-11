@@ -41,7 +41,7 @@ function useSheet(task) {
     const d = p.contractDraft || {}
     return {
       paint: task.paint ? { ...(p.jobData?.paint || {}), date: p.jobData?.stageDates?.paint || null, touchUps: (p.jobData?.touchUps || []).filter(t => !t.done) } : null,
-      electrical: d.dp?.values || {}, completedStages: p.jobData?.completedStages || [], projectTypeOverride: p.jobData?.projectTypeOverride || null,
+      electrical: d.dp?.values || {}, completedStages: p.jobData?.completedStages || [], stageDates: p.jobData?.stageDates || {}, projectTypeOverride: p.jobData?.projectTypeOverride || null,
       projectTypes: d.projectTypes || [], hasWindows: /window|glass|enclos/i.test(JSON.stringify([d.scopeBullets || [], d.scopeLines || []])),
     }
   }
@@ -56,6 +56,7 @@ export function JobSheet({ task }) {
     contractDraft: { projectTypes: sheet.projectTypes || [], scopeBullets: sheet.hasWindows ? ['window'] : [] },
   }) : null
   const done = new Set(sheet?.completedStages || [])
+  const dates = sheet?.stageDates || {}
   const paint = task.paint ? sheet?.paint : null
   const colors = paintColorsOf(paint)
   const touchUps = paint?.touchUps || []
@@ -114,7 +115,8 @@ export function JobSheet({ task }) {
               return (
                 <li key={s.key} className={`flex items-center gap-2.5 text-base ${ok ? 'text-gray-500' : 'text-gray-900'}`}>
                   {ok ? <CheckCircle2 size={20} className="text-green-600 shrink-0" /> : <Circle size={20} className="text-gray-300 shrink-0" />}
-                  <span>{s.label}</span>
+                  <span className="flex-1 min-w-0">{s.label}</span>
+                  {!ok && dates[s.key] && <span className="shrink-0 text-sm font-semibold text-gray-700">{dayLabel(dates[s.key])}</span>}
                 </li>
               )
             })}

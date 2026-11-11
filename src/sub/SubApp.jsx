@@ -31,7 +31,8 @@ import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos
 import { PhotoDays, AddPhotosButton } from '../components/TaskPhotos'
 import { WeekInvoiceCard, InvoicesScreen, NewInvoiceScreen, TaskMoneyLine } from './SubInvoices'
 import { CrewLink, CrewPicker, CrewScreen } from './SubCrew'
-import { useCanAssign } from './useCrew'
+import { useCanAssign, useCrew } from './useCrew'
+import { freshness, markSeen } from './seen'
 import { JobSheet } from './SubJobSheet'
 
 // The one next step for each status, and what it moves the task to.
@@ -66,6 +67,11 @@ function TaskList() {
   const done = tasks.filter(t => statusKey(t) === 'done' && (t.statusDates?.done?.at || '').slice(0, 10) >= recent)
     .sort((a, b) => (b.statusDates?.done?.at || '').localeCompare(a.statusDates?.done?.at || ''))
 
+  // A company's PM: a job with nobody on it can't get photos or move along
+  const crew = useCrew()
+  const needsTech = (t) => crew.hasCrew && statusKey(t) !== 'done' && !t.crewUserId
+    && (DEMO ? String(t.subId) === String(crew.companyId) : t.subUserId === me?.id)
+
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const firstName = (me?.displayName || '').split(' ')[0]
@@ -80,8 +86,8 @@ function TaskList() {
       <WeekInvoiceCard />
       <CrewLink />
 
-      <Section title="Working on" tasks={working} empty="Nothing in progress." />
-      <Section title="Up next" tasks={next} empty="Nothing booked yet. Your PM will add tasks here." />
+      <Section title="Working on" tasks={working} empty="Nothing in progress." needsTech={needsTech} />
+      <Section title="Up next" tasks={next} empty="Nothing booked yet. Your PM will add tasks here." needsTech={needsTech} />
 
       {done.length > 0 && (
         <div className="space-y-2.5">
@@ -95,27 +101,32 @@ function TaskList() {
   )
 }
 
-function Section({ title, tasks, empty }) {
+function Section({ title, tasks, empty, needsTech }) {
   return (
     <div className="space-y-2.5">
       <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">{title}</h2>
-      {tasks.length === 0 ? <p className="text-sm text-gray-500 px-1">{empty}</p> : tasks.map(t => <TaskRow key={t.id} t={t} />)}
+      {tasks.length === 0 ? <p className="text-sm text-gray-500 px-1">{empty}</p> : tasks.map(t => <TaskRow key={t.id} t={t} needsTech={!!needsTech?.(t)} />)}
     </div>
   )
 }
 
-function TaskRow({ t }) {
+function TaskRow({ t, needsTech = false }) {
   const navigate = useNavigate()
   const st = statusKey(t)
   const late = st !== 'done' && t.endDate && t.endDate < todayStr()
   const noPhotos = missingTodaysPhotos(t)
+  const fresh = freshness(t)   // never opened on this phone, or changed by the PM since
   return (
     <button onClick={() => navigate(`/task/${t.id}`)}
-      className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${noPhotos ? 'border-l-red-500' : late ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
+      className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${noPhotos ? 'border-l-red-500' : late || needsTech ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
       <div className="flex-1 min-w-0">
-        <p className="text-base font-semibold text-gray-900 truncate">{t.title}</p>
+        <p className="text-base font-semibold text-gray-900 truncate">
+          {fresh && <span className="mr-2 align-middle text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--brand-600)] text-white">{fresh === 'new' ? 'New' : 'Updated'}</span>}
+          {t.title}
+        </p>
         <p className="text-sm text-gray-600 truncate">{t.client || t.address || 'Job'}{t.crewName ? ` · ${t.crewName}` : ''}</p>
         <p className={`text-sm truncate ${late ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>{late ? `Was due ${dayLabel(t.endDate)}` : dateRange(t)}</p>
+        {needsTech && <p className="text-sm font-semibold text-amber-700">Needs a technician</p>}
         {noPhotos && <p className="text-sm font-semibold text-red-600 flex items-center gap-1"><Camera size={14} /> Photos needed today</p>}
       </div>
       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_PILL[st]}`}>{statusLabel(t)}</span>
@@ -134,6 +145,9 @@ function TaskScreen() {
   // A company's PM hands the job to one of their technicians. The technician
   // on the job sends the daily photos and moves it along, not the PM.
   const companyPm = !!useCanAssign(t)
+  // Opening the job clears its New / Updated marker on this phone
+  const taskId = t?.id, changedAt = t?.changedAt
+  useEffect(() => { if (taskId) markSeen(taskId) }, [taskId, changedAt])
 
   if (!t) {
     return (
@@ -163,6 +177,9 @@ function TaskScreen() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 leading-tight">{t.title}</h1>
         <p className="text-base text-gray-600 mt-0.5">{t.client}</p>
+        {t.changedAt && t.changeNote && t.changedAt.slice(0, 10) >= addDays(-7) && (
+          <p className="text-sm font-medium text-amber-700 mt-1">Updated {dayLabel(t.changedAt.slice(0, 10))}: {t.changeNote}</p>
+        )}
       </div>
 
       {t.address && (

@@ -29,6 +29,7 @@ import { DEMO } from '../demo'
 import { blankColor, tidyColor, hasColor, paintColorsOf } from '../lib/paintColors'
 import { STATUS_PILL, statusKey, statusLabel } from '../lib/subTasks'
 import { PhotoDays } from '../components/TaskPhotos'
+import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { usePaintCrew } from './usePaintCrew'
 import { isJob, isJobClosed } from '../lib/attention'
 import { jobFinancials } from '../lib/finance'
@@ -49,6 +50,7 @@ function clientPaints(p) {
 // Every open job we paint, with its paint facts.
 function usePaintJobs() {
   const proposals = useStore(s => s.proposals)
+  const subTasks = useStore(s => s.subTasks)
   return useMemo(() => proposals
     .filter(p => isJob(p) && !isJobClosed(p) && !clientPaints(p))
     .map(p => describeJob(p, null))
@@ -60,9 +62,11 @@ function usePaintJobs() {
         painted: j.done.has('paint'),
         crew: jd.paint?.crew || '',
         touchUps: (jd.touchUps || []).filter(t => !t.done),
+        // The painters put on this job (PaintersOnJob), each with where they stand
+        painters: (subTasks || []).filter(t => t && t.paint && t.crewName && String(t.proposalId) === String(j.p.id)),
       }
     })
-    .sort((a, b) => (a.p.client || '').localeCompare(b.p.client || '')), [proposals])
+    .sort((a, b) => (a.p.client || '').localeCompare(b.p.client || '')), [proposals, subTasks])
 }
 
 function PaintRow({ j, sub, tone }) {
@@ -75,6 +79,10 @@ function PaintRow({ j, sub, tone }) {
         <p className="text-base font-semibold text-gray-900 truncate">{j.p.client || 'Unnamed job'}</p>
         {j.p.address && <p className="text-sm text-gray-500 truncate">{j.p.address}</p>}
         <p className="text-sm font-medium text-gray-800 truncate">{sub}</p>
+        {(j.painters || []).length > 0 && (
+          <p className="text-sm text-gray-600 truncate">{j.painters.map(t => `${t.crewName} · ${statusLabel(t)}`).join(', ')}</p>
+        )}
+        {(j.painters || []).some(missingTodaysPhotos) && <p className="text-sm font-semibold text-red-600">Photos needed today</p>}
       </div>
       <ChevronRight size={20} className="text-gray-300 shrink-0" />
     </button>
