@@ -7,6 +7,13 @@
 // simply tried again on the next 10-minute tick). A job with no permit at its
 // address doesn't count against the county: the site answered.
 //
+// "Too many requests" (429 / 503) is the county site pacing us, not an outage:
+// those jobs are simply asked again later and never count toward "down" — the
+// one exception being a county where nothing at all has been read for a day.
+// And a county is graded against ALL its tracked jobs, not just the ones in
+// this run: the 10-minute re-check only retries the jobs that failed, and
+// three stubborn jobs out of fifty are not the county being down.
+//
 // Kept in the shared settings (permitPulse.health) so every office screen sees
 // the same state (the banner shows right away). An email goes to office /
 // admin only when a county is STILL down on the next check — one busy morning
@@ -18,19 +25,32 @@ const DOWN_SHARE = 0.3
 const DOWN_MIN_FAILED = 2
 const STALE_MS = 26 * 3600 * 1000   // checks run at 8 AM and 1 PM — a day+ without one is a problem
 const REALERT_MS = 12 * 3600 * 1000
+const NOTHING_READ_MS = 24 * 3600 * 1000
+
+// The county site said it's busy (the server's wording, api/_accela.js).
+export const isBusyError = (e) => /busy right now|answered 429|answered 503/i.test(String(e || ''))
 
 // A city that inspects its own jobs (Rock Hill) has its own connection
 export const countyOf = (p) => p.imported?.jurisdiction || p.imported?.county || locateAddress(p.address).county || 'Unknown'
 
-// stats: { [county]: { ok, failed, lastError } } from one run
+// stats, from one run: { [county]: { ok, failed, busy, total, lastError } }
+//   ok / failed / busy  jobs in this run that were read, couldn't be read, or
+//                       were put off by a busy answer
+//   total               every tracked job in the county (this run may have
+//                       covered only a few of them)
 export function gradeRun(prevHealth = {}, stats = {}, now = new Date().toISOString()) {
   const health = { ...prevHealth }
   const changes = []
   for (const [county, s] of Object.entries(stats)) {
-    const total = s.ok + s.failed
-    if (!total) continue
-    const down = s.failed > 0 && (s.ok === 0 || (s.failed >= DOWN_MIN_FAILED && s.failed / total >= DOWN_SHARE))
+    const busy = s.busy || 0
+    const ran = s.ok + s.failed + busy
+    if (!ran) continue
+    const total = Math.max(s.total || 0, ran)
     const prev = prevHealth[county] || {}
+    const nothingRead = !s.ok && prev.lastOkAt && new Date(now) - new Date(prev.lastOkAt) > NOTHING_READ_MS
+    const down = !!nothingRead || (s.failed > 0 && (
+      (s.ok === 0 && busy === 0 && ran >= total)                                   // the whole county, nothing read
+      || (s.failed >= DOWN_MIN_FAILED && s.failed / total >= DOWN_SHARE)))         // a real share of the county
     // Checks in a row that found it down (older saved states have no count)
     const downRuns = down ? (prev.down ? (prev.downRuns || 1) + 1 : 1) : 0
     const next = {
@@ -38,9 +58,9 @@ export function gradeRun(prevHealth = {}, stats = {}, now = new Date().toISOStri
       down,
       downRuns,
       checkedAt: now,
-      lastOk: s.ok, lastFailed: s.failed,
+      lastOk: s.ok, lastFailed: s.failed, lastBusy: busy, tracked: total,
       ...(s.ok ? { lastOkAt: now } : {}),
-      ...(down ? { lastError: s.lastError || prev.lastError || 'Unknown error', since: prev.down ? prev.since : now } : { since: null }),
+      ...(down ? { lastError: (s.failed ? s.lastError : '') || (nothingRead ? 'Nothing in this county has been read for a day' : '') || prev.lastError || 'Unknown error', since: prev.down ? prev.since : now } : { since: null }),
     }
     const emailedDown = prev.alertedState === 'down'
     const recently = (state) => prev.alertedAt && prev.alertedState === state && Date.now() - new Date(prev.alertedAt) < REALERT_MS
@@ -63,7 +83,7 @@ export function gradeRun(prevHealth = {}, stats = {}, now = new Date().toISOStri
 export function connectionAlerts(permitPulse, { hasJobs = true, now = Date.now() } = {}) {
   const out = []
   for (const [county, h] of Object.entries(permitPulse?.health || {})) {
-    if (h.down) out.push({ key: `down-${county}`, county, since: h.since, error: h.lastError, failed: h.lastFailed, total: (h.lastOk || 0) + (h.lastFailed || 0) })
+    if (h.down) out.push({ key: `down-${county}`, county, since: h.since, error: h.lastError, failed: h.lastFailed, total: h.tracked || (h.lastOk || 0) + (h.lastFailed || 0) })
   }
   const last = permitPulse?.lastRunAt ? new Date(permitPulse.lastRunAt).getTime() : null
   if (hasJobs && last && now - last > STALE_MS) out.push({ key: 'stale', stale: true, since: permitPulse.lastRunAt })
