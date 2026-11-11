@@ -3,7 +3,7 @@
 // Booked → Started → Near completion → Completed, and line up the inspection
 // once it's near completion or done. Same records as the phone (lib/subTasks).
 import { useState } from 'react'
-import { Plus, X, CalendarDays, Phone } from 'lucide-react'
+import { Plus, X, CalendarDays, Phone, Pencil } from 'lucide-react'
 import { useStore } from '../store'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { drawnOn, money, agreedOf } from '../lib/subDraws'
@@ -98,6 +98,7 @@ export default function JobSubsTab({ proposal }) {
   const updateSubTask = useStore(s => s.updateSubTask)
   const deleteSubTask = useStore(s => s.deleteSubTask)
   const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState(null)
 
   return (
     <div className="space-y-3">
@@ -132,11 +133,15 @@ export default function JobSubsTab({ proposal }) {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_PILL[st]}`}>{statusLabel(t)}</span>
+                <button onClick={() => setEditingId(id => (id === t.id ? null : t.id))}
+                  className="text-gray-300 hover:text-gray-700" aria-label={`Edit booking: ${t.title}`}><Pencil size={13} /></button>
                 <button onClick={() => window.confirm(`Remove "${t.title}" for ${subNameOf(t, subs)}?`) && deleteSubTask(t.id)}
                   className="text-gray-300 hover:text-red-500" aria-label="Remove booking"><X size={13} /></button>
               </div>
             </div>
-            {t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
+            {editingId === t.id
+              ? <EditBooking task={t} onSave={(changes) => { updateSubTask(t.id, changes); setEditingId(null) }} onCancel={() => setEditingId(null)} />
+              : t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
             {isOffice && <AgreedLine key={`${t.id}-${agreedOf(t.id, terms)}`} task={t} agreed={agreedOf(t.id, terms) || null} draws={draws} onSave={(v) => setAgreedAmount(t.id, v)} />}
             {missingTodaysPhotos(t) && <p className="text-xs font-semibold text-red-600">No photos from the sub today</p>}
             <PhotoDays task={t} />
@@ -160,6 +165,41 @@ export default function JobSubsTab({ proposal }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// Correct a booking after it's made: the service, its dates and the notes the
+// sub reads. The sub's phone shows the change right away.
+function EditBooking({ task, onSave, onCancel }) {
+  const [f, setF] = useState({ title: task.title || '', startDate: task.startDate || '', endDate: task.endDate || '', notes: task.notes || '' })
+  const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
+  const lbl = 'block text-xs font-medium text-gray-600 mb-1'
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
+      <div>
+        <label className={lbl}>Service</label>
+        <input value={f.title} onChange={set('title')} className={inputCls} aria-label="Service" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={lbl}>Start</label>
+          <input type="date" value={f.startDate} onChange={set('startDate')} className={inputCls} aria-label="Start" />
+        </div>
+        <div>
+          <label className={lbl}>Finish by</label>
+          <input type="date" value={f.endDate} min={f.startDate || undefined} onChange={set('endDate')} className={inputCls} aria-label="Finish by" />
+        </div>
+      </div>
+      <div>
+        <label className={lbl}>Notes for the sub</label>
+        <textarea rows={2} value={f.notes} onChange={set('notes')} className={`${inputCls} resize-none`} aria-label="Notes for the sub" />
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => onSave({ title: f.title.trim(), startDate: f.startDate || null, endDate: f.endDate || null, notes: f.notes.trim() })} disabled={!f.title.trim()}
+          className="flex-1 py-1.5 text-xs rounded-lg font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)] disabled:opacity-40">Save</button>
+        <button onClick={onCancel} className="flex-1 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Cancel</button>
+      </div>
     </div>
   )
 }
