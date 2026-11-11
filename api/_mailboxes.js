@@ -73,12 +73,38 @@ export function transportForRow(row) {
   }
   return { transporter: transportFor({ host: row.host, port: row.port, username: row.username, password: decryptSecret(row.secret_enc) }), email: row.email }
 }
-function googleTransport(email, refreshToken) {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: { type: 'OAuth2', user: email, clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, refreshToken },
-    connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 12000,
+// Sign in with Google only asks for "send email" (gmail.send). Google accepts
+// that permission on the Gmail API, not on SMTP (SMTP needs full mailbox
+// access), so a Google mailbox sends through the Gmail API.
+async function googleAccessToken(email, refreshToken) {
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, refresh_token: refreshToken, grant_type: 'refresh_token' }),
   })
+  const tok = await r.json().catch(() => ({}))
+  if (!r.ok || !tok.access_token) throw new Error(`Google no longer accepts the sign-in for ${email} (${tok.error_description || tok.error || r.status}). Reconnect it in Settings › Email Account.`)
+  if (tok.scope && !String(tok.scope).includes('gmail.send')) throw new Error(`The Google sign-in for ${email} doesn't include sending email. Reconnect it in Settings › Email Account and tick "Send email on your behalf".`)
+  return tok.access_token
+}
+// Looks like a mail transport to the rest of the server: verify() and sendMail().
+export function googleTransport(email, refreshToken) {
+  const composer = nodemailer.createTransport({ streamTransport: true, buffer: true, newline: 'windows' })
+  return {
+    async verify() { await googleAccessToken(email, refreshToken); return true },
+    async sendMail(mail) {
+      const built = await composer.sendMail(mail)          // builds the message; nothing is sent here
+      const token = await googleAccessToken(email, refreshToken)
+      const r = await fetch('https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'message/rfc822' },
+        body: built.message,
+      })
+      const out = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(`Gmail didn't send the email from ${email} (${out.error?.message || r.status}).`)
+      return { messageId: built.messageId, gmailId: out.id || null, threadId: out.threadId || null, envelope: built.envelope }
+    },
+  }
 }
 
 // ── Sign in with Google (one click per person) ───────────────────────────────
