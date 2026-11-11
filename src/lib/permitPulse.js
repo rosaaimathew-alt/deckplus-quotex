@@ -7,7 +7,7 @@ import { useStore } from '../store'
 import { getStages } from '../pages/Jobs'
 import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty, closeIfFinaled } from './permitTracking'
 import { isJob } from './attention'
-import { countyOf, gradeRun, sendConnectionAlert } from './permitHealth'
+import { countyOf, gradeRun, sendConnectionAlert, isBusyError } from './permitHealth'
 
 // Jobs per request: one parallel round on the server, well inside its 60 s
 const BATCH = 3
@@ -15,6 +15,9 @@ const BATCH = 3
 // (at most this many times in one run, so a blocked site can't stall the check).
 const COOL_DOWN_MS = 25000
 const MAX_COOL_DOWNS = 8
+// Between batches: the county limit counts page loads per minute, and the check
+// is in no hurry (80 jobs take about five minutes this way).
+const PACE_MS = 5000
 
 // Notes we already have, by inspection id, so the server only opens the
 // "View Details" page of inspections it hasn't read before.
@@ -68,10 +71,17 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
     .filter(p => !ids || ids.includes(p.id))
   let done = 0, failed = 0, lastError = null, interrupted = false, cooling = false
   // Per county: jobs whose county site was read, and jobs where it wasn't
+  // (a busy answer is counted apart: it's the site pacing us, not an outage),
+  // against every tracked job in that county, not just the ones in this run.
   const stats = {}
+  const countyJobs = {}
+  for (const p of proposals) if (isJob(p) && permitTracked(p) && countyConnected(p)) countyJobs[countyOf(p)] = (countyJobs[countyOf(p)] || 0) + 1
   const tally = (p, ok, error) => {
-    const c = (stats[countyOf(p)] ||= { ok: 0, failed: 0, lastError: '' })
-    if (ok) c.ok++; else { c.failed++; c.lastError = error || c.lastError }
+    const county = countyOf(p)
+    const c = (stats[county] ||= { ok: 0, failed: 0, busy: 0, total: countyJobs[county] || 0, lastError: '' })
+    if (ok) c.ok++
+    else if (isBusyError(error)) c.busy++
+    else { c.failed++; c.lastError = error || c.lastError }
   }
   let coolDowns = 0
   for (let i = 0; i < jobs.length; i += BATCH) {
@@ -81,6 +91,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
       // The county site said "too many requests" on the last batch: its limit
       // counts requests per minute, so give it a breather before the next one.
       if (cooling && coolDowns < MAX_COOL_DOWNS) { coolDowns++; await sleep(COOL_DOWN_MS) }
+      else if (i > 0) await sleep(PACE_MS)   // an unhurried pace between batches
       cooling = false
       await whenVisible()
       const res = await postBatch(JSON.stringify({
@@ -111,7 +122,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
     for (const p of batch) {
       const r = results[p.id]
       if (!r) { failed++; tally(p, false, 'No answer for this job'); continue }
-      if (r.siteError && /busy right now|answered 429|answered 503/i.test(r.error || '')) cooling = true
+      if (r.siteError && isBusyError(r.error)) cooling = true
       tally(p, !r.siteError, r.error)
       // Keep the last good reading if this check failed, with the error on top.
       const prev = useStore.getState().proposals.find(x => x.id === p.id)?.countyPermit
