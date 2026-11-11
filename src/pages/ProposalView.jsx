@@ -36,17 +36,22 @@ export default function ProposalView() {
   const blue     = branding?.primaryColor || DEFAULT_BRAND_COLOR   // Deck Plus blue — PROPOSAL title and company name
   const companyName = branding?.companyName || 'QUOTEX'
 
-  // Opening the send box fills in the signature this person saved last time.
+  // Opening the send box fills in the signature this person saved. Anything
+  // typed (or auto-filled by the browser) before it arrives is kept on top.
+  const [sigLoaded, setSigLoaded] = useState(false)
   useEffect(() => {
-    if (!showSend || signature) return
+    if (!showSend || sigLoaded) return
     let off = false
-    const fallback = { name: me?.displayName || '' }
+    const typed = (s) => Object.fromEntries(Object.entries(s || {}).filter(([, v]) => String(v || '').trim()))
+    const fill = (saved) => {
+      if (off) return
+      setSignature(s => ({ ...(saved || {}), name: saved?.name || me?.displayName || '', ...typed(s) }))
+      setSigLoaded(true)
+    }
     fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'signature' }) })
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (!off) setSignature(s => s || { ...(d?.signature || {}), name: d?.signature?.name || fallback.name }) })
-      .catch(() => { if (!off) setSignature(s => s || fallback) })
+      .then(r => (r.ok ? r.json() : null)).then(d => fill(d?.signature)).catch(() => fill(null))
     return () => { off = true }
-  }, [showSend, signature, me])
+  }, [showSend, sigLoaded, me])
 
   useEffect(() => {
     const raw = sessionStorage.getItem('proposal')
@@ -340,12 +345,16 @@ export default function ProposalView() {
                       {email || <span className="text-red-500 italic">No email on this proposal — go back and add one.</span>}
                     </div>
                   </div>
-                  {[['name', 'Your name'], ['title', 'Title'], ['cell', 'Cell']].map(([k, label]) => (
+                  <p className="text-xs font-semibold text-gray-700 pt-1">Your email signature</p>
+                  {[['name', 'Name'], ['title', 'Title'], ['cell', 'Cell']].map(([k, label]) => (
                     <div key={k}>
                       <label className="text-xs font-medium text-gray-500 block mb-1">{label}</label>
                       <input
                         aria-label={label}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)]"
+                        autoComplete="off"
+                        disabled={!sigLoaded}
+                        placeholder={sigLoaded ? '' : 'Loading…'}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] disabled:bg-gray-50"
                         value={signature?.[k] ?? ''}
                         onChange={e => setSig(k, e.target.value)}
                       />
@@ -365,7 +374,7 @@ export default function ProposalView() {
                   </button>
                   <button
                     onClick={handleSend}
-                    disabled={sending || !email}
+                    disabled={sending || !email || !sigLoaded}
                     className="flex items-center gap-1.5 px-4 py-2 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {sending ? <><Loader size={14} className="animate-spin" /> Sending...</> : <><Send size={14} /> Send Proposal</>}
