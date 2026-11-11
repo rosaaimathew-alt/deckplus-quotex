@@ -11,6 +11,10 @@ import { countyOf, gradeRun, sendConnectionAlert } from './permitHealth'
 
 // Jobs per request: one parallel round on the server, well inside its 60 s
 const BATCH = 3
+// After a batch the county site called busy, wait this long before the next
+// (at most this many times in one run, so a blocked site can't stall the check).
+const COOL_DOWN_MS = 25000
+const MAX_COOL_DOWNS = 8
 
 // Notes we already have, by inspection id, so the server only opens the
 // "View Details" page of inspections it hasn't read before.
@@ -62,17 +66,22 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
   const jobs = proposals
     .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
     .filter(p => !ids || ids.includes(p.id))
-  let done = 0, failed = 0, lastError = null, interrupted = false
+  let done = 0, failed = 0, lastError = null, interrupted = false, cooling = false
   // Per county: jobs whose county site was read, and jobs where it wasn't
   const stats = {}
   const tally = (p, ok, error) => {
     const c = (stats[countyOf(p)] ||= { ok: 0, failed: 0, lastError: '' })
     if (ok) c.ok++; else { c.failed++; c.lastError = error || c.lastError }
   }
+  let coolDowns = 0
   for (let i = 0; i < jobs.length; i += BATCH) {
     const batch = jobs.slice(i, i + BATCH)
     let results = {}
     try {
+      // The county site said "too many requests" on the last batch: its limit
+      // counts requests per minute, so give it a breather before the next one.
+      if (cooling && coolDowns < MAX_COOL_DOWNS) { coolDowns++; await sleep(COOL_DOWN_MS) }
+      cooling = false
       await whenVisible()
       const res = await postBatch(JSON.stringify({
           jobs: batch.map(p => ({
@@ -102,6 +111,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
     for (const p of batch) {
       const r = results[p.id]
       if (!r) { failed++; tally(p, false, 'No answer for this job'); continue }
+      if (r.siteError && /busy right now|answered 429|answered 503/i.test(r.error || '')) cooling = true
       tally(p, !r.siteError, r.error)
       // Keep the last good reading if this check failed, with the error on top.
       const prev = useStore.getState().proposals.find(x => x.id === p.id)?.countyPermit

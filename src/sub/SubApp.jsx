@@ -31,6 +31,8 @@ import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos
 import { PhotoDays, AddPhotosButton } from '../components/TaskPhotos'
 import { WeekInvoiceCard, InvoicesScreen, NewInvoiceScreen, TaskMoneyLine } from './SubInvoices'
 import { CrewLink, CrewPicker, CrewScreen } from './SubCrew'
+import { useCanAssign } from './useCrew'
+import { JobSheet } from './SubJobSheet'
 
 // The one next step for each status, and what it moves the task to.
 const NEXT = {
@@ -129,6 +131,9 @@ function TaskScreen() {
   const members = useStore(s => s.members)
   const setSubTaskStatus = useStore(s => s.setSubTaskStatus)
   const [toast, showToast] = useUndo()
+  // A company's PM hands the job to one of their technicians. The technician
+  // on the job sends the daily photos and moves it along, not the PM.
+  const companyPm = !!useCanAssign(t)
 
   if (!t) {
     return (
@@ -171,8 +176,11 @@ function TaskScreen() {
 
       <CrewPicker task={t} />
 
+      {/* What's being installed, and where the job stands */}
+      <JobSheet task={t} />
+
       {/* Today's photos: required before the status buttons work */}
-      {step && (
+      {step && !companyPm && (
         <Card className={`p-4 space-y-3 ${ready ? '' : 'border-red-300'}`}>
           <div className="flex items-center gap-2">
             <Camera size={20} className={ready ? 'text-green-600' : 'text-red-600'} />
@@ -198,7 +206,11 @@ function TaskScreen() {
             )
           })}
         </ol>
-        {step ? (
+        {step && companyPm ? (
+          <p className="text-base text-gray-700">
+            {t.crewName ? `${t.crewName} sends the daily photos and moves this job along.` : 'Put one of your technicians on this job. They send the daily photos and move it along.'}
+          </p>
+        ) : step ? (
           <div className="space-y-2">
             <button onClick={() => move(step.to)} disabled={!ready}
               className="w-full h-16 rounded-xl bg-green-600 active:bg-green-700 text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm disabled:bg-gray-300">

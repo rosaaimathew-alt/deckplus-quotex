@@ -75,6 +75,9 @@ export async function submitSubDraw(draw, orgId = _orgId) {
   if (error) throw new Error(String(error.message || error).replace(/^permission denied:\s*/i, ''))
 }
 // An outside company's PM (sub app): their crew, and inviting one of them.
+// Sub app: the electrical answers and the stage checklist of the job a task is
+// on, and nothing else about it (supabase/sub_job_sheet.sql).
+export const subJobSheet = (taskId) => rpc('sub_job_sheet', { p_task_id: String(taskId) })
 export const myCrew = () => rpc('my_crew', {})
 export const createCrewInvite = (email, name) => rpc('create_crew_invite', { p_email: email, p_name: name })
 // Office: invite a sub (Money › Vendors) to the sub app (supabase/sub_role.sql).

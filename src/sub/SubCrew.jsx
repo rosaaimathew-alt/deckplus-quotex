@@ -5,39 +5,14 @@
 // Here that PM invites their electricians and puts one on each job. An
 // electrician then sees only the jobs they're put on: status and the daily
 // photos, never the agreed amount or invoices (supabase/sub_role.sql).
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users, ChevronRight, UserPlus, CheckCircle2 } from 'lucide-react'
 import { useStore } from '../store'
-import { myCrew, createCrewInvite } from '../supabase'
+import { createCrewInvite } from '../supabase'
+import { useCrew, useCanAssign } from './useCrew'
 import { DEMO } from '../demo'
 import { Card, BackButton } from '../field/shared'
-
-let _cache = null
-// { hasCrew, company, crew: [{ name, email, userId }] } for the signed-in sub.
-function useCrew() {
-  const subs = useStore(s => s.subcontractors)
-  const [data, setData] = useState(_cache)
-  const reload = useCallback(() => {
-    if (DEMO) return
-    myCrew().then(d => { _cache = d; setData(d) }).catch(() => { /* offline: keep what we had */ })
-  }, [])
-  useEffect(() => { reload() }, [reload])
-  if (DEMO) {
-    const c = (subs || []).find(s => s?.hasCrew)
-    return { hasCrew: !!c, company: c?.name, companyId: c?.id, crew: c?.crew || [], reload }
-  }
-  return { ...(data || { hasCrew: false, crew: [] }), reload }
-}
-
-// Is this task one the signed-in company PM can put their crew on?
-function useCanAssign(task) {
-  const me = useStore(s => s.me)
-  const crew = useCrew()
-  if (!crew.hasCrew || !task) return null
-  if (DEMO ? String(task.subId) !== String(crew.companyId) : task.subUserId !== me?.id) return null
-  return crew
-}
 
 // On the task list: the company PM's way into their crew.
 export function CrewLink() {
