@@ -15,7 +15,7 @@ import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-
 import {
   Sun, CalendarDays, HardHat, PaintRoller, Phone, MessageSquare, Navigation,
   ChevronLeft, ChevronRight, Check, CheckCircle2, Circle, AlertTriangle, Clock,
-  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2, ShieldCheck, FileText,
+  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2, ShieldCheck, FileText, Users,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
@@ -25,7 +25,7 @@ import { JOB_TYPE_OPTIONS } from '../pages/Jobs'
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
 import { setViewPref, usePaintView } from './fieldMode'
-import { PaintQueue, PaintSchedule, PaintTouchUps, PaintJob } from './PaintApp'
+import { PaintQueue, PaintSchedule, PaintTouchUps, PaintJob, PaintCrew } from './PaintApp'
 import InstallCard from './InstallCard'
 import JobMoney from './JobMoney'
 import SubTasksCard from './SubTasksCard'
@@ -496,6 +496,7 @@ const PAINT_TABS = [
   { to: '/field', label: 'Queue', icon: PaintRoller, end: true },
   { to: '/field/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/field/touchups', label: 'Touch-ups', icon: ListChecks },
+  { to: '/field/crew', label: 'Crew', icon: Users },
 ]
 
 export default function FieldApp() {
@@ -557,6 +558,7 @@ export default function FieldApp() {
             <Route path="/field" element={<PaintQueue />} />
             <Route path="/field/schedule" element={<PaintSchedule />} />
             <Route path="/field/touchups" element={<PaintTouchUps />} />
+            <Route path="/field/crew" element={<PaintCrew />} />
             <Route path="/field/job/:id" element={<PaintJob />} />
             <Route path="*" element={<Navigate to="/field" replace />} />
           </Routes>
@@ -573,7 +575,7 @@ export default function FieldApp() {
       </main>
 
       <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]" aria-label="Field navigation">
-        <div className="max-w-xl mx-auto grid grid-cols-3">
+        <div className={`max-w-xl mx-auto grid ${tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
           {tabs.map(t => (
             <NavLink key={t.to} to={t.to} end={t.end}
               className={({ isActive }) => `h-16 flex flex-col items-center justify-center gap-0.5 text-xs font-semibold ${isActive ? 'text-[var(--brand-700)]' : 'text-gray-500'}`}>

@@ -21,9 +21,15 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Check, CheckCircle2, Circle, CalendarDays, Users, Phone, MessageSquare, Navigation,
-  PaintRoller, Plus, Wallet, ChevronRight,
+  PaintRoller, Plus, Wallet, ChevronRight, UserPlus,
 } from 'lucide-react'
 import { useStore } from '../store'
+import { createPaintCrewInvite } from '../supabase'
+import { DEMO } from '../demo'
+import { blankColor, tidyColor, hasColor, paintColorsOf } from '../lib/paintColors'
+import { STATUS_PILL, statusKey, statusLabel } from '../lib/subTasks'
+import { PhotoDays } from '../components/TaskPhotos'
+import { usePaintCrew } from './usePaintCrew'
 import { isJob, isJobClosed } from '../lib/attention'
 import { jobFinancials } from '../lib/finance'
 import {
@@ -276,6 +282,7 @@ export function PaintJob() {
         )}
       </Card>
 
+      <PaintersOnJob proposal={proposal} />
       <PaintDetails paint={paint} onSave={setPaint} />
       <TouchUps proposal={proposal} onToast={showToast} />
       <PrePaintPayment proposal={proposal} onToast={showToast} />
@@ -286,20 +293,123 @@ export function PaintJob() {
   )
 }
 
-// A job often has more than one color: rails one, ceiling another, trim a
-// third. Each entry is a color with its product, sheen and what it goes on
-// (paint.colors). Jobs saved before this had a single color in paint.product /
-// .color / .sheen / .areas: that reads as the first entry, and the first entry
-// is still written there so nothing that reads the old fields goes blank.
-const COLOR_FIELDS = ['product', 'sheen', 'color', 'areas']
-const blankColor = () => ({ product: '', sheen: '', color: '', areas: '' })
-const tidyColor = (c) => Object.fromEntries(COLOR_FIELDS.map(k => [k, String(c?.[k] ?? '').trim()]))
-const hasColor = (c) => COLOR_FIELDS.some(k => c[k])
-function paintColorsOf(paint) {
-  const list = Array.isArray(paint?.colors) ? paint.colors.map(tidyColor).filter(hasColor) : []
-  if (list.length) return list
-  const old = tidyColor(paint)
-  return hasColor(old) ? [old] : []
+// Which painters are on this job. Each painter put on it sees the job on their
+// phone (address, colors, touch-ups), sends the daily photos and moves it
+// along. Several painters can be on one job; each has their own entry.
+function PaintersOnJob({ proposal }) {
+  const navigate = useNavigate()
+  const crew = usePaintCrew()
+  const me = useStore(s => s.me)
+  const tasks = useStore(s => s.subTasks)
+  const addSubTask = useStore(s => s.addSubTask)
+  const deleteSubTask = useStore(s => s.deleteSubTask)
+  const onJob = (tasks || []).filter(t => t && t.paint && String(t.proposalId) === String(proposal.id))
+  const taskOf = (c) => onJob.find(t => t.crewUserId && t.crewUserId === c.userId)
+  const toggle = (c) => {
+    const t = taskOf(c)
+    if (t) {
+      const started = statusKey(t) !== 'booked' || (t.photos || []).length > 0
+      if (started && !window.confirm(`Take ${c.name} off this job?`)) return
+      deleteSubTask(t.id)
+      return
+    }
+    addSubTask({
+      paint: true, proposalId: proposal.id, subId: crew.id, subName: crew.name || 'Paint crew',
+      subUserId: me?.id || null, pmId: me?.id || null, crewUserId: c.userId, crewName: c.name,
+      title: 'Paint', notes: '', startDate: proposal.jobData?.stageDates?.paint || null, endDate: null,
+      client: proposal.client || '', address: proposal.address || '',
+    })
+  }
+  const ready = crew.crew.filter(c => c.userId)
+  const waiting = crew.crew.filter(c => !c.userId)
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><Users size={18} className="text-gray-500" /> Painters on this job</p>
+        <button onClick={() => navigate('/field/crew')} className="text-sm font-semibold text-[var(--brand-700)] px-2 py-1">Crew</button>
+      </div>
+      {crew.crew.length === 0 && <p className="text-sm text-gray-500">{crew.loaded ? 'Add your painters under Crew first.' : 'Loading…'}</p>}
+      <div className="space-y-2">
+        {ready.map(c => {
+          const t = taskOf(c)
+          return (
+            <div key={c.email} className={`rounded-xl border ${t ? 'border-[var(--brand-600)] bg-[var(--brand-50)]' : 'border-gray-200'}`}>
+              <button onClick={() => toggle(c)} aria-pressed={!!t} aria-label={`${c.name} on this job`}
+                className="w-full min-h-12 px-3 py-2 flex items-center gap-3 text-left">
+                {t ? <CheckCircle2 size={24} className="text-[var(--brand-600)] shrink-0" /> : <Circle size={24} className="text-gray-300 shrink-0" />}
+                <span className="flex-1 min-w-0 text-base font-medium text-gray-900 truncate">{c.name}</span>
+                {t && <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_PILL[statusKey(t)]}`}>{statusLabel(t)}</span>}
+              </button>
+              {t && (t.photos || []).length > 0 && <div className="px-3 pb-3"><PhotoDays task={t} big /></div>}
+            </div>
+          )
+        })}
+        {waiting.map(c => (
+          <div key={c.email} className="min-h-12 px-3 py-2 flex items-center gap-3 rounded-xl border border-dashed border-gray-200">
+            <Circle size={24} className="text-gray-200 shrink-0" />
+            <span className="flex-1 min-w-0 text-base text-gray-500 truncate">{c.name}</span>
+            <span className="text-sm text-gray-500 shrink-0">Hasn't signed up yet</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+// ── Crew: the paint PM's painters ────────────────────────────────────────────
+// Add a painter (name, email, phone): they get a link to set their own
+// password, then see the jobs they're put on in the sub app on their phone.
+export function PaintCrew() {
+  const crew = usePaintCrew()
+  const [f, setF] = useState({ name: '', email: '', phone: '' })
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
+  const input = 'w-full h-12 px-3 rounded-xl border border-gray-300 bg-white text-base text-gray-900 outline-none'
+  const invite = async (e) => {
+    e.preventDefault()
+    setBusy(true); setMsg(null)
+    try {
+      if (DEMO) throw new Error('Invites are turned off in the demo.')
+      const r = await createPaintCrewInvite(f.email.trim(), f.name.trim(), f.phone.trim())
+      const link = `${window.location.origin}/signup?code=${r.code}`
+      try { await navigator.clipboard?.writeText(link) } catch { /* shown below */ }
+      setMsg({ ok: true, text: `Link for ${r.display_name} copied. Text it to them; it works for 14 days.`, link })
+      setF({ name: '', email: '', phone: '' })
+      crew.reload()
+    } catch (err) { setMsg({ ok: false, text: err.message }) } finally { setBusy(false) }
+  }
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-gray-900">Crew</h1>
+      <Card className="divide-y divide-gray-100 overflow-hidden">
+        {crew.crew.length === 0 && <p className="px-4 py-3 text-sm text-gray-500">{crew.loaded ? 'No painters yet.' : 'Loading…'}</p>}
+        {crew.crew.map(c => (
+          <div key={c.email} className="px-4 py-3 flex items-center gap-3">
+            <span className="flex-1 min-w-0">
+              <span className="block text-base font-medium text-gray-900 truncate">{c.name}</span>
+              <span className="block text-sm text-gray-500 truncate">{[c.phone, c.email].filter(Boolean).join(' · ')}</span>
+            </span>
+            {c.phone && <a href={telUrl(c.phone)} aria-label={`Call ${c.name}`} className="p-2 text-[var(--brand-700)]"><Phone size={20} /></a>}
+            {c.userId
+              ? <span className="text-sm font-semibold text-green-700 flex items-center gap-1 shrink-0"><CheckCircle2 size={16} /> On the app</span>
+              : <span className="text-sm text-gray-500 shrink-0">Invited</span>}
+          </div>
+        ))}
+      </Card>
+      <Card className="p-4">
+        <form onSubmit={invite} className="space-y-3">
+          <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-gray-500" /> Add a painter</p>
+          <input value={f.name} onChange={set('name')} placeholder="Their name" aria-label="Painter name" className={input} />
+          <input type="email" value={f.email} onChange={set('email')} placeholder="Their email" aria-label="Painter email" className={input} />
+          <input type="tel" value={f.phone} onChange={set('phone')} placeholder="Their phone (optional)" aria-label="Painter phone" className={input} />
+          <button type="submit" disabled={busy || !f.name.trim() || !f.email.trim()}
+            className="w-full h-12 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold disabled:opacity-40">{busy ? 'Adding…' : 'Add and get their link'}</button>
+          {msg && <p className={`text-sm break-all ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.text}{msg.link ? <><br />{msg.link}</> : null}</p>}
+        </form>
+      </Card>
+    </div>
+  )
 }
 
 function PaintDetails({ paint, onSave }) {

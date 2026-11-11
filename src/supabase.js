@@ -78,6 +78,9 @@ export async function submitSubDraw(draw, orgId = _orgId) {
 // Sub app: the electrical answers and the stage checklist of the job a task is
 // on, and nothing else about it (supabase/sub_job_sheet.sql).
 export const subJobSheet = (taskId) => rpc('sub_job_sheet', { p_task_id: String(taskId) })
+// Paint PM: their painters, and adding one (supabase/paint_crew.sql).
+export const paintCrew = () => rpc('paint_crew', {})
+export const createPaintCrewInvite = (email, name, phone) => rpc('create_paint_crew_invite', { p_email: email, p_name: name, p_phone: phone || null })
 export const myCrew = () => rpc('my_crew', {})
 export const createCrewInvite = (email, name) => rpc('create_crew_invite', { p_email: email, p_name: name })
 // Office: invite a sub (Money › Vendors) to the sub app (supabase/sub_role.sql).
