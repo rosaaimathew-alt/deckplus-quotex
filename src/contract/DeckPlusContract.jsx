@@ -17,7 +17,7 @@ import {
   PORCH_FORM, DECK_FORM, PATIO_FORM, PROCESSING_FORM, PACKET_FORMS,
   RELEASE, E589CI_FORM, YORK_PERMIT_FORM,
 } from './deckPlusAgreement'
-import { roleOfSigId, fmtDate } from './contractFields'
+import { roleOfSigId, fmtDate, MAX_ELEC_WRITE_INS, elecWriteInKey, elecWriteInQtyKey } from './contractFields'
 
 const CONTRACT_IMAGES = {
   logo:            '/contract/deckplus-logo.png',
@@ -77,6 +77,7 @@ function makeCtx({ values, checks, editable, onValue, onCheck, renderSig, render
   const sigdate = (id) => <span className="dp-sigdate">{renderSigDate?.(id, roleOfSigId(id)) || null}</span>
   return {
     blank, check, init, sig, sigdate,
+    values: values || {}, editing: !!(editable && onValue),
     placeholder(spec) {
       const [kind, id] = spec.includes(':') ? spec.split(':') : [null, spec]
       if (kind === 'check') return check(id)
@@ -219,6 +220,10 @@ function UnforeseenPage({ ctx }) {
 // ── Page 8 ──────────────────────────────────────────────────────────────────
 function ElectricalPage({ ctx }) {
   const E = ELECTRICAL_FORM
+  const used = (i) => String(ctx.values[elecWriteInKey(i)] ?? '').trim() || String(ctx.values[elecWriteInQtyKey(i)] ?? '').trim()
+  let last = 0
+  for (let i = 1; i <= MAX_ELEC_WRITE_INS; i++) if (used(i)) last = i
+  const writeIns = Math.min(MAX_ELEC_WRITE_INS, Math.max(1, last + (ctx.editing ? 1 : 0)))
   return (
     <section className="dp-page dp-form">
       <div className="dp-formhead">
@@ -237,10 +242,19 @@ function ElectricalPage({ ctx }) {
       <table className="dp-grid dp-electable">
         <thead><tr>{E.columns.map((c, i) => <th key={i} className={i ? 'dp-qty' : ''}><Inline text={c} ctx={ctx} /></th>)}</tr></thead>
         <tbody>
-          {E.items.map(it => (
+          {E.items.filter(it => it.id !== 'other').map(it => (
             <tr key={it.id}>
               <td><Inline text={it.label} ctx={ctx} /></td>
               <td className="dp-qty">{ctx.blank(`elecQty_${it.id}`, { min: 4 })}</td>
+            </tr>
+          ))}
+          {/* Write-in lines: the form's blank last row, then one more for every
+              extra item. While editing there is always an empty line to type
+              the next item into; clear a line's wording to drop it. */}
+          {Array.from({ length: writeIns }, (_, i) => i + 1).map(i => (
+            <tr key={`other${i}`} className={ctx.editing && i > 1 && !used(i) ? 'no-print' : undefined}>
+              <td>{ctx.blank(elecWriteInKey(i), { min: ctx.editing ? 44 : 10 })}</td>
+              <td className="dp-qty">{ctx.blank(elecWriteInQtyKey(i), { min: 4 })}</td>
             </tr>
           ))}
         </tbody>
