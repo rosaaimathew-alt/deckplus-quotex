@@ -13,7 +13,8 @@
 //
 // Data (all on the job, so the office sees it too):
 //   jobData.stageDates.paint      paint date (same as the PM calendar)
-//   jobData.paint                 { crew, product, color, sheen, areas, notes }
+//   jobData.paint                 { crew, colors: [{ color, areas, product, sheen }], notes }
+//                                 (+ the first color in product / color / sheen / areas)
 //   jobData.touchUps              [{ id, text, done, createdAt, doneAt, by }]
 //   jobData.paymentsReceived      the Pre-Paint payment, when collected
 import { useMemo, useState } from 'react'
@@ -199,8 +200,11 @@ export function PaintTouchUps() {
 }
 
 // ── One paint job ───────────────────────────────────────────────────────────
-const PRODUCTS = ['Paint', 'Solid stain', 'Semi-transparent stain', 'Clear sealer']
-const SHEENS = ['Flat', 'Satin', 'Semi-gloss', 'Gloss']
+const PRODUCTS = ['Paint', 'Solid stain', 'Semi-solid stain', 'Semi-transparent stain', 'Clear coat']
+const SHEENS = ['Flat', 'Satin', 'Semi-gloss', 'Gloss', 'High gloss']
+// A choice saved before the list changed (e.g. "Clear sealer") stays selectable on that job.
+const withSaved = (list, v) => (v && !list.includes(v) ? [...list, v] : list)
+const newTouchUpId = () => `t${Date.now()}`
 
 export function PaintJob() {
   const { id } = useParams()
@@ -282,12 +286,36 @@ export function PaintJob() {
   )
 }
 
+// A job often has more than one color: rails one, ceiling another, trim a
+// third. Each entry is a color with its product, sheen and what it goes on
+// (paint.colors). Jobs saved before this had a single color in paint.product /
+// .color / .sheen / .areas: that reads as the first entry, and the first entry
+// is still written there so nothing that reads the old fields goes blank.
+const COLOR_FIELDS = ['product', 'sheen', 'color', 'areas']
+const blankColor = () => ({ product: '', sheen: '', color: '', areas: '' })
+const tidyColor = (c) => Object.fromEntries(COLOR_FIELDS.map(k => [k, String(c?.[k] ?? '').trim()]))
+const hasColor = (c) => COLOR_FIELDS.some(k => c[k])
+function paintColorsOf(paint) {
+  const list = Array.isArray(paint?.colors) ? paint.colors.map(tidyColor).filter(hasColor) : []
+  if (list.length) return list
+  const old = tidyColor(paint)
+  return hasColor(old) ? [old] : []
+}
+
 function PaintDetails({ paint, onSave }) {
   const [editing, setEditing] = useState(false)
-  const [f, setF] = useState({})
-  const has = paint.product || paint.color || paint.sheen || paint.areas || paint.notes
-  const start = () => { setF({ product: paint.product || '', color: paint.color || '', sheen: paint.sheen || '', areas: paint.areas || '', notes: paint.notes || '' }); setEditing(true) }
-  const set = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }))
+  const [colors, setColors] = useState([])
+  const [notes, setNotes] = useState('')
+  const saved = paintColorsOf(paint)
+  const has = saved.length > 0 || paint.notes
+  const start = () => { setColors(saved.length ? saved : [blankColor()]); setNotes(paint.notes || ''); setEditing(true) }
+  const set = (i, k) => (e) => setColors(list => list.map((c, j) => (j === i ? { ...c, [k]: e.target.value } : c)))
+  const save = () => {
+    const list = colors.map(tidyColor).filter(hasColor)
+    const first = list[0] || blankColor()
+    onSave({ colors: list, product: first.product, color: first.color, sheen: first.sheen, areas: first.areas, notes: notes.trim() })
+    setEditing(false)
+  }
   const input = 'w-full h-12 px-3 rounded-xl border border-gray-300 bg-white text-base text-gray-900'
 
   return (
@@ -297,35 +325,54 @@ function PaintDetails({ paint, onSave }) {
         {!editing && <button onClick={start} className="text-sm font-semibold text-[var(--brand-700)] px-2 py-1">{has ? 'Edit' : 'Add'}</button>}
       </div>
       {editing ? (
-        <div className="space-y-2.5">
-          <div className="grid grid-cols-2 gap-2">
-            <select id="pd-product" aria-label="Product" className={input} value={f.product} onChange={set('product')}>
-              <option value="">Product…</option>{PRODUCTS.map(x => <option key={x}>{x}</option>)}
-            </select>
-            <select id="pd-sheen" aria-label="Sheen" className={input} value={f.sheen} onChange={set('sheen')}>
-              <option value="">Sheen…</option>{SHEENS.map(x => <option key={x}>{x}</option>)}
-            </select>
-          </div>
-          <input id="pd-color" className={input} value={f.color} onChange={set('color')} placeholder="Color (brand, name, code)" />
-          <input id="pd-areas" className={input} value={f.areas} onChange={set('areas')} placeholder="What gets painted (rails, ceiling, trim…)" />
-          <textarea id="pd-notes" rows={2} value={f.notes} onChange={set('notes')} placeholder="Notes for the painter"
+        <div className="space-y-3">
+          {colors.map((c, i) => (
+            <div key={i} className="space-y-2.5 rounded-xl border border-gray-200 p-3" role="group" aria-label={`Color ${i + 1}`}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-700">Color {i + 1}</p>
+                {colors.length > 1 && <button onClick={() => setColors(list => list.filter((_, j) => j !== i))} className="text-sm font-semibold text-red-600 px-2 py-1" aria-label={`Remove color ${i + 1}`}>Remove</button>}
+              </div>
+              <input className={input} value={c.color} onChange={set(i, 'color')} placeholder="Color (brand, name, code)" aria-label={`Color ${i + 1} name`} />
+              <input className={input} value={c.areas} onChange={set(i, 'areas')} placeholder="What gets painted (rails, ceiling, trim…)" aria-label={`Color ${i + 1} areas`} />
+              <div className="grid grid-cols-2 gap-2">
+                <select aria-label={`Color ${i + 1} product`} className={input} value={c.product} onChange={set(i, 'product')}>
+                  <option value="">Product…</option>{withSaved(PRODUCTS, c.product).map(x => <option key={x}>{x}</option>)}
+                </select>
+                <select aria-label={`Color ${i + 1} sheen`} className={input} value={c.sheen} onChange={set(i, 'sheen')}>
+                  <option value="">Sheen…</option>{withSaved(SHEENS, c.sheen).map(x => <option key={x}>{x}</option>)}
+                </select>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => setColors(list => [...list, blankColor()])}
+            className="w-full h-12 rounded-xl text-base font-semibold text-[var(--brand-700)] border border-dashed border-gray-300">+ Add another color</button>
+          <textarea id="pd-notes" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes for the painter"
             className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-base text-gray-900 bg-white resize-none" />
           <div className="flex gap-2">
-            <button onClick={() => { onSave(Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()]))); setEditing(false) }}
-              className="flex-1 h-12 rounded-xl text-base font-bold text-white bg-[var(--brand-600)]">Save</button>
+            <button onClick={save} className="flex-1 h-12 rounded-xl text-base font-bold text-white bg-[var(--brand-600)]">Save</button>
             <button onClick={() => setEditing(false)} className="h-12 px-5 rounded-xl text-base font-semibold text-gray-600 border border-gray-200">Cancel</button>
           </div>
         </div>
       ) : has ? (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-base">
-          {[['Product', paint.product], ['Color', paint.color], ['Sheen', paint.sheen], ['Areas', paint.areas], ['Notes', paint.notes]]
-            .filter(([, v]) => v).map(([k, v]) => (
-              <div key={k} className="contents">
-                <dt className="text-sm text-gray-500 pt-0.5">{k}</dt>
-                <dd className="text-gray-900 font-medium whitespace-pre-wrap">{v}</dd>
-              </div>
-            ))}
-        </dl>
+        <div className="space-y-3">
+          {saved.length > 0 && (
+            <ul className="divide-y divide-gray-100" aria-label="Paint colors">
+              {saved.map((c, i) => (
+                <li key={i} className="py-2 first:pt-0 last:pb-0">
+                  <p className="text-base font-semibold text-gray-900">{c.color || 'Color not set'}</p>
+                  {c.areas && <p className="text-base text-gray-800">{c.areas}</p>}
+                  {(c.product || c.sheen) && <p className="text-sm text-gray-500">{[c.product, c.sheen].filter(Boolean).join(' · ')}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {paint.notes && (
+            <div className={saved.length ? 'pt-2 border-t border-gray-100' : ''}>
+              <p className="text-sm text-gray-500">Notes</p>
+              <p className="text-base text-gray-900 font-medium whitespace-pre-wrap">{paint.notes}</p>
+            </div>
+          )}
+        </div>
       ) : <p className="text-sm text-gray-500">No color or product set yet.</p>}
     </Card>
   )
@@ -339,7 +386,7 @@ function TouchUps({ proposal, onToast }) {
   const save = (next) => updateJobData(proposal.id, { touchUps: next })
   const add = () => {
     if (!text.trim()) return
-    save([...list, { id: `t${Date.now()}`, text: text.trim(), done: false, createdAt: new Date().toISOString(), by: me?.displayName || '' }])
+    save([...list, { id: newTouchUpId(), text: text.trim(), done: false, createdAt: new Date().toISOString(), by: me?.displayName || '' }])
     setText('')
   }
   const toggle = (t) => {
