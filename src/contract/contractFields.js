@@ -191,3 +191,11 @@ export function autoChecks({ hoa = null, power = null, lumberDrop = null, projec
   if (/eze|3.?season|sunroom|conversion/.test(t)) c.jt_3season = true
   return c
 }
+
+// Write-in lines on the Electrical Specifications page: line 1 is the form's
+// own blank last row (elecOther / elecQty_other); further lines are
+// elecOther2 / elecQty_other2, and so on, so a job can list as many extra
+// electrical items as it has, each with its own quantity.
+export const MAX_ELEC_WRITE_INS = 12
+export const elecWriteInKey = (i) => (i <= 1 ? 'elecOther' : `elecOther${i}`)
+export const elecWriteInQtyKey = (i) => (i <= 1 ? 'elecQty_other' : `elecQty_other${i}`)

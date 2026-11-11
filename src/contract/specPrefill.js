@@ -12,6 +12,7 @@
 import { DECK_COLLECTIONS, matchCollection } from '../lib/deckPricing'
 import { PORCH_ROOFS, deckSlug } from '../porchBuild'
 import { HS_PAVERS, HS_CONCRETE } from '../hardscape'
+import { MAX_ELEC_WRITE_INS, elecWriteInKey, elecWriteInQtyKey } from './contractFields'
 
 const n = (v) => (v === true ? 1 : Number(v) || 0)
 
@@ -115,7 +116,10 @@ export function specPrefill(lines = []) {
     value: (id, v) => { if (v != null && v !== '' && values[id] == null) values[id] = String(v) },
   }
   const elec = {}            // form row → qty
-  const elecOther = []
+  // Items with no printed row: each gets its own write-in line and quantity
+  // (the form's blank last row, then elecOther2, elecOther3… — DeckPlusContract).
+  const elecOther = new Map()   // label → qty
+  const addOther = (label, qty) => { const t = String(label || '').trim(); if (t && qty > 0) elecOther.set(t, (elecOther.get(t) || 0) + qty) }
   const addElec = (row, qty) => { if (qty > 0) elec[row] = (elec[row] || 0) + qty }
   const addPackage = (pkg, times = 1) => Object.entries(pkg).forEach(([row, q]) => addElec(row, q * times))
   const lv = { postcap: 0, halfmoon: 0, riser: 0, transformer: 0 }
@@ -190,7 +194,11 @@ export function specPrefill(lines = []) {
         if (pb.elecPackage && ELEC_PACKAGES[pb.elecPackage]) addPackage(ELEC_PACKAGES[pb.elecPackage])
         for (const [k, q] of Object.entries(ex)) {
           if (ELEC_EXTRAS[k]) addElec(ELEC_EXTRAS[k], n(q))
-          else if (ELEC_OTHER[k] && n(q) > 0) elecOther.push(`${ELEC_OTHER[k]}${LF_ITEMS.has(k) ? ` (${n(q)} LF)` : n(q) > 1 ? ` (${n(q)})` : ''}`)
+          else if (ELEC_OTHER[k] && n(q) > 0) {
+            // Footage goes in the wording (one run of it); counts go in the QTY column
+            if (LF_ITEMS.has(k)) addOther(`${ELEC_OTHER[k]} (${n(q)} LF)`, 1)
+            else addOther(ELEC_OTHER[k], n(q))
+          }
         }
         lv.postcap += n(ex.elec_cap_light); lv.halfmoon += n(ex.elec_post_light)
         lv.riser += n(ex.elec_riser) + n(ex.elec_riser_stair); lv.transformer += n(ex.elec_lv_transformer)
@@ -233,10 +241,13 @@ export function specPrefill(lines = []) {
     const name = `${l.name || ''}`
     if (/electric/i.test(l.category || '') || ELEC_BY_NAME.some(([re]) => re.test(name))) {
       const hit = ELEC_BY_NAME.find(([re]) => re.test(name))
+      const qty = n(l.qty) || 1
       if (hit) {
-        const qty = n(l.qty) || 1
         if (typeof hit[1] === 'string') addElec(hit[1], qty)
         else addPackage(hit[1], qty)
+      } else if (name.trim()) {
+        // An electrical line with no printed row of its own: its own write-in line
+        addOther(name, qty)
       }
     } else if (!deckFromTool && /deck|decking/i.test(name)) {
       const coll = matchCollection(name)
@@ -245,11 +256,13 @@ export function specPrefill(lines = []) {
   }
 
   for (const [row, qty] of Object.entries(elec)) put.value(`elecQty_${row}`, qty)
-  if (elecOther.length) { put.value('elecOther', elecOther.join('; ')); put.value('elecQty_other', 1) }
+  ;[...elecOther].slice(0, MAX_ELEC_WRITE_INS).forEach(([label, qty], i) => {
+    put.value(elecWriteInKey(i + 1), label); put.value(elecWriteInQtyKey(i + 1), qty)
+  })
   if (lv.postcap) { put.check('lv_postcap'); put.value('lvPostCapQty', lv.postcap) }
   if (lv.halfmoon) { put.check('lv_halfmoon'); put.value('lvHalfMoonQty', lv.halfmoon) }
   if (lv.riser) { put.check('lv_riser'); put.value('lvRiserQty', lv.riser) }
   if (lv.transformer) { put.check('lv_transformer'); put.value('lvTransformerQty', lv.transformer) }
 
-  return { checks, values, hasElectrical: Object.keys(elec).length > 0 || elecOther.length > 0 }
+  return { checks, values, hasElectrical: Object.keys(elec).length > 0 || elecOther.size > 0 }
 }
