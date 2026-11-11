@@ -18,5 +18,6 @@ export function priceRangeOf(total, pr) {
 const usd = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US')
 export const rangeText = (r) => (r ? `${usd(r.low)} – ${usd(r.high)}` : '')
 
-// The deposit wording follows the exact price (10% for $30k–$100k jobs, else 20%).
-export const depositPctOf = (total) => (total >= 30000 && total <= 100000 ? 10 : 20)
+// The deposit a proposal asks for: 10% on every job.
+export const DEPOSIT_PCT = 10
+export const depositPctOf = () => DEPOSIT_PCT

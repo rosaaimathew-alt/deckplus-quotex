@@ -107,7 +107,7 @@ export const PROPOSAL_STATUSES = ['Draft', 'Sent', 'Followed Up', 'Negotiating',
 // Starter follow-up email templates. {client} is replaced with the customer name.
 export const DEFAULT_EMAIL_TEMPLATES = [
   { id: 1, name: 'Gentle nudge', body: "Hi {client},\n\nJust circling back on the proposal I sent over — did you have any questions? Happy to walk through anything or adjust the scope to fit your needs.\n\nTalk soon!" },
-  { id: 2, name: 'Ready to schedule', body: "Hi {client},\n\nWe have a few openings coming up and I'd love to get your project on the calendar. A 20% deposit locks in your start date. Want me to send over the next steps?\n\nThanks!" },
+  { id: 2, name: 'Ready to schedule', body: "Hi {client},\n\nWe have a few openings coming up and I'd love to get your project on the calendar. A 10% deposit locks in your start date. Want me to send over the next steps?\n\nThanks!" },
   { id: 3, name: 'Last check-in', body: "Hi {client},\n\nWanted to check in one more time before I close out your file. Are you still interested in moving forward? Just reply and let me know either way — no pressure.\n\nAppreciate it!" },
   { id: 4, name: 'Thanks for your time', body: "Hi {client},\n\nThank you for taking the time to meet with us. It was great learning about your project. Your proposal is attached — reach out anytime with questions.\n\nBest," },
 ]

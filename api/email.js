@@ -13,6 +13,8 @@ import dotenv from 'dotenv'
 import { saveMessage } from './_store.js'
 import { sendMail, isMailerConfigured, smtpUser } from './_mailer.js'
 import { requireAuth } from './_auth.js'
+import { getKV } from './_kv.js'
+import { buildProposalEmail, signatureOf, loadSignature, saveSignature } from './_proposalEmail.js'
 
 // Company name shown in customer emails (per-instance; set COMPANY_NAME in the env).
 const COMPANY = process.env.COMPANY_NAME || 'Your Company'
@@ -26,108 +28,6 @@ const fmt = (n) =>
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ))
-
-// "View Your Proposal" button — only rendered when a tracked view link exists.
-// Opening it logs a view against the proposal's activity feed.
-const viewButton = (viewUrl) => {
-  if (!viewUrl || !/^https?:\/\//i.test(viewUrl)) return ''
-  const safe = esc(viewUrl)
-  return `<div style="text-align:center;margin:8px 0 24px;">
-    <a href="${safe}" style="display:inline-block;background:#3b82f6;color:#ffffff;font-size:15px;font-weight:600;padding:14px 36px;border-radius:8px;text-decoration:none;">View Your Proposal</a>
-  </div>`
-}
-
-// ── Proposal email HTML ───────────────────────────────────────────────────────
-function buildProposalHtml({ client, email, address, expiration, lines, companyName, fromName, viewUrl, showBreakdown, isAlaCarte }) {
-  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  const expirationFormatted = expiration
-    ? new Date(expiration + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    : null
-  const subtotal = (lines || []).reduce((s, l) => s + (l.qty || 1) * (l.unitPrice || 0), 0)
-  // Lines merged into another are folded into it; on a lump sum, hidden lines
-  // are left out and no line shows its own price. (Same rule as
-  // src/lib/hiddenLines.js.)
-  const summed = showBreakdown === false && !isAlaCarte
-  const all    = (lines || []).filter(Boolean)
-  const byId   = new Map(all.map(l => [String(l.id), l]))
-  const rootOf = (l) => { let cur = l; const seen = new Set(); while (cur?.mergeInto != null && byId.has(String(cur.mergeInto)) && !seen.has(String(cur.id))) { seen.add(String(cur.id)); cur = byId.get(String(cur.mergeInto)) } return cur }
-  const amt    = (l) => (l.qty || 1) * (l.unitPrice || 0)
-  const extra  = new Map()
-  for (const l of all) { const r = rootOf(l); if (r !== l) extra.set(String(r.id), (extra.get(String(r.id)) || 0) + amt(l)) }
-  const folded = all.filter(l => rootOf(l) === l).map(l => extra.has(String(l.id)) ? { ...l, qty: 1, unitPrice: amt(l) + extra.get(String(l.id)) } : l)
-  // The discount shows under the items (Project Total → Discount), not as one.
-  const discLines = isAlaCarte ? [] : folded.filter(l => l.isDiscount)
-  const discAmt  = -discLines.reduce((s, l) => s + amt(l), 0)
-  const items    = folded.filter(l => !l.isDiscount)
-  const shown    = summed ? items.filter(l => !l.hidden) : items
-  const company  = esc(companyName || COMPANY)
-  const sender   = esc(fromName) || company
-  const lineRows = shown.map((l, i) => `
-    <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-      <td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500;border-bottom:1px solid #f1f5f9;">${esc(l.name) || '—'}</td>
-      <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#1e293b;text-align:right;border-bottom:1px solid #f1f5f9;">${summed ? '' : `$${fmt((l.qty || 1) * (l.unitPrice || 0))}`}</td>
-    </tr>`).join('') + (discLines.length ? `
-    <tr><td style="padding:10px 16px;font-size:13px;color:#1e293b;font-weight:500;border-bottom:1px solid #f1f5f9;">Project Total</td>
-      <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#1e293b;text-align:right;border-bottom:1px solid #f1f5f9;">$${fmt(subtotal + discAmt)}</td></tr>
-    <tr><td style="padding:10px 16px;font-size:13px;color:#15803d;font-weight:600;border-bottom:1px solid #f1f5f9;">${esc(discLines[0].name) || 'Discount'}</td>
-      <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#15803d;text-align:right;border-bottom:1px solid #f1f5f9;">−$${fmt(discAmt)}</td></tr>` : '')
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;">
-      <tr><td style="background:#0f172a;padding:32px 40px;">
-        <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.02em;">${company}</p>
-        <p style="margin:6px 0 0;font-size:13px;color:#94a3b8;">Proposal · ${today}</p>
-      </td></tr>
-      <tr><td style="padding:32px 40px 24px;">
-        <p style="margin:0 0 12px;font-size:15px;color:#1e293b;">Hi ${esc(client) || 'there'},</p>
-        <p style="margin:0;font-size:14px;color:#475569;line-height:1.7;">
-          Thank you for the opportunity to work with you. Please find your project proposal below.
-          ${expirationFormatted ? `This proposal is valid until <strong>${expirationFormatted}</strong>.` : ''}
-          Feel free to reach out with any questions.
-        </p>
-      </td></tr>
-      ${viewUrl ? `<tr><td style="padding:0 40px;">${viewButton(viewUrl)}</td></tr>` : ''}
-      ${address ? `<tr><td style="padding:0 40px 20px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:8px;padding:16px;">
-          <tr><td style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;padding-bottom:8px;">Project Address</td></tr>
-          <tr><td style="font-size:14px;color:#1e293b;">${esc(address)}</td></tr>
-        </table>
-      </td></tr>` : ''}
-      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e2e8f0;margin:0;"></td></tr>
-      <tr><td style="padding:24px 40px 0;">
-        <p style="margin:0 0 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;">Proposal Summary</p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-          <thead><tr style="background:#f1f5f9;">
-            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;">Item</th>
-            <th style="padding:10px 16px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;width:100px;">Amount</th>
-          </tr></thead>
-          <tbody>${lineRows}</tbody>
-          <tfoot><tr style="background:#0f172a;">
-            <td colspan="2" style="padding:14px 16px;font-size:13px;font-weight:700;color:#ffffff;letter-spacing:0.02em;">TOTAL INVESTMENT</td>
-            <td style="padding:14px 16px;text-align:right;font-size:18px;font-weight:700;color:#ffffff;">$${fmt(subtotal)}</td>
-          </tr></tfoot>
-        </table>
-      </td></tr>
-      <tr><td style="padding:28px 40px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border-radius:8px;border-left:4px solid #3b82f6;">
-          <tr><td style="padding:16px 20px;font-size:13px;color:#1e40af;line-height:1.6;">
-            To accept this proposal, simply reply to this email or give us a call.
-            A 20% deposit is required to schedule your project.
-          </td></tr>
-        </table>
-      </td></tr>
-      <tr><td style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
-        <p style="margin:0;font-size:12px;color:#94a3b8;">
-          Sent by <strong style="color:#475569;">${sender}</strong> via ${company}
-          ${email ? ` · <a href="mailto:${email}" style="color:#3b82f6;text-decoration:none;">${esc(email)}</a>` : ''}
-        </p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table></body></html>`
-}
 
 // ── Payment reminder HTML ─────────────────────────────────────────────────────
 function buildReminderHtml({ client, amount, milestone, dueDate, contractNum, address, projectType }) {
@@ -260,13 +160,23 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const staff = await requireAuth(req, res)
   if (!staff) return
+  const { action, ...body } = req.body || {}
+
+  // ── The signed-in person's email signature (name, title, cell…) ───────────
+  if (action === 'signature' || action === 'signature-save') {
+    const kv = await getKV()
+    const saved = await loadSignature(kv, staff.sub)
+    if (action === 'signature') return res.status(200).json({ signature: signatureOf(null, saved), saved: !!saved })
+    const signature = signatureOf(body.signature, saved)
+    await saveSignature(kv, staff.sub, signature)
+    return res.status(200).json({ signature, saved: true })
+  }
+
   // Emails go out from the signed-in person's own connected mailbox when they have one.
   const mailSender = { userId: staff.sub, email: staff.email }
   if (!(await isMailerConfigured(mailSender))) {
     return res.status(500).json({ error: 'No email account connected. Connect your mailbox in Settings › Email Account.' })
   }
-
-  const { action, ...body } = req.body || {}
 
   // ── Payment reminder ──────────────────────────────────────────────────────
   if (action === 'payment-reminder') {
@@ -350,59 +260,37 @@ export default async function handler(req, res) {
   }
 
   // ── Proposal email (default) ──────────────────────────────────────────────
-  const { proposal, fromName, fromEmail, replyText, inReplyTo, subject: customSubject, pdfBase64, pdfFilename, viewUrl } = body
+  const { proposal, fromName, replyText, inReplyTo, subject: customSubject, viewUrl } = body
   const recipientEmail = proposal?.email
   if (!recipientEmail) return res.status(400).json({ error: 'Recipient email is required.' })
 
   const isReply = !!replyText
-  const company = esc(proposal?.companyName || COMPANY)
-  const sender  = esc(fromName) || company
-
-  let html, subject
+  let html, subject, text, senderName
   if (isReply) {
     html    = `<div style="font-family:-apple-system,sans-serif;font-size:14px;line-height:1.6;color:#1e293b;max-width:600px;margin:0 auto;padding:24px;">${replyText.replace(/\n/g, '<br>')}</div>`
     subject = customSubject || `Re: Your Proposal`
-  } else if (pdfBase64) {
-    const client  = esc(proposal?.client) || 'there'
-    const expLine = proposal?.expiration
-      ? `This proposal is valid until <strong>${new Date(proposal.expiration + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</strong>.`
-      : ''
-    html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:32px 16px;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;">
-  <tr><td style="background:#0f172a;padding:28px 40px;">
-    <p style="margin:0;font-size:20px;font-weight:700;color:#ffffff;">${company}</p>
-    <p style="margin:6px 0 0;font-size:13px;color:#94a3b8;">Proposal</p>
-  </td></tr>
-  <tr><td style="padding:32px 40px;">
-    <p style="margin:0 0 14px;font-size:15px;color:#1e293b;">Hi ${client},</p>
-    <p style="margin:0 0 14px;font-size:14px;color:#475569;line-height:1.7;">
-      Thank you for the opportunity to work with you. You can view your proposal online with the button below, or open the attached PDF. ${expLine}
-    </p>
-    ${viewButton(viewUrl)}
-    <p style="margin:0;font-size:14px;color:#475569;line-height:1.7;">
-      To accept this proposal, simply reply to this email or give us a call. A 20% deposit is required to schedule your project.
-    </p>
-  </td></tr>
-  <tr><td style="background:#f8fafc;padding:20px 40px;border-top:1px solid #e2e8f0;">
-    <p style="margin:0;font-size:12px;color:#94a3b8;">
-      Sent by <strong style="color:#475569;">${sender}</strong>
-      ${fromEmail ? ` · <a href="mailto:${fromEmail}" style="color:#3b82f6;text-decoration:none;">${esc(fromEmail)}</a>` : ''}
-    </p>
-  </td></tr>
-</table></td></tr></table></body></html>`
-    subject = customSubject || `Proposal for ${proposal.client || 'Your Project'}${proposal.expiration ? ` — Valid Until ${new Date(proposal.expiration + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`
+    senderName = esc(fromName) || esc(proposal?.companyName || COMPANY)
   } else {
-    html    = buildProposalHtml({ ...proposal, fromName, viewUrl })
-    subject = customSubject || `Proposal for ${proposal.client || 'Your Project'}${proposal.expiration ? ` — Valid Until ${new Date(proposal.expiration + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`
+    // The customer gets the link only (no PDF), so every look at the proposal
+    // is an open we can see. No link, no email.
+    if (!viewUrl || !/^https?:\/\//i.test(viewUrl)) {
+      return res.status(400).json({ error: 'The proposal link could not be created, so nothing was sent. Please try again.' })
+    }
+    // The sender's signature: what they just typed, else what they saved.
+    let signature = signatureOf(body.signature, null, fromName)
+    try {
+      const kv = await getKV()
+      const saved = await loadSignature(kv, staff.sub)
+      signature = signatureOf(body.signature, saved, fromName)
+      if (body.signature && JSON.stringify(signature) !== JSON.stringify(saved)) await saveSignature(kv, staff.sub, signature)
+    } catch (err) { console.error('Email signature:', err.message) }
+    const host = req.headers['x-forwarded-host'] || req.headers.host || ''
+    const logoUrl = host ? `${host.includes('localhost') ? 'http' : 'https'}://${host}/deckplus-logo.png` : ''
+    ;({ subject, html, text } = buildProposalEmail({ client: proposal?.client, viewUrl, signature, logoUrl }))
+    senderName = signature.name.replace(/["<>]/g, '') || esc(proposal?.companyName || COMPANY)
   }
 
-  const attachments = pdfBase64
-    ? [{ filename: pdfFilename || 'Proposal.pdf', content: Buffer.from(pdfBase64, 'base64'), contentType: 'application/pdf' }]
-    : undefined
-
-  const result = await sendMail({ to: recipientEmail, subject, html, attachments, fromName: sender, sender: mailSender })
+  const result = await sendMail({ to: recipientEmail, subject, html, text, fromName: senderName, sender: mailSender })
   if (result.error) return res.status(500).json({ error: result.error })
 
   const msgId = `out_${result.messageId || Date.now()}`
@@ -410,7 +298,7 @@ export default async function handler(req, res) {
     id: msgId, direction: 'outbound',
     from: { name: fromName || 'You', email: result.sentFrom || smtpUser() || 'noreply' },
     to: [recipientEmail], subject,
-    textBody: isReply ? replyText : '',
+    textBody: isReply ? replyText : (text || ''),
     htmlBody: html,
     messageId: result.messageId || msgId,
     inReplyTo: inReplyTo || null,
