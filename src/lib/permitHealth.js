@@ -8,8 +8,10 @@
 // address doesn't count against the county: the site answered.
 //
 // Kept in the shared settings (permitPulse.health) so every office screen sees
-// the same state, and an email goes to office / admin only when a county goes
-// down or comes back — never on every check.
+// the same state (the banner shows right away). An email goes to office /
+// admin only when a county is STILL down on the next check — one busy morning
+// clears itself on the 10-minute re-check and emails nobody — and again when
+// it comes back after such an email. Never on every check.
 import { locateAddress } from './permitFees'
 
 const DOWN_SHARE = 0.3
@@ -29,21 +31,28 @@ export function gradeRun(prevHealth = {}, stats = {}, now = new Date().toISOStri
     if (!total) continue
     const down = s.failed > 0 && (s.ok === 0 || (s.failed >= DOWN_MIN_FAILED && s.failed / total >= DOWN_SHARE))
     const prev = prevHealth[county] || {}
+    // Checks in a row that found it down (older saved states have no count)
+    const downRuns = down ? (prev.down ? (prev.downRuns || 1) + 1 : 1) : 0
     const next = {
       ...prev,
       down,
+      downRuns,
       checkedAt: now,
       lastOk: s.ok, lastFailed: s.failed,
       ...(s.ok ? { lastOkAt: now } : {}),
       ...(down ? { lastError: s.lastError || prev.lastError || 'Unknown error', since: prev.down ? prev.since : now } : { since: null }),
     }
-    if (down !== !!prev.down) {
-      const recentlyAlerted = prev.alertedAt && Date.now() - new Date(prev.alertedAt) < REALERT_MS && prev.alertedState === (down ? 'down' : 'up')
-      if (!recentlyAlerted) {
-        changes.push({ county, state: down ? 'down' : 'up', error: next.lastError, failed: s.failed, total })
-        next.alertedAt = now
-        next.alertedState = down ? 'down' : 'up'
-      }
+    const emailedDown = prev.alertedState === 'down'
+    const recently = (state) => prev.alertedAt && prev.alertedState === state && Date.now() - new Date(prev.alertedAt) < REALERT_MS
+    // Down twice in a row and nobody told yet → email. Back up after a "down"
+    // email → email that it's resolved.
+    const tell = down
+      ? (downRuns >= 2 && !(emailedDown && prev.down) && !recently('down') ? 'down' : null)
+      : (prev.down && emailedDown ? 'up' : null)
+    if (tell) {
+      changes.push({ county, state: tell, error: next.lastError, failed: s.failed, total })
+      next.alertedAt = now
+      next.alertedState = tell
     }
     health[county] = next
   }
