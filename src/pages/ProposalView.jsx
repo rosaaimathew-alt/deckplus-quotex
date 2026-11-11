@@ -6,8 +6,6 @@ import { buildProposalSnapshot } from '../proposalSnapshot'
 import { withSavedDesign } from '../lib/designSnapshot'
 import DesignShareToggle from '../components/DesignShareToggle'
 import { DEFAULT_BRAND_COLOR } from '../brand'
-import { toCanvas } from 'html-to-image'
-import jsPDF from 'jspdf'
 import { customerLines, discountOf } from '../lib/hiddenLines'
 import { priceRangeOf, rangeText, depositPctOf } from '../lib/priceRange'
 import { customerUpgrades } from '../lib/upgrades'
@@ -26,8 +24,10 @@ export default function ProposalView() {
   const [sending, setSending] = useState(false)
   const [sendSuccess, setSendSuccess] = useState(false)
   const [sendError, setSendError] = useState('')
-  const [fromName, setFromName] = useState('')
-  const [fromEmail, setFromEmail] = useState('')
+  // The sender's email signature (name, title, cell): saved per person, filled in once.
+  const me = useStore(s => s.me)
+  const [signature, setSignature] = useState(null)
+  const setSig = (k, v) => setSignature(s => ({ ...(s || {}), [k]: v }))
 
   const proposalDocRef = useRef(null)
   const proposalIdRef = useRef(null)
@@ -35,6 +35,18 @@ export default function ProposalView() {
   const branding = useStore(s => s.branding)
   const blue     = branding?.primaryColor || DEFAULT_BRAND_COLOR   // Deck Plus blue — PROPOSAL title and company name
   const companyName = branding?.companyName || 'QUOTEX'
+
+  // Opening the send box fills in the signature this person saved last time.
+  useEffect(() => {
+    if (!showSend || signature) return
+    let off = false
+    const fallback = { name: me?.displayName || '' }
+    fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'signature' }) })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!off) setSignature(s => s || { ...(d?.signature || {}), name: d?.signature?.name || fallback.name }) })
+      .catch(() => { if (!off) setSignature(s => s || fallback) })
+    return () => { off = true }
+  }, [showSend, signature, me])
 
   useEffect(() => {
     const raw = sessionStorage.getItem('proposal')
@@ -184,41 +196,9 @@ export default function ProposalView() {
     setSending(true)
     setSendError('')
     try {
-      // Render the proposal in an invisible overlay at viewport origin (0,0)
-      // so there is no sidebar offset in the captured image.
-      // opacity:0 hides it from the user; html-to-image makes its own fresh
-      // clone for the SVG foreignObject so the output is at full opacity.
-      const LETTER_PX = 816 // 8.5in @ 96dpi
-      const original = proposalDocRef.current
-      const overlay = document.createElement('div')
-      overlay.style.cssText = `position:fixed;top:0;left:0;z-index:99999;width:${LETTER_PX}px;opacity:0;pointer-events:none;`
-      const clone = original.cloneNode(true)
-      clone.style.cssText = `width:${LETTER_PX}px;max-width:${LETTER_PX}px;margin:0;border-radius:0;box-shadow:none;overflow:visible;`
-      overlay.appendChild(clone)
-      document.body.appendChild(overlay)
-      // Let browser finish layout before capturing
-      await new Promise(r => setTimeout(r, 150))
-
-      const canvas = await toCanvas(clone, { pixelRatio: 2, backgroundColor: '#ffffff' })
-      document.body.removeChild(overlay)
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.92)
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })
-      const pageW = pdf.internal.pageSize.getWidth()
-      const pageH = pdf.internal.pageSize.getHeight()
-      const imgW = pageW
-      const imgH = (canvas.height * pageW) / canvas.width
-      let y = 0
-      while (y < imgH) {
-        if (y > 0) pdf.addPage()
-        pdf.addImage(imgData, 'JPEG', 0, -y, imgW, imgH)
-        y += pageH
-      }
-      const pdfBase64 = pdf.output('datauristring').split(',')[1]
-
       // Create/refresh a permanent tracked view link so the email carries a
       // "View Your Proposal" button and every open is logged to this proposal's
-      // activity. Best-effort — if it fails, the email still sends with the PDF.
+      // activity. The customer gets the link only (no PDF), so no link, no email.
       let viewUrl = null
       try {
         const pid = proposalIdRef.current ?? data.id ?? null
@@ -232,17 +212,16 @@ export default function ProposalView() {
           viewUrl = vd.url || null
           if (pid != null && vd.token) setProposalViewToken(pid, vd.token)
         }
-      } catch { /* non-fatal — send without the tracked link */ }
+      } catch { /* reported just below */ }
+      if (!viewUrl) throw new Error('The proposal link could not be created, so nothing was sent. Please try again.')
 
       const res = await fetch('/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          proposal: { ...data },
-          fromName,
-          fromEmail,
-          pdfBase64,
-          pdfFilename: `Proposal-${(data.client || 'Client').replace(/\s+/g, '-')}.pdf`,
+          proposal: { client: data.client, email: data.email },
+          signature: signature || undefined,
+          fromName: signature?.name || me?.displayName || '',
           viewUrl,
         }),
       })
@@ -361,25 +340,17 @@ export default function ProposalView() {
                       {email || <span className="text-red-500 italic">No email on this proposal — go back and add one.</span>}
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 block mb-1">Your Name (optional — shows as sender)</label>
-                    <input
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)]"
-                      placeholder="e.g. Mike's Construction"
-                      value={fromName}
-                      onChange={e => setFromName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 block mb-1">Reply-to Email (optional)</label>
-                    <input
-                      type="email"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)]"
-                      placeholder="you@yourcompany.com"
-                      value={fromEmail}
-                      onChange={e => setFromEmail(e.target.value)}
-                    />
-                  </div>
+                  {[['name', 'Your name'], ['title', 'Title'], ['cell', 'Cell']].map(([k, label]) => (
+                    <div key={k}>
+                      <label className="text-xs font-medium text-gray-500 block mb-1">{label}</label>
+                      <input
+                        aria-label={label}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)]"
+                        value={signature?.[k] ?? ''}
+                        onChange={e => setSig(k, e.target.value)}
+                      />
+                    </div>
+                  ))}
                 </div>
 
                 {sendError && (
@@ -397,7 +368,7 @@ export default function ProposalView() {
                     disabled={sending || !email}
                     className="flex items-center gap-1.5 px-4 py-2 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {sending ? <><Loader size={14} className="animate-spin" /> Generating PDF...</> : <><Send size={14} /> Send Proposal</>}
+                    {sending ? <><Loader size={14} className="animate-spin" /> Sending...</> : <><Send size={14} /> Send Proposal</>}
                   </button>
                 </div>
               </>
