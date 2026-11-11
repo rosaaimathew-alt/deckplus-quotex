@@ -79,6 +79,27 @@ export const myCrew = () => rpc('my_crew', {})
 export const createCrewInvite = (email, name) => rpc('create_crew_invite', { p_email: email, p_name: name })
 // Office: invite a sub (Money › Vendors) to the sub app (supabase/sub_role.sql).
 export const createSubInvite = (subId, email) => rpc('create_sub_invite', { p_sub_id: String(subId), p_email: email })
+// Office: a sub that came over from Knowify is filed as a vendor, where it
+// can't be invited or booked. This moves that one sub to the subs list, with
+// its POs and bills (supabase/sub_promote.sql), and shows the result here
+// right away instead of waiting for the live feed.
+export async function setUpVendorAsSub(vendorId) {
+  const id = String(vendorId)
+  const out = await rpc('promote_vendor_to_sub', { p_vendor_id: id })
+  if (_store && _orgId) {
+    const rows = (table, q) => q(supabase.from(table).select('id, data, deleted_at').eq('org_id', _orgId)).then(r => r.data || [])
+    const [subs, pos, bills] = await Promise.all([
+      rows('subcontractors', q => q.eq('id', id)),
+      rows('purchases', q => q.eq('data->>vendorRef', `s:${id}`)),
+      rows('bills', q => q.eq('data->>vendorRef', `s:${id}`)),
+    ]).catch(() => [[], [], []])
+    for (const [table, list] of [['subcontractors', subs], ['purchases', pos], ['bills', bills]]) {
+      for (const row of list) applyRemote(_store, table, { eventType: 'UPDATE', new: row })
+    }
+    if (subs.length) applyRemote(_store, 'vendors', { eventType: 'DELETE', old: { id } })
+  }
+  return out
+}
 
 // Admins remove someone from the team (the database only lets admins do this).
 // Their proposals and jobs stay with the company; they can no longer sign in to it.
@@ -357,7 +378,7 @@ if (typeof window !== 'undefined') {
 export function pendingWrites() { return _queue.length }
 
 // ── Adapter: store → rows, rows → store ─────────────────────────────────────
-let _armed = false, _applyingRemote = false, _orgId = null, _channel = null
+let _armed = false, _applyingRemote = false, _orgId = null, _channel = null, _store = null
 const _snap = {}   // collection key → Map(idStr → record); settings → object
 
 const same = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b)
@@ -479,6 +500,7 @@ function applyRemoteSettings(store, payload) {
 // Call once after loadOrg()'s result has been put into the store.
 export function armAdapter(store, orgId, settings) {
   _orgId = orgId
+  _store = store
   const s = store.getState()
   for (const key of Object.keys(RECORD_TABLES)) snapshot(key, s[key])
   for (const key of Object.keys(MAP_TABLES))    snapshot(key, mapAsRecords(s[key]))
