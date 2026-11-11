@@ -138,6 +138,7 @@ export function uncheckedJobIds() {
 // as started in the shared settings first, so two office
 // screens open at the same time don't both run it.
 const STALE_START_MS = 15 * 60 * 1000
+const FILL_LOCK_MS = 8 * 60 * 1000
 let running = false
 
 export async function startPulse(by, { force = false } = {}) {
@@ -148,7 +149,13 @@ export async function startPulse(by, { force = false } = {}) {
       // Not time for the full check, but fill in jobs never checked
       const ids = uncheckedJobIds()
       if (!ids.length) return null
+      // One office screen at a time: every open screen ticks every 10 minutes,
+      // and all of them retrying the same jobs at once is what makes a busy
+      // county site busier.
+      const filling = permitPulse?.fillStartedAt && Date.now() - new Date(permitPulse.fillStartedAt) < FILL_LOCK_MS
+      if (filling) return null
       running = true
+      setPermitPulse({ ...(permitPulse || {}), fillStartedAt: new Date().toISOString() })
       try {
         const out = await runPermitPulse({ ids })
         recordHealth(out.stats)

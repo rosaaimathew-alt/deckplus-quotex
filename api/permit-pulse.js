@@ -22,7 +22,7 @@ import dotenv from 'dotenv'
 import { requireAuth, staffRole } from './_auth.js'
 import { sendPermitAlert } from './_permit-alert.js'
 import { EVOLVE_SITES, searchAddress as evolveSearch, permitDetails as evolveDetails } from './_evolve.js'
-import { SITES, searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, RECORD_RE } from './_accela.js'
+import { SITES, searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, RECORD_RE, setPatience } from './_accela.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
@@ -258,6 +258,7 @@ export default async function handler(req, res) {
 
   const results = {}
   const deadline = Date.now() + 40000   // leave room inside the 60 s limit
+  setPatience(deadline)                 // a busy county site is waited out until then
   await inBatches(jobs.map(j => ({ ...j, deadline })), 3, async (job) => {
     const checkedAt = new Date().toISOString()
     try {

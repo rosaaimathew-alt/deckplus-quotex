@@ -8,7 +8,9 @@
  * Sent by an office / admin screen when the inspection check finds a county's
  * permit site can't be read (state 'down') or works again ('up') — see
  * src/lib/permitHealth.js. Goes to every office and admin member of the
- * sender's company, from the company mailbox.
+ * sender's company, from the company mailbox — except people whose "Alert
+ * emails" switch is off (Settings › Team › Access), e.g. a shared login
+ * whose address isn't a real mailbox.
  */
 import { requireAuth, staffMembership, asUser } from './_auth.js'
 import { sendMail } from './_mailer.js'
@@ -31,8 +33,8 @@ export async function sendPermitAlert(req, res, body) {
 
   // Office and admin of this company
   const sb = asUser(token)
-  const { data: people } = await sb.from('org_members').select('email, role').eq('org_id', member.org_id).in('role', ['office', 'admin'])
-  const to = [...new Set((people || []).map(p => p.email).filter(Boolean))]
+  const { data: people } = await sb.from('org_members').select('email, role, permissions').eq('org_id', member.org_id).in('role', ['office', 'admin'])
+  const to = [...new Set((people || []).filter(p => p.permissions?.['email.alerts'] !== false).map(p => p.email).filter(Boolean))]
   if (!to.length) return res.status(200).json({ sent: false, reason: 'No office or admin email on file' })
 
   const origin = req.headers.origin || `https://${req.headers.host || 'deckplus.app'}`

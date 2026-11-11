@@ -52,6 +52,41 @@ export function recordUrl([id1, id2, id3], site = MECK) {
   return `${baseOf(site)}/Cap/CapDetail.aspx?Module=${site.module}&TabName=${site.module}&capID1=${id1}&capID2=${id2}&capID3=${id3}&agencyCode=${site.agency}&IsToShowInspection=`
 }
 
+// ── Being a polite visitor ───────────────────────────────────────────────────
+// The county site answers 429 ("too many requests") or 503 when asked too
+// much at once (one job is 6 to 20 page loads: the search, each permit, the
+// inspector notes). So: only a few requests are in flight at a time, a beat
+// apart, and a busy
+// answer is waited out and asked again (as long as the check has time left)
+// instead of being reported as the county site being down.
+const MAX_IN_FLIGHT = 3
+const GAP_MS = 200          // between one request starting and the next
+const BUSY = new Set([429, 503])
+const BUSY_WAITS = [1500, 3000, 6000]
+let inFlight = 0
+let nextStart = 0
+const waiting = []
+async function gate(fn) {
+  if (inFlight >= MAX_IN_FLIGHT) await new Promise(r => waiting.push(r))
+  inFlight++
+  try {
+    const now = Date.now()
+    const wait = nextStart - now
+    nextStart = Math.max(now, nextStart) + GAP_MS
+    if (wait > 0) await pause(wait)
+    return await fn()
+  } finally { inFlight--; waiting.shift()?.() }
+}
+// Busy answers are retried only until this time (set per check by the caller).
+let patientUntil = 0
+export const setPatience = (untilMs) => { patientUntil = Number(untilMs) || 0 }
+const pause = (ms) => new Promise(r => setTimeout(r, ms))
+function busyWait(res, tries) {
+  const asked = Number(res.headers.get('retry-after'))
+  const ms = Number.isFinite(asked) && asked > 0 ? Math.min(asked * 1000, 8000) : BUSY_WAITS[tries]
+  return ms && tries < BUSY_WAITS.length && Date.now() + ms < patientUntil ? ms : 0
+}
+
 // ── Tiny HTTP client with a cookie jar (the postback needs the session) ─────
 function client() {
   const jar = new Map()
@@ -68,14 +103,21 @@ function client() {
   }
   return async function request(url, { method = 'GET', body, headers = {} } = {}) {
     let next = url
+    let busyTries = 0
     for (let hop = 0; hop < 6; hop++) {
       if (!next.startsWith(ORIGIN + '/')) throw new Error('Unexpected redirect off the county site')
-      const res = await fetch(next, {
-        method, body, redirect: 'manual',
+      const target = next, m = method, b = body
+      const res = await gate(() => fetch(target, {
+        method: m, body: b, redirect: 'manual',
         headers: { 'User-Agent': UA, Cookie: cookieHeader(), ...headers },
         signal: AbortSignal.timeout(20000),
-      })
+      }))
       keep(res)
+      if (BUSY.has(res.status)) {
+        const ms = busyWait(res, busyTries)
+        if (ms) { busyTries++; hop--; await pause(ms); continue }
+        throw new Error(`County site is busy right now (answered ${res.status}); this job is tried again in 10 minutes`)
+      }
       if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
         next = new URL(res.headers.get('location'), next).toString()
         method = 'GET'; body = undefined
