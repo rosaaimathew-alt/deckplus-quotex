@@ -59,7 +59,7 @@ export function buildProposalEmail({ client, viewUrl, signature, logoUrl }) {
     sig.cell ? `<p style="${line}">Tel: <a href="tel:${esc(digits(sig.cell))}" style="${link}">${esc(sig.cell)}</a></p>` : '',
     sig.office ? `<p style="${line}">Office: <a href="tel:${esc(digits(sig.office))}" style="${link}">${esc(sig.office)}</a></p>` : '',
     sig.website ? `<p style="${line}"><a href="${esc(siteHref(sig.website))}" style="${link}">${esc(sig.website)}</a></p>` : '',
-    logoUrl ? `<p style="margin:14px 0 0;"><img src="${esc(logoUrl)}" width="146" height="75" alt="Deck Plus Outdoor Additions" style="display:block;border:0;width:146px;height:75px;"></p>` : '',
+    logoUrl ? `<p style="margin:14px 0 0;"><img src="${esc(logoUrl)}" width="117" height="60" alt="Deck Plus Outdoor Additions" style="display:block;border:0;width:117px;height:60px;"></p>` : '',
   ].filter(Boolean).join('\n          ')
 
   const body = 'margin:0 0 16px;font-size:15px;line-height:1.7;color:#374151;'
@@ -68,11 +68,17 @@ export function buildProposalEmail({ client, viewUrl, signature, logoUrl }) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5f6;padding:32px 16px;">
   <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;">
-      <tr><td style="background:${TEAL};padding:24px 40px 20px;">
-        <p style="margin:0;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:0.02em;">DECK <span style="color:#ffd9b8;font-weight:700;">plus</span></p>
-        <p style="margin:4px 0 0;font-size:11px;font-weight:600;color:#d6ecf1;letter-spacing:0.22em;">OUTDOOR ADDITIONS</p>
+      <tr><td align="center" style="background:#ffffff;padding:28px 40px 22px;">
+        ${logoUrl
+          ? `<img src="${esc(logoUrl)}" width="204" height="105" alt="Deck Plus Outdoor Additions" style="display:block;border:0;width:204px;height:105px;margin:0 auto;">`
+          : `<p style="margin:0;font-size:24px;font-weight:800;color:${TEAL};">Deck Plus</p>`}
       </td></tr>
-      <tr><td style="background:${ORANGE};height:5px;line-height:5px;font-size:0;">&nbsp;</td></tr>
+      <tr><td style="font-size:0;line-height:0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td width="70%" style="background:${TEAL};height:5px;line-height:5px;font-size:0;">&nbsp;</td>
+          <td width="30%" style="background:${ORANGE};height:5px;line-height:5px;font-size:0;">&nbsp;</td>
+        </tr></table>
+      </td></tr>
       <tr><td style="padding:32px 40px 8px;">
         <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#111827;">Hi ${esc(name)},</p>
         <p style="${body}">${esc(p1)}</p>
