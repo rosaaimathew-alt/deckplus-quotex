@@ -2,9 +2,10 @@
 // A sub invoices the office one job at a time, answering the same questions
 // as the office's Google Form "Deckplus Subcontractor Invoice" (English with
 // Spanish): company, date, job name / address, work type, invoice amount,
-// notes, and a photo or PDF of the invoice. Any amount up to what's left on
-// the job; one invoice per job per week (lib/subDraws). The office approves
-// it or sends it back with a reason.
+// notes, and (optionally) a photo or PDF of the invoice. Carpenters draw any
+// amount up to what's left on the job, once per job per week; every other
+// trade sends one invoice per job (lib/subDraws drawsAllowed). The office
+// approves it or sends it back with a reason.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { tr, getLang } from '../lib/lang'
 import { useNavigate } from 'react-router-dom'
@@ -13,7 +14,7 @@ import { useStore } from '../store'
 import { submitSubDraw } from '../supabase'
 import { DEMO } from '../demo'
 import { Card, BackButton, todayStr } from '../field/shared'
-import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, sentThisWeek, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday, tradeOf, tradeEs } from '../lib/subDraws'
+import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday, tradeOf, tradeEs, drawsAllowed, canInvoice } from '../lib/subDraws'
 import { uploadInvoiceFile } from '../lib/taskPhotos'
 
 // Only tasks booked with this login carry money. An outside company's crew
@@ -29,9 +30,9 @@ const useMine = () => {
     terms: terms || [],
   }
 }
-// Jobs that can be invoiced now: money left, and not invoiced yet this week.
-const invoiceable = (tasks, terms, draws) =>
-  tasks.filter(t => remainingOn(t.id, terms, draws) > 0 && !sentThisWeek(draws, t.id))
+// Jobs that can be invoiced now: a carpenter's with money left and no draw yet
+// this week; any other trade's that hasn't been invoiced yet (lib/subDraws).
+const invoiceable = (tasks, terms, draws) => tasks.filter(t => canInvoice(t, terms, draws))
 
 const jobName = (l) => [l.client, l.address].filter(Boolean).join(' · ') || l.title || 'Job'
 const dateLabel = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '')
@@ -172,11 +173,12 @@ export function NewInvoiceScreen() {
   // The trade booked for this job fills in the work type; picked only when there's none
   const trade = tradeOf(task) || (jobs.length && jobs.every(t => tradeOf(t) && tradeOf(t) === tradeOf(jobs[0])) ? tradeOf(jobs[0]) : '')
   const work = trade ? [trade] : workTypes
-  const left = task ? remainingOn(task.id, terms, draws) : 0
+  const draw = drawsAllowed(task)   // carpenters draw against the agreed amount
+  const left = task && draw ? remainingOn(task.id, terms, draws) : 0
   const amt = round2(amount)
-  const over = task && amt > left
+  const over = task && draw && amt > left
   const missing = {
-    job: !task, date: !date, work: !work.length, amount: !(amt > 0), files: !files.length,
+    job: !task, date: !date, work: !work.length, amount: !(amt > 0),
   }
   const ready = !Object.values(missing).some(Boolean) && !over
 
@@ -276,7 +278,7 @@ export function NewInvoiceScreen() {
           <input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
             className="flex-1 min-w-0 bg-transparent text-base text-gray-900 outline-none" aria-label="Invoice amount" />
         </label>
-        {task && <p className={`text-sm ${over ? 'text-red-600' : 'text-gray-500'}`}>{over ? `That's more than the ${money(left)} left on this job.` : `${money(left)} left on this job (of ${money(agreedOf(task.id, terms))}).`}</p>}
+        {task && draw && <p className={`text-sm ${over ? 'text-red-600' : 'text-gray-500'}`}>{over ? `That's more than the ${money(left)} left on this job.` : `${money(left)} left on this job (of ${money(agreedOf(task.id, terms))}).`}</p>}
         {need('amount')}
       </Q>
 
@@ -285,7 +287,7 @@ export function NewInvoiceScreen() {
           className="w-full px-3 py-2.5 rounded-xl border border-gray-300 bg-white text-base text-gray-900 outline-none resize-none" aria-label="Notes" />
       </Q>
 
-      <Q en="Invoice upload file/photo" es="Carga de archivo/foto de factura" required>
+      <Q en="Invoice upload file/photo" es="Carga de archivo/foto de factura">
         <p className="text-sm text-gray-500">Up to {MAX_FILES} photos or PDFs.</p>
         {files.length > 0 && (
           <ul className="space-y-2">
@@ -298,7 +300,6 @@ export function NewInvoiceScreen() {
             <input ref={pickRef} type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={e => addFiles(e.target.files)} />
           </label>
         )}
-        {need('files')}
       </Q>
 
       {err && <p className="text-sm text-red-600 px-1">{err}</p>}
@@ -315,7 +316,7 @@ export function TaskMoneyLine({ task }) {
   const draws = useStore(s => s.subDraws)
   const terms = useStore(s => s.subTerms)
   const agreed = agreedOf(task.id, terms)
-  if (!(agreed > 0)) return null
+  if (!drawsAllowed(task) || !(agreed > 0)) return null
   const left = remainingOn(task.id, terms, draws || [])
   return (
     <p className="text-base text-gray-800 flex items-center gap-2">

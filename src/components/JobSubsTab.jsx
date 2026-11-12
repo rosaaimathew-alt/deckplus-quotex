@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Plus, X, CalendarDays, Phone, Pencil } from 'lucide-react'
 import { useStore } from '../store'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
-import { drawnOn, money, agreedOf } from '../lib/subDraws'
+import { drawnOn, money, agreedOf, drawsAllowed } from '../lib/subDraws'
 import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
 import { ELECTRICAL_ITEM_NAMES, jobElectricalItems, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
@@ -43,7 +43,7 @@ export function BookSubForm({ proposal, onDone, big = false }) {
       // An electrician gets the job's electrical items straight away (typed once per job)
       ...(isElectricalBooking({ title: f.title }, sub) && jobElectricalItems(proposal).length ? { electrical: jobElectricalItems(proposal) } : {}),
     })
-    if (isOffice && Number(f.agreed) > 0) setAgreedAmount(id, Math.round(Number(f.agreed) * 100) / 100)
+    if (isOffice && drawsAllowed(sub) && Number(f.agreed) > 0) setAgreedAmount(id, Math.round(Number(f.agreed) * 100) / 100)
     onDone?.()
   }
 
@@ -74,7 +74,8 @@ export function BookSubForm({ proposal, onDone, big = false }) {
         </div>
       </div>
       <div>
-        {isOffice && (
+        {/* Only carpenters draw against an agreed amount; other trades send one invoice */}
+        {isOffice && drawsAllowed(sub) && (
           <div className="mb-3">
             <label className={lbl}>Agreed amount</label>
             <input inputMode="decimal" value={f.agreed} onChange={e => setF(x => ({ ...x, agreed: e.target.value.replace(/[^\d.]/g, '') }))} placeholder="$ the sub can draw against" className={fld} />
@@ -174,7 +175,7 @@ export default function JobSubsTab({ proposal }) {
                     </ul>
                   )}
                 </>}
-            {isOffice && <AgreedLine key={`${t.id}-${agreedOf(t.id, terms)}`} task={t} agreed={agreedOf(t.id, terms) || null} draws={draws} onSave={(v) => setAgreedAmount(t.id, v)} />}
+            {isOffice && drawsAllowed(t) && <AgreedLine key={`${t.id}-${agreedOf(t.id, terms)}`} task={t} agreed={agreedOf(t.id, terms) || null} draws={draws} onSave={(v) => setAgreedAmount(t.id, v)} />}
             {missingTodaysPhotos(t) && <p className="text-xs font-semibold text-red-600">No photos from the sub today</p>}
             <PhotoDays task={t} />
             <div className="flex items-center gap-1.5 flex-wrap">

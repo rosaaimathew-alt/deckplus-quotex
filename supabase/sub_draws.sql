@@ -113,7 +113,8 @@ create policy sub_draws_sub_update on public.sub_draws for update
   using (org_id = auth_org() and auth_role() = 'sub' and owner_id = auth.uid() and deleted_at is null)
   with check (org_id = auth_org() and auth_role() = 'sub' and owner_id = auth.uid());
 
--- 4. A sub's invoice must be sent Monday–Thursday, add up, and stay inside the agreed amounts.
+-- 4. A sub's invoice must be sent Monday–Thursday and add up. A carpenter's draw stays inside
+--    the agreed amount (once a week per job); any other trade sends one invoice per job.
 --    (Runs as the table owner so it can see every invoice on the task.)
 create or replace function public.check_sub_draw() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -152,29 +153,40 @@ begin
     select * into t from public.sub_tasks
       where org_id = new.org_id and id = l->>'taskId' and owner_id = auth.uid() and deleted_at is null;
     if not found then raise exception '%that job isn''t booked for you', bad using errcode = '42501'; end if;
-    if exists (select 1 from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
-               where d.org_id = new.org_id and d.owner_id = auth.uid() and d.deleted_at is null
-                 and d.data->>'status' <> 'rejected' and d.data->>'weekOf' = new.data->>'weekOf'
-                 and x->>'taskId' = t.id) then
-      raise exception '%"%" was already invoiced this week', bad, t.data->>'title' using errcode = '42501';
-    end if;
     amt := case when (l->>'amount') ~ '^\d+(\.\d{1,2})?$' then (l->>'amount')::numeric end;
     if amt is null or amt <= 0 then raise exception '%each amount must be more than $0', bad using errcode = '42501'; end if;
-    select coalesce(sum((x->>'amount')::numeric), 0) into drawn
-      from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
-      where d.org_id = new.org_id and d.deleted_at is null and d.data->>'status' <> 'rejected' and x->>'taskId' = t.id;
-    if drawn + amt > coalesce((select nullif(m.data->>'agreedAmount', '')::numeric from public.sub_task_terms m
-                               where m.org_id = new.org_id and m.id = t.id and m.deleted_at is null), 0) then
-      raise exception '%that''s more than is left on "%"', bad, t.data->>'title' using errcode = '42501';
+    if coalesce(t.data->>'trade', '') ~* 'carpent|framing' then
+      -- Carpenters draw: once a week per job, up to the agreed amount.
+      if exists (select 1 from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
+                 where d.org_id = new.org_id and d.owner_id = auth.uid() and d.deleted_at is null
+                   and d.data->>'status' <> 'rejected' and d.data->>'weekOf' = new.data->>'weekOf'
+                   and x->>'taskId' = t.id) then
+        raise exception '%"%" was already invoiced this week', bad, t.data->>'title' using errcode = '42501';
+      end if;
+      select coalesce(sum((x->>'amount')::numeric), 0) into drawn
+        from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
+        where d.org_id = new.org_id and d.deleted_at is null and d.data->>'status' <> 'rejected' and x->>'taskId' = t.id;
+      if drawn + amt > coalesce((select nullif(m.data->>'agreedAmount', '')::numeric from public.sub_task_terms m
+                                 where m.org_id = new.org_id and m.id = t.id and m.deleted_at is null), 0) then
+        raise exception '%that''s more than is left on "%"', bad, t.data->>'title' using errcode = '42501';
+      end if;
+    else
+      -- Every other trade: one invoice for the job (a sent-back one can be sent again).
+      if exists (select 1 from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
+                 where d.org_id = new.org_id and d.deleted_at is null
+                   and d.data->>'status' <> 'rejected' and x->>'taskId' = t.id) then
+        raise exception '%"%" already has an invoice', bad, t.data->>'title' using errcode = '42501';
+      end if;
     end if;
     total := total + amt;
   end loop;
   if abs(total - coalesce(nullif(new.data->>'total', '')::numeric, -1)) > 0.004 then
     raise exception '%the total doesn''t add up', bad using errcode = '42501';
   end if;
-  -- The invoice itself (photo or PDF), stored beside that job's photos.
-  if jsonb_typeof(new.data->'files') is distinct from 'array' or jsonb_array_length(new.data->'files') = 0 then
-    raise exception '%add a photo or PDF of the invoice', bad using errcode = '42501';
+  -- The invoice itself (photo or PDF, optional), stored beside that job's photos.
+  if new.data->'files' is null or jsonb_typeof(new.data->'files') = 'null' then new.data := jsonb_set(new.data, '{files}', '[]'::jsonb); end if;
+  if jsonb_typeof(new.data->'files') is distinct from 'array' then
+    raise exception '%the invoice files aren''t a list', bad using errcode = '42501';
   end if;
   if jsonb_array_length(new.data->'files') > 10 then
     raise exception '%up to 10 files per invoice', bad using errcode = '42501';

@@ -3,8 +3,10 @@
 // see agreedOf below). A sub invoices one job at a time, answering the same
 // questions as the office's Google Form "Deckplus Subcontractor Invoice":
 // company, date, job name / address, work type, invoice amount, notes, and
-// the invoice itself (photo or PDF, required). Any amount up to what's left
-// on the job; one invoice per job per week. The office approves it (it
+// the invoice itself (photo or PDF, optional). Any amount up to what's left
+// on the job; one invoice per job per week. Only carpenters draw like that:
+// every other trade sends one invoice per job (drawsAllowed). A photo or PDF
+// of the invoice is optional. The office approves it (it
 // becomes a bill on that job in Money › Bills, the same layout as every
 // other bill) or sends it back with a reason.
 //
@@ -70,6 +72,17 @@ export function drawnOn(taskId, draws, { exceptId = null } = {}) {
 // sees what their company is paid.
 export const agreedOf = (taskId, terms) => Number((terms || []).find(t => t && String(t.id) === String(taskId))?.agreedAmount) || 0
 export const remainingOn = (taskId, terms, draws, opts) => round2(agreedOf(taskId, terms) - drawnOn(taskId, draws, opts))
+
+// Carpenters draw against an agreed amount, as often as once a week. Every
+// other trade sends one invoice for the job: no agreed amount, no cap.
+// (The database follows the same rule: supabase/sub_draws.sql.)
+export const drawsAllowed = (task) => /carpent|framing/i.test(String(task?.trade || ''))
+// The live invoice already sent for this job (any week), if any.
+export const sentOnJob = (draws, taskId) =>
+  (draws || []).find(d => live(d) && (d.lines || []).some(l => String(l.taskId) === String(taskId))) || null
+export const canInvoice = (task, terms, draws) => (drawsAllowed(task)
+  ? remainingOn(task.id, terms, draws) > 0 && !sentThisWeek(draws, task.id)
+  : !sentOnJob(draws, task.id))
 
 // The live invoice already sent for this job this week, if any.
 export const sentThisWeek = (draws, taskId, monday = weekOf()) =>
