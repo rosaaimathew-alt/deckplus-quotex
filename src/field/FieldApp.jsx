@@ -15,7 +15,7 @@ import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-
 import {
   Sun, CalendarDays, HardHat, PaintRoller, Phone, MessageSquare, Navigation,
   ChevronLeft, ChevronRight, Check, CheckCircle2, Circle, AlertTriangle, Clock,
-  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Settings2, ShieldCheck, FileText, Users,
+  Search, Monitor, LogOut, StickyNote, ListChecks, Undo2, Menu, ShieldCheck, FileText, Users,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
@@ -524,8 +524,8 @@ export default function FieldApp() {
           : <span className="text-base font-black tracking-widest">{companyName}</span>}
         <span className="text-xs font-semibold uppercase tracking-wide bg-white/15 rounded-full px-2 py-0.5">{paint ? 'Paint' : 'Field'}</span>
         <div className="ml-auto relative">
-          <button onClick={() => setMenu(m => !m)} className="h-10 w-10 rounded-lg flex items-center justify-center text-white/80 active:bg-white/10" aria-label="Options">
-            <Settings2 size={20} />
+          <button onClick={() => setMenu(m => !m)} className="h-10 px-3 rounded-lg flex items-center gap-1.5 text-white active:bg-white/10" aria-label="Menu">
+            <Menu size={22} /> <span className="text-sm font-semibold">Menu</span>
           </button>
           {menu && (
             <>
