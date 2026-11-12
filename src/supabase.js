@@ -184,10 +184,12 @@ export const RECORD_TABLES = {
   subDraws:               'sub_draws',
   // Agreed amount per booking (sub_draws.sql): office, and the sub it's with.
   subTerms:               'sub_task_terms',
+  // Job chat between a sub's manager and the PM (supabase/sub_messages.sql).
+  subMessages:            'sub_messages',
 }
 // Tables added after launch: a missing one loads as empty instead of failing
 // the whole sign-in, and nothing is written to it until it exists.
-const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices', 'sub_tasks', 'sub_draws', 'sub_task_terms'])
+const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices', 'sub_tasks', 'sub_draws', 'sub_task_terms', 'sub_messages'])
 const _missing = new Set()
 const isMissingTable = (e) => e && (e.code === '42P01' || e.code === 'PGRST205' || /does not exist|could not find the table/i.test(e.message || ''))
 // Object-keyed-by-id collections → a table whose row id is the key.

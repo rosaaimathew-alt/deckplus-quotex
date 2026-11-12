@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { Plus, HardHat, Phone, CalendarDays } from 'lucide-react'
 import { useStore } from '../store'
 import { BookSubForm } from '../components/JobSubsTab'
+import { SubChats } from '../components/JobChat'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, needsInspection, subNameOf, tasksForJob, changeStamp } from '../lib/subTasks'
 import { Card, dayLabel, telUrl } from './shared'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
@@ -93,6 +94,9 @@ export default function SubTasksCard({ proposal }) {
           })}
         </ul>
       )}
+
+      {/* One conversation per sub on this job */}
+      <SubChats proposal={proposal} big />
     </Card>
   )
 }

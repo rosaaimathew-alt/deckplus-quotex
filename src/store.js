@@ -9,6 +9,7 @@ import { appRoleOf } from './roles'
 import { clientGroups } from './lib/proposalGroups'
 import { newSubTaskId } from './lib/subTasks'
 import { stampInspections } from './lib/subInspections'
+import { newMessageId } from './lib/subChat'
 import { newDrawId } from './lib/subDraws'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -1210,6 +1211,22 @@ export const useStore = create(
             : [...list, { id, agreedAmount: amount }] }
         }),
 
+      // ── Job chat: a sub's manager and the PM, per job (lib/subChat) ──────
+      subMessages: [],
+      addSubMessage: ({ proposalId, subId, subUserId, client = '', from, text }) => {
+        const t = String(text || '').trim().slice(0, 2000)
+        if (!t || proposalId == null || subId == null) return null
+        const id = newMessageId()
+        set((s) => ({
+          subMessages: [...(s.subMessages || []), {
+            id, proposalId, subId, subUserId: subUserId || null, client, from, text: t,
+            byId: s.me?.id || null, byName: s.me?.displayName || s.me?.email || '', at: new Date().toISOString(),
+          }],
+        }))
+        notify('message', id)   // the other side gets an email (lib/notify)
+        return id
+      },
+
       // ── Sub draw invoices (lib/subDraws) ─────────────────────────────────
       subDraws: [],
       addSubDraw: (draw) => {
@@ -1608,7 +1625,7 @@ export function bootstrapOrg() {
     const cols   = { ...collections, catalog: stripDeckItems(collections.catalog || []) }
     // Everyone opens in the company's chosen appearance (light / dark); the
     // header toggle switches it for this visit only.
-    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).some(t => !t.startsWith('sub_')) })
+    useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).some(t => !t.startsWith('sub_')), chatMissing: (missingTables || []).includes('sub_messages') })
     armAdapter(useStore, orgId, settings)
     // A brand-new org gets the built-in email templates once; the adapter
     // writes them as rows because they arrive after arming. (Not for the paint

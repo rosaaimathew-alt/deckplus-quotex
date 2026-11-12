@@ -20,7 +20,7 @@
 // ("Schedule inspection"), and in the job's Subs tab in the office.
 import { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Settings2, Check, HardHat, Camera, Lock } from 'lucide-react'
+import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Settings2, Check, HardHat, Camera, Lock, MessageSquare } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
 import { logout } from '../components/AuthGuard'
@@ -34,6 +34,8 @@ import { CrewLink, CrewPicker, CrewScreen } from './SubCrew'
 import { useCanAssign, useCrew } from './useCrew'
 import { freshness, markSeen } from './seen'
 import { JobSheet } from './SubJobSheet'
+import JobChat from '../components/JobChat'
+import { unreadCount } from '../lib/subChat'
 
 // The one next step for each status, and what it moves the task to.
 const NEXT = {
@@ -116,6 +118,7 @@ function TaskRow({ t, needsTech = false }) {
   const late = st !== 'done' && t.endDate && t.endDate < todayStr()
   const noPhotos = missingTodaysPhotos(t)
   const fresh = freshness(t)   // never opened on this phone, or changed by the PM since
+  const unread = useStore(s => (t.subUserId && t.subUserId === s.me?.id ? unreadCount(s.subMessages, t.proposalId, t.subId, 'sub') : 0))
   return (
     <button onClick={() => navigate(`/task/${t.id}`)}
       className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${noPhotos ? 'border-l-red-500' : late || needsTech ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
@@ -126,6 +129,7 @@ function TaskRow({ t, needsTech = false }) {
         </p>
         <p className="text-sm text-gray-600 truncate">{t.client || t.address || 'Job'}{t.crewName ? ` · ${t.crewName}` : ''}</p>
         <p className={`text-sm truncate ${late ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>{late ? `Was due ${dayLabel(t.endDate)}` : dateRange(t)}</p>
+        {unread > 0 && <p className="text-sm font-semibold text-[var(--brand-700)] flex items-center gap-1"><MessageSquare size={14} /> {unread} new message{unread === 1 ? '' : 's'}</p>}
         {needsTech && <p className="text-sm font-semibold text-amber-700">Needs a technician</p>}
         {noPhotos && <p className="text-sm font-semibold text-red-600 flex items-center gap-1"><Camera size={14} /> Photos needed today</p>}
       </div>
@@ -140,6 +144,8 @@ function TaskScreen() {
   const { id } = useParams()
   const t = useMyTasks().find(x => String(x.id) === String(id))
   const members = useStore(s => s.members)
+  const myId = useStore(s => s.me?.id)
+  const chatMissing = useStore(s => s.chatMissing)
   const setSubTaskStatus = useStore(s => s.setSubTaskStatus)
   const [toast, showToast] = useUndo()
   // A company's PM hands the job to one of their technicians. The technician
@@ -163,6 +169,8 @@ function TaskScreen() {
   const today = photosOn(t)
   const ready = hasPhotosToday(t)   // photos first, then the status buttons
   const pm = (members || []).find(m => m.id === t.pmId)
+  // The sub's own login (their manager), not a technician or painter put on the job
+  const isManager = !chatMissing && !t.paint && !!myId && t.subUserId === myId
   const move = (to) => {
     const was = st
     setSubTaskStatus(t.id, to)
@@ -192,6 +200,14 @@ function TaskScreen() {
       )}
 
       <CrewPicker task={t} />
+
+      {/* The sub's manager and the PM talk here, one conversation per job */}
+      {isManager && (
+        <Card className="p-4 space-y-3">
+          <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><MessageSquare size={20} className="text-[var(--brand-700)]" /> Messages{pm ? ` with ${pm.displayName || 'your PM'}` : ''}</p>
+          <JobChat proposalId={t.proposalId} subId={t.subId} subUserId={t.subUserId} client={t.client || ''} side="sub" big placeholder={`Message ${pm?.displayName || 'your PM'}…`} />
+        </Card>
+      )}
 
       {/* What's being installed, and where the job stands */}
       <JobSheet task={t} />

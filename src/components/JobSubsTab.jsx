@@ -11,6 +11,7 @@ import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
 import { ELECTRICAL_ITEM_NAMES, electricalItemsOf, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
 import { changeStamp } from '../lib/subTasks'
+import { SubChats } from './JobChat'
 
 const fmt = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
 const inputCls = 'w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand-300,#93c5fd)]'
@@ -176,6 +177,9 @@ export default function JobSubsTab({ proposal }) {
           </div>
         )
       })}
+
+      {/* One conversation per sub on this job */}
+      <SubChats proposal={proposal} />
     </div>
   )
 }
