@@ -8,7 +8,8 @@ import { useStore } from '../store'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { drawnOn, money, agreedOf, drawsAllowed } from '../lib/subDraws'
 import { PhotoDays } from './TaskPhotos'
-import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
+import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf, stageOf } from '../lib/subTasks'
+import SendBack from './SendBack'
 import { ELECTRICAL_ITEM_NAMES, jobElectricalItems, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
 import { changeStamp, techPhone } from '../lib/subTasks'
 import { SubChats } from './JobChat'
@@ -145,7 +146,8 @@ export default function JobSubsTab({ proposal }) {
           <div key={t.id} className={`border rounded-xl p-3 space-y-2 ${needsInspection(t) ? 'border-amber-300 bg-amber-50/40' : 'border-gray-100'}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{t.title}</p>
+                <p className="text-sm font-semibold text-gray-900">{t.title}{stageOf(t) > 1 && <span className="ml-1.5 font-normal text-gray-500">· Stage {stageOf(t)}</span>}</p>
+                {t.assignment && <p className="text-xs text-gray-700">{t.assignment}</p>}
                 <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
                   <span>{subNameOf(t, subs)}{t.crewName ? ` · ${t.crewName}` : ''}</span>
                   {!t.crewName && sub?.hasCrew && st !== 'done' && <span className="font-semibold text-amber-700">No technician yet</span>}
@@ -186,6 +188,7 @@ export default function JobSubsTab({ proposal }) {
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{s.label}</button>
               ))}
             </div>
+            {st === 'done' && <SendBack task={t} />}
             {(st === 'near' || st === 'done') && (
               <label className="flex items-center gap-2 text-xs text-gray-700">
                 <span className={`font-semibold ${t.inspectionDate ? 'text-gray-700' : 'text-amber-700'}`}>

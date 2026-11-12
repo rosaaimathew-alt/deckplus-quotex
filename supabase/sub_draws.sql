@@ -171,11 +171,16 @@ begin
         raise exception '%that''s more than is left on "%"', bad, t.data->>'title' using errcode = '42501';
       end if;
     else
-      -- Every other trade: one invoice for the job (a sent-back one can be sent again).
+      -- Every other trade: one invoice per stage of the job (a sent-back one can
+      -- be sent again; a sub sent back for the next stage invoices that stage).
+      if coalesce(l->>'stage', '1') is distinct from coalesce(t.data->>'stage', '1') then
+        raise exception '%that isn''t the stage "%" is on', bad, t.data->>'title' using errcode = '42501';
+      end if;
       if exists (select 1 from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
                  where d.org_id = new.org_id and d.deleted_at is null
-                   and d.data->>'status' <> 'rejected' and x->>'taskId' = t.id) then
-        raise exception '%"%" already has an invoice', bad, t.data->>'title' using errcode = '42501';
+                   and d.data->>'status' <> 'rejected' and x->>'taskId' = t.id
+                   and coalesce(x->>'stage', '1') = coalesce(t.data->>'stage', '1')) then
+        raise exception '%"%" already has an invoice for this stage', bad, t.data->>'title' using errcode = '42501';
       end if;
     end if;
     total := total + amt;

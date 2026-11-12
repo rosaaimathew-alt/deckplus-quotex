@@ -55,6 +55,25 @@ export function changeStamp(task, changes, now = new Date().toISOString()) {
   return what.length ? { changedAt: now, changeNote: what.join(', ') } : {}
 }
 
+// ── Back for the next stage ─────────────────────────────────────────────────
+// Jobs come in stages: a sub does the first one, another trade steps in, and
+// the PM sends the first sub back for the next. One click and a note puts the
+// same booking back to Booked for stage 2, 3, … with the PM's note
+// (assignment) shown next to the job on the sub's phone. Earlier stages stay
+// in task.returns. A carpenter keeps drawing against the same agreed amount;
+// any other trade sends one invoice per stage (lib/subDraws).
+export const stageOf = (t) => Math.max(1, Number(t?.stage) || 1)
+export function sendBackChanges(task, { note, startDate = null, endDate = null, by = '' }, now = new Date().toISOString()) {
+  const stage = stageOf(task) + 1
+  return {
+    status: 'booked', stage, assignment: String(note || '').trim(),
+    startDate: startDate || null, endDate: endDate || null, inspectionDate: null,
+    statusDates: { booked: { at: now, by } },
+    returns: [...(Array.isArray(task?.returns) ? task.returns : []), { stage, note: String(note || '').trim(), at: now, by, startDate: startDate || null }],
+    changedAt: now, changeNote: 'next stage',
+  }
+}
+
 // The cell of the technician on a booking, from the sub company's crew list.
 export const techPhone = (task, sub) =>
   (task?.crewUserId && (sub?.crew || []).find(c => c && c.userId === task.crewUserId)?.phone) || ''

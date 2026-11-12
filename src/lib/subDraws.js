@@ -14,7 +14,7 @@
 //   { id, subId, subName, subUserId, email, date: 'yyyy-mm-dd',
 //     weekOf: Monday 'yyyy-mm-dd' (the week it was sent),
 //     workTypes: [the booking's trade] (or ['Carpentry' | 'Masonry', ...] picked when it has none),
-//     lines: [{ taskId, proposalId, client, address, title, amount }]  (one job),
+//     lines: [{ taskId, proposalId, client, address, title, amount, stage }]  (one job),
 //     total, notes, files: [{ id, name, type: 'photo' | 'pdf', path }],
 //     status: 'submitted' | 'approved' | 'rejected',
 //     submittedAt, submittedBy, decidedAt, decidedBy, reason, billIds }
@@ -74,15 +74,18 @@ export const agreedOf = (taskId, terms) => Number((terms || []).find(t => t && S
 export const remainingOn = (taskId, terms, draws, opts) => round2(agreedOf(taskId, terms) - drawnOn(taskId, draws, opts))
 
 // Carpenters draw against an agreed amount, as often as once a week. Every
-// other trade sends one invoice for the job: no agreed amount, no cap.
+// other trade sends one invoice per stage of the job (a sub sent back for the
+// next stage, lib/subTasks, can invoice again): no agreed amount, no cap.
 // (The database follows the same rule: supabase/sub_draws.sql.)
 export const drawsAllowed = (task) => /carpent|framing/i.test(String(task?.trade || ''))
-// The live invoice already sent for this job (any week), if any.
-export const sentOnJob = (draws, taskId) =>
-  (draws || []).find(d => live(d) && (d.lines || []).some(l => String(l.taskId) === String(taskId))) || null
+const stageOfTask = (task) => Math.max(1, Number(task?.stage) || 1)
+// The live invoice already sent for this stage of the job, if any.
+export const sentOnStage = (draws, task) =>
+  (draws || []).find(d => live(d) && (d.lines || []).some(l => String(l.taskId) === String(task?.id)
+    && Math.max(1, Number(l.stage) || 1) === stageOfTask(task))) || null
 export const canInvoice = (task, terms, draws) => (drawsAllowed(task)
   ? remainingOn(task.id, terms, draws) > 0 && !sentThisWeek(draws, task.id)
-  : !sentOnJob(draws, task.id))
+  : !sentOnStage(draws, task))
 
 // The live invoice already sent for this job this week, if any.
 export const sentThisWeek = (draws, taskId, monday = weekOf()) =>

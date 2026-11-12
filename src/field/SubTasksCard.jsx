@@ -7,7 +7,8 @@ import { Plus, HardHat, Phone, CalendarDays } from 'lucide-react'
 import { useStore } from '../store'
 import { BookSubForm } from '../components/JobSubsTab'
 import { SubChats } from '../components/JobChat'
-import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, needsInspection, subNameOf, tasksForJob, changeStamp, techPhone } from '../lib/subTasks'
+import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, needsInspection, subNameOf, tasksForJob, changeStamp, techPhone, stageOf } from '../lib/subTasks'
+import SendBack from '../components/SendBack'
 import { Card, dayLabel, telUrl } from './shared'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { PhotoDays } from '../components/TaskPhotos'
@@ -46,7 +47,8 @@ export default function SubTasksCard({ proposal }) {
               <li key={t.id} className={`rounded-xl border ${flag ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}>
                 <button onClick={() => setOpen(o => (o === t.id ? null : t.id))} className="w-full text-left px-3 py-3 flex items-center gap-3">
                   <span className="flex-1 min-w-0">
-                    <span className="block text-base font-semibold text-gray-900 truncate">{t.title}</span>
+                    <span className="block text-base font-semibold text-gray-900 truncate">{t.title}{stageOf(t) > 1 ? ` · Stage ${stageOf(t)}` : ''}</span>
+                    {t.assignment && <span className="block text-sm text-gray-700 truncate">{t.assignment}</span>}
                     <span className="block text-sm text-gray-500 truncate">
                       {subNameOf(t, subs)}{t.crewName ? ` · ${t.crewName}` : ''}{t.startDate ? ` · ${dayLabel(t.startDate)}` : ''}
                     </span>
@@ -74,6 +76,7 @@ export default function SubTasksCard({ proposal }) {
                             : 'bg-white border-gray-200 text-gray-700'}`}>{s.label}</button>
                       ))}
                     </div>
+                    {st === 'done' && <SendBack task={t} big />}
                     {(st === 'near' || st === 'done') && (
                       <label className="flex items-center gap-3 h-12 px-3 rounded-xl border border-gray-200 bg-white">
                         <CalendarDays size={18} className="text-gray-500 shrink-0" />
