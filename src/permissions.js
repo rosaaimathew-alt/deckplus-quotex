@@ -59,6 +59,7 @@ export const PATH_KEYS = {
   '/analytics':     'insights.overview',
   '/profitability': 'insights.profit',
   '/finance':       'insights.expenses',
+  '/leads':         'sales.leads',
   '/analyze':       'catalog.import',
   '/ai':            'catalog.import',
 }

@@ -22,7 +22,7 @@ const ALL_ROUTES = [
   '/', '/analyze', '/ai', '/catalog', '/quote', '/analytics', '/proposal',
   '/clients', '/tracker', '/settings', '/contracts', '/contract',
   '/jobs', '/subs', '/scheduler', '/profitability', '/pipeline', '/finance',
-  '/checklists',
+  '/checklists', '/leads',
 ]
 
 // Entry tier: proposals, item catalog, proposal builder, proposal tracker.

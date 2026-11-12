@@ -697,13 +697,18 @@
     function showBooking(b, f, existing) {
       const when = new Date(b.start)
       const first = f.firstName.value.trim()
-      $('doneTitle').textContent = existing ? `You're already scheduled, ${first}` : `You're scheduled, ${first}`
-      $('doneText').textContent = existing
-        ? `We found an upcoming appointment under your email or phone number, so we kept that one. Need a different time? Contact ${b.repName} below.`
+      const had = existing && b.past
+      $('doneTitle').textContent = had ? `We just met with you, ${first}` : existing ? `You're already scheduled, ${first}` : `You're scheduled, ${first}`
+      $('doneText').textContent = had
+        ? `We found a recent appointment for you, so we didn't book another one. To set up another visit, contact ${b.repName} below.`
+        : existing
+        ? `We found an upcoming appointment for you, so we kept that one. Need a different time? Contact ${b.repName} below.`
         : `Your confirmation and calendar invite are on their way to ${f.email.value.trim()}.`
       $('rWhen').textContent = `${fmtDay(when)} at ${fmtTime(when)}`
       $('rWho').textContent = b.repName
-      $('nextText').textContent = existing
+      $('nextText').textContent = had
+        ? `${b.repName} is your consultant and can set up another visit or answer any questions.`
+        : existing
         ? `${b.repName} is your consultant and can reschedule or answer any questions.`
         : `${b.repName} will call you within 24 hours to go over a few preliminary questions about your project, so we can make the most of your appointment.`
       $('cInitial').textContent = b.repName[0]

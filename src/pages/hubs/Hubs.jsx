@@ -22,6 +22,7 @@ import Finance from '../Finance'
 import ItemCatalog from '../ItemCatalog'
 import Analyze from '../Analyze'
 import Designs from '../Designs'
+import Leads from '../Leads'
 import Invoices from '../books/Invoices'
 import Bills from '../books/Bills'
 import Purchases from '../books/Purchases'
@@ -49,6 +50,7 @@ export function SalesHub() {
     proposals: () => <ProposalTracker view="list" initialStatus={status} initialQuery={q} initialOpens={params.get('opens') === '1'} />,
     pipeline:  () => <ProposalTracker view="pipeline" initialStatus={status} />,
     designs:   () => <Designs />,
+    leads:     () => <Leads />,
   }, { proposals: { count: dueCount, countTone: 'alert' } })
 
   // Clients and Opens now live inside Proposals (search box, Opens switch)
