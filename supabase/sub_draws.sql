@@ -113,7 +113,7 @@ create policy sub_draws_sub_update on public.sub_draws for update
   using (org_id = auth_org() and auth_role() = 'sub' and owner_id = auth.uid() and deleted_at is null)
   with check (org_id = auth_org() and auth_role() = 'sub' and owner_id = auth.uid());
 
--- 4. A sub's invoice must be sent Monday–Wednesday, add up, and stay inside the agreed amounts.
+-- 4. A sub's invoice must be sent Monday–Thursday, add up, and stay inside the agreed amounts.
 --    (Runs as the table owner so it can see every invoice on the task.)
 create or replace function public.check_sub_draw() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -127,9 +127,9 @@ begin
     if new.data is not distinct from old.data and new.deleted_at is not distinct from old.deleted_at then return new; end if;
     raise exception '%a sent invoice can''t be changed', bad using errcode = '42501';
   end if;
-  -- Subs send invoices Monday 12:00 AM through Wednesday 11:59 PM, Charlotte time.
-  if extract(isodow from (now() at time zone 'America/New_York')) > 3 then
-    raise exception '%invoices can only be sent Monday through Wednesday', bad using errcode = '42501';
+  -- Subs send invoices Monday 12:00 AM through Thursday 11:59 PM, Charlotte time.
+  if extract(isodow from (now() at time zone 'America/New_York')) > 4 then
+    raise exception '%invoices can only be sent Monday through Thursday', bad using errcode = '42501';
   end if;
   if new.data->>'status' is distinct from 'submitted' then
     raise exception '%a new invoice must be submitted for review', bad using errcode = '42501';

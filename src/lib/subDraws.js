@@ -11,7 +11,7 @@
 // One record per invoice (store.subDraws, table sub_draws):
 //   { id, subId, subName, subUserId, email, date: 'yyyy-mm-dd',
 //     weekOf: Monday 'yyyy-mm-dd' (the week it was sent),
-//     workTypes: ['Carpentry' | 'Masonry', ...],
+//     workTypes: [the booking's trade] (or ['Carpentry' | 'Masonry', ...] picked when it has none),
 //     lines: [{ taskId, proposalId, client, address, title, amount }]  (one job),
 //     total, notes, files: [{ id, name, type: 'photo' | 'pdf', path }],
 //     status: 'submitted' | 'approved' | 'rejected',
@@ -35,15 +35,15 @@ export function weekOf(d = new Date()) {
   x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
 }
-// Subs send invoices Monday 12:00 AM through Wednesday 11:59 PM, Charlotte
+// Subs send invoices Monday 12:00 AM through Thursday 11:59 PM, Charlotte
 // time. The database refuses one sent any other day (supabase/sub_draws.sql).
 const TZ = 'America/New_York'
 const DOW = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }
 const easternDay = (d) => DOW[new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short' }).format(d)]
-export const invoiceWindowOpen = (d = new Date()) => easternDay(d) <= 3
+export const invoiceWindowOpen = (d = new Date()) => easternDay(d) <= 4
 // The Monday the window opens next, as a date ('2026-11-16') for display
 export function nextInvoiceMonday(d = new Date()) {
-  const ahead = 8 - easternDay(d)   // Thursday (4) → 4 days, Sunday (7) → 1
+  const ahead = 8 - easternDay(d)   // Friday (5) → 3 days, Sunday (7) → 1
   const x = new Date(d.getTime() + ahead * 86400e3)
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(x)
 }
@@ -81,5 +81,19 @@ export const WORK_TYPES = [
   { key: 'Masonry',   es: 'Albañilería' },
 ]
 export const MAX_FILES = 10
+
+// The work type comes from the sub's trade, stamped on each booking when the
+// office books it (JobSubsTab), so the sub doesn't pick it. Spanish beside it,
+// like the form's other questions.
+const TRADE_ES = {
+  Carpentry: 'Carpintería', Masonry: 'Albañilería', Electrical: 'Eléctrico', Plumbing: 'Plomería',
+  Painting: 'Pintura', HVAC: 'HVAC', Mechanical: 'Mecánico', Roofing: 'Techado', Concrete: 'Concreto',
+  Gutters: 'Canaletas', Framing: 'Estructura', Drywall: 'Tablaroca', Landscaping: 'Jardinería',
+}
+export const tradeOf = (task) => {
+  const t = String(task?.trade || '').trim()
+  return t && t.toLowerCase() !== 'other' ? t : ''
+}
+export const tradeEs = (trade) => TRADE_ES[trade] || ''
 
 export const newDrawId = () => `dr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`

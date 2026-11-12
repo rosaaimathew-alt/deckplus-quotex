@@ -332,7 +332,7 @@ function PaintersOnJob({ proposal }) {
       return
     }
     addSubTask({
-      paint: true, proposalId: proposal.id, subId: crew.id, subName: crew.name || 'Paint crew',
+      paint: true, trade: 'Painting', proposalId: proposal.id, subId: crew.id, subName: crew.name || 'Paint crew',
       subUserId: me?.id || null, pmId: me?.id || null, crewUserId: c.userId, crewName: c.name,
       title: 'Paint', notes: '', startDate: proposal.jobData?.stageDates?.paint || null, endDate: null,
       client: proposal.client || '', address: proposal.address || '',
