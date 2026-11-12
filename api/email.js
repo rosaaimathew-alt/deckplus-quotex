@@ -12,6 +12,7 @@ import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
 import { saveMessage } from './_store.js'
 import { sendMail, isMailerConfigured, smtpUser } from './_mailer.js'
+import { sendNotification } from './_notify.js'
 import { requireAuth } from './_auth.js'
 import { getKV } from './_kv.js'
 import { buildProposalEmail, signatureOf, loadSignature, saveSignature } from './_proposalEmail.js'
@@ -158,6 +159,9 @@ function buildCloseoutHtml({ client, contractNum, address, projectType, completi
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  // Alerts about a sub's job are open to every login on the team (a technician
+  // tapping "Completed" tells the PM); the database decides who is told what.
+  if (req.body?.action === 'notify') return sendNotification(req, res, req.body)
   const staff = await requireAuth(req, res)
   if (!staff) return
   const { action, ...body } = req.body || {}
