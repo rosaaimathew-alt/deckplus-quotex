@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { DEMO } from '../demo'
 import { getSession, signOut } from '../supabase'
 
@@ -14,8 +14,14 @@ export async function logout() {
 }
 
 export default function AuthGuard({ children }) {
+  const location = useLocation()
   // Demo builds are a public sandbox with no real data — skip the login gate.
   if (DEMO) return children
-  if (!getSession()) return <Navigate to="/login" replace />
+  if (!getSession()) {
+    // Remember where the link was going (an alert email's job or message), so
+    // signing in lands there instead of on the dashboard.
+    const back = `${location.pathname}${location.search}`
+    return <Navigate to={back && back !== '/' ? `/login?next=${encodeURIComponent(back)}` : '/login'} replace />
+  }
   return children
 }
