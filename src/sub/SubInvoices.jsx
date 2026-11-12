@@ -6,14 +6,14 @@
 // the job; one invoice per job per week (lib/subDraws). The office approves
 // it or sends it back with a reason.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { tr } from '../lib/lang'
+import { tr, getLang } from '../lib/lang'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Send, Paperclip, X, Check } from 'lucide-react'
 import { useStore } from '../store'
 import { submitSubDraw } from '../supabase'
 import { DEMO } from '../demo'
 import { Card, BackButton, todayStr } from '../field/shared'
-import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, sentThisWeek, newDrawId, WORK_TYPES, MAX_FILES } from '../lib/subDraws'
+import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, sentThisWeek, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday } from '../lib/subDraws'
 import { uploadInvoiceFile } from '../lib/taskPhotos'
 
 // Only tasks booked with this login carry money. An outside company's crew
@@ -41,13 +41,29 @@ function StatusPill({ d }) {
   return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${st.cls}`}>{st.label}</span>
 }
 
+// Outside Monday–Wednesday: when they can send next, instead of the button.
+function WindowClosed() {
+  const next = new Date(`${nextInvoiceMonday()}T12:00:00`)
+    .toLocaleDateString(getLang() === 'es' ? 'es-US' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  return (
+    <div className="rounded-xl bg-amber-50 px-4 py-3 text-base text-amber-900">
+      <p className="font-semibold">{tr('Invoices can be sent Monday through Wednesday.')}</p>
+      <p>{tr('Next:')} {next}</p>
+    </div>
+  )
+}
+
 function SendButton() {
   const navigate = useNavigate()
+  if (!invoiceWindowOpen()) return <WindowClosed />
   return (
-    <button onClick={() => navigate('/invoices/new')}
-      className="w-full h-14 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold flex items-center justify-center gap-2">
-      <Send size={20} /> {tr('Send an invoice')}
-    </button>
+    <div className="space-y-1.5">
+      <button onClick={() => navigate('/invoices/new')}
+        className="w-full h-14 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold flex items-center justify-center gap-2">
+        <Send size={20} /> {tr('Send an invoice')}
+      </button>
+      <p className="text-sm text-gray-500 text-center">{tr('Send by Wednesday at midnight.')}</p>
+    </div>
   )
 }
 
@@ -190,6 +206,14 @@ export function NewInvoiceScreen() {
 
   const need = (k) => tried && missing[k] && <p className="text-sm text-red-600">This is a required question (Esta pregunta es obligatoria)</p>
 
+  if (!invoiceWindowOpen()) {
+    return (
+      <div className="space-y-4">
+        <BackButton />
+        <WindowClosed />
+      </div>
+    )
+  }
   if (!jobs.length) {
     return (
       <div className="space-y-4">

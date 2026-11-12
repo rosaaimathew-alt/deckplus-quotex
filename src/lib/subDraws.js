@@ -35,6 +35,18 @@ export function weekOf(d = new Date()) {
   x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
 }
+// Subs send invoices Monday 12:00 AM through Wednesday 11:59 PM, Charlotte
+// time. The database refuses one sent any other day (supabase/sub_draws.sql).
+const TZ = 'America/New_York'
+const DOW = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }
+const easternDay = (d) => DOW[new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short' }).format(d)]
+export const invoiceWindowOpen = (d = new Date()) => easternDay(d) <= 3
+// The Monday the window opens next, as a date ('2026-11-16') for display
+export function nextInvoiceMonday(d = new Date()) {
+  const ahead = 8 - easternDay(d)   // Thursday (4) → 4 days, Sunday (7) → 1
+  const x = new Date(d.getTime() + ahead * 86400e3)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(x)
+}
 export const weekLabel = (monday) => {
   const a = new Date(`${monday}T12:00:00`); const b = new Date(a); b.setDate(b.getDate() + 6)
   const f = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
