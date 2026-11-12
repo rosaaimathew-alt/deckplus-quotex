@@ -154,7 +154,9 @@ function ShellSwitch() {
     // is the PM's screen: anyone else lands in the full app, unless they picked
     // Field mode themselves on this phone.
     if (role === 'pm' || (canUseField(role) && readViewPref() === 'field')) return <FieldApp />
-    return <Navigate to="/" replace />
+    // An emailed link to a job (e.g. a sub's message) opens that job in the full app
+    const jobId = /^\/field\/job\/([^/]+)/.exec(path)?.[1]
+    return <Navigate to={jobId ? `/projects?tab=jobs&job=${encodeURIComponent(jobId)}` : '/'} replace />
   }
   if (path === '/' && fieldHome) return <FieldApp />
   return <AppShell />

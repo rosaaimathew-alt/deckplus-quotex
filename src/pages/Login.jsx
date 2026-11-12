@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { signIn, supabaseReady } from '../supabase'
+import { nextAfterLogin } from '../lib/nextAfterLogin'
 
 // The login page renders before sign-in, so it can't read the org's branding
 // row (RLS). It shows the company logo from a static file instead, and falls
@@ -22,7 +23,7 @@ export default function Login() {
     setLoading(true)
     try {
       await signIn(email.trim(), password)
-      window.location.href = '/'
+      window.location.href = nextAfterLogin()   // back to the page the link was for
     } catch (err) {
       setError(err.message || 'Login failed')
     } finally {
