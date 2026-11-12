@@ -129,6 +129,8 @@ export async function resetMemberPassword(userId) {
 export const setMemberPermissions = (userId, permissions) => rpc('set_member_permissions', { p_user: userId, p_permissions: permissions })
 // Admin / office: change someone's team role (office: non-admins only).
 export const setMemberRole = (userId, role) => rpc('set_member_role', { p_user: userId, p_role: role })
+// A team member's phone (their own, or anyone's for the office): subs see their PM's number (supabase/notify.sql).
+export const setMemberPhone = (userId, phone) => rpc('set_member_phone', { p_user: userId, p_phone: phone || '' })
 export const claimInvite  = (code, name) => rpc('claim_invite', { p_code: code || null, p_name: name || null })
 
 // Creates the login. Returns { session } when signed in straight away, or
@@ -278,21 +280,21 @@ export async function loadOrg() {
   const uid = currentUserId()
   if (!supabase || !uid) throw new Error('Not signed in')
   const { data: member, error: mErr } = await supabase
-    .from('org_members').select('org_id, role, display_name, email, permissions').eq('user_id', uid).maybeSingle()
+    .from('org_members').select('org_id, role, display_name, email, permissions, phone').eq('user_id', uid).maybeSingle()
   if (mErr) throw mErr
   let me = member
   if (!me) {
     // First sign-in after accepting an invite (e.g. once email is confirmed):
     // join the team the invite is for, then read the membership again.
     try { await claimInvite() } catch { /* no invite for this email */ }
-    const again = await supabase.from('org_members').select('org_id, role, display_name, email, permissions').eq('user_id', uid).maybeSingle()
+    const again = await supabase.from('org_members').select('org_id, role, display_name, email, permissions, phone').eq('user_id', uid).maybeSingle()
     me = again.data
   }
   if (!me) throw new Error('This login is not on a team yet. Ask your admin for an invite link.')
   const orgId = me.org_id
 
   const [{ data: members }, { data: settingsRow }] = await Promise.all([
-    supabase.from('org_members').select('user_id, role, display_name, email, permissions').eq('org_id', orgId),
+    supabase.from('org_members').select('user_id, role, display_name, email, permissions, phone').eq('org_id', orgId),
     supabase.from('org_settings').select('data').eq('org_id', orgId).maybeSingle(),
   ])
 
@@ -318,8 +320,8 @@ export async function loadOrg() {
 
   return {
     orgId,
-    me: { id: uid, role: me.role, displayName: me.display_name, email: me.email, permissions: me.permissions || {} },
-    members: (members || []).map(m => ({ id: m.user_id, role: m.role, displayName: m.display_name, email: m.email, permissions: m.permissions || {} })),
+    me: { id: uid, role: me.role, displayName: me.display_name, email: me.email, permissions: me.permissions || {}, phone: me.phone || '' },
+    members: (members || []).map(m => ({ id: m.user_id, role: m.role, displayName: m.display_name, email: m.email, permissions: m.permissions || {}, phone: m.phone || '' })),
     settings: settingsRow?.data || {},
     collections,
     missingTables: [..._missing],

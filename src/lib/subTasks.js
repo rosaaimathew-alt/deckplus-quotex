@@ -54,3 +54,7 @@ export function changeStamp(task, changes, now = new Date().toISOString()) {
   const what = [...new Set(CHANGE_LABELS.filter(([k]) => k in changes && plain(task?.[k]) !== plain(changes[k])).map(([, label]) => label))]
   return what.length ? { changedAt: now, changeNote: what.join(', ') } : {}
 }
+
+// The cell of the technician on a booking, from the sub company's crew list.
+export const techPhone = (task, sub) =>
+  (task?.crewUserId && (sub?.crew || []).find(c => c && c.userId === task.crewUserId)?.phone) || ''
