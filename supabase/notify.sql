@@ -8,6 +8,8 @@
 --   booked               Deck Plus PM / office / paint PM   the sub (and the technician, if one is on it)
 --   changed              Deck Plus PM / office / paint PM   the sub and the technician
 --   inspection           Deck Plus PM / office              the sub and the technician
+--   inspection_result    Deck Plus PM / office              the sub and the technician of that trade
+--                        (the booking carries only its own trade's results: src/lib/subInspections.js)
 --   assigned             the sub company's PM, or staff     the technician / painter put on the job
 --   done                 the sub or the technician          the Deck Plus PM on the job
 --   invoice_submitted    the sub                            office and admin (those who get alert emails)
@@ -73,13 +75,13 @@ begin
   end if;
 
   -- ── Bookings ───────────────────────────────────────────────────────────────
-  if p_kind not in ('booked', 'changed', 'inspection', 'assigned', 'done') then return null; end if;
+  if p_kind not in ('booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done') then return null; end if;
   select * into t from public.sub_tasks where org_id = my_org and id = p_id and deleted_at is null;
   if not found then return null; end if;
   is_paint := coalesce((t.data->>'paint')::boolean, false);
   staff := r in ('pm', 'office', 'admin') or (r = 'paint' and is_paint);
 
-  if p_kind in ('booked', 'changed', 'inspection') and not staff then return null; end if;
+  if p_kind in ('booked', 'changed', 'inspection', 'inspection_result') and not staff then return null; end if;
   -- ("is not distinct from": a booking with nobody on it has no crew_id, and a plain = would be unknown, not false)
   if p_kind = 'assigned' and not (staff or t.owner_id is not distinct from uid) then return null; end if;
   if p_kind = 'done' and not (t.owner_id is not distinct from uid or t.crew_id is not distinct from uid) then return null; end if;
@@ -108,7 +110,7 @@ begin
 
   -- Alerts to a sub go out in the name of the PM on the job; "assigned" from
   -- a sub company's PM and "done" go out in the name of whoever did it.
-  sender := case when p_kind in ('booked', 'changed', 'inspection') and pm.user_id is not null
+  sender := case when p_kind in ('booked', 'changed', 'inspection', 'inspection_result') and pm.user_id is not null
     then jsonb_build_object('id', pm.user_id, 'name', pm.display_name, 'email', pm.email, 'phone', pm.phone)
     else jsonb_build_object('id', me.user_id, 'name', me.display_name, 'email', me.email, 'phone', me.phone) end;
 
@@ -116,11 +118,12 @@ begin
     'kind', p_kind,
     'by', jsonb_build_object('id', me.user_id, 'name', me.display_name, 'email', me.email),
     'sender', sender,
-    'senderIsStaff', (p_kind in ('booked', 'changed', 'inspection') and pm.user_id is not null) or staff,
+    'senderIsStaff', (p_kind in ('booked', 'changed', 'inspection', 'inspection_result') and pm.user_id is not null) or staff,
     'task', jsonb_build_object(
       'id', t.id, 'proposalId', t.data->>'proposalId', 'title', t.data->>'title', 'client', t.data->>'client', 'address', t.data->>'address',
       'startDate', t.data->>'startDate', 'endDate', t.data->>'endDate', 'inspectionDate', t.data->>'inspectionDate',
-      'changeNote', t.data->>'changeNote', 'crewName', t.data->>'crewName', 'subName', coalesce(s.data->>'name', t.data->>'subName'), 'paint', is_paint),
+      'changeNote', t.data->>'changeNote', 'crewName', t.data->>'crewName', 'subName', coalesce(s.data->>'name', t.data->>'subName'), 'paint', is_paint,
+      'inspections', case when jsonb_typeof(t.data->'inspections') = 'array' then t.data->'inspections' else '[]'::jsonb end),
     'recipients', who);
 end $$;
 revoke all on function public.notify_targets(text, text) from public, anon;

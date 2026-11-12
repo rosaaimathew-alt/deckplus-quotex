@@ -13,7 +13,7 @@
 // A sub's login can't read the job itself; the database hands back just these
 // two things for their own tasks (supabase/sub_job_sheet.sql). No prices.
 import { useEffect, useState } from 'react'
-import { Zap, ListChecks, CheckCircle2, Circle, PaintRoller } from 'lucide-react'
+import { Zap, ListChecks, CheckCircle2, Circle, PaintRoller, ClipboardCheck } from 'lucide-react'
 import { useStore } from '../store'
 import { subJobSheet } from '../supabase'
 import { DEMO } from '../demo'
@@ -61,7 +61,9 @@ export function JobSheet({ task }) {
   const colors = paintColorsOf(paint)
   const touchUps = paint?.touchUps || []
   const hasPaint = colors.length > 0 || paint?.notes || touchUps.length > 0 || paint?.date
-  if (!items.length && !stages && !hasPaint) return null
+  // Their own trade's inspection results on this job, newest first (lib/subInspections)
+  const results = [...(Array.isArray(task.inspections) ? task.inspections : [])].reverse()
+  if (!items.length && !stages && !hasPaint && !results.length) return null
   return (
     <>
       {hasPaint && (
@@ -91,6 +93,25 @@ export function JobSheet({ task }) {
               <ul className="list-disc pl-5 text-base text-gray-800" aria-label="Touch-ups">{touchUps.map((t, i) => <li key={i}>{t.text}</li>)}</ul>
             </div>
           )}
+        </Card>
+      )}
+      {results.length > 0 && (
+        <Card className="p-4 space-y-2">
+          <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><ClipboardCheck size={20} className="text-[var(--brand-700)]" /> Inspection results</p>
+          <ul className="divide-y divide-gray-100" aria-label="Inspection results">
+            {results.map(r => (
+              <li key={r.id} className="py-2 first:pt-0 last:pb-0">
+                <p className="flex items-center gap-2 text-base text-gray-900">
+                  <span className="flex-1 min-w-0 font-semibold">{r.name}</span>
+                  <span className={`shrink-0 text-sm font-bold px-2.5 py-0.5 rounded-full ${r.state === 'pass' ? 'bg-green-100 text-green-800' : r.state === 'fail' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                    {r.state === 'pass' ? 'Passed' : r.state === 'fail' ? 'Did not pass' : (r.result || 'Recorded')}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-500">{[r.date ? dayLabel(r.date) : '', r.state === 'fail' ? r.result : ''].filter(Boolean).join(' · ')}</p>
+                {r.state === 'fail' && r.note && <p className="text-base text-gray-800 mt-1 whitespace-pre-wrap">{r.note}</p>}
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
       {items.length > 0 && (
