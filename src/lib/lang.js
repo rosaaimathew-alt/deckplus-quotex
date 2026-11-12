@@ -92,7 +92,7 @@ const ES = {
   'Windows, Doors and Glass Installed': 'Ventanas, puertas y vidrios instalados', 'Final Inspection': 'Inspección final', 'Punch List': 'Lista de pendientes', 'Job Closed': 'Trabajo cerrado',
   'Structure Complete': 'Estructura terminada', 'Stain / Seal': 'Tinte / sellado', 'Stain / Seal / Finish': 'Tinte / sellado / acabado', 'Posts & Footings': 'Postes y cimientos',
   'Beam & Rafter Install': 'Instalación de vigas y cabios', 'Foundation / Footings': 'Fundación / cimientos', 'Demo / Site Prep': 'Demolición / preparación del sitio',
-  'English': 'English', 'Español': 'Español',
+  'English': 'English', 'Español': 'Español', 'Menu': 'Menú',
 }
 
 // The Spanish for an English phrase when Spanish is on; the English otherwise.

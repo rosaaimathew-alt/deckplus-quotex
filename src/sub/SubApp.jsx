@@ -20,7 +20,7 @@
 // ("Schedule inspection"), and in the job's Subs tab in the office.
 import { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Settings2, Check, HardHat, Camera, Lock, MessageSquare, Phone } from 'lucide-react'
+import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Menu, Check, HardHat, Camera, Lock, MessageSquare, Phone } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
 import { logout } from '../components/AuthGuard'
@@ -320,8 +320,8 @@ export default function SubApp() {
           : <span className="text-base font-black tracking-widest">{companyName}</span>}
         <span className="text-xs font-semibold uppercase tracking-wide bg-white/15 rounded-full px-2 py-0.5">Sub</span>
         <div className="ml-auto relative">
-          <button onClick={() => setMenu(m => !m)} className="h-10 w-10 rounded-lg flex items-center justify-center text-white/80 active:bg-white/10" aria-label={tr('Options')}>
-            <Settings2 size={20} />
+          <button onClick={() => setMenu(m => !m)} className="h-10 px-3 rounded-lg flex items-center gap-1.5 text-white active:bg-white/10" aria-label={tr('Menu')}>
+            <Menu size={22} /> <span className="text-sm font-semibold">{tr('Menu')}</span>
           </button>
           {menu && (
             <>
