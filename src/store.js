@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdBlock } from './supabase'
 import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
+import { notify, alertForTaskChange } from './lib/notify'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
 import { appRoleOf } from './roles'
@@ -1149,20 +1150,29 @@ export const useStore = create(
             createdAt: new Date().toISOString(),
           }],
         }))
+        // Tell the sub (or the painter put straight on it); lib/notify
+        notify(task.crewUserId ? 'assigned' : 'booked', id)
         return id
       },
 
-      updateSubTask: (id, changes) =>
-        set((s) => ({ subTasks: (s.subTasks || []).map((t) => (t.id === id ? { ...t, ...changes } : t)) })),
+      updateSubTask: (id, changes) => {
+        const alert = alertForTaskChange((get().subTasks || []).find((t) => t.id === id), changes)
+        set((s) => ({ subTasks: (s.subTasks || []).map((t) => (t.id === id ? { ...t, ...changes } : t)) }))
+        if (alert) notify(alert, id)
+      },
 
       // Moves a task to a status and stamps when (and by whom) it got there.
-      setSubTaskStatus: (id, status) =>
+      setSubTaskStatus: (id, status) => {
+        const was = (get().subTasks || []).find((t) => t.id === id)?.status
         set((s) => ({
           subTasks: (s.subTasks || []).map((t) => t.id !== id ? t : {
             ...t, status,
             statusDates: { ...(t.statusDates || {}), [status]: { at: new Date().toISOString(), by: s.me?.displayName || s.me?.email || '' } },
           }),
-        })),
+        }))
+        // The sub or technician finished: the PM lines up the inspection (lib/notify)
+        if (status === 'done' && was !== 'done' && get().me?.role === 'sub') notify('done', id)
+      },
 
       // A job photo (lib/taskPhotos) on a sub task. Photos are only ever added.
       addSubTaskPhoto: (id, photo) =>
@@ -1184,10 +1194,14 @@ export const useStore = create(
       addSubDraw: (draw) => {
         const id = draw.id || newDrawId()
         set((s) => ({ subDraws: [...(s.subDraws || []), { ...draw, id, submittedAt: new Date().toISOString(), submittedBy: s.me?.displayName || s.me?.email || '' }] }))
+        notify('invoice_submitted', id)
         return id
       },
-      updateSubDraw: (id, changes) =>
-        set((s) => ({ subDraws: (s.subDraws || []).map((d) => (d.id === id ? { ...d, ...changes } : d)) })),
+      updateSubDraw: (id, changes) => {
+        set((s) => ({ subDraws: (s.subDraws || []).map((d) => (d.id === id ? { ...d, ...changes } : d)) }))
+        if (changes?.status === 'approved' || changes?.status === 'rejected') notify('invoice_decision', id)
+        else if (changes?.status === 'submitted') notify('invoice_submitted', id)   // sent again after being sent back
+      },
 
       deleteSubTask: (id) =>
         set((s) => ({ subTasks: (s.subTasks || []).filter((t) => t.id !== id) })),
