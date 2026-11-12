@@ -26,7 +26,8 @@ import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from 
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, statusIndex } from '../lib/subTasks'
-import { Card, dayLabel, mapsUrl, todayStr, addDays, useUndo, BackButton } from '../field/shared'
+import { Card, mapsUrl, todayStr, addDays, useUndo, BackButton } from '../field/shared'
+import { tr, trList, dayText as dayLabel, startLang, setLang, useLang } from '../lib/lang'
 import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos'
 import { PhotoDays, AddPhotosButton } from '../components/TaskPhotos'
 import { WeekInvoiceCard, InvoicesScreen, NewInvoiceScreen, TaskMoneyLine } from './SubInvoices'
@@ -52,8 +53,8 @@ function useMyTasks() {
 
 const dateRange = (t) => {
   if (!t.startDate && !t.endDate) return ''
-  if (!t.endDate) return `Starts ${dayLabel(t.startDate)}`
-  if (!t.startDate) return `Finish by ${dayLabel(t.endDate)}`
+  if (!t.endDate) return `${tr('Starts')} ${dayLabel(t.startDate)}`
+  if (!t.startDate) return `${tr('Finish by')} ${dayLabel(t.endDate)}`
   return `${dayLabel(t.startDate)} – ${dayLabel(t.endDate)}`
 }
 
@@ -61,6 +62,7 @@ const dateRange = (t) => {
 function TaskList() {
   const tasks = useMyTasks()
   const me = useStore(s => s.me)
+  const lang = useLang()
   const [showDone, setShowDone] = useState(false)
   const recent = addDays(-14)
   const byStart = (a, b) => (a.startDate || '9999').localeCompare(b.startDate || '9999')
@@ -75,26 +77,26 @@ function TaskList() {
     && (DEMO ? String(t.subId) === String(crew.companyId) : t.subUserId === me?.id)
 
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const greeting = tr(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening')
   const firstName = (me?.displayName || '').split(' ')[0]
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
-        <p className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        <p className="text-sm text-gray-500">{new Date().toLocaleDateString(lang === 'es' ? 'es-US' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </div>
 
       <WeekInvoiceCard />
       <CrewLink />
 
-      <Section title="Working on" tasks={working} empty="Nothing in progress." needsTech={needsTech} />
-      <Section title="Up next" tasks={next} empty="Nothing booked yet. Your PM will add tasks here." needsTech={needsTech} />
+      <Section title={tr('Working on')} tasks={working} empty={tr('Nothing in progress.')} needsTech={needsTech} />
+      <Section title={tr('Up next')} tasks={next} empty={tr('Nothing booked yet. Your PM will add tasks here.')} needsTech={needsTech} />
 
       {done.length > 0 && (
         <div className="space-y-2.5">
           <button onClick={() => setShowDone(v => !v)} className="text-sm font-bold uppercase tracking-wide text-gray-500">
-            Done lately ({done.length}) · {showDone ? 'Hide' : 'Show'}
+            {tr('Done lately')} ({done.length}) · {tr(showDone ? 'Hide' : 'Show')}
           </button>
           {showDone && done.map(t => <TaskRow key={t.id} t={t} />)}
         </div>
@@ -124,16 +126,16 @@ function TaskRow({ t, needsTech = false }) {
       className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${noPhotos ? 'border-l-red-500' : late || needsTech ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
       <div className="flex-1 min-w-0">
         <p className="text-base font-semibold text-gray-900 truncate">
-          {fresh && <span className="mr-2 align-middle text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--brand-600)] text-white">{fresh === 'new' ? 'New' : 'Updated'}</span>}
+          {fresh && <span className="mr-2 align-middle text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--brand-600)] text-white">{tr(fresh === 'new' ? 'New' : 'Updated')}</span>}
           {t.title}
         </p>
-        <p className="text-sm text-gray-600 truncate">{t.client || t.address || 'Job'}{t.crewName ? ` · ${t.crewName}` : ''}</p>
-        <p className={`text-sm truncate ${late ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>{late ? `Was due ${dayLabel(t.endDate)}` : dateRange(t)}</p>
-        {unread > 0 && <p className="text-sm font-semibold text-[var(--brand-700)] flex items-center gap-1"><MessageSquare size={14} /> {unread} new message{unread === 1 ? '' : 's'}</p>}
-        {needsTech && <p className="text-sm font-semibold text-amber-700">Needs a technician</p>}
-        {noPhotos && <p className="text-sm font-semibold text-red-600 flex items-center gap-1"><Camera size={14} /> Photos needed today</p>}
+        <p className="text-sm text-gray-600 truncate">{t.client || t.address || tr('Job')}{t.crewName ? ` · ${t.crewName}` : ''}</p>
+        <p className={`text-sm truncate ${late ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>{late ? `${tr('Was due')} ${dayLabel(t.endDate)}` : dateRange(t)}</p>
+        {unread > 0 && <p className="text-sm font-semibold text-[var(--brand-700)] flex items-center gap-1"><MessageSquare size={14} /> {unread} {tr(unread === 1 ? 'new message' : 'new messages')}</p>}
+        {needsTech && <p className="text-sm font-semibold text-amber-700">{tr('Needs a technician')}</p>}
+        {noPhotos && <p className="text-sm font-semibold text-red-600 flex items-center gap-1"><Camera size={14} /> {tr('Photos needed today')}</p>}
       </div>
-      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_PILL[st]}`}>{statusLabel(t)}</span>
+      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_PILL[st]}`}>{tr(statusLabel(t))}</span>
       <ChevronRight size={20} className="text-gray-300 shrink-0" />
     </button>
   )
@@ -159,7 +161,7 @@ function TaskScreen() {
     return (
       <div className="space-y-4">
         <BackButton />
-        <p className="text-base text-gray-600">That task isn't here anymore.</p>
+        <p className="text-base text-gray-600">{tr("That task isn't here anymore.")}</p>
       </div>
     )
   }
@@ -174,8 +176,8 @@ function TaskScreen() {
   const move = (to) => {
     const was = st
     setSubTaskStatus(t.id, to)
-    const label = SUB_STATUSES.find(s => s.key === to).label
-    showToast(to === 'done' || to === 'near' ? `${label} — your PM has been told` : label, () => setSubTaskStatus(t.id, was))
+    const label = tr(SUB_STATUSES.find(s => s.key === to).label)
+    showToast(to === 'done' || to === 'near' ? `${label} — ${tr('your PM has been told')}` : label, () => setSubTaskStatus(t.id, was))
   }
 
   return (
@@ -186,7 +188,7 @@ function TaskScreen() {
         <h1 className="text-2xl font-bold text-gray-900 leading-tight">{t.title}</h1>
         <p className="text-base text-gray-600 mt-0.5">{t.client}</p>
         {t.changedAt && t.changeNote && t.changedAt.slice(0, 10) >= addDays(-7) && (
-          <p className="text-sm font-medium text-amber-700 mt-1">Updated {dayLabel(t.changedAt.slice(0, 10))}: {t.changeNote}</p>
+          <p className="text-sm font-medium text-amber-700 mt-1">{tr('Updated')} {dayLabel(t.changedAt.slice(0, 10))}: {trList(t.changeNote)}</p>
         )}
       </div>
 
@@ -195,7 +197,7 @@ function TaskScreen() {
           className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-3.5 active:bg-gray-50">
           <Navigation size={22} className="text-[var(--brand-700)] shrink-0" />
           <span className="flex-1 min-w-0 text-base text-gray-900">{t.address}</span>
-          <span className="text-sm font-semibold text-[var(--brand-700)] shrink-0">Directions</span>
+          <span className="text-sm font-semibold text-[var(--brand-700)] shrink-0">{tr('Directions')}</span>
         </a>
       )}
 
@@ -204,8 +206,8 @@ function TaskScreen() {
       {/* The sub's manager and the PM talk here, one conversation per job */}
       {isManager && (
         <Card className="p-4 space-y-3">
-          <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><MessageSquare size={20} className="text-[var(--brand-700)]" /> Messages{pm ? ` with ${pm.displayName || 'your PM'}` : ''}</p>
-          <JobChat proposalId={t.proposalId} subId={t.subId} subUserId={t.subUserId} client={t.client || ''} side="sub" big placeholder={`Message ${pm?.displayName || 'your PM'}…`} />
+          <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><MessageSquare size={20} className="text-[var(--brand-700)]" /> {tr('Messages')}{pm ? ` ${tr('with')} ${pm.displayName || tr('your PM')}` : ''}</p>
+          <JobChat proposalId={t.proposalId} subId={t.subId} subUserId={t.subUserId} client={t.client || ''} side="sub" big placeholder={`${tr('Message')} ${pm?.displayName || tr('your PM')}…`} />
         </Card>
       )}
 
@@ -217,48 +219,48 @@ function TaskScreen() {
         <Card className={`p-4 space-y-3 ${ready ? '' : 'border-red-300'}`}>
           <div className="flex items-center gap-2">
             <Camera size={20} className={ready ? 'text-green-600' : 'text-red-600'} />
-            <p className="flex-1 text-base font-semibold text-gray-900">Today's photos</p>
-            <span className={`text-sm font-semibold ${ready ? 'text-green-700' : 'text-red-600'}`}>{today.length ? `${today.length} sent` : 'Required'}</span>
+            <p className="flex-1 text-base font-semibold text-gray-900">{tr("Today's photos")}</p>
+            <span className={`text-sm font-semibold ${ready ? 'text-green-700' : 'text-red-600'}`}>{today.length ? `${today.length} ${tr('sent')}` : tr('Required')}</span>
           </div>
-          {!ready && <p className="text-sm text-gray-600">Send photos of the work every day. The buttons below unlock once today's are in.</p>}
-          <AddPhotosButton task={t} label={ready ? 'Add more photos' : 'Take photos'} onAdded={(n) => showToast(`${n} photo${n > 1 ? 's' : ''} sent`)}
+          {!ready && <p className="text-sm text-gray-600">{tr("Send photos of the work every day. The buttons below unlock once today's are in.")}</p>}
+          <AddPhotosButton task={t} label={tr(ready ? 'Add more photos' : 'Take photos')} onAdded={(n) => showToast(`${n} ${tr(n > 1 ? 'photos sent' : 'photo sent')}`)}
             className={`w-full ${ready ? 'h-12 border border-gray-200 bg-white text-gray-800' : 'h-14 bg-[var(--brand-600)] text-white'} rounded-xl text-base font-bold flex items-center justify-center gap-2 disabled:opacity-60`} />
         </Card>
       )}
 
       {/* Where it stands, and the one thing to do next */}
       <Card className="p-4 space-y-4">
-        <ol className="grid grid-cols-4 gap-1.5" aria-label="Progress">
+        <ol className="grid grid-cols-4 gap-1.5" aria-label={tr('Progress')}>
           {SUB_STATUSES.map((s, i) => {
             const reached = i <= statusIndex(t)
             return (
               <li key={s.key} className="space-y-1.5">
                 <div className={`h-2 rounded-full ${reached ? 'bg-[var(--brand-600)]' : 'bg-gray-100'}`} />
-                <p className={`text-[11px] leading-tight font-semibold ${reached ? 'text-gray-900' : 'text-gray-400'}`}>{s.label}</p>
+                <p className={`text-[11px] leading-tight font-semibold ${reached ? 'text-gray-900' : 'text-gray-400'}`}>{tr(s.label)}</p>
               </li>
             )
           })}
         </ol>
         {step && companyPm ? (
           <p className="text-base text-gray-700">
-            {t.crewName ? `${t.crewName} sends the daily photos and moves this job along.` : 'Put one of your technicians on this job. They send the daily photos and move it along.'}
+            {t.crewName ? `${t.crewName} ${tr('sends the daily photos and moves this job along.')}` : tr('Put one of your technicians on this job. They send the daily photos and move it along.')}
           </p>
         ) : step ? (
           <div className="space-y-2">
             <button onClick={() => move(step.to)} disabled={!ready}
               className="w-full h-16 rounded-xl bg-green-600 active:bg-green-700 text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm disabled:bg-gray-300">
-              {ready ? <Check size={24} /> : <Lock size={22} />} {step.label}
+              {ready ? <Check size={24} /> : <Lock size={22} />} {tr(step.label)}
             </button>
             {st === 'started' && (
               <button onClick={() => move('done')} disabled={!ready} className="w-full h-12 rounded-xl border border-gray-200 text-base font-semibold text-gray-700 disabled:text-gray-300">
-                Skip to completed
+                {tr('Skip to completed')}
               </button>
             )}
           </div>
         ) : (
           <div className="flex items-center gap-3 rounded-xl bg-green-50 border border-green-200 px-4 py-3">
             <CheckCircle2 size={26} className="text-green-600 shrink-0" />
-            <p className="text-base font-semibold text-green-800">Completed. Your PM will line up the inspection.</p>
+            <p className="text-base font-semibold text-green-800">{tr('Completed. Your PM will line up the inspection.')}</p>
           </div>
         )}
       </Card>
@@ -267,17 +269,17 @@ function TaskScreen() {
         {dateRange(t) && <p className="text-base text-gray-800 flex items-center gap-2"><CalendarDays size={18} className="text-gray-500 shrink-0" /> {dateRange(t)}</p>}
         <TaskMoneyLine task={t} />
         {pm && <p className="text-base text-gray-800 flex items-center gap-2"><HardHat size={18} className="text-gray-500 shrink-0" /> PM: {pm.displayName || pm.email}</p>}
-        {t.inspectionDate && <p className="text-base text-gray-800 flex items-center gap-2"><CheckCircle2 size={18} className="text-gray-500 shrink-0" /> Inspection {dayLabel(t.inspectionDate)}</p>}
+        {t.inspectionDate && <p className="text-base text-gray-800 flex items-center gap-2"><CheckCircle2 size={18} className="text-gray-500 shrink-0" /> {tr('Inspection')} {dayLabel(t.inspectionDate)}</p>}
         {t.notes && (
           <div className="pt-2 border-t border-gray-100">
-            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">From your PM</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">{tr('From your PM')}</p>
             <p className="text-base text-gray-800 whitespace-pre-wrap">{t.notes}</p>
           </div>
         )}
       </Card>
       {(t.photos || []).length > 0 && (
         <Card className="p-4 space-y-2">
-          <p className="text-base font-semibold text-gray-900">Photos sent</p>
+          <p className="text-base font-semibold text-gray-900">{tr('Photos sent')}</p>
           <PhotoDays task={t} big />
         </Card>
       )}
@@ -288,6 +290,9 @@ function TaskScreen() {
 
 // ── Shell ───────────────────────────────────────────────────────────────────
 export default function SubApp() {
+  // The crews' screens can be read in Spanish; switched on only once this app is showing (lib/lang)
+  useState(() => { startLang(); return null })
+  const lang = useLang()
   const branding = useStore(s => s.branding)
   const theme = useStore(s => s.theme)
   const [menu, setMenu] = useState(false)
@@ -306,15 +311,21 @@ export default function SubApp() {
           : <span className="text-base font-black tracking-widest">{companyName}</span>}
         <span className="text-xs font-semibold uppercase tracking-wide bg-white/15 rounded-full px-2 py-0.5">Sub</span>
         <div className="ml-auto relative">
-          <button onClick={() => setMenu(m => !m)} className="h-10 w-10 rounded-lg flex items-center justify-center text-white/80 active:bg-white/10" aria-label="Options">
+          <button onClick={() => setMenu(m => !m)} className="h-10 w-10 rounded-lg flex items-center justify-center text-white/80 active:bg-white/10" aria-label={tr('Options')}>
             <Settings2 size={20} />
           </button>
           {menu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
               <div className="absolute right-0 top-12 z-50 w-56 bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden text-gray-900">
+                <div className="p-2 grid grid-cols-2 gap-1.5 border-b border-gray-100" role="group" aria-label="Language / Idioma">
+                  {[['en', 'English'], ['es', 'Español']].map(([k, label]) => (
+                    <button key={k} onClick={() => { setLang(k); setMenu(false) }} aria-pressed={lang === k}
+                      className={`h-11 rounded-xl text-base font-semibold ${lang === k ? 'bg-[var(--brand-600)] text-white' : 'bg-gray-100 text-gray-700'}`}>{label}</button>
+                  ))}
+                </div>
                 <button onClick={DEMO ? resetDemo : logout} className="w-full px-4 h-14 flex items-center gap-3 text-base text-left active:bg-gray-50">
-                  <LogOut size={18} className="text-gray-500" /> {DEMO ? 'Reset demo' : 'Log out'}
+                  <LogOut size={18} className="text-gray-500" /> {tr(DEMO ? 'Reset demo' : 'Log out')}
                 </button>
               </div>
             </>
@@ -322,7 +333,8 @@ export default function SubApp() {
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 pt-4 pb-16">
+      {/* key: switching language redraws every screen in the new one */}
+      <main key={lang} className="max-w-xl mx-auto px-4 pt-4 pb-16">
         <Routes>
           <Route path="/" element={<TaskList />} />
           <Route path="/task/:id" element={<TaskScreen />} />

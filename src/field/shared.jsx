@@ -2,6 +2,7 @@
 // both the PM screens (FieldApp) and the paint screens (PaintApp).
 /* eslint-disable react-refresh/only-export-components */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { tr } from '../lib/lang'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, CheckCircle2, Clock, HardHat, StickyNote, Undo2 } from 'lucide-react'
 import { useStore } from '../store'
@@ -164,7 +165,7 @@ export function BackButton() {
   return (
     <button onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/field/jobs'))}
       className="-ml-2 h-10 pr-3 flex items-center gap-1 text-base font-semibold text-[var(--brand-700)]">
-      <ChevronLeft size={22} /> Back
+      <ChevronLeft size={22} /> {tr('Back')}
     </button>
   )
 }

@@ -2,6 +2,7 @@
 // Thumbnails grouped by day (tap for full size) and the "Take photos" button.
 // Used by the sub app, the PM's phone Subs card and the Jobs page Subs tab.
 import { useRef, useState } from 'react'
+import { tr } from '../lib/lang'
 import { Camera, X, Loader2 } from 'lucide-react'
 import { useStore } from '../store'
 import { photosByDay, uploadTaskPhoto, usePhotoUrl } from '../lib/taskPhotos'
@@ -68,7 +69,7 @@ export function AddPhotosButton({ task, className = '', label = 'Take photos', o
   return (
     <div className="space-y-1.5">
       <button type="button" onClick={() => ref.current?.click()} disabled={!!busy} className={className}>
-        {busy ? <><Loader2 size={20} className="animate-spin" /> Sending {busy}…</> : <><Camera size={20} /> {label}</>}
+        {busy ? <><Loader2 size={20} className="animate-spin" /> {tr('Sending')} {busy}…</> : <><Camera size={20} /> {label}</>}
       </button>
       <input ref={ref} type="file" accept="image/*" multiple className="hidden"
         onChange={e => { add(e.target.files); e.target.value = '' }} />
