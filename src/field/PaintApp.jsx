@@ -69,9 +69,13 @@ function usePaintJobs() {
     .sort((a, b) => (a.p.client || '').localeCompare(b.p.client || '')), [proposals, subTasks])
 }
 
+// Every painter put on the job has tapped Completed (and there is at least one).
+const paintersDone = (painters) => (painters || []).length > 0 && painters.every(t => statusKey(t) === 'done')
+
 function PaintRow({ j, sub, tone }) {
   const navigate = useNavigate()
-  const toneCls = { green: 'border-l-green-500', amber: 'border-l-amber-400', blue: 'border-l-[var(--brand-600)]' }[tone] || 'border-l-transparent'
+  const finished = !j.painted && paintersDone(j.painters)
+  const toneCls = { green: 'border-l-green-500', amber: 'border-l-amber-400', blue: 'border-l-[var(--brand-600)]' }[finished ? 'green' : tone] || 'border-l-transparent'
   return (
     <button onClick={() => navigate(`/field/job/${j.p.id}`)}
       className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${toneCls} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
@@ -83,6 +87,7 @@ function PaintRow({ j, sub, tone }) {
           <p className="text-sm text-gray-600 truncate">{j.painters.map(t => `${t.crewName} · ${statusLabel(t)}`).join(', ')}</p>
         )}
         {(j.painters || []).some(missingTodaysPhotos) && <p className="text-sm font-semibold text-red-600">Photos needed today</p>}
+        {finished && <p className="text-sm font-semibold text-green-700">Painters finished. Mark paint done.</p>}
       </div>
       <ChevronRight size={20} className="text-gray-300 shrink-0" />
     </button>
@@ -91,7 +96,7 @@ function PaintRow({ j, sub, tone }) {
 
 const whenLine = (j) => [
   j.paintDate ? dayLabel(j.paintDate) : 'Not scheduled',
-  j.crew || null,
+  j.crew || null,   // (painters on the job are listed on their own line of the row)
 ].filter(Boolean).join(' · ')
 
 // ── Queue ───────────────────────────────────────────────────────────────────
@@ -155,7 +160,7 @@ export function PaintSchedule() {
       {byDay.map(d => (
         <div key={d.key} className="space-y-2.5">
           <H2>{d.key === 'late' ? 'Past date — not marked done' : dayLabel(d.key)}</H2>
-          {d.jobs.map(j => <PaintRow key={j.p.id} j={j} tone={d.key === 'late' ? 'amber' : 'blue'} sub={j.crew || 'No crew set'} />)}
+          {d.jobs.map(j => <PaintRow key={j.p.id} j={j} tone={d.key === 'late' ? 'amber' : 'blue'} sub={j.crew || ((j.painters || []).length ? `${j.painters.length} painter${j.painters.length === 1 ? '' : 's'} on it` : 'No crew set')} />)}
         </div>
       ))}
       <div className="space-y-2.5">
@@ -227,6 +232,7 @@ export function PaintJob() {
   const setJobStageDate = useStore(s => s.setJobStageDate)
   const updateJobData = useStore(s => s.updateJobData)
   const allProposals = useStore(s => s.proposals)
+  const subTasks = useStore(s => s.subTasks)
   const [toast, showToast] = useUndo()
 
   // Crews used on other jobs, offered as suggestions
@@ -237,6 +243,8 @@ export function PaintJob() {
   const jd = proposal.jobData || {}
   const paint = jd.paint || {}
   const painted = (jd.completedStages || []).includes('paint')
+  // The painters put on this job (PaintersOnJob below)
+  const onJob = (subTasks || []).filter(t => t && t.paint && t.crewName && String(t.proposalId) === String(proposal.id))
   const setPaint = (changes) => updateJobData(proposal.id, { paint: { ...paint, ...changes } })
   const togglePaint = () => {
     toggleJobStage(proposal.id, 'paint')
@@ -274,14 +282,16 @@ export function PaintJob() {
                 onChange={e => setJobStageDate(proposal.id, 'paint', e.target.value || null)}
                 className="flex-1 min-w-0 bg-transparent text-base text-gray-900 text-right outline-none" />
             </label>
-            <label className="flex items-center gap-3 h-12 px-3 rounded-xl border border-gray-200">
+            {/* The typed crew name: kept wherever one is saved, and for jobs with no painters picked below */}
+            {(paint.crew || !onJob.length) && <label className="flex items-center gap-3 h-12 px-3 rounded-xl border border-gray-200">
               <Users size={18} className="text-gray-500 shrink-0" />
               <span className="text-sm text-gray-600 shrink-0">Crew</span>
               <input id="paint-crew" list="paint-crews" defaultValue={paint.crew || ''} key={paint.crew || ''}
                 onBlur={e => e.target.value.trim() !== (paint.crew || '') && setPaint({ crew: e.target.value.trim() })}
                 placeholder="Who's painting?" className="flex-1 min-w-0 bg-transparent text-base text-gray-900 text-right outline-none" />
               <datalist id="paint-crews">{crews.map(c => <option key={c} value={c} />)}</datalist>
-            </label>
+            </label>}
+            {paintersDone(onJob) && <p className="text-base font-semibold text-green-800 flex items-center gap-2"><CheckCircle2 size={20} className="text-green-600 shrink-0" /> {onJob.length === 1 ? `${onJob[0].crewName} marked this completed.` : 'Every painter marked this completed.'}</p>}
             <button onClick={togglePaint}
               className="w-full h-16 rounded-xl bg-green-600 active:bg-green-700 text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm">
               <Check size={24} /> Mark paint done
