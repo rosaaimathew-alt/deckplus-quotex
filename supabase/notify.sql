@@ -14,6 +14,7 @@
 --   done                 the sub or the technician          the Deck Plus PM on the job
 --   invoice_submitted    the sub                            office and admin (those who get alert emails)
 --   invoice_decision     office / admin                     the sub
+--   message              whoever wrote it (job chat)        the other side: the sub's manager, or the PM on the job
 --
 -- Run once in the Supabase SQL editor. Safe to re-run.
 
@@ -40,7 +41,7 @@ create or replace function public.notify_targets(p_kind text, p_id text) returns
 language plpgsql stable security definer set search_path = public as $$
 declare
   my_org uuid := public.auth_org(); r text := public.auth_role(); uid uuid := auth.uid();
-  t public.sub_tasks; d public.sub_draws; s public.subcontractors;
+  t public.sub_tasks; d public.sub_draws; s public.subcontractors; msg public.sub_messages;
   me public.org_members; pm public.org_members; owner public.org_members; tech public.org_members;
   staff boolean; is_paint boolean; crew jsonb; who jsonb := '[]'::jsonb; sender jsonb;
 begin
@@ -71,6 +72,36 @@ begin
       'sender', jsonb_build_object('id', me.user_id, 'name', me.display_name, 'email', me.email, 'phone', me.phone),
       'draw', jsonb_build_object('id', d.id, 'status', d.status, 'total', d.data->'total', 'weekOf', d.data->>'weekOf',
                                  'reason', d.data->>'reason', 'subName', coalesce(d.data->>'subName', d.data->>'submittedBy')),
+      'recipients', who);
+  end if;
+
+  -- ── Job chat (supabase/sub_messages.sql): tell the other side ──────────────
+  if p_kind = 'message' then
+    select * into msg from public.sub_messages where org_id = my_org and id = p_id and deleted_at is null;
+    if not found or msg.data->>'byId' is distinct from uid::text then return null; end if;
+    -- the sub's latest booking on that job: its PM is who the sub is talking to
+    select * into t from public.sub_tasks
+      where org_id = my_org and deleted_at is null and data->>'proposalId' = msg.proposal_id and data->>'subId' = msg.sub_id
+      order by created_at desc limit 1;
+    if msg.data->>'from' = 'sub' then
+      select * into pm from public.org_members where org_id = my_org and user_id = t.pm_id;
+      if pm.user_id is not null and coalesce(pm.email, '') <> '' then
+        who := jsonb_build_array(jsonb_build_object('name', pm.display_name, 'email', pm.email, 'phone', pm.phone));
+      end if;
+    else
+      select * into owner from public.org_members where org_id = my_org and user_id = msg.owner_id;
+      select * into s from public.subcontractors where org_id = my_org and id = msg.sub_id and deleted_at is null;
+      if owner.user_id is not null and coalesce(owner.email, '') <> '' then
+        who := jsonb_build_array(jsonb_build_object('name', owner.display_name, 'email', owner.email, 'phone', s.data->>'phone'));
+      end if;
+    end if;
+    return jsonb_build_object(
+      'kind', p_kind,
+      'by', jsonb_build_object('id', me.user_id, 'name', me.display_name, 'email', me.email),
+      'sender', jsonb_build_object('id', me.user_id, 'name', me.display_name, 'email', me.email, 'phone', me.phone),
+      'senderIsStaff', msg.data->>'from' = 'pm',
+      'message', jsonb_build_object('id', msg.id, 'from', msg.data->>'from', 'text', msg.data->>'text', 'client', msg.data->>'client',
+                                    'proposalId', msg.proposal_id, 'subId', msg.sub_id, 'taskId', t.id),
       'recipients', who);
   end if;
 

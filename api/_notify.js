@@ -16,6 +16,8 @@
  *   assigned                       → the technician put on the job
  *   done                           → the Deck Plus PM on the job
  *   invoice_submitted              → the office      invoice_decision → the sub
+ *   message (job chat)             → the other side of that conversation: the sub's manager,
+ *                                    or the Deck Plus PM on the job
  */
 import { verifyToken, asUser, staffMembership } from './_auth.js'
 import { sendMail } from './_mailer.js'
@@ -24,7 +26,8 @@ import { getKV } from './_kv.js'
 
 const TEAL = '#1d758b'
 const ORANGE = '#ea7a24'
-export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision']
+export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message']
+const CHAT_QUIET_SECONDS = 300   // a back-and-forth emails each side at most once every five minutes per job
 const QUIET_SECONDS = 60   // the same alert about the same booking is not repeated inside a minute
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -141,6 +144,20 @@ export function messageFor(info) {
         path: '/invoices', cta: 'Open invoices / Abrir facturas',
       }
     }
+    case 'message': {
+      const m = info.message || {}
+      const said = tidy(m.text, 600)
+      if (!said) return null
+      const toSub = m.from === 'pm'
+      return {
+        subject: `Message from ${by}: ${tidy(m.client, 60) || 'your job'}`,
+        en: `${by} wrote about ${tidy(m.client, 80) || 'the job'}: "${said}"`,
+        es: toSub ? `${by} escribió sobre ${tidy(m.client, 80) || 'el trabajo'}: "${said}"` : null,
+        sms: `Deck Plus: ${by} (${tidy(m.client, 40) || 'job'}): ${tidy(m.text, 200)}`,
+        path: toSub ? (m.taskId ? `/task/${encodeURIComponent(m.taskId)}` : '/') : (m.proposalId ? `/field/job/${encodeURIComponent(m.proposalId)}` : '/field'),
+        cta: toSub ? 'Reply / Responder' : 'Reply',
+      }
+    }
     default: return null
   }
 }
@@ -190,11 +207,12 @@ export async function sendNotification(req, res, body) {
   if (!msg) return res.status(200).json({ sent: false, reason: 'Nothing to say.' })
 
   // Not twice in a minute (a date typed digit by digit, a double tap).
-  const quietKey = `notify:${kind}:${id}`
+  // Chat: per conversation and direction, not per message
+  const quietKey = kind === 'message' ? `notify:message:${info.message?.proposalId}:${info.message?.subId}:${info.message?.from}` : `notify:${kind}:${id}`
   try {
     const kv = await getKV()
     if (await kv.get(quietKey)) return res.status(200).json({ sent: false, reason: 'Already sent a moment ago.' })
-    await kv.set(quietKey, { at: Date.now() }, { ex: QUIET_SECONDS })
+    await kv.set(quietKey, { at: Date.now() }, { ex: kind === 'message' ? CHAT_QUIET_SECONDS : QUIET_SECONDS })
   } catch { /* storage hiccup: better a repeat than no alert */ }
 
   const host = req.headers?.host || 'www.deckplus.app'
