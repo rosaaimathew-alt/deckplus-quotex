@@ -9,7 +9,7 @@ import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { drawnOn, money, agreedOf } from '../lib/subDraws'
 import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
-import { ELECTRICAL_ITEM_NAMES, electricalItemsOf, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
+import { ELECTRICAL_ITEM_NAMES, jobElectricalItems, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
 import { changeStamp } from '../lib/subTasks'
 import { SubChats } from './JobChat'
 
@@ -39,6 +39,8 @@ export function BookSubForm({ proposal, onDone, big = false }) {
       startDate: f.startDate || null, endDate: f.endDate || null,
       // What the sub needs to find the job, without opening the proposal.
       client: proposal.client || '', address: proposal.address || '',
+      // An electrician gets the job's electrical items straight away (typed once per job)
+      ...(isElectricalBooking({ title: f.title }, sub) && jobElectricalItems(proposal).length ? { electrical: jobElectricalItems(proposal) } : {}),
     })
     if (isOffice && Number(f.agreed) > 0) setAgreedAmount(id, Math.round(Number(f.agreed) * 100) / 100)
     onDone?.()
@@ -100,8 +102,24 @@ export default function JobSubsTab({ proposal }) {
   const setAgreedAmount = useStore(s => s.setAgreedAmount)
   const updateSubTask = useStore(s => s.updateSubTask)
   const deleteSubTask = useStore(s => s.deleteSubTask)
+  const updateJobData = useStore(s => s.updateJobData)
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState(null)
+
+  // The electrical items are the job's, typed once: saving them on one booking
+  // saves them on the job and on every other electrical booking of the job.
+  const saveBooking = (t, changes) => {
+    updateSubTask(t.id, { ...changes, ...changeStamp(t, changes) })
+    if (!('electrical' in changes)) return
+    updateJobData(proposal.id, { electricalItems: changes.electrical })
+    for (const other of tasks) {
+      if (other.id === t.id) continue
+      const sub = (subs || []).find(s => String(s.id) === String(other.subId))
+      if (!isElectricalBooking(other, sub)) continue
+      // (no "Updated" stamp here: the sub is told once, about the booking that was edited)
+      if (JSON.stringify(other.electrical || []) !== JSON.stringify(changes.electrical)) updateSubTask(other.id, { electrical: changes.electrical })
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -144,8 +162,8 @@ export default function JobSubsTab({ proposal }) {
               </div>
             </div>
             {editingId === t.id
-              ? <EditBooking task={t} electrical={isElectricalBooking(t, sub)} contractItems={electricalItemsOf(proposal.contractDraft?.dp?.values)}
-                  onSave={(changes) => { updateSubTask(t.id, { ...changes, ...changeStamp(t, changes) }); setEditingId(null) }} onCancel={() => setEditingId(null)} />
+              ? <EditBooking task={t} electrical={isElectricalBooking(t, sub)} contractItems={jobElectricalItems(proposal)}
+                  onSave={(changes) => { saveBooking(t, changes); setEditingId(null) }} onCancel={() => setEditingId(null)} />
               : <>
                   {t.notes && <p className="text-xs text-gray-600 whitespace-pre-wrap">{t.notes}</p>}
                   {(t.electrical || []).length > 0 && (
