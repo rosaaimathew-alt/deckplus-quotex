@@ -34,3 +34,12 @@ export const cleanElectricalItems = (rows) => (Array.isArray(rows) ? rows : [])
 // Is this booking electrical work? (The sub's trade, or how the service reads.)
 export const isElectricalBooking = (task, sub) =>
   /electr/i.test(sub?.trade || '') || /electr/i.test(task?.title || '') || (task?.electrical || []).length > 0
+
+// The job's own list. It is typed once and every electrical booking on the
+// job shares it: what the office saved on the job (jobData.electricalItems),
+// else what the contract's Electrical Specifications page says.
+export function jobElectricalItems(proposal) {
+  const saved = cleanElectricalItems(proposal?.jobData?.electricalItems)
+  return saved.length ? saved : electricalItemsOf(proposal?.contractDraft?.dp?.values)
+}
+
