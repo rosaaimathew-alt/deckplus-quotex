@@ -6,6 +6,7 @@
 // electrician then sees only the jobs they're put on: status and the daily
 // photos, never the agreed amount or invoices (supabase/sub_role.sql).
 import { useState } from 'react'
+import { tr } from '../lib/lang'
 import { useNavigate } from 'react-router-dom'
 import { Users, ChevronRight, UserPlus, CheckCircle2 } from 'lucide-react'
 import { useStore } from '../store'
@@ -24,8 +25,8 @@ export function CrewLink() {
     <button onClick={() => navigate('/crew')} className="w-full text-left bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50">
       <Users size={20} className="text-gray-500 shrink-0" />
       <span className="flex-1 min-w-0">
-        <span className="block text-base font-semibold text-gray-900">Your crew</span>
-        <span className="block text-sm text-gray-500">{joined} on the app{crew.crew.length > joined ? ` · ${crew.crew.length - joined} invited` : ''}</span>
+        <span className="block text-base font-semibold text-gray-900">{tr('Your crew')}</span>
+        <span className="block text-sm text-gray-500">{joined} {tr('on the app')}{crew.crew.length > joined ? ` · ${crew.crew.length - joined} ${tr('Invited').toLowerCase()}` : ''}</span>
       </span>
       <ChevronRight size={20} className="text-gray-300 shrink-0" />
     </button>
@@ -44,10 +45,10 @@ export function CrewPicker({ task }) {
   }
   return (
     <Card className="p-4 space-y-2">
-      <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><Users size={18} className="text-gray-500" /> Who's on it</p>
+      <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><Users size={18} className="text-gray-500" /> {tr("Who's on it")}</p>
       <select value={task.crewUserId || ''} onChange={e => pick(e.target.value)} aria-label="Crew member"
         className="w-full h-12 px-3 rounded-xl border border-gray-300 bg-white text-base text-gray-900">
-        <option value="">Nobody yet</option>
+        <option value="">{tr('Nobody yet')}</option>
         {ready.map(c => <option key={c.userId} value={c.userId}>{c.name}</option>)}
       </select>
       {ready.length === 0 && <p className="text-sm text-gray-500">Invite your crew first (Your crew, on the first screen).</p>}
@@ -75,17 +76,17 @@ export function CrewScreen() {
     } catch (err) { setMsg({ ok: false, text: err.message }) } finally { setBusy(false) }
   }
   if (!crew.hasCrew) {
-    return <div className="space-y-4"><BackButton /><p className="text-base text-gray-600">This login doesn't run a crew.</p></div>
+    return <div className="space-y-4"><BackButton /><p className="text-base text-gray-600">{tr("This login doesn't run a crew.")}</p></div>
   }
   return (
     <div className="space-y-4">
       <BackButton />
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Your crew</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{tr('Your crew')}</h1>
         {crew.company && <p className="text-sm text-gray-500">{crew.company}</p>}
       </div>
       <Card className="divide-y divide-gray-100 overflow-hidden">
-        {crew.crew.length === 0 && <p className="px-4 py-3 text-sm text-gray-500">Nobody yet.</p>}
+        {crew.crew.length === 0 && <p className="px-4 py-3 text-sm text-gray-500">{tr('Nobody yet.')}</p>}
         {crew.crew.map(c => (
           <div key={c.email} className="px-4 py-3 flex items-center gap-3">
             <span className="flex-1 min-w-0">
@@ -93,20 +94,20 @@ export function CrewScreen() {
               <span className="block text-sm text-gray-500 truncate">{c.email}</span>
             </span>
             {c.userId
-              ? <span className="text-sm font-semibold text-green-700 flex items-center gap-1"><CheckCircle2 size={16} /> On the app</span>
-              : <span className="text-sm text-gray-500">Invited</span>}
+              ? <span className="text-sm font-semibold text-green-700 flex items-center gap-1"><CheckCircle2 size={16} /> {tr('On the app')}</span>
+              : <span className="text-sm text-gray-500">{tr('Invited')}</span>}
           </div>
         ))}
       </Card>
       <Card className="p-4">
         <form onSubmit={invite} className="space-y-3">
-          <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-gray-500" /> Add someone</p>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Their name"
+          <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><UserPlus size={18} className="text-gray-500" /> {tr('Add someone')}</p>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder={tr('Their name')}
             className="w-full h-12 px-3 rounded-xl border border-gray-300 bg-white text-base text-gray-900 outline-none" />
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Their email"
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={tr('Their email')}
             className="w-full h-12 px-3 rounded-xl border border-gray-300 bg-white text-base text-gray-900 outline-none" />
           <button type="submit" disabled={busy || !name.trim() || !email.trim()}
-            className="w-full h-12 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold disabled:opacity-40">{busy ? 'Inviting…' : 'Invite'}</button>
+            className="w-full h-12 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold disabled:opacity-40">{tr(busy ? 'Inviting…' : 'Invite')}</button>
           {msg && <p className={`text-sm break-all ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.text}{msg.link ? <><br />{msg.link}</> : null}</p>}
         </form>
       </Card>

@@ -6,6 +6,7 @@
 // the job; one invoice per job per week (lib/subDraws). The office approves
 // it or sends it back with a reason.
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { tr } from '../lib/lang'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Send, Paperclip, X, Check } from 'lucide-react'
 import { useStore } from '../store'
@@ -45,7 +46,7 @@ function SendButton() {
   return (
     <button onClick={() => navigate('/invoices/new')}
       className="w-full h-14 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold flex items-center justify-center gap-2">
-      <Send size={20} /> Send an invoice
+      <Send size={20} /> {tr('Send an invoice')}
     </button>
   )
 }
@@ -62,8 +63,8 @@ export function WeekInvoiceCard() {
     <Card className="p-4 space-y-3">
       <div className="flex items-center gap-2">
         <FileText size={18} className="text-gray-500" />
-        <p className="flex-1 text-base font-semibold text-gray-900">Invoices</p>
-        <button onClick={() => navigate('/invoices')} className="text-sm font-semibold text-[var(--brand-700)]">All invoices</button>
+        <p className="flex-1 text-base font-semibold text-gray-900">{tr('Invoices')}</p>
+        <button onClick={() => navigate('/invoices')} className="text-sm font-semibold text-[var(--brand-700)]">{tr('All invoices')}</button>
       </div>
       {sent.map(d => (
         <button key={d.id} onClick={() => navigate('/invoices')} className="w-full flex items-center gap-3 text-left">
@@ -71,7 +72,7 @@ export function WeekInvoiceCard() {
           <StatusPill d={d} />
         </button>
       ))}
-      {open.length > 0 ? <SendButton /> : !sent.length && <p className="text-sm text-gray-500">Nothing left to invoice on your jobs this week.</p>}
+      {open.length > 0 ? <SendButton /> : !sent.length && <p className="text-sm text-gray-500">{tr('Nothing left to invoice on your jobs this week.')}</p>}
     </Card>
   )
 }
@@ -289,7 +290,7 @@ export function TaskMoneyLine({ task }) {
   const left = remainingOn(task.id, terms, draws || [])
   return (
     <p className="text-base text-gray-800 flex items-center gap-2">
-      <FileText size={18} className="text-gray-500 shrink-0" /> Agreed {money(agreed)} · {money(left)} left to invoice
+      <FileText size={18} className="text-gray-500 shrink-0" /> {tr('Agreed')} {money(agreed)} · {money(left)} {tr('left to invoice')}
     </p>
   )
 }

@@ -7,6 +7,7 @@ import { Send, MessageSquare, ChevronDown } from 'lucide-react'
 import { useStore } from '../store'
 import { threadOf, markChatSeen, chatTime, unreadCount } from '../lib/subChat'
 import { tasksForJob, subNameOf } from '../lib/subTasks'
+import { tr } from '../lib/lang'
 
 // side: 'pm' (Deck Plus staff) or 'sub' (the sub's manager).  big: phone-sized controls.
 export default function JobChat({ proposalId, subId, subUserId, client = '', side, big = false, placeholder }) {
@@ -52,11 +53,11 @@ export default function JobChat({ proposalId, subId, subUserId, client = '', sid
       <form onSubmit={send} className="flex items-end gap-2">
         <textarea value={text} onChange={e => setText(e.target.value.slice(0, 2000))} rows={1} aria-label="Message"
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !big) send(e) }}
-          placeholder={placeholder || 'Write a message…'}
+          placeholder={placeholder || tr('Write a message…')}
           className={`flex-1 min-w-0 resize-none rounded-xl border border-gray-300 bg-white text-gray-900 outline-none focus:border-[var(--brand-600)] ${big ? 'min-h-12 px-3 py-3 text-base' : 'px-2.5 py-1.5 text-sm'}`} />
         <button type="submit" disabled={!text.trim()} aria-label="Send message"
           className={`shrink-0 rounded-xl bg-[var(--brand-600)] text-white font-semibold disabled:opacity-40 flex items-center justify-center gap-1.5 ${big ? 'h-12 px-4 text-base' : 'h-8 px-3 text-xs'}`}>
-          <Send size={big ? 18 : 13} /> Send
+          <Send size={big ? 18 : 13} /> {tr('Send')}
         </button>
       </form>
     </div>
