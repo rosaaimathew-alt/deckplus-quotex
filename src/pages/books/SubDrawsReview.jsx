@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { FileText, Paperclip } from 'lucide-react'
 import { useStore } from '../../store'
 import { todayISO, jobIndex, jobLabel } from '../../lib/books'
-import { money, weekLabel, drawnOn, agreedOf } from '../../lib/subDraws'
+import { money, weekLabel, drawnOn, agreedOf, drawsAllowed } from '../../lib/subDraws'
 import { usePhotoUrl } from '../../lib/taskPhotos'
 import { Modal, inputCls, btnPrimary, btnGhost } from './ui'
 
@@ -55,6 +55,7 @@ function ReviewModal({ id, onClose }) {
   const d = useStore(s => (s.subDraws || []).find(x => x.id === id))
   const draws = useStore(s => s.subDraws)
   const terms = useStore(s => s.subTerms)
+  const tasks = useStore(s => s.subTasks)
   const proposals = useStore(s => s.proposals)
   const me = useStore(s => s.me)
   const addBill = useStore(s => s.addBill)
@@ -108,14 +109,16 @@ function ReviewModal({ id, onClose }) {
               {(d.lines || []).map(l => {
                 const agreed = agreedOf(l.taskId, terms)
                 const before = drawnOn(l.taskId, draws, { exceptId: d.id })
+                // only a carpenter's draw is against an agreed amount
+                const draw = drawsAllowed((tasks || []).find(t => t && String(t.id) === String(l.taskId)))
                 const job = jobs.get(String(l.proposalId))
                 return (
                   <tr key={l.taskId}>
                     <td className="px-3 py-2.5"><p className="font-semibold text-gray-900">{l.title}</p><p className="text-gray-600">{job ? jobLabel(job) : [l.client, l.address].filter(Boolean).join(' · ')}</p>{l.note && <p className="text-gray-500 italic">{l.note}</p>}</td>
-                    <td className="px-3 text-right">{money(agreed)}</td>
-                    <td className="px-3 text-right">{money(before)}</td>
+                    <td className="px-3 text-right">{draw ? money(agreed) : '—'}</td>
+                    <td className="px-3 text-right">{draw ? money(before) : '—'}</td>
                     <td className="px-3 text-right font-semibold">{money(l.amount)}</td>
-                    <td className={`px-3 text-right ${agreed - before - l.amount < 0 ? 'text-red-600 font-semibold' : ''}`}>{money(agreed - before - l.amount)}</td>
+                    <td className={`px-3 text-right ${draw && agreed - before - l.amount < 0 ? 'text-red-600 font-semibold' : ''}`}>{draw ? money(agreed - before - l.amount) : '—'}</td>
                   </tr>
                 )
               })}
