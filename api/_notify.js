@@ -11,6 +11,8 @@
  * someone who is part of that booking.
  *
  *   booked / changed / inspection  → the sub and their technician, in the PM's name
+ *   inspection_result              → the sub and technician of that trade only (an electrical
+ *                                    result never goes to the carpenters), in the PM's name
  *   assigned                       → the technician put on the job
  *   done                           → the Deck Plus PM on the job
  *   invoice_submitted              → the office      invoice_decision → the sub
@@ -22,7 +24,7 @@ import { getKV } from './_kv.js'
 
 const TEAL = '#1d758b'
 const ORANGE = '#ea7a24'
-export const KINDS = ['booked', 'changed', 'inspection', 'assigned', 'done', 'invoice_submitted', 'invoice_decision']
+export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision']
 const QUIET_SECONDS = 60   // the same alert about the same booking is not repeated inside a minute
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -90,6 +92,26 @@ export function messageFor(info) {
         en: `The inspection for ${tidy(t.title)} at ${at} is set for ${dayText(t.inspectionDate)}.`,
         es: `La inspección de ${tidy(t.title)} en ${at} es el ${dayText(t.inspectionDate, 'es')}.`,
         sms: `Deck Plus: inspection for ${tidy(t.title, 40)}, ${tidy(t.client, 40)} is ${dayText(t.inspectionDate)}.`,
+        path: taskPath, cta: 'Open the job / Abrir el trabajo',
+      }
+    }
+    case 'inspection_result': {
+      // The latest pass / fail on this booking (it only carries its own trade's results)
+      const r = [...(Array.isArray(t.inspections) ? t.inspections : [])].reverse().find(i => i && (i.state === 'pass' || i.state === 'fail'))
+      if (!r) return null
+      const ok = r.state === 'pass'
+      const name = tidy(r.name, 60) || 'Inspection'
+      const note = tidy(r.note, 400)
+      const on = dayText(r.date), el = dayText(r.date, 'es')
+      return {
+        subject: `${ok ? 'Passed' : 'Did not pass'}: ${name} inspection · ${tidy(t.client)}`,
+        en: ok
+          ? `The ${name.toLowerCase()} inspection at ${at} passed${on ? ` on ${on}` : ''}.`
+          : `The ${name.toLowerCase()} inspection at ${at} did not pass${on ? ` on ${on}` : ''} (${tidy(r.result, 60) || 'failed'}).${note ? ` Inspector's note: ${note}` : ''} ${who} will be in touch about going back.`,
+        es: ok
+          ? `La inspección (${name.toLowerCase()}) en ${at} fue aprobada${el ? ` el ${el}` : ''}.`
+          : `La inspección (${name.toLowerCase()}) en ${at} no fue aprobada${el ? ` el ${el}` : ''}.${note ? ` Nota del inspector: ${note}` : ''} ${who} se comunicará con usted para regresar.`,
+        sms: ok ? `Deck Plus: ${name} inspection passed, ${tidy(t.client, 40)}.` : `Deck Plus: ${name} inspection did not pass, ${tidy(t.client, 40)}. ${who} will be in touch.`,
         path: taskPath, cta: 'Open the job / Abrir el trabajo',
       }
     }

@@ -8,6 +8,7 @@ import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
 import { appRoleOf } from './roles'
 import { clientGroups } from './lib/proposalGroups'
 import { newSubTaskId } from './lib/subTasks'
+import { stampInspections } from './lib/subInspections'
 import { newDrawId } from './lib/subDraws'
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -160,6 +161,20 @@ export const ACTIVITY_TYPES = ['Call', 'Follow-up', 'Meeting', 'Email', 'Objecti
 // or deleted by anyone but an admin, only while the client keeps another
 // proposal that isn't archived: alternatives clear off the dashboard and
 // pipeline, the customer stays. Their last one is marked Lost, not removed.
+// Copies a job's inspection results onto its subs' bookings, each sub getting
+// only their own trade's (lib/subInspections), and alerts the sub about a new
+// pass / fail from the last three days.
+function syncSubInspections(get, set, proposalId, alert = true) {
+  const s = get()
+  const p = (s.proposals || []).find((x) => String(x.id) === String(proposalId))
+  if (!p || !(s.subTasks || []).length) return
+  const since = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)
+  const out = stampInspections(s.subTasks, p, s.subcontractors, { since })
+  if (out.tasks === s.subTasks) return
+  set({ subTasks: out.tasks })
+  if (alert) out.alert.forEach((id) => notify('inspection_result', id))
+}
+
 export const canDeleteProposals = (me) => DEMO || me?.role === 'admin'
 export function clientKeepsAnother(proposals, id) {
   const group = clientGroups(proposals).find(g => g.all.some(p => p.id === id))
@@ -923,14 +938,17 @@ export const useStore = create(
       },
 
       // ── Job Management (stages, notes, dates per won proposal) ──────────
-      updateJobData: (proposalId, changes) =>
+      updateJobData: (proposalId, changes) => {
         set((s) => ({
           proposals: s.proposals.map((p) =>
             p.id === proposalId
               ? { ...p, jobData: { ...(p.jobData || {}), ...changes } }
               : p
           ),
-        })),
+        }))
+        // A result the office recorded by hand reaches the sub of that trade
+        if (changes && 'officeInspections' in changes) syncSubInspections(get, set, proposalId)
+      },
 
       // Schedule (or clear) a single job stage on the PM calendar.
       setJobStageDate: (proposalId, stageKey, date) =>
@@ -962,7 +980,7 @@ export const useStore = create(
 
       // County permit results from the inspection pulse. Stages the county
       // has passed are checked off; nothing is ever unchecked.
-      setCountyPermit: (proposalId, countyPermit, passedStages = []) =>
+      setCountyPermit: (proposalId, countyPermit, passedStages = []) => {
         set((s) => ({
           proposals: s.proposals.map((p) => {
             if (p.id !== proposalId) return p
@@ -974,7 +992,9 @@ export const useStore = create(
               ...(add.length ? { jobData: { ...(p.jobData || {}), completedStages: [...done, ...add] } } : {}),
             }
           }),
-        })),
+        }))
+        syncSubInspections(get, set, proposalId)   // each sub hears about their own trade's results
+      },
 
       toggleJobStage: (proposalId, stageKey) =>
         set((s) => ({
@@ -1152,6 +1172,7 @@ export const useStore = create(
         }))
         // Tell the sub (or the painter put straight on it); lib/notify
         notify(task.crewUserId ? 'assigned' : 'booked', id)
+        if (task.proposalId != null) syncSubInspections(get, set, task.proposalId, false)   // results already on the job
         return id
       },
 
