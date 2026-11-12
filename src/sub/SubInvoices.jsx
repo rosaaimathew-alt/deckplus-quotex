@@ -13,7 +13,7 @@ import { useStore } from '../store'
 import { submitSubDraw } from '../supabase'
 import { DEMO } from '../demo'
 import { Card, BackButton, todayStr } from '../field/shared'
-import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, sentThisWeek, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday } from '../lib/subDraws'
+import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, sentThisWeek, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday, tradeOf, tradeEs } from '../lib/subDraws'
 import { uploadInvoiceFile } from '../lib/taskPhotos'
 
 // Only tasks booked with this login carry money. An outside company's crew
@@ -41,13 +41,13 @@ function StatusPill({ d }) {
   return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${st.cls}`}>{st.label}</span>
 }
 
-// Outside Monday–Wednesday: when they can send next, instead of the button.
+// Outside Monday–Thursday: when they can send next, instead of the button.
 function WindowClosed() {
   const next = new Date(`${nextInvoiceMonday()}T12:00:00`)
     .toLocaleDateString(getLang() === 'es' ? 'es-US' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   return (
     <div className="rounded-xl bg-amber-50 px-4 py-3 text-base text-amber-900">
-      <p className="font-semibold">{tr('Invoices can be sent Monday through Wednesday.')}</p>
+      <p className="font-semibold">{tr('Invoices can be sent Monday through Thursday.')}</p>
       <p>{tr('Next:')} {next}</p>
     </div>
   )
@@ -62,7 +62,7 @@ function SendButton() {
         className="w-full h-14 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold flex items-center justify-center gap-2">
         <Send size={20} /> {tr('Send an invoice')}
       </button>
-      <p className="text-sm text-gray-500 text-center">{tr('Send by Wednesday at midnight.')}</p>
+      <p className="text-sm text-gray-500 text-center">{tr('Send by Thursday at midnight.')}</p>
     </div>
   )
 }
@@ -169,11 +169,14 @@ export function NewInvoiceScreen() {
   const pickRef = useRef(null)
 
   const task = jobs.find(t => String(t.id) === String(taskId)) || null
+  // The trade booked for this job fills in the work type; picked only when there's none
+  const trade = tradeOf(task) || (jobs.length && jobs.every(t => tradeOf(t) && tradeOf(t) === tradeOf(jobs[0])) ? tradeOf(jobs[0]) : '')
+  const work = trade ? [trade] : workTypes
   const left = task ? remainingOn(task.id, terms, draws) : 0
   const amt = round2(amount)
   const over = task && amt > left
   const missing = {
-    job: !task, date: !date, work: !workTypes.length, amount: !(amt > 0), files: !files.length,
+    job: !task, date: !date, work: !work.length, amount: !(amt > 0), files: !files.length,
   }
   const ready = !Object.values(missing).some(Boolean) && !over
 
@@ -195,7 +198,7 @@ export function NewInvoiceScreen() {
       const draw = {
         id: newDrawId(),
         subId: task.subId, subName: task.subName || company, subUserId: me?.id || null, email: me?.email || '',
-        date, weekOf: weekOf(), workTypes, status: 'submitted', notes: notes.trim(), total: amt, files: uploaded,
+        date, weekOf: weekOf(), workTypes: work, status: 'submitted', notes: notes.trim(), total: amt, files: uploaded,
         lines: [{ taskId: task.id, proposalId: task.proposalId, client: task.client || '', address: task.address || '', title: task.title || '', amount: amt }],
       }
       if (!DEMO) await submitSubDraw(draw)
@@ -250,6 +253,7 @@ export function NewInvoiceScreen() {
       </Q>
 
       <Q en="Work type" es="Tipo de trabajo" required>
+        {trade ? <p className={fixed}>{trade}{tradeEs(trade) && tradeEs(trade) !== trade ? ` (${tradeEs(trade)})` : ''}</p> : <>
         <div className="space-y-1">
           {WORK_TYPES.map(w => {
             const on = workTypes.includes(w.key)
@@ -263,6 +267,7 @@ export function NewInvoiceScreen() {
           })}
         </div>
         {need('work')}
+        </>}
       </Q>
 
       <Q en="Invoice amount" es="Total de la factura" required>

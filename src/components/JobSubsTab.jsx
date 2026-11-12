@@ -34,6 +34,7 @@ export function BookSubForm({ proposal, onDone, big = false }) {
     const id = addSubTask({
       proposalId: proposal.id,
       subId: sub.id, subName: sub.name || '', subUserId: sub.userId || null,
+      trade: sub.trade || '',   // fills in the sub's invoice (lib/subDraws tradeOf)
       pmId: proposal.pmId || me?.id || null,
       title: f.title.trim(), notes: f.notes.trim(),
       startDate: f.startDate || null, endDate: f.endDate || null,
