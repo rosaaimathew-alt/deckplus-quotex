@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Users, Copy, X, KeyRound, CheckCircle2, UserMinus, SlidersHorizontal } from 'lucide-react'
 import { useStore } from '../store'
-import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword, setMemberRole, setMemberPermissions } from '../supabase'
+import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword, setMemberRole, setMemberPermissions, setMemberPhone } from '../supabase'
 import { permissionGroups, departmentAllows } from '../permissions'
 import { DEMO } from '../demo'
 
@@ -34,6 +34,17 @@ export function TeamCard() {
   const [fresh, setFresh]     = useState(null)   // the invite just created
   const [copied, setCopied]   = useState('')
   const [removing, setRemoving] = useState('')   // user id being removed
+  const savePhone = async (m, value) => {
+    const next = value.trim()
+    if (next === (m.phone || '')) return
+    try {
+      const saved = (await setMemberPhone(m.id, next)) || ''
+      useStore.setState((s) => ({
+        members: (s.members || []).map(x => (x.id === m.id ? { ...x, phone: saved } : x)),
+        ...(s.me?.id === m.id ? { me: { ...s.me, phone: saved } } : {}),
+      }))
+    } catch (err) { setError(err.message) }
+  }
   const adminCount = members.filter(m => m.role === 'admin').length
   // Admins only; never yourself, never the last admin.
   const canRemove = (m) => isAdmin && !DEMO && m.id !== me?.id && !(m.role === 'admin' && adminCount <= 1)
@@ -195,6 +206,12 @@ export function TeamCard() {
             <div key={m.id}>
             <div className="flex items-center gap-3 px-3 py-2 text-sm">
               <p className="flex-1 min-w-0 truncate text-gray-800">{m.displayName || m.email}<span className="text-gray-400"> · {m.email}</span></p>
+              {/* Their cell: subs see their PM's number on the job, and alerts are signed with it */}
+              {(isAdmin || me?.role === 'office' || m.id === me?.id) && m.role !== 'sub' && (
+                <input type="tel" defaultValue={m.phone || ''} key={m.phone || ''} placeholder="Cell" aria-label={`Cell for ${m.displayName || m.email}`}
+                  onBlur={e => savePhone(m, e.target.value)}
+                  className="w-32 shrink-0 text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700" />
+              )}
               {canChangeRole(m) ? (
                 <select value={m.role} disabled={!!changing} onChange={e => changeRole(m, e.target.value)}
                   aria-label={`Role for ${m.displayName || m.email}`}

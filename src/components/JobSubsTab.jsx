@@ -10,7 +10,7 @@ import { drawnOn, money, agreedOf } from '../lib/subDraws'
 import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf } from '../lib/subTasks'
 import { ELECTRICAL_ITEM_NAMES, jobElectricalItems, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
-import { changeStamp } from '../lib/subTasks'
+import { changeStamp, techPhone } from '../lib/subTasks'
 import { SubChats } from './JobChat'
 
 const fmt = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
@@ -148,6 +148,7 @@ export default function JobSubsTab({ proposal }) {
                   <span>{subNameOf(t, subs)}{t.crewName ? ` · ${t.crewName}` : ''}</span>
                   {!t.crewName && sub?.hasCrew && st !== 'done' && <span className="font-semibold text-amber-700">No technician yet</span>}
                   {sub?.phone && <a href={`tel:${sub.phone}`} className="flex items-center gap-0.5 hover:underline"><Phone size={11} /> {sub.phone}</a>}
+                  {techPhone(t, sub) && <a href={`tel:${techPhone(t, sub)}`} className="flex items-center gap-0.5 hover:underline" aria-label={`Call ${t.crewName}`}><Phone size={11} /> {t.crewName}: {techPhone(t, sub)}</a>}
                   {(t.startDate || t.endDate) && (
                     <span className="flex items-center gap-0.5"><CalendarDays size={11} /> {fmt(t.startDate) || '?'}{t.endDate ? ` – ${fmt(t.endDate)}` : ''}</span>
                   )}

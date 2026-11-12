@@ -20,13 +20,13 @@
 // ("Schedule inspection"), and in the job's Subs tab in the office.
 import { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Settings2, Check, HardHat, Camera, Lock, MessageSquare } from 'lucide-react'
+import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Settings2, Check, HardHat, Camera, Lock, MessageSquare, Phone } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, statusIndex } from '../lib/subTasks'
-import { Card, mapsUrl, todayStr, addDays, useUndo, BackButton } from '../field/shared'
+import { Card, mapsUrl, telUrl, todayStr, addDays, useUndo, BackButton } from '../field/shared'
 import { tr, trList, dayText as dayLabel, startLang, setLang, useLang } from '../lib/lang'
 import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos'
 import { PhotoDays, AddPhotosButton } from '../components/TaskPhotos'
@@ -268,7 +268,9 @@ function TaskScreen() {
       <Card className="p-4 space-y-2">
         {dateRange(t) && <p className="text-base text-gray-800 flex items-center gap-2"><CalendarDays size={18} className="text-gray-500 shrink-0" /> {dateRange(t)}</p>}
         <TaskMoneyLine task={t} />
-        {pm && <p className="text-base text-gray-800 flex items-center gap-2"><HardHat size={18} className="text-gray-500 shrink-0" /> PM: {pm.displayName || pm.email}</p>}
+        {pm && <p className="text-base text-gray-800 flex items-center gap-2"><HardHat size={18} className="text-gray-500 shrink-0" /> <span className="flex-1 min-w-0">PM: {pm.displayName || pm.email}</span>
+          {pm.phone && <a href={telUrl(pm.phone)} aria-label={`${tr('Call')} ${pm.displayName || 'PM'}`} className="shrink-0 h-10 px-3 rounded-xl border border-gray-200 bg-white flex items-center gap-1.5 text-sm font-semibold text-[var(--brand-700)]"><Phone size={16} /> {pm.phone}</a>}
+        </p>}
         {t.inspectionDate && <p className="text-base text-gray-800 flex items-center gap-2"><CheckCircle2 size={18} className="text-gray-500 shrink-0" /> {tr('Inspection')} {dayLabel(t.inspectionDate)}</p>}
         {t.notes && (
           <div className="pt-2 border-t border-gray-100">

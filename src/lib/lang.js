@@ -57,7 +57,7 @@ const ES = {
   "Send photos of the work every day. The buttons below unlock once today's are in.": 'Envíe fotos del trabajo todos los días. Los botones de abajo se activan cuando envíe las de hoy.',
   'Add more photos': 'Agregar más fotos', 'Take photos': 'Tomar fotos', 'Sending': 'Enviando',
   'photo sent': 'foto enviada', 'photos sent': 'fotos enviadas', 'Photos sent': 'Fotos enviadas',
-  'Inspection': 'Inspección', 'From your PM': 'De su PM', 'Progress': 'Avance',
+  'Inspection': 'Inspección', 'From your PM': 'De su PM', 'Progress': 'Avance', 'Call': 'Llamar a',
   // what changed (lib/subTasks changeStamp)
   'service': 'el servicio', 'dates': 'las fechas', 'notes': 'las notas', 'electrical items': 'los artículos eléctricos', 'inspection date': 'la fecha de inspección',
   // job sheet

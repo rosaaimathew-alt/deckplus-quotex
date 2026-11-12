@@ -7,7 +7,7 @@ import { Plus, HardHat, Phone, CalendarDays } from 'lucide-react'
 import { useStore } from '../store'
 import { BookSubForm } from '../components/JobSubsTab'
 import { SubChats } from '../components/JobChat'
-import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, needsInspection, subNameOf, tasksForJob, changeStamp } from '../lib/subTasks'
+import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, needsInspection, subNameOf, tasksForJob, changeStamp, techPhone } from '../lib/subTasks'
 import { Card, dayLabel, telUrl } from './shared'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { PhotoDays } from '../components/TaskPhotos'
@@ -85,6 +85,11 @@ export default function SubTasksCard({ proposal }) {
                     {sub?.phone && (
                       <a href={telUrl(sub.phone)} className="h-11 rounded-xl border border-gray-200 bg-white flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
                         <Phone size={16} /> Call {sub.name || 'sub'}
+                      </a>
+                    )}
+                    {techPhone(t, sub) && (
+                      <a href={telUrl(techPhone(t, sub))} className="h-11 rounded-xl border border-gray-200 bg-white flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
+                        <Phone size={16} /> Call {t.crewName}
                       </a>
                     )}
                   </div>
