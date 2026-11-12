@@ -23,11 +23,12 @@ const ALL = [
   '/', '/clients', '/analyze', '/ai', '/catalog', '/quote', '/analytics',
   '/proposal', '/tracker', '/settings', '/contracts', '/contract',
   '/jobs', '/subs', '/scheduler', '/profitability', '/pipeline', '/finance',
-  '/checklists',
+  '/checklists', '/leads',
 ]
 
-// Sales: the current app minus the Subcontractors, Profitability & Finance.
-const SALES = ALL.filter(r => r !== '/subs' && r !== '/profitability' && r !== '/finance')
+// Sales: the current app minus the Subcontractors, Profitability, Finance and
+// the master lead list (website bookings are office-only in the database too).
+const SALES = ALL.filter(r => r !== '/subs' && r !== '/profitability' && r !== '/finance' && r !== '/leads')
 
 // PM: job-management focus + read-only quote/contract viewing + scheduling.
 const PM = ['/', '/jobs', '/subs', '/scheduler', '/proposal', '/contract', '/contracts', '/settings', '/checklists']

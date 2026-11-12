@@ -10,7 +10,7 @@ import { useMemo } from 'react'
 import {
   House, Handshake, HardHat, ChartColumn, Package, List, Columns3, Ruler,
   ClipboardCheck, FileSignature, CalendarDays, TrendingUp, Wallet, Target,
-  Sparkles, Calculator, Hammer, ShieldCheck, Landmark, FileText, Receipt, ShoppingCart, Truck, FilePen,
+  Sparkles, Calculator, Users, Hammer, ShieldCheck, Landmark, FileText, Receipt, ShoppingCart, Truck, FilePen,
 } from 'lucide-react'
 import { useStore } from './store'
 import { canAccessRoute } from './plans'
@@ -27,6 +27,8 @@ export const DESTINATIONS = [
       { key: 'proposals', label: 'Proposals', icon: List, access: '/tracker', hint: 'Every client and quote, newest first, and who opened them', keywords: 'tracker quotes follow up reminder status revise contract clients customers contacts opens opened views' },
       { key: 'pipeline',  label: 'Pipeline',  icon: Columns3, access: '/tracker', hint: 'Board by status', keywords: 'kanban board stages' },
       { key: 'designs',   label: 'Designs',   icon: Ruler, access: '/tracker', hint: '3D renderings and floor plans', keywords: 'drawings floor plan rendering 3d 2d cad illustrator design' },
+      // Office / admin only: website bookings can't be read by anyone else
+      { key: 'leads',     label: 'Leads',     icon: Users, access: '/leads', hint: 'Everyone who booked online, got a quote or had a job, to check before booking', keywords: 'master lead list double booked duplicate website calendar booking caller phone' },
     ] },
 
   // Contracts get their own place: sales prepares and sends them, managers and
@@ -83,6 +85,7 @@ export const LEGACY_REDIRECTS = {
   '/tracker':       '/sales?tab=proposals',
   '/pipeline':      '/sales?tab=pipeline',
   '/clients':       '/sales?tab=proposals',
+  '/leads':         '/sales?tab=leads',
   '/jobs':          '/projects?tab=jobs',
   '/scheduler':     '/projects?tab=calendar',
   '/subs':          '/money?tab=vendors',

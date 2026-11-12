@@ -146,23 +146,47 @@ async function getSlots(res) {
   })
 }
 
-// A person's upcoming live booking, matched by email or phone (either one is enough).
-// validateLead stores every phone as (555) 555-5555, so an exact match works.
-async function existingBooking({ email, phone }) {
+// A person's live booking: one still coming up, or one that took place in the
+// last RECENT_DAYS days (a customer who was just seen books again through the
+// rep, not as a new lead). Matched by email, phone or the house (street number
+// and street name, same ZIP), any one is enough, so "Lori" and "Lory" at the
+// same house with the same number are one person.
+// validateLead stores every phone as (555) 555-5555 and email in lower case.
+const RECENT_DAYS = 30
+const houseKey = (street, zip) => {
+  const m = String(street || '').toLowerCase().trim()
+    .match(/^(\d+[a-z]?)\s+(?:(?:n|s|e|w|north|south|east|west)\.?\s+)?([a-z0-9]+)/)
+  return m ? `${m[1]} ${m[2]} ${String(zip || '').trim().slice(0, 5)}` : ''
+}
+async function existingBooking({ email, phone, street, zip }) {
+  const since = new Date(Date.now() - RECENT_DAYS * 86_400_000).toISOString()
   const { data, error } = await db().from('rr_bookings')
-    .select('starts_at, ends_at, rr_reps(name, phone, email)')
-    .eq('status', 'booked').gt('ends_at', new Date().toISOString())
-    .or(`lead_email.eq."${email}",lead_phone.eq."${phone}"`)
-    .order('starts_at').limit(1)
+    .select('starts_at, ends_at, lead_email, lead_phone, address_street, address_zip, rr_reps(name, phone, email)')
+    .eq('status', 'booked').gt('ends_at', since)
+    .order('starts_at', { ascending: false }).limit(1000)
   if (error) throw error
-  return data?.[0] || null
+  const house = houseKey(street, zip)
+  const same = (data || []).filter(b => (email && (b.lead_email || '').toLowerCase() === email)
+    || (phone && b.lead_phone === phone)
+    || (house && houseKey(b.address_street, b.address_zip) === house))
+  const now = Date.now()
+  // an upcoming one first (soonest), else the most recent past one
+  const b = same.filter(x => Date.parse(x.ends_at) > now).sort((x, y) => Date.parse(x.starts_at) - Date.parse(y.starts_at))[0] || same[0]
+  if (!b) return null
+  // Matched on the house alone: someone else there may have booked, so their
+  // appointment isn't shown (houseOnly → a plain "please call us").
+  b.houseOnly = !((email && (b.lead_email || '').toLowerCase() === email) || (phone && b.lead_phone === phone))
+  return b
 }
 
 function alreadyBooked(res, b) {
+  if (b.houseOnly) {
+    return res.status(400).json({ code: 'house_booked', error: 'We already have an appointment at this address. Please call us to schedule.' })
+  }
   return res.status(409).json({
     code: 'already_booked',
     error: 'You already have an appointment with us.',
-    existing: { start: b.starts_at, end: b.ends_at, repName: b.rr_reps?.name, repPhone: b.rr_reps?.phone || null, repEmail: b.rr_reps?.email },
+    existing: { start: b.starts_at, end: b.ends_at, past: Date.parse(b.ends_at) <= Date.now(), repName: b.rr_reps?.name, repPhone: b.rr_reps?.phone || null, repEmail: b.rr_reps?.email },
   })
 }
 
@@ -194,10 +218,11 @@ async function book(req, res) {
   const notes = lead.notes || null
   const address = `${lead.street}, ${lead.city}, ${lead.state} ${lead.zip}`
 
-  // One upcoming appointment per person: don't take a second one (or use up a turn).
+  // One appointment per person (upcoming, or just had): don't take a second one (or use up a turn).
   const prior = await existingBooking(lead)
   if (prior) {
-    await refused(body, `This customer already has an appointment (${fmtWhen(prior.starts_at, 'America/New_York', 'UTC')} with ${prior.rr_reps?.name}), so nothing new was booked. The screen showed them that existing appointment.`)
+    const had = Date.parse(prior.ends_at) <= Date.now()
+    await refused(body, `This customer ${had ? 'already had' : 'already has'} an appointment (${fmtWhen(prior.starts_at, 'America/New_York', 'UTC')} with ${prior.rr_reps?.name}), so nothing new was booked. ${prior.houseOnly ? 'Matched on the address only, so the screen asked them to call.' : `The screen showed them that appointment and ${prior.rr_reps?.name}'s contact details.`}`)
     return alreadyBooked(res, prior)
   }
 
