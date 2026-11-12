@@ -25,7 +25,7 @@ import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
-import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, statusIndex } from '../lib/subTasks'
+import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, statusIndex, stageOf } from '../lib/subTasks'
 import { Card, mapsUrl, telUrl, todayStr, addDays, useUndo, BackButton } from '../field/shared'
 import { tr, trList, dayText as dayLabel, startLang, setLang, useLang } from '../lib/lang'
 import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos'
@@ -129,7 +129,7 @@ function TaskRow({ t, needsTech = false }) {
           {fresh && <span className="mr-2 align-middle text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--brand-600)] text-white">{tr(fresh === 'new' ? 'New' : 'Updated')}</span>}
           {t.title}
         </p>
-        <p className="text-sm text-gray-600 truncate">{t.client || t.address || tr('Job')}{t.crewName ? ` · ${t.crewName}` : ''}</p>
+        <p className="text-sm text-gray-600 truncate">{t.client || t.address || tr('Job')}{t.assignment ? ` · ${t.assignment}` : ''}{t.crewName ? ` · ${t.crewName}` : ''}</p>
         <p className={`text-sm truncate ${late ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>{late ? `${tr('Was due')} ${dayLabel(t.endDate)}` : dateRange(t)}</p>
         {unread > 0 && <p className="text-sm font-semibold text-[var(--brand-700)] flex items-center gap-1"><MessageSquare size={14} /> {unread} {tr(unread === 1 ? 'new message' : 'new messages')}</p>}
         {needsTech && <p className="text-sm font-semibold text-amber-700">{tr('Needs a technician')}</p>}
@@ -185,12 +185,19 @@ function TaskScreen() {
       <BackButton />
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 leading-tight">{t.title}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 leading-tight">{t.title}{stageOf(t) > 1 && <span className="font-semibold text-gray-500"> · {tr('Stage')} {stageOf(t)}</span>}</h1>
         <p className="text-base text-gray-600 mt-0.5">{t.client}</p>
         {t.changedAt && t.changeNote && t.changedAt.slice(0, 10) >= addDays(-7) && (
           <p className="text-sm font-medium text-amber-700 mt-1">{tr('Updated')} {dayLabel(t.changedAt.slice(0, 10))}: {trList(t.changeNote)}</p>
         )}
       </div>
+
+      {t.assignment && (
+        <Card className="p-4 border-l-4 border-l-[var(--brand-600)]">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">{tr('Back for the next stage')}</p>
+          <p className="text-base text-gray-900 whitespace-pre-wrap">{t.assignment}</p>
+        </Card>
+      )}
 
       {t.address && (
         <a href={mapsUrl(t.address)} target="_blank" rel="noreferrer"

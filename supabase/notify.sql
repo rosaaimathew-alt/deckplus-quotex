@@ -153,7 +153,7 @@ begin
     'task', jsonb_build_object(
       'id', t.id, 'proposalId', t.data->>'proposalId', 'title', t.data->>'title', 'client', t.data->>'client', 'address', t.data->>'address',
       'startDate', t.data->>'startDate', 'endDate', t.data->>'endDate', 'inspectionDate', t.data->>'inspectionDate',
-      'changeNote', t.data->>'changeNote', 'crewName', t.data->>'crewName', 'subName', coalesce(s.data->>'name', t.data->>'subName'), 'paint', is_paint,
+      'changeNote', t.data->>'changeNote', 'assignment', t.data->>'assignment', 'stage', t.data->'stage', 'crewName', t.data->>'crewName', 'subName', coalesce(s.data->>'name', t.data->>'subName'), 'paint', is_paint,
       'inspections', case when jsonb_typeof(t.data->'inspections') = 'array' then t.data->'inspections' else '[]'::jsonb end),
     'recipients', who);
 end $$;

@@ -79,6 +79,17 @@ export function messageFor(info) {
       path: taskPath, cta: 'Open the job / Abrir el trabajo',
     }
     case 'changed': {
+      // Sent back for the next stage of the job (lib/subTasks sendBackChanges)
+      if (t.changeNote === 'next stage') {
+        const note = tidy(t.assignment, 400)
+        return {
+          subject: `Back on the job: ${job}`,
+          en: `${who} needs you back at ${at} for the next stage of ${tidy(t.title)}.${note ? ` ${note}` : ''} ${whenText(t)}`.replace(/\s+/g, ' ').trim(),
+          es: `${who} lo necesita de regreso en ${at} para la siguiente etapa de ${tidy(t.title)}.${note ? ` ${note}` : ''} ${whenText(t, 'es')}`.replace(/\s+/g, ' ').trim(),
+          sms: `Deck Plus: ${who} needs you back at ${tidy(t.client, 40)} for the next stage.${note ? ` ${tidy(note, 120)}` : ''} ${whenText(t)}`.trim(),
+          path: taskPath, cta: 'Open the job / Abrir el trabajo',
+        }
+      }
       const what = tidy(t.changeNote) || 'details'
       return {
         subject: `Job updated: ${job}`,

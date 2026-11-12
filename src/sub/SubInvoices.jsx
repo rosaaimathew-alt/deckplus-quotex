@@ -201,7 +201,7 @@ export function NewInvoiceScreen() {
         id: newDrawId(),
         subId: task.subId, subName: task.subName || company, subUserId: me?.id || null, email: me?.email || '',
         date, weekOf: weekOf(), workTypes: work, status: 'submitted', notes: notes.trim(), total: amt, files: uploaded,
-        lines: [{ taskId: task.id, proposalId: task.proposalId, client: task.client || '', address: task.address || '', title: task.title || '', amount: amt }],
+        lines: [{ taskId: task.id, proposalId: task.proposalId, client: task.client || '', address: task.address || '', title: task.title || '', amount: amt, stage: Math.max(1, Number(task.stage) || 1) }],
       }
       if (!DEMO) await submitSubDraw(draw)
       addSubDraw(draw)

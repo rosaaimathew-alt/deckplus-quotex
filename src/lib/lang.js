@@ -60,6 +60,7 @@ const ES = {
   'Inspection': 'Inspección', 'From your PM': 'De su PM', 'Progress': 'Avance', 'Call': 'Llamar a',
   // what changed (lib/subTasks changeStamp)
   'service': 'el servicio', 'dates': 'las fechas', 'notes': 'las notas', 'electrical items': 'los artículos eléctricos', 'inspection date': 'la fecha de inspección',
+  'next stage': 'la siguiente etapa', 'Stage': 'Etapa', 'Back for the next stage': 'De regreso para la siguiente etapa',
   // job sheet
   'Paint': 'Pintura', 'Paint date': 'Fecha de pintura', 'Color not set': 'Color sin definir', 'Notes for the painter': 'Notas para el pintor', 'Touch-ups': 'Retoques',
   'Inspection results': 'Resultados de inspección', 'Passed': 'Aprobada', 'Did not pass': 'No aprobada', 'Recorded': 'Registrada',
