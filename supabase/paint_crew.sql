@@ -140,6 +140,15 @@ begin
     'projectTypeOverride', jd->'projectTypeOverride',
     'projectTypes', coalesce(d->'projectTypes', '[]'::jsonb),
     'hasWindows', (coalesce(d->'scopeBullets', '[]'::jsonb)::text || coalesce(d->'scopeLines', '[]'::jsonb)::text) ~* 'window|glass|enclos',
+    -- What the job includes, as text, so the sub's checklist is the office's
+    -- (getStages in src/pages/Jobs.jsx). Names and descriptions only, no prices.
+    'checklistText', left(concat_ws(' \n ',
+        (select string_agg(x, ' ') from jsonb_array_elements_text(case when jsonb_typeof(p.data->'projectTypes') = 'array' then p.data->'projectTypes' else '[]'::jsonb end) x),
+        (select string_agg(x, ' ') from jsonb_array_elements_text(case when jsonb_typeof(d->'projectTypes') = 'array' then d->'projectTypes' else '[]'::jsonb end) x),
+        p.data->>'projectSummary',
+        (select string_agg(concat_ws(' ', l->>'name', l->>'category', l->>'description'), ' \n ') from jsonb_array_elements(case when jsonb_typeof(p.data->'lines') = 'array' then p.data->'lines' else '[]'::jsonb end) l),
+        (select string_agg(concat_ws(' ', x->>'type', x->>'description'), ' \n ') from jsonb_array_elements(case when jsonb_typeof(p.data->'countyPermit'->'permits') = 'array' then p.data->'countyPermit'->'permits' else '[]'::jsonb end) x)
+      ), 8000),
     'paint', case when coalesce((t.data->>'paint')::boolean, false) then jsonb_build_object(
         'colors', coalesce(pt->'colors', '[]'::jsonb), 'product', pt->'product', 'color', pt->'color', 'sheen', pt->'sheen', 'areas', pt->'areas',
         'notes', pt->'notes', 'date', jd->'stageDates'->'paint',

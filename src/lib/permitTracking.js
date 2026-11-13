@@ -144,10 +144,16 @@ export function countyStageKey(ins, permit, stageKeys) {
   if (permit.manual) {
     // Office entries carry the board's own codes
     if (ins.code === 'ER') return pick('rough_elec_insp')
-    if (['EF', 'MI', 'MF'].includes(ins.code)) return null
+    if (ins.code === 'EF') return pick('final_elec_insp')
+    if (ins.code === 'MI') return pick('rough_mech_insp')
+    if (ins.code === 'MF') return null
   } else if (permit.role === 'trade') {
-    // Only the electrical permit's rough inspection has a stage of its own
+    // The electrical permit's rough (and final) inspections have stages of their own
     if ((permit.kind || tradeKind(permit.record)) === 'ELC' && (ins.code === 'RF' || ins.code === 'ER')) return pick('rough_elec_insp')
+    // …and its final, on jobs whose checklist has one
+    if ((permit.kind || tradeKind(permit.record)) === 'ELC' && (ins.code === 'FI' || ins.code === 'EF')) return pick('final_elec_insp')
+    // A gas fireplace's mechanical rough (the gas line, at the framing inspection)
+    if (['MEC', 'PLM'].includes(permit.kind || tradeKind(permit.record)) && ['RF', 'MI'].includes(ins.code)) return pick('rough_mech_insp')
     return null
   }
   switch (ins.code) {
