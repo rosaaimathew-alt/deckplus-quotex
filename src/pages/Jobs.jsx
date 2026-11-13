@@ -186,6 +186,65 @@ const STAGE_TEMPLATES = {
   ],
 }
 
+// A screen porch, sunroom or Eze-Breeze built on a deck: the office's own
+// progression, top to bottom. The enclosure step is named for what the job
+// has; LVP, when the job has it, goes in last. A fireplace adds its stone after
+// the ceiling and before painting; a gas one also needs the mechanical gas
+// line inspected at the framing inspection. Keys the old porch-over-deck
+// list used are kept, so steps already checked stay checked.
+function porchOnDeckStages(text) {
+  const enclosure = /eze[- ]?breeze/i.test(text) ? 'Eze-Breeze'
+    : /screen/i.test(text) ? 'Screen'
+    : 'Screen or Eze-Breeze'
+  const lvp = /\bLVP\b|luxury vinyl|vinyl plank/i.test(text)
+  const fireplace = /fire ?place/i.test(text)
+  const gas = fireplace && /\bgas\b|propane|ventless|vent[- ]free|natural gas|\bLP\b/i.test(text)
+  return [
+    { key: 'demo_footings',       label: 'Demo / Footings' },
+    { key: 'footing_insp',        label: 'Footing Inspection' },
+    { key: 'materials',           label: 'Material Delivery' },
+    { key: 'deck_framing',        label: 'Deck Framing' },
+    { key: 'floor_framing_insp',  label: 'Deck Framing Inspection' },
+    { key: 'materials_2',         label: 'Material Delivery' },
+    { key: 'install_decking',     label: 'Install Decking, Walls and Roof' },
+    { key: 'shingles',            label: 'Shingles' },
+    { key: 'rough_elec_insp',     label: 'Rough Electrical Inspection' },
+    ...(gas ? [{ key: 'rough_mech_insp', label: 'Mechanical Gas Line Inspection' }] : []),
+    { key: 'rough_building_insp', label: 'Rough Building Inspection' },
+    { key: 'ceiling_trim',        label: 'Ceiling & Trim' },
+    ...(fireplace ? [{ key: 'fireplace_stone', label: 'Fireplace Stone' }] : []),
+    { key: 'ready_paint',         label: 'Ready for Paint' },
+    { key: 'painting',            label: 'Painting' },
+    { key: 'paint',               label: 'Painting Complete' },
+    { key: 'electrical_finish',   label: 'Electrical Trim' },
+    { key: 'gutters',             label: 'Gutters' },
+    { key: 'windows_glass',       label: enclosure },
+    { key: 'walkthrough',         label: 'Final Walk-through' },
+    { key: 'punch',               label: 'Punch List' },
+    { key: 'final_elec_insp',     label: 'Final Electrical Inspection' },
+    { key: 'final_insp',          label: 'Final Building Inspection' },
+    { key: 'touchups',            label: 'Paint Touch-ups / Cleaning' },
+    ...(lvp ? [{ key: 'lvp', label: 'LVP Flooring' }] : []),
+    { key: 'closed',              label: 'Job Closed' },
+  ]
+}
+
+// Everything the job says about itself, as one piece of text: project types,
+// the quote's lines, the summary, the contract scope and the county permits.
+// (The sub app gets this from sub_job_sheet as checklistText.)
+function jobScopeText(proposal) {
+  if (typeof proposal.checklistText === 'string') return proposal.checklistText
+  const d = proposal.contractDraft || {}
+  const line = (l) => (typeof l === 'string' ? l : `${l?.name || ''} ${l?.category || ''} ${l?.description || ''} ${l?.text || ''}`)
+  return [
+    ...(proposal.projectTypes || []), ...(d.projectTypes || []),
+    proposal.projectSummary || '',
+    ...(proposal.lines || []).map(line), ...(proposal.upgrades || []).map(line),
+    ...(d.scopeBullets || []).map(line), ...(d.scopeLines || []).map(line),
+    ...((proposal.countyPermit?.permits) || []).map(pm => `${pm?.type || ''} ${pm?.description || ''}`),
+  ].join(' \n ')
+}
+
 export const JOB_TYPE_OPTIONS = [
   'Porch Conversion',
   'Deck (New)',
@@ -207,18 +266,28 @@ export function getStages(proposal) {
     if (override === 'Deck (New)')                    return STAGE_TEMPLATES.deck_new
     if (override === 'Ground Level Porch')            return STAGE_TEMPLATES.porch_ground
     if (override === 'Ground Level Porch + Windows')  return STAGE_TEMPLATES.porch_ground_windows
-    if (override === 'Porch Over Deck')               return STAGE_TEMPLATES.porch_over_deck
-    if (override === 'Porch Over Deck + Windows')     return STAGE_TEMPLATES.porch_over_deck_windows
+    if (override === 'Porch Over Deck' || override === 'Porch Over Deck + Windows') return porchOnDeckStages(jobScopeText(proposal))
     if (override === 'Pergola')                       return STAGE_TEMPLATES.pergola
     if (override === 'Gazebo')                        return STAGE_TEMPLATES.gazebo
   }
 
-  const types = proposal.contractDraft?.projectTypes || []
+  // The quote's project types ("Screen Porches", "Open Deck"…) and the
+  // contract's, read the same way
+  const ALIAS = { 'open deck': 'Deck', 'screen porches': 'Screened Porch', 'open porches': 'Open Porch', 'porch conversions': 'Porch Conversion',
+    'sunrooms': 'Sunroom', 'eze-breeze porches': 'Eze-Breeze Porch' }
+  const types = [...new Set([...(proposal.contractDraft?.projectTypes || []), ...(proposal.projectTypes || [])]
+    .map(t => ALIAS[String(t).toLowerCase()] || t))]
+  const text = jobScopeText(proposal)
   const scope = [
     ...(proposal.contractDraft?.scopeBullets || []),
     ...(proposal.contractDraft?.scopeLines   || []).map(l => (typeof l === 'string' ? l : `${l?.name || ''} ${l?.text || ''}`)),
   ].join(' ')
   const hasWindows = /window|glass|enclos/i.test(scope)
+
+  // A screen porch, sunroom or Eze-Breeze built on a deck: the office's progression
+  const enclosed = types.some(t => ['Screened Porch', 'Sunroom', 'Eze-Breeze Porch'].includes(t)) || /eze[- ]?breeze|screen ?eze|screen porch|sunroom/i.test(text)
+  const onGround = /ground level|on (a |the )?(concrete )?slab/i.test(text)
+  if (enclosed && !onGround && !types.includes('Porch Conversion')) return porchOnDeckStages(text)
 
   const isDeckType  = types.some(t => ['Deck', 'Deck (New)', 'Deck (Resurface / Rebuild)'].includes(t))
   const isPorchType = types.some(t => ['Screened Porch', 'Open Porch', 'Ground Level Porch', 'Porch Over Deck'].includes(t))
@@ -1888,24 +1957,28 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                     Select the job type above to load the correct stage checklist.
                   </p>
                 ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {stages.map(stage => {
+                // One column, top to bottom, in the order the work happens
+                <ol className="flex flex-col gap-1.5 max-w-xl" aria-label="Job checklist">
+                  {stages.map((stage, i) => {
                     const done = completedStages.includes(stage.key)
                     return (
-                      <button key={stage.key} onClick={() => toggleJobStage(proposal.id, stage.key)}
-                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-all ${
+                      <li key={stage.key}>
+                      <button onClick={() => toggleJobStage(proposal.id, stage.key)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-all ${
                           done
                             ? 'bg-green-50 text-green-800 border border-green-200'
                             : 'bg-gray-50 text-gray-600 border border-gray-100 hover:border-blue-200 hover:bg-blue-50'
                         }`}>
+                        <span className="w-5 text-right text-xs tabular-nums text-gray-400 shrink-0">{i + 1}</span>
                         {done
                           ? <CheckCircle2 size={15} className="text-green-500 shrink-0" />
                           : <Circle size={15} className="text-gray-300 shrink-0" />}
                         <span className={done ? 'line-through opacity-60' : ''}>{stage.label}</span>
                       </button>
+                      </li>
                     )
                   })}
-                </div>
+                </ol>
                 )}
                 {/* Notes */}
                 <div className="pt-2 border-t border-gray-100">

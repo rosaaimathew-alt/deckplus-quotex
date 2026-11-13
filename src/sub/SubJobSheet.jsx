@@ -52,6 +52,8 @@ export function JobSheet({ task }) {
   const sheet = useSheet(task)
   const items = (task.electrical || []).length ? task.electrical : electricalItemsOf(sheet?.electrical)
   const stages = sheet ? getStages({
+    // the job's own text (types, quote lines, summary, permits) when the database sends it
+    ...(typeof sheet.checklistText === 'string' ? { checklistText: sheet.checklistText } : {}),
     jobData: { projectTypeOverride: sheet.projectTypeOverride || undefined },
     contractDraft: { projectTypes: sheet.projectTypes || [], scopeBullets: sheet.hasWindows ? ['window'] : [] },
   }) : null
