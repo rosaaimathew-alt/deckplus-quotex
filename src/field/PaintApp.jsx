@@ -5,7 +5,7 @@
 //   Schedule   — paint dates and crews for the next two weeks
 //   Touch-ups  — every open touch-up, across jobs
 //   Paint job  — date + crew, Mark paint done, paint details (product,
-//                color, sheen, areas), touch-ups, the Pre-Paint payment
+//                color, brand, sheen, areas), touch-ups, the Pre-Paint payment
 //                they collect, notes
 //
 // Only jobs where Deck Plus does the paint are shown: a job is skipped when
@@ -13,7 +13,7 @@
 //
 // Data (all on the job, so the office sees it too):
 //   jobData.stageDates.paint      paint date (same as the PM calendar)
-//   jobData.paint                 { crew, colors: [{ color, areas, product, sheen }], notes }
+//   jobData.paint                 { crew, colors: [{ color, areas, brand, product, sheen }], notes }
 //                                 (+ the first color in product / color / sheen / areas)
 //   jobData.touchUps              [{ id, text, done, createdAt, doneAt, by }]
 //   jobData.paymentsReceived      the Pre-Paint payment, when collected
@@ -26,7 +26,7 @@ import {
 import { useStore } from '../store'
 import { createPaintCrewInvite } from '../supabase'
 import { DEMO } from '../demo'
-import { blankColor, tidyColor, hasColor, paintColorsOf } from '../lib/paintColors'
+import { blankColor, tidyColor, hasColor, paintColorsOf, BRANDS, colorDetail } from '../lib/paintColors'
 import { STATUS_PILL, statusKey, statusLabel } from '../lib/subTasks'
 import { PhotoDays } from '../components/TaskPhotos'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
@@ -436,8 +436,16 @@ function PaintDetails({ paint, onSave }) {
   const [notes, setNotes] = useState('')
   const saved = paintColorsOf(paint)
   const has = saved.length > 0 || paint.notes
-  const start = () => { setColors(saved.length ? saved : [blankColor()]); setNotes(paint.notes || ''); setEditing(true) }
+  // otherBrand: the brand is typed in (not one of BRANDS); tidyColor drops it on save
+  const start = () => {
+    setColors((saved.length ? saved : [blankColor()]).map(c => ({ ...c, otherBrand: !!c.brand && !BRANDS.includes(c.brand) })))
+    setNotes(paint.notes || ''); setEditing(true)
+  }
   const set = (i, k) => (e) => setColors(list => list.map((c, j) => (j === i ? { ...c, [k]: e.target.value } : c)))
+  const pickBrand = (i) => (e) => {
+    const v = e.target.value
+    setColors(list => list.map((c, j) => (j !== i ? c : v === 'Other' ? { ...c, brand: '', otherBrand: true } : { ...c, brand: v, otherBrand: false })))
+  }
   const save = () => {
     const list = colors.map(tidyColor).filter(hasColor)
     const first = list[0] || blankColor()
@@ -460,7 +468,11 @@ function PaintDetails({ paint, onSave }) {
                 <p className="text-sm font-semibold text-gray-700">Color {i + 1}</p>
                 {colors.length > 1 && <button onClick={() => setColors(list => list.filter((_, j) => j !== i))} className="text-sm font-semibold text-red-600 px-2 py-1" aria-label={`Remove color ${i + 1}`}>Remove</button>}
               </div>
-              <input className={input} value={c.color} onChange={set(i, 'color')} placeholder="Color (brand, name, code)" aria-label={`Color ${i + 1} name`} />
+              <select aria-label={`Color ${i + 1} brand`} className={input} value={c.otherBrand ? 'Other' : c.brand} onChange={pickBrand(i)}>
+                <option value="">Brand…</option>{BRANDS.map(x => <option key={x}>{x}</option>)}<option>Other</option>
+              </select>
+              {c.otherBrand && <input className={input} value={c.brand} onChange={set(i, 'brand')} placeholder="Brand name" aria-label={`Color ${i + 1} other brand`} autoFocus />}
+              <input className={input} value={c.color} onChange={set(i, 'color')} placeholder="Color (name, code)" aria-label={`Color ${i + 1} name`} />
               <input className={input} value={c.areas} onChange={set(i, 'areas')} placeholder="What gets painted (rails, ceiling, trim…)" aria-label={`Color ${i + 1} areas`} />
               <div className="grid grid-cols-2 gap-2">
                 <select aria-label={`Color ${i + 1} product`} className={input} value={c.product} onChange={set(i, 'product')}>
@@ -489,7 +501,7 @@ function PaintDetails({ paint, onSave }) {
                 <li key={i} className="py-2 first:pt-0 last:pb-0">
                   <p className="text-base font-semibold text-gray-900">{c.color || 'Color not set'}</p>
                   {c.areas && <p className="text-base text-gray-800">{c.areas}</p>}
-                  {(c.product || c.sheen) && <p className="text-sm text-gray-500">{[c.product, c.sheen].filter(Boolean).join(' · ')}</p>}
+                  {colorDetail(c) && <p className="text-sm text-gray-500">{colorDetail(c)}</p>}
                 </li>
               ))}
             </ul>

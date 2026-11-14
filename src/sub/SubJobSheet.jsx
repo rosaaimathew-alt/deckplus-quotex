@@ -20,7 +20,7 @@ import { DEMO } from '../demo'
 import { Card } from '../field/shared'
 import { getStages } from '../pages/Jobs'
 import { electricalItemsOf } from '../lib/electricalItems'
-import { paintColorsOf } from '../lib/paintColors'
+import { paintColorsOf, colorDetail } from '../lib/paintColors'
 import { tr, dayText as dayLabel } from '../lib/lang'
 
 const _cache = new Map()   // task id → sheet, so going back and forth doesn't blink
@@ -78,7 +78,7 @@ export function JobSheet({ task }) {
                 <li key={i} className="py-2 first:pt-0 last:pb-0">
                   <p className="text-base font-semibold text-gray-900">{c.color || tr('Color not set')}</p>
                   {c.areas && <p className="text-base text-gray-800">{c.areas}</p>}
-                  {(c.product || c.sheen) && <p className="text-sm text-gray-500">{[c.product, c.sheen].filter(Boolean).join(' · ')}</p>}
+                  {colorDetail(c) && <p className="text-sm text-gray-500">{colorDetail(c)}</p>}
                 </li>
               ))}
             </ul>
