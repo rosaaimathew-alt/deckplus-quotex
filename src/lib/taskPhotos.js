@@ -34,7 +34,7 @@ async function shrink(file, maxSide = MAX_SIDE) {
   const url = URL.createObjectURL(file)
   try {
     const img = await new Promise((resolve, reject) => {
-      const i = new Image(); i.onload = () => resolve(i); i.onerror = () => reject(new Error(`"${file.name}" isn't a photo this phone can read.`)); i.src = url
+      const i = new Image(); i.onload = () => resolve(i); i.onerror = () => reject(new Error(`"${file.name}" isn't a photo this device can read.`)); i.src = url
     })
     const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight))
     const c = document.createElement('canvas')
@@ -81,6 +81,45 @@ export async function uploadInvoiceFile({ orgId, taskId, file }) {
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: pdf ? 'application/pdf' : 'image/jpeg', upsert: false })
   if (error) throw new Error(/fetch|network/i.test(error.message) ? 'No signal: the file did not upload. Try again when you have service.' : error.message)
   return { ...entry, path }
+}
+
+// A job's own files (Jobs › Photos and Documents): photos and PDFs are kept in
+// the app, in the same private bucket, at <org>/job-<proposal id>/<id>.<jpg|pdf>
+// (supabase/job_files.sql), not in Google Drive. Photos are shrunk first, so a
+// large phone photo still goes up. The job keeps the list on
+// jobData.documents: { id, name, path, mimeType, folder, uploadedAt, by }.
+const isPdfFile = (file) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')
+const isPhotoFile = (file) => /^image\//.test(file.type || '') || /\.(jpe?g|png|heic|webp)$/i.test(file.name || '')
+export const keptInApp = (file) => isPdfFile(file) || isPhotoFile(file)
+// A stored file (not a Drive link), and whether it is a picture.
+export const isStored = (d) => !!(d?.path || d?.dataUrl)
+export const isStoredPhoto = (d) => isStored(d) && /^image\//.test(d.mimeType || '')
+
+// A job's own photos, newest first: stored pictures in any folder but Receipts
+// (job money).
+export const jobPhotos = (proposal) => ((proposal.jobData || {}).documents || [])
+  .filter(d => isStoredPhoto(d) && d.folder !== 'Receipts')
+  .sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')))
+export const jobPhotoCount = (proposal, tasks = []) => jobPhotos(proposal).length + tasks.reduce((n, t) => n + (t.photos || []).length, 0)
+
+export async function uploadJobFile({ orgId, proposalId, file, readable = false }) {
+  const pdf = isPdfFile(file)
+  const blob = pdf ? file : await shrink(file, readable ? 2400 : MAX_SIDE)
+  if (blob.size > MAX_FILE) throw new Error(`"${file.name}" is too big (10 MB max).`)
+  const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  const entry = { id, name: file.name || (pdf ? 'file.pdf' : 'photo.jpg'), mimeType: pdf ? 'application/pdf' : 'image/jpeg' }
+  if (DEMO || !supabase) return { ...entry, dataUrl: await blobToDataUrl(blob) }
+  if (!orgId) throw new Error('Not signed in to a company yet. Reload and try again.')
+  const path = `${orgId}/job-${proposalId}/${id}.${pdf ? 'pdf' : 'jpg'}`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: entry.mimeType, upsert: false })
+  if (error) throw new Error(/fetch|network/i.test(error.message) ? `No connection: "${entry.name}" did not upload. Try again.` : error.message)
+  return { ...entry, path }
+}
+
+// Taking a file off a job also deletes it from storage (office and admins;
+// for anyone else it just leaves the job's list).
+export function deleteJobFile(d) {
+  if (d?.path && supabase) supabase.storage.from(BUCKET).remove([d.path]).catch(() => {})
 }
 
 // A viewable URL for a stored photo: a signed link good for 12 hours,

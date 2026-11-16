@@ -7,6 +7,8 @@ import { StatusPill, DateRange, ExportButton, btnPrimary, btnGhost } from './ui'
 import { InvoiceModal } from './Invoices'
 import { PurchaseModal } from './Purchases'
 import { BillModal } from './Bills'
+import { deleteJobFile, isStored, isStoredPhoto, keptInApp, uploadJobFile } from '../../lib/taskPhotos'
+import { DocThumb, PhotoViewer, StoredLink } from '../../components/JobPhotos'
 
 function useJobBooks(proposal) {
   const invoices = useStore(s => s.invoices)
@@ -174,14 +176,26 @@ export function JobDocuments({ proposal, showReceipts = true }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef(null)
+  const orgId = useStore(s => s.orgId)
+  const me = useStore(s => s.me)
+  const [viewing, setViewing] = useState(null)   // id of the photo open full size
+  const latestDocs = () => (useStore.getState().proposals.find(p => String(p.id) === String(proposal.id))?.jobData || {}).documents || []
 
+  // Photos and PDFs are kept in the app; anything else still goes to Drive.
   const onFiles = async (e) => {
     const files = [...(e.target.files || [])]
     if (!files.length) return
     setUploading(true); setError('')
+    const added = []
     try {
-      const added = []
       for (const file of files) {
+        const at = new Date().toISOString()
+        if (keptInApp(file)) {
+          const f = await uploadJobFile({ orgId, proposalId: proposal.id, file, readable: folder !== 'Photos' && folder !== 'Other' })
+          const photo = f.mimeType !== 'application/pdf'
+          added.push({ ...f, folder: photo && folder === 'Other' ? 'Photos' : folder, shareMobile: false, uploadedAt: at, by: me?.displayName || me?.email || '' })
+          continue
+        }
         const base64 = await new Promise((resolve, reject) => {
           const r = new FileReader()
           r.onload = () => resolve(String(r.result).split(',')[1])
@@ -193,13 +207,13 @@ export function JobDocuments({ proposal, showReceipts = true }) {
           body: JSON.stringify({ pdfBase64: base64, fileName: `${(proposal.client || 'Job').replace(/[^\w ,.-]+/g, '')}-${folder}-${file.name}`, mimeType: file.type || 'application/octet-stream' }),
         })
         const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Upload failed')
-        added.push({ id: data.fileId || `${Date.now()}${Math.random()}`, name: file.name, link: data.driveLink, mimeType: file.type, folder, shareMobile: false, uploadedAt: new Date().toISOString() })
+        if (!res.ok) throw new Error(data.error || (res.status === 413 ? `"${file.name}" is too big to upload.` : 'Upload failed'))
+        added.push({ id: data.fileId || `${Date.now()}${Math.random()}`, name: file.name, link: data.driveLink, mimeType: file.type, folder, shareMobile: false, uploadedAt: at })
       }
-      updateJobData(proposal.id, { documents: [...(jd.documents || []), ...added] })
     } catch (err) {
       setError(/token|auth|not connected|401|drive/i.test(err.message) ? 'Connect Google Drive in Settings first, then try again.' : err.message)
     } finally {
+      if (added.length) updateJobData(proposal.id, { documents: [...latestDocs(), ...added] })
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
     }
@@ -210,9 +224,10 @@ export function JobDocuments({ proposal, showReceipts = true }) {
     else updateJobData(proposal.id, { documents: (jd.documents || []).map(x => (x.id === d.id ? { ...x, ...patch } : x)) })
   }
   const removeDoc = (d) => {
-    if (!window.confirm(`Remove "${d.name}" from the job? (The file stays in your Drive.)`)) return
+    if (!window.confirm(isStored(d) ? `Delete "${d.name}" from the job?` : `Remove "${d.name}" from the job? (The file stays in your Drive.)`)) return
     if (d.legacyReceipt) updateJobData(proposal.id, { receipts: (jd.receipts || []).filter(r => r.id !== d.id) })
     else updateJobData(proposal.id, { documents: (jd.documents || []).filter(x => x.id !== d.id) })
+    deleteJobFile(d)
   }
 
   const s = q.trim().toLowerCase()
@@ -221,9 +236,11 @@ export function JobDocuments({ proposal, showReceipts = true }) {
 
   const fileRow = (d) => (
     <div key={`${d.legacyReceipt ? 'r' : 'd'}${d.id}`} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg group">
-      <FileText size={15} className="text-gray-400 shrink-0" />
+      {isStoredPhoto(d) ? <DocThumb doc={d} size="w-10 h-10" onOpen={() => setViewing(d.id)} /> : <FileText size={15} className="text-gray-400 shrink-0" />}
       <div className="flex-1 min-w-0">
-        {d.link ? <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-800 hover:underline truncate block">{d.name}</a> : <p className="text-sm text-gray-800 truncate">{d.name}</p>}
+        {isStoredPhoto(d) ? <button type="button" onClick={() => setViewing(d.id)} className="text-sm text-gray-800 hover:underline truncate block max-w-full text-left">{d.name}</button>
+          : isStored(d) ? <StoredLink doc={d} className="text-sm text-gray-800 hover:underline truncate block">{d.name}</StoredLink>
+          : d.link ? <a href={d.link} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-800 hover:underline truncate block">{d.name}</a> : <p className="text-sm text-gray-800 truncate">{d.name}</p>}
         <p className="text-[11px] text-gray-400">{shortDate(d.uploadedAt)}{s ? ` · ${d.folder || 'Other'}` : ''}</p>
       </div>
       <select value={d.folder || 'Other'} onChange={e => patchDoc(d, { folder: e.target.value })} disabled={d.legacyReceipt} className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white" aria-label="Folder">
@@ -254,7 +271,7 @@ export function JobDocuments({ proposal, showReceipts = true }) {
         </button>
       </div>
       {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-      {docs.length === 0 && <p className="text-center py-8 text-sm text-gray-400 border border-dashed border-gray-200 rounded-xl">No documents yet. Upload contracts, plans, photos or receipts — they're stored in your Google Drive.</p>}
+      {docs.length === 0 && <p className="text-center py-8 text-sm text-gray-400 border border-dashed border-gray-200 rounded-xl">No documents yet</p>}
       {visible ? (
         <div className="space-y-1.5">
           {!s && <button onClick={() => setOpenFolder(null)} className="text-xs text-[var(--brand-700)] hover:underline">← All folders</button>}
@@ -271,6 +288,11 @@ export function JobDocuments({ proposal, showReceipts = true }) {
           ))}
         </div>
       )}
+      {viewing != null && (() => {
+        const shown = (visible || docs).filter(isStoredPhoto)
+        const at = shown.findIndex(d => d.id === viewing)
+        return at < 0 ? null : <PhotoViewer docs={shown} index={at} onIndex={(n) => setViewing(shown[n].id)} onClose={() => setViewing(null)} />
+      })()}
     </div>
   )
 }
