@@ -32,6 +32,7 @@ import SubTasksCard from './SubTasksCard'
 import { needsInspection, statusKey, subNameOf } from '../lib/subTasks'
 import { missingTodaysPhotos, isStored } from '../lib/taskPhotos'
 import { StoredLink } from '../components/JobPhotos'
+import JobForms from '../components/JobForms'
 import { useJobMoney } from '../nav'
 import {
   todayStr, addDays, dayLabel, mapsUrl, telUrl, smsUrl, describeJob, useFieldJobs, Card, Progress, ScopeToggle, JobRow, nextLine, useUndo, BackButton, QuickAction, QuickNote, RecentNotes,
@@ -408,6 +409,14 @@ function JobScreen() {
 
       {showMoney && <JobMoney proposal={proposal} />}
 
+      {proposal.contractDraft && (
+        <Card className="px-4">
+          <button onClick={() => navigate(`/field/job/${proposal.id}/forms`)} className="w-full flex items-center gap-3 py-3.5 text-base text-gray-900 text-left">
+            <FileText size={18} className="text-gray-400 shrink-0" /><span className="flex-1 font-semibold">Job forms</span><ChevronRight size={16} className="text-gray-300" />
+          </button>
+        </Card>
+      )}
+
       <SharedDocs proposal={proposal} />
 
       <button onClick={() => { setViewPref('full'); navigate('/projects?tab=jobs') }}
@@ -415,6 +424,19 @@ function JobScreen() {
         <Monitor size={16} /> Open budget, change orders & more in the full app
       </button>
       {toast}
+    </div>
+  )
+}
+
+// The job's forms from the contract: scope of work and payment schedule, spec
+// sheets, processing form (components/JobForms).
+function JobFormsScreen() {
+  const { id } = useParams()
+  const proposal = useStore(s => s.proposals.find(p => String(p.id) === String(id)))
+  return (
+    <div className="space-y-3">
+      <BackButton />
+      {proposal ? <JobForms proposal={proposal} phone /> : <p className="text-base text-gray-600">That job isn't here anymore.</p>}
     </div>
   )
 }
@@ -575,6 +597,7 @@ export default function FieldApp() {
           <Route path="/field" element={<TodayScreen />} />
           <Route path="/field/jobs" element={<JobsScreen />} />
           <Route path="/field/paint" element={<PaintScreen />} />
+          <Route path="/field/job/:id/forms" element={<JobFormsScreen />} />
           <Route path="/field/job/:id" element={<JobScreen />} />
           <Route path="*" element={<Navigate to="/field" replace />} />
         </Routes>

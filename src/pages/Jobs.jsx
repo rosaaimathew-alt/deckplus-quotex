@@ -8,6 +8,7 @@ import JobPriceList from '../components/JobPriceList'
 import PermitsTab from '../components/PermitsTab'
 import JobSubsTab from '../components/JobSubsTab'
 import JobPhotosTab from '../components/JobPhotos'
+import JobForms from '../components/JobForms'
 import { jobPhotoCount } from '../lib/taskPhotos'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
@@ -1789,6 +1790,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
     { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
+    { key: 'forms', label: 'Forms' },
     { key: 'photos', label: `Photos${photoCount ? ` (${photoCount})` : ''}` },
     { key: 'documents', label: `Documents${docCount ? ` (${docCount})` : ''}` },
   ]
@@ -2020,6 +2022,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}
             {tab === 'summary' && books && <JobSummary proposal={proposal} />}
+            {tab === 'forms' && <JobForms proposal={proposal} />}
             {tab === 'photos' && <JobPhotosTab proposal={proposal} tasks={showSubs ? jobTasks : []} />}
             {tab === 'documents' && <JobDocuments proposal={proposal} showReceipts={money} />}
           </div>

@@ -448,12 +448,31 @@ export default function DeckPlusContract({
   scopeLines = [], projectSummary = '', total = 0, payments = [],
   editable = false, onValue, onCheck, renderSig, renderSigDate, renderInit,
   scopeSlot = null, renderBold, includeScope = true, showPaymentPct = false,
+  formsOnly = false,
   innerRef, className = '', style,
 }) {
   const ctx = makeCtx({ values, checks, editable, onValue, onCheck, renderSig, renderSigDate, renderInit })
   const forms = PACKET_FORMS.filter(f => packet.includes(f.key) && !f.image && !f.standalone)
   const govForms = PACKET_FORMS.filter(f => packet.includes(f.key) && f.image)
   const IMAGE_FORMS = { e589: E589CI_FORM, york: YORK_PERMIT_FORM }
+  // The working pages only, for the project manager (Jobs › Forms): the Scope
+  // of Work with its payment schedule, the spec sheets and the Processing
+  // Form, each exactly as it prints in the packet.
+  if (formsOnly) {
+    return (
+      <div ref={innerRef} className={`dp-doc contract-doc ${className}`} style={style}>
+        <ScopePages values={values} scopeLines={scopeLines} projectSummary={projectSummary} total={total} payments={payments} renderBold={renderBold} />
+        {forms.map(f => (
+          <Fragment key={f.key}>
+            <PageBreak />
+            {f.key === 'electrical' ? <ElectricalPage ctx={ctx} /> : <GridForm form={FORMS[f.key]} ctx={ctx} />}
+          </Fragment>
+        ))}
+        <PageBreak />
+        <ProcessingPage ctx={ctx} />
+      </div>
+    )
+  }
   return (
     <div ref={innerRef} className={`dp-doc contract-doc ${className}`} style={style}>
       <AgreementPages ctx={ctx} />

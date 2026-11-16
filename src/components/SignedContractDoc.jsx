@@ -5,7 +5,8 @@ import { fmtShortDate, ROLE_LABELS, effectivePacket } from '../contract/contract
 // The packet exactly as it was sent, with every party's signatures and initials
 // in their fields. Used by the full-document view (/view/:recordId) and by the
 // signing link once that party has signed, so both print the same copy.
-export default function SignedContractDoc({ record }) {
+// formsOnly: just the Scope of Work, spec sheets and Processing Form (Jobs › Forms).
+export default function SignedContractDoc({ record, formsOnly = false }) {
   const d = record?.contractData
   const dp = d?.dp
   const signatures = record?.signatures || {}
@@ -21,6 +22,7 @@ export default function SignedContractDoc({ record }) {
       values={dp.values} checks={dp.checks} packet={effectivePacket(dp)}
       scopeLines={d?.scopeLines || []} projectSummary={d?.projectSummary || ''} total={Number(d?.total) || 0} payments={d?.payments || []}
       renderSig={renderSig} renderSigDate={renderSigDate} renderInit={renderInit}
+      formsOnly={formsOnly}
     />
   )
 }
