@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { FileSignature, FilePen, CheckCircle2, Clock, Search, X, FileX, ExternalLink, Eye, Loader2, Copy, MoreHorizontal, ShieldCheck } from 'lucide-react'
 import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf } from '../contractTotal'
-import { QuickPicks } from '../components/FilterBar'
+import { QuickPicks, RepToggle } from '../components/FilterBar'
+import { useScopedProposals } from '../lib/proposalScope'
 
 const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -52,9 +53,9 @@ function SignaturesModal({ recordId, onClose }) {
   const [record, setRecord]   = useState(null)
   const [error, setError]     = useState('')
 
+  // Mounted fresh for each record (keyed by record id), so it starts out loading
   useEffect(() => {
     if (!recordId) return
-    setLoading(true)
     fetch(`/api/sign/record-${recordId}`)
       .then(async r => {
         const text = await r.text()
@@ -198,6 +199,14 @@ export default function ContractsList({ initialFilter } = {}) {
   const markContractSigned   = useStore(s => s.markContractSigned)
   const saveContractDraft    = useStore(s => s.saveContractDraft)
   const markSignedOffPlatform = useStore(s => s.markContractsSignedOffPlatform)
+  const members              = useStore(s => s.members)
+  // Office and admin pick one sales rep's contracts, same choice as on Proposals
+  const { canChoose, reps, repId, setRep } = useScopedProposals()
+  const showRep = canChoose && !repId
+  const repNameOf = (id) => {
+    const m = (members || []).find(x => x.id === id)
+    return m ? (m.displayName || (m.email || '').split('@')[0]) : ''
+  }
 
   const [filter, setFilter]  = useState(FILTERS.includes(initialFilter) ? initialFilter : 'All')
   const [query,  setQuery]   = useState('')
@@ -232,8 +241,8 @@ export default function ContractsList({ initialFilter } = {}) {
     }
   }
 
-  // Only Won proposals are relevant to contracts
-  const wonProposals = proposals.filter(p => p.status === 'Won')
+  // Only Won proposals are relevant to contracts (one rep's when a rep is picked)
+  const wonProposals = proposals.filter(p => p.status === 'Won' && (!repId || p.ownerId === repId))
 
   // Auto-detect signatures made remotely. When a customer signs from their own
   // device the signature only lands on the server — this app is never told. On
@@ -384,7 +393,10 @@ export default function ContractsList({ initialFilter } = {}) {
 
       {/* Filter tabs + search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
-        <QuickPicks value={filter} onChange={setFilter} options={FILTERS.map(f => ({ value: f, label: f, count: counts[f] }))} />
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+          {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
+          <QuickPicks value={filter} onChange={setFilter} options={FILTERS.map(f => ({ value: f, label: f, count: counts[f] }))} />
+        </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-56">
@@ -412,7 +424,7 @@ export default function ContractsList({ initialFilter } = {}) {
       {wonProposals.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-20 text-center">
           <FileSignature size={40} className="text-gray-200 mb-4" />
-          <p className="text-gray-500 font-medium mb-1">No won proposals yet</p>
+          <p className="text-gray-500 font-medium mb-1">{repId ? 'No won proposals for this sales rep yet' : 'No won proposals yet'}</p>
           <p className="text-sm text-gray-400">Mark a proposal as Won in the Proposal Tracker to generate a contract.</p>
           <button
             onClick={() => navigate('/tracker')}
@@ -464,6 +476,7 @@ export default function ContractsList({ initialFilter } = {}) {
                   <div className="sm:hidden mt-0.5">{clientSignedPending ? <span className="text-xs font-semibold text-blue-700">Client signed</span> : <StatusBadge status={status} />}</div>
                   <p className="text-xs text-gray-400 truncate">
                     <span className="font-mono">{contractNum}</span> · ${fmt(contractTotalOf(p))}
+                    {showRep && repNameOf(p.ownerId) ? ` · ${repNameOf(p.ownerId)}` : ''}
                     {status === 'signed' && (draft.signedOffPlatform
                       ? ' · off-platform'
                       : signedAt ? ` · Signed ${fmtDate(signedAt)}` : '')}
@@ -494,7 +507,7 @@ export default function ContractsList({ initialFilter } = {}) {
       )}
 
       {viewingRecordId && (
-        <SignaturesModal recordId={viewingRecordId} onClose={() => setViewingRecordId(null)} />
+        <SignaturesModal key={viewingRecordId} recordId={viewingRecordId} onClose={() => setViewingRecordId(null)} />
       )}
       {viewingLinks && (
         <LinksModal links={viewingLinks} onClose={() => setViewingLinks(null)} />
