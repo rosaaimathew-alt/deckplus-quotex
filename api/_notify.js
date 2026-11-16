@@ -201,6 +201,20 @@ export function buildAlertEmail({ msg, toName, sender, link, logoUrl }) {
   return { html, text }
 }
 
+// Whose mailbox an alert goes out from: the PM on the job, so a PM's alerts
+// run through their own email account and not the company's.
+//   a PM tells a sub (booked, changed, inspection…)  → that PM's mailbox
+//   a sub tells the PM (job done, a chat reply)       → the mailbox of the PM
+//                                                       receiving it
+// Only when that PM has no mailbox connected (Settings › Email Account) does
+// the mailer fall back to the company mailbox (api/_mailer.js).
+export function mailSenderFor(kind, info, people, orgId = null) {
+  const sender = info?.sender || {}
+  if (info?.senderIsStaff && sender.id) return { orgId, userId: sender.id, email: sender.email }
+  const toPm = ['done', 'message'].includes(kind) ? (people || [])[0] : null
+  return toPm?.email ? { orgId, email: toPm.email } : { orgId }
+}
+
 export async function sendNotification(req, res, body) {
   const header = req.headers?.authorization || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : (req.headers?.['x-qx-token'] || null)
@@ -237,7 +251,7 @@ export async function sendNotification(req, res, body) {
   // From the PM's own mailbox when they have one connected, else the company
   // mailbox with the PM's name on it; replies go to the PM either way.
   const member = await staffMembership(token, user).catch(() => null)
-  const mailSender = { orgId: member?.org_id || null, ...(info.senderIsStaff && sender.id ? { userId: sender.id, email: sender.email } : {}) }
+  const mailSender = mailSenderFor(kind, info, people, member?.org_id || null)
 
   let emailed = 0, texted = 0, pushed = 0
   const errors = []
