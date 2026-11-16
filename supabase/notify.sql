@@ -56,8 +56,9 @@ begin
       if d.owner_id is distinct from uid then return null; end if;
       select coalesce(jsonb_agg(jsonb_build_object('name', m.display_name, 'email', m.email, 'phone', m.phone)), '[]'::jsonb) into who
         from public.org_members m
-        where m.org_id = my_org and m.role in ('office', 'admin') and coalesce(m.email, '') <> ''
-          and coalesce((m.permissions->>'email.alerts')::boolean, true);
+        -- everyone in the office: those with "Alert emails" off still get the
+        -- pop-up; the server leaves them out of the email (api/_notify.js)
+        where m.org_id = my_org and m.role in ('office', 'admin') and coalesce(m.email, '') <> '';
     else
       if r not in ('office', 'admin') then return null; end if;
       select * into owner from public.org_members where org_id = my_org and user_id = d.owner_id;

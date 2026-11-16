@@ -7,9 +7,12 @@
 // Keys:
 //   '<destination>.<tab>'  every tab in the navigation (nav.js DESTINATIONS),
 //                          e.g. 'projects.inspections', 'insights.profit'
-//   'email.alerts'         the alert emails the office gets (a county permit
-//                          site that can't be read). Off for a shared login
-//                          whose address isn't a real mailbox.
+//   'email.alerts'         alerts by email: job alerts (a booking, a job done,
+//                          a chat message, an invoice) and the office's permit
+//                          alerts. Off: this person gets pop-ups only, is never
+//                          emailed an alert, and no alert is sent through their
+//                          mailbox, which stays for customers. Also off for a
+//                          shared login whose address isn't a real mailbox.
 //   'job.money'            the money inside a job: Budget, Price list, Costs,
 //                          Receipts, payments, close-out profit, Money › Bills
 //                          and Purchases, and the quote builder's cost / margin.
@@ -39,8 +42,8 @@ export const permissionGroups = () => [
   },
   {
     label: 'Emails',
-    items: [{ key: ALERT_EMAILS, label: 'Alert emails', access: '/settings', officeOnly: true,
-      hint: 'Emails the office gets when a county permit site can\'t be read. Untick for a login whose address isn\'t a real mailbox.' }],
+    items: [{ key: ALERT_EMAILS, label: 'Alert emails', access: '/',
+      hint: 'Job and permit alerts by email. Untick for pop-ups only: this person is never emailed an alert and none is sent through their mailbox.' }],
   },
 ]
 

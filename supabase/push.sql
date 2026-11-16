@@ -101,6 +101,18 @@ end $$;
 revoke all on function public.proposal_owner_email_s(text, text) from public;
 grant execute on function public.proposal_owner_email_s(text, text) to anon, authenticated;
 
+-- Server only: of these addresses, the team members with "Alert emails"
+-- switched off (Settings › Team › Access): pop-ups only, never an alert email.
+create or replace function public.alert_emails_off_s(p_emails text[], s text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.server_secret_ok(s) then raise exception 'Not allowed' using errcode = '42501'; end if;
+  return (select coalesce(jsonb_agg(distinct lower(m.email)), '[]'::jsonb) from public.org_members m
+          where lower(m.email) = any (select lower(e) from unnest(p_emails) e) and (m.permissions->>'email.alerts') = 'false');
+end $$;
+revoke all on function public.alert_emails_off_s(text[], text) from public;
+grant execute on function public.alert_emails_off_s(text[], text) to anon, authenticated;
+
 -- The API reaches these with the public key; the secret check inside is the lock.
 revoke all on function public.push_subs_s(text[], text) from public;
 revoke all on function public.push_drop_s(text, text) from public;
