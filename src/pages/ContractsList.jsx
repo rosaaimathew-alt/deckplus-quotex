@@ -5,6 +5,7 @@ import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf } from '../contractTotal'
 import { QuickPicks, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
+import { supabase } from '../supabase'
 
 const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -209,6 +210,16 @@ export default function ContractsList({ initialFilter } = {}) {
   }
 
   const [filter, setFilter]  = useState(FILTERS.includes(initialFilter) ? initialFilter : 'All')
+  // When customers opened their contract's signing link (supabase/contract_opens.sql):
+  // null while loading, then [{ proposalId, at }] newest first.
+  const [opens, setOpens] = useState(null)
+  const [showOpens, setShowOpens] = useState(false)
+  useEffect(() => {
+    if (!supabase) return
+    let live = true
+    supabase.rpc('contract_opens').then(({ data }) => { if (live) setOpens(Array.isArray(data) ? data : []) })
+    return () => { live = false }
+  }, [])
   const [query,  setQuery]   = useState('')
   const [viewingRecordId, setViewingRecordId] = useState(null)
   const [viewingLinks,    setViewingLinks]    = useState(null)
@@ -296,6 +307,14 @@ export default function ContractsList({ initialFilter } = {}) {
     if (p.contractDraft.signed || remote[p.id]?.status === 'signed') return 'signed'
     return 'in-progress'
   }
+
+  const opensByJob = new Map()   // proposal id → { count, last }
+  for (const o of opens || []) {
+    const k = String(o.proposalId)
+    const cur = opensByJob.get(k)
+    if (cur) cur.count++; else opensByJob.set(k, { count: 1, last: o.at })
+  }
+  const fmtOpen = (ms) => { const d = new Date(ms); return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` }
 
   const filtered = wonProposals
     .filter(p => {
@@ -396,6 +415,12 @@ export default function ContractsList({ initialFilter } = {}) {
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
           {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           <QuickPicks value={filter} onChange={setFilter} options={FILTERS.map(f => ({ value: f, label: f, count: counts[f] }))} />
+          {supabase && (
+            <button type="button" onClick={() => setShowOpens(v => !v)} aria-pressed={showOpens} title="When customers opened their contracts"
+              className={`flex items-center gap-1.5 h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${showOpens ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+              <Eye size={14} /> Opens
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -442,8 +467,34 @@ export default function ContractsList({ initialFilter } = {}) {
         </div>
       )}
 
+      {/* Opens: every time a customer opened a signing link, newest first */}
+      {showOpens && (() => {
+        const shown = new Map(filtered.map(p => [String(p.id), p]))
+        const rows = (opens || []).filter(o => shown.has(String(o.proposalId)))
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 max-w-2xl" aria-label="Contract opens">
+            <p className="text-sm font-semibold text-gray-800 mb-4">Opened by customers, newest first</p>
+            {opens === null ? <p className="text-xs text-gray-400 italic py-6 text-center">Loading…</p>
+              : rows.length === 0 ? <p className="text-xs text-gray-400 italic py-6 text-center">No opens yet</p>
+              : rows.map((o, i) => {
+                  const p = shown.get(String(o.proposalId))
+                  const d = new Date(o.at)
+                  return (
+                    <div key={i} className="flex gap-3 py-2.5 border-b border-gray-50 last:border-b-0">
+                      <Eye size={13} className="text-blue-500 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-gray-700">{d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}, {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
+                        <p className="text-xs text-gray-600">{p.client} · <span className="font-mono">{p.contractDraft?.contractNum || contractNumberFor(p.id)}</span></p>
+                      </div>
+                    </div>
+                  )
+                })}
+          </div>
+        )
+      })()}
+
       {/* Contract list — one card, clean rows, primary button + overflow menu */}
-      {filtered.length > 0 && (
+      {!showOpens && filtered.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           {filtered.map(p => {
             const status      = getContractStatus(p)
@@ -455,6 +506,7 @@ export default function ContractsList({ initialFilter } = {}) {
             // Secondary actions live in the ⋯ menu.
             const recId = draft.signRecordId || remote[p.id]?.recordId
             const clientSignedPending = remote[p.id]?.clientSigned && status !== 'signed'
+            const opened = opensByJob.get(String(p.id))
             const menu = []
             if (recId) menu.push({ icon: <Eye size={14} className="text-gray-400" />, label: 'Signatures', onClick: () => setViewingRecordId(recId) })
             if (recId) menu.push({ icon: <ShieldCheck size={14} className="text-gray-400" />, label: 'Audit certificate', onClick: () => navigate(`/certificate/contract/${recId}`) })
@@ -481,6 +533,12 @@ export default function ContractsList({ initialFilter } = {}) {
                       ? ' · off-platform'
                       : signedAt ? ` · Signed ${fmtDate(signedAt)}` : '')}
                   </p>
+                  {/* Sent for signature: has the customer opened it? */}
+                  {opens && (opened || (status === 'in-progress' && recId)) && (
+                    <p className={`text-xs truncate ${opened ? 'text-gray-500' : 'text-amber-700'}`}>
+                      {opened ? `Opened ${opened.count} time${opened.count === 1 ? '' : 's'} · last ${fmtOpen(opened.last)}` : 'Not opened yet'}
+                    </p>
+                  )}
                 </div>
                 <div className="hidden sm:block shrink-0">
                 {clientSignedPending ? (
