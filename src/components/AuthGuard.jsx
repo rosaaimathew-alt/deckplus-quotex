@@ -1,3 +1,4 @@
+import { disablePush } from '../lib/push'
 import { Navigate, useLocation } from 'react-router-dom'
 import { DEMO } from '../demo'
 import { getSession, signOut } from '../supabase'
@@ -9,6 +10,8 @@ export function useAuth() {
 }
 
 export async function logout() {
+  // Signing out stops this phone's pop-up alerts for the person leaving (lib/push)
+  try { await disablePush() } catch { /* alerts were already off */ }
   try { await signOut() } catch {}
   window.location.href = '/login'
 }
