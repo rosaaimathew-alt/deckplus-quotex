@@ -9,6 +9,8 @@ import { enablePush, isPhone, pushStatus, syncPush } from '../lib/push'
 import { tr, getLang } from '../lib/lang'
 
 const DISMISS_KEY = 'qx.pushDismissed'
+const BLOCKED_COMPUTER = 'Your browser is blocking notifications for this site. Click "Notifications blocked" at the left of the address bar, choose Allow, then try again.'
+const BLOCKED_PHONE = "Notifications are blocked for Deck Plus. Allow them in this phone's settings, then try again."
 const readDismissed = () => { try { return localStorage.getItem(DISMISS_KEY) === '1' } catch { return false } }
 
 // compact: the office pages, where it sits as a slim card and not a phone-sized one
@@ -19,7 +21,9 @@ export default function PushCard({ installHint = true, compact = false }) {
   const [error, setError] = useState('')
   useEffect(() => { syncPush(getLang()) }, [])
 
-  if (dismissed || status === 'on' || status === 'none' || status === 'blocked') return null
+  // Blocked in the browser or phone settings: nothing to offer, unless they
+  // just tapped and need to be told why nothing happened.
+  if (dismissed || status === 'on' || status === 'none' || (status === 'blocked' && !error)) return null
   if (status === 'install' && !installHint) return null
   const dismiss = () => {
     try { localStorage.setItem(DISMISS_KEY, '1') } catch { /* not remembered: fine */ }
@@ -28,7 +32,11 @@ export default function PushCard({ installHint = true, compact = false }) {
   const title = tr(isPhone() ? 'Get alerts on this phone' : 'Get alerts on this computer')
   const turnOn = async () => {
     setBusy(true); setError('')
-    try { await enablePush(getLang()) } catch (e) { setError(tr(e.message)) }
+    try {
+      const on = await enablePush(getLang())
+      // The browser said no, or kept the question hidden ("Notifications blocked" in the address bar)
+      if (!on) setError(tr(isPhone() ? BLOCKED_PHONE : BLOCKED_COMPUTER))
+    } catch (e) { setError(tr(e.message)) }
     setStatus(pushStatus()); setBusy(false)
   }
   return (
