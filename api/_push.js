@@ -165,3 +165,12 @@ export async function alertMakerOfOpen({ kind, email = null, proposalId = null, 
   })()
   try { return await Promise.race([work, new Promise(resolve => setTimeout(() => resolve({ pushed: 0, slow: true }), 3000))]) } catch { return { pushed: 0 } }
 }
+
+// ── "Alert emails" switched off (Settings › Team › Access) ──────────────────
+// Of these addresses, the ones whose owner gets pop-ups only: never emailed an
+// alert, and no alert goes out through their mailbox.
+export async function alertEmailsOff(emails) {
+  const list = [...new Set((emails || []).map(e => String(e || '').toLowerCase()).filter(Boolean))]
+  if (!pushAvailable() || !list.length) return []
+  try { return (await rpc('alert_emails_off_s', { p_emails: list })) || [] } catch { return [] }
+}

@@ -24,7 +24,7 @@
 import { verifyToken, asUser, staffMembership } from './_auth.js'
 import { sendMail } from './_mailer.js'
 import { sendSms, smsConfigured } from './_sms.js'
-import { pushToEmails } from './_push.js'
+import { pushToEmails, alertEmailsOff } from './_push.js'
 import { getKV } from './_kv.js'
 
 const TEAL = '#1d758b'
@@ -208,11 +208,15 @@ export function buildAlertEmail({ msg, toName, sender, link, logoUrl }) {
 //                                                       receiving it
 // Only when that PM has no mailbox connected (Settings › Email Account) does
 // the mailer fall back to the company mailbox (api/_mailer.js).
-export function mailSenderFor(kind, info, people, orgId = null) {
+// A PM with "Alert emails" switched off keeps their mailbox for customers: no
+// alert goes out through it (popupOnly: those addresses), so it falls to the
+// company mailbox.
+export function mailSenderFor(kind, info, people, orgId = null, popupOnly = new Set()) {
   const sender = info?.sender || {}
-  if (info?.senderIsStaff && sender.id) return { orgId, userId: sender.id, email: sender.email }
+  const kept = (email) => popupOnly.has(String(email || '').toLowerCase())
+  if (info?.senderIsStaff && sender.id) return kept(sender.email) ? { orgId } : { orgId, userId: sender.id, email: sender.email }
   const toPm = ['done', 'message'].includes(kind) ? (people || [])[0] : null
-  return toPm?.email ? { orgId, email: toPm.email } : { orgId }
+  return toPm?.email && !kept(toPm.email) ? { orgId, email: toPm.email } : { orgId }
 }
 
 export async function sendNotification(req, res, body) {
@@ -251,12 +255,15 @@ export async function sendNotification(req, res, body) {
   // From the PM's own mailbox when they have one connected, else the company
   // mailbox with the PM's name on it; replies go to the PM either way.
   const member = await staffMembership(token, user).catch(() => null)
-  const mailSender = mailSenderFor(kind, info, people, member?.org_id || null)
+  // People with "Alert emails" off get pop-ups only (Settings › Team › Access)
+  const popupOnly = new Set(await alertEmailsOff([...people.map(p => p.email), sender.email]))
+  const mailSender = mailSenderFor(kind, info, people, member?.org_id || null, popupOnly)
 
   let emailed = 0, texted = 0, pushed = 0
   const errors = []
   // Phones first: someone whose phone gets the pop-up (they turned alerts on,
-  // api/_push.js) is not emailed or texted as well.
+  // api/_push.js) is not emailed or texted as well. Someone with "Alert
+  // emails" off is never emailed or texted, pop-up or not.
   const byPhone = new Set()
   try {
     const out = await pushToEmails(people.map(p => p.email), { title: msg.subject, body: String(msg.sms || msg.en || '').replace(/^Deck Plus:\s*/, ''), url: link })
@@ -265,12 +272,13 @@ export async function sendNotification(req, res, body) {
     errors.push(...out.errors)
   } catch (err) { errors.push(String(err?.message || err).slice(0, 120)) }
   for (const p of people) {
-    if (byPhone.has(String(p.email).toLowerCase())) continue
+    if (byPhone.has(String(p.email).toLowerCase()) || popupOnly.has(String(p.email).toLowerCase())) continue
     const { html, text } = buildAlertEmail({ msg, toName: p.name, sender, link, logoUrl })
     const out = await sendMail({
       to: p.email, subject: msg.subject, html, text,
       fromName: sender.name ? `${tidy(sender.name, 60)} · Deck Plus` : 'Deck Plus',
-      replyTo: info.senderIsStaff && sender.email ? sender.email : undefined,
+      // replies reach the PM, unless their mailbox is kept for customers
+      replyTo: info.senderIsStaff && sender.email && !popupOnly.has(String(sender.email).toLowerCase()) ? sender.email : undefined,
       sender: mailSender,
     })
     if (out.error) errors.push(out.error); else emailed++
