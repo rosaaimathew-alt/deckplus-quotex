@@ -30,7 +30,8 @@ import InstallCard from './InstallCard'
 import JobMoney from './JobMoney'
 import SubTasksCard from './SubTasksCard'
 import { needsInspection, statusKey, subNameOf } from '../lib/subTasks'
-import { missingTodaysPhotos } from '../lib/taskPhotos'
+import { missingTodaysPhotos, isStored } from '../lib/taskPhotos'
+import { StoredLink } from '../components/JobPhotos'
 import { useJobMoney } from '../nav'
 import {
   todayStr, addDays, dayLabel, mapsUrl, telUrl, smsUrl, describeJob, useFieldJobs, Card, Progress, ScopeToggle, JobRow, nextLine, useUndo, BackButton, QuickAction, QuickNote, RecentNotes,
@@ -421,7 +422,7 @@ function JobScreen() {
 // Files the office shared to mobile (Jobs › Documents › "Mobile").
 function SharedDocs({ proposal }) {
   const jd = proposal.jobData || {}
-  const docs = [...(jd.documents || []), ...(jd.receipts || [])].filter(d => d.shareMobile && d.link)
+  const docs = [...(jd.documents || []), ...(jd.receipts || [])].filter(d => d.shareMobile && (d.link || isStored(d)))
   if (!docs.length) return null
   return (
     <Card className="px-4 pt-3 pb-1">
@@ -429,9 +430,15 @@ function SharedDocs({ proposal }) {
       <ul className="divide-y divide-gray-100">
         {docs.map(d => (
           <li key={d.id}>
-            <a href={d.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 py-3 text-base text-gray-900">
-              <FileText size={18} className="text-gray-400 shrink-0" /><span className="flex-1 truncate">{d.name}</span><ChevronRight size={16} className="text-gray-300" />
-            </a>
+            {isStored(d) ? (
+              <StoredLink doc={d} className="flex items-center gap-3 py-3 text-base text-gray-900">
+                <FileText size={18} className="text-gray-400 shrink-0" /><span className="flex-1 truncate">{d.name}</span><ChevronRight size={16} className="text-gray-300" />
+              </StoredLink>
+            ) : (
+              <a href={d.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 py-3 text-base text-gray-900">
+                <FileText size={18} className="text-gray-400 shrink-0" /><span className="flex-1 truncate">{d.name}</span><ChevronRight size={16} className="text-gray-300" />
+              </a>
+            )}
           </li>
         ))}
       </ul>

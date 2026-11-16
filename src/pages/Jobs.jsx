@@ -7,6 +7,8 @@ import JobFinancials from '../components/JobFinancials'
 import JobPriceList from '../components/JobPriceList'
 import PermitsTab from '../components/PermitsTab'
 import JobSubsTab from '../components/JobSubsTab'
+import JobPhotosTab from '../components/JobPhotos'
+import { jobPhotoCount } from '../lib/taskPhotos'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
@@ -1775,6 +1777,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   // Subs booked on this job: PMs and the office (reps can't read sub tasks).
   const showSubs   = useStore(s => s.role !== 'sales')
   const jobTasks   = (useStore(s => s.subTasks) || []).filter(t => t && String(t.proposalId) === String(proposal.id))
+  const photoCount = jobPhotoCount(proposal, showSubs ? jobTasks : [])
 
   const TABS = [
     ...(books ? [{ key: 'summary', label: 'Summary' }] : []),
@@ -1786,6 +1789,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
     { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
+    { key: 'photos', label: `Photos${photoCount ? ` (${photoCount})` : ''}` },
     { key: 'documents', label: `Documents${docCount ? ` (${docCount})` : ''}` },
   ]
 
@@ -2016,6 +2020,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}
             {tab === 'warranty'&& <WarrantyTab proposal={proposal} />}
             {tab === 'summary' && books && <JobSummary proposal={proposal} />}
+            {tab === 'photos' && <JobPhotosTab proposal={proposal} tasks={showSubs ? jobTasks : []} />}
             {tab === 'documents' && <JobDocuments proposal={proposal} showReceipts={money} />}
           </div>
         </div>
