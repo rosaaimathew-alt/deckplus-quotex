@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { uploadToDrive } from '../_google-drive.js'
 import { verifyToken, verifyStaff, canSeeRecord, staffMembership, asUser } from '../_auth.js'
+import { alertMakerOfOpen, looksLikeBot } from '../_push.js'
 import { getKV } from '../_kv.js'
 import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, buildCompanySignature, verifyRecord } from '../_esign.js'
 import { sendWelcomeEmail } from '../_welcome.js'
@@ -45,6 +46,11 @@ async function latestRecord(kv, recordId) {
     id = rec.supersededBy; rec = next
   }
   return { recordId: id, rec }
+}
+
+const originOf = (req) => {
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'www.deckplus.app'
+  return `${host.includes('localhost') ? 'http' : 'https'}://${host}`
 }
 
 export default async function handler(req, res) {
@@ -242,6 +248,8 @@ export default async function handler(req, res) {
           ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim(),
         }].slice(-1000)
         await kv.set(`pview:${viewToken}`, { ...rec, opens })
+        // Tell the person who made this proposal (a pop-up, to them only)
+        if (rec.proposalId != null) await alertMakerOfOpen({ kind: 'proposal', proposalId: rec.proposalId, client: rec.snapshot?.client, origin: originOf(req), quietKey: `notify:open:p:${viewToken}`, kv })
       }
       // Strip contact PII from the PUBLIC response — the quote page doesn't need
       // the customer's email/phone, so don't expose it to anyone holding the link.
@@ -389,6 +397,13 @@ export default async function handler(req, res) {
       const viewer = bearer ? await verifyToken(bearer) : null
       await logEventSafe(requestContext(req), { ...logBase, event: viewer ? 'staff_viewed' : 'opened', docHash,
         detail: viewer || closed ? { ...(viewer ? { staff: viewer.email } : {}), ...(closed ? { closed: true } : {}) } : null })
+      // The customer (not staff, not the builder's own link, not a link scanner)
+      // opening it: tell the person who made this contract (a pop-up, to them only)
+      if (!viewer && link.role !== 'builder' && !looksLikeBot(req.headers['user-agent'])) {
+        await alertMakerOfOpen({ kind: 'contract', email: record.createdBy || null, proposalId: record.contractData?.proposalId,
+          client: record.contractData?.dp?.values?.clientName || record.contractData?.client, contractNum: record.contractNum,
+          origin: originOf(req), quietKey: `notify:open:c:${recordId}:${link.role}`, kv })
+      }
       if (closed) return res.json(closedBody)
       const { verified } = await otpStatus(kv, token)
       return res.json({

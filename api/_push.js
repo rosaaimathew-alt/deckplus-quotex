@@ -135,3 +135,33 @@ export async function pushToEmails(emails, payload, { lookup = (list) => rpc('pu
   }))
   return { pushed, reached: [...reached], errors }
 }
+
+// ── "Your customer just opened it" ──────────────────────────────────────────
+// A pop-up to the person who made a proposal or a contract, each time their
+// customer opens it. Pop-up only: nobody is emailed about an open, and only
+// the maker is told (never the rest of the team). Never holds up or breaks
+// the customer's page: any failure is swallowed, and it gives up after 3s.
+const BOTS = /bot|crawler|spider|preview|scanner|facebookexternalhit|slackbot|whatsapp|telegram|proofpoint|mimecast|barracuda|googleimageproxy|bingpreview|linkpreview|curl|wget|python-requests|headless/i
+export const looksLikeBot = (ua) => BOTS.test(String(ua || ''))
+
+// What the pop-up says. kind: 'proposal' | 'contract'
+export function openAlert(kind, { client, contractNum, origin }) {
+  const who = String(client || '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Your customer'
+  return kind === 'contract'
+    ? { title: 'Contract opened', body: `${who} just opened contract ${String(contractNum || '').slice(0, 30)}`.trim() + '.', url: `${origin}/contracts` }
+    : { title: 'Proposal opened', body: `${who} just opened their proposal.`, url: `${origin}/sales?tab=proposals` }
+}
+
+export async function alertMakerOfOpen({ kind, email = null, proposalId = null, client, contractNum, origin, quietKey, kv, send = pushToEmails, ownerOf = (id) => rpc('proposal_owner_email_s', { p_proposal_id: String(id) }) }) {
+  const work = (async () => {
+    // The same page loading twice in a minute is one open
+    if (kv && quietKey) {
+      if (await kv.get(quietKey)) return { pushed: 0, quiet: true }
+      await kv.set(quietKey, { at: Date.now() }, { ex: 60 })
+    }
+    const to = email || (proposalId != null && proposalId !== '' ? await ownerOf(proposalId) : null)
+    if (!to) return { pushed: 0 }
+    return send([to], openAlert(kind, { client, contractNum, origin }))
+  })()
+  try { return await Promise.race([work, new Promise(resolve => setTimeout(() => resolve({ pushed: 0, slow: true }), 3000))]) } catch { return { pushed: 0 } }
+}
