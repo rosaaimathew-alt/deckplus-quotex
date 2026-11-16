@@ -14,6 +14,7 @@ const flag = () => { try { return localStorage.getItem(ON_KEY) === '1' } catch {
 const setFlag = (on) => { try { if (on) localStorage.setItem(ON_KEY, '1'); else localStorage.removeItem(ON_KEY) } catch { /* not remembered: fine */ } }
 
 const isInstalled = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
+export const isPhone = () => /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
 // 'on' | 'ask' (can be turned on) | 'install' (iPhone: add to Home Screen first)
@@ -55,10 +56,19 @@ async function subscribe(lang) {
 }
 
 // Asks the phone's permission (must come from a tap), then saves this phone.
+// The first pop-up arrives right away, so the person sees it working.
 export async function enablePush(lang) {
   const perm = await Notification.requestPermission()
   if (perm !== 'granted') return false
-  return subscribe(lang)
+  await subscribe(lang)
+  sendTestPush(lang)
+  return true
+}
+
+// A pop-up to this person's own phones: "this is how alerts look".
+export function sendTestPush(lang) {
+  return fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'push-test', lang: lang || 'en' }) })
+    .then(r => r.json()).catch(() => ({ sent: false }))
 }
 
 // On opening the app: keep this phone's entry current (the address can change,

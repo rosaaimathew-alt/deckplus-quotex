@@ -31,6 +31,7 @@ import { nextReminderDate, contractStatusOf, isJobClosed } from './lib/attention
 import { TodoDock } from './components/TodoPanel'
 import { DEMO, DEMO_BASENAME, resetDemo } from './demo'
 import FieldApp from './field/FieldApp'
+import PushCard from './components/PushCard'
 import SubApp from './sub/SubApp'
 import { useFieldHome, useIsPhone, canUseField, setViewPref, readViewPref } from './field/fieldMode'
 
@@ -72,9 +73,11 @@ function RoleHome() {
   const role = useStore(s => s.role || 'manager')
   const me = useStore(s => s.me)
   const location = useLocation()
-  if (role === 'pm') return <PMHome />
-  if (role === 'manager' && (me?.role === 'office' || new URLSearchParams(location.search).get('home') === 'office')) return <OfficeHome />
-  return <Dashboard />
+  const home = role === 'pm' ? <PMHome />
+    : role === 'manager' && (me?.role === 'office' || new URLSearchParams(location.search).get('home') === 'office') ? <OfficeHome />
+    : <Dashboard />
+  // Pop-up alerts for the office too (lib/push): the card hides once they're on
+  return <><div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 empty:hidden"><PushCard compact /></div>{home}</>
 }
 
 // Blocks a route the current plan OR role can't reach, redirecting home.

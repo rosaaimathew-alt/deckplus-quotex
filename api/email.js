@@ -13,8 +13,8 @@ import dotenv from 'dotenv'
 import { saveMessage } from './_store.js'
 import { sendMail, isMailerConfigured, smtpUser } from './_mailer.js'
 import { sendNotification } from './_notify.js'
-import { pushPublicKey } from './_push.js'
-import { requireAuth } from './_auth.js'
+import { pushPublicKey, pushToEmails } from './_push.js'
+import { requireAuth, verifyToken } from './_auth.js'
 import { getKV } from './_kv.js'
 import { buildProposalEmail, signatureOf, loadSignature, saveSignature } from './_proposalEmail.js'
 
@@ -167,6 +167,23 @@ export default async function handler(req, res) {
   // Public by nature: it only lets a phone accept messages from this app.
   if (req.body?.action === 'push-key') {
     try { return res.status(200).json({ key: await pushPublicKey() }) } catch { return res.status(200).json({ key: null }) }
+  }
+  // "This is how alerts look": a pop-up to the signed-in person's own phones,
+  // sent the moment they turn alerts on. Open to every login (subs too).
+  if (req.body?.action === 'push-test') {
+    const header = req.headers?.authorization || ''
+    const me = await verifyToken(header.startsWith('Bearer ') ? header.slice(7) : (req.headers?.['x-qx-token'] || null))
+    if (!me?.email) return res.status(401).json({ error: 'Unauthorized — please sign in again.' })
+    const host = req.headers?.host || 'www.deckplus.app'
+    const es = req.body?.lang === 'es'
+    try {
+      const out = await pushToEmails([me.email], {
+        title: 'Deck Plus',
+        body: es ? 'Los avisos están activados en este teléfono. Así se verán.' : 'Alerts are on. This is how they will look.',
+        url: `${host.includes('localhost') ? 'http' : 'https'}://${host}/`,
+      })
+      return res.status(200).json({ sent: out.pushed > 0, pushed: out.pushed, ...(out.errors.length ? { error: out.errors[0] } : {}) })
+    } catch (err) { return res.status(200).json({ sent: false, error: String(err?.message || err).slice(0, 120) }) }
   }
   const staff = await requireAuth(req, res)
   if (!staff) return
