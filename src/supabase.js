@@ -276,30 +276,24 @@ async function fetchAllTogether(table, orgId) {
 }
 
 // Everything the signed-in user may see, in the store's own shape.
-export async function loadOrg() {
-  const uid = currentUserId()
-  if (!supabase || !uid) throw new Error('Not signed in')
-  const { data: member, error: mErr } = await supabase
-    .from('org_members').select('org_id, role, display_name, email, permissions, phone').eq('user_id', uid).maybeSingle()
-  if (mErr) throw mErr
-  let me = member
-  if (!me) {
-    // First sign-in after accepting an invite (e.g. once email is confirmed):
-    // join the team the invite is for, then read the membership again.
-    try { await claimInvite() } catch { /* no invite for this email */ }
-    const again = await supabase.from('org_members').select('org_id, role, display_name, email, permissions, phone').eq('user_id', uid).maybeSingle()
-    me = again.data
-  }
-  if (!me) throw new Error('This login is not on a team yet. Ask your admin for an invite link.')
-  const orgId = me.org_id
+// The company this login belonged to last time on this browser. It lets the
+// next open ask for the company's records at the same moment as it checks the
+// membership, not after it. Only a hint: the membership check still decides,
+// and the database only ever returns what this login may see.
+const ORG_HINT_KEY = 'qx_org_hint'
+function rememberedOrg(uid) {
+  try { const h = JSON.parse(localStorage.getItem(ORG_HINT_KEY) || 'null'); return h && h.uid === uid && typeof h.orgId === 'string' ? h.orgId : null } catch { return null }
+}
+function rememberOrg(uid, orgId) {
+  try { localStorage.setItem(ORG_HINT_KEY, JSON.stringify({ uid, orgId })) } catch { /* private window: only a speed-up */ }
+}
 
+// The team, the settings and every table of one company, all asked for at once.
+async function loadOrgData(orgId) {
+  const collections = {}
   const [{ data: members }, { data: settingsRow }] = await Promise.all([
     supabase.from('org_members').select('user_id, role, display_name, email, permissions, phone').eq('org_id', orgId),
     supabase.from('org_settings').select('data').eq('org_id', orgId).maybeSingle(),
-  ])
-
-  const collections = {}
-  await Promise.all([
     ...Object.entries(RECORD_TABLES).map(async ([key, table]) => {
       try {
         const rows = await fetchAll(table, orgId)
@@ -317,6 +311,34 @@ export async function loadOrg() {
       collections[key] = Object.fromEntries(rows.map(r => [r.id, r.data]))
     }),
   ])
+  return { members, settingsRow, collections }
+}
+
+export async function loadOrg() {
+  const uid = currentUserId()
+  if (!supabase || !uid) throw new Error('Not signed in')
+  // Start on the records right away when this browser knows the company
+  const hint = rememberedOrg(uid)
+  const early = hint ? { orgId: hint, loads: loadOrgData(hint) } : null
+  early?.loads.catch(() => { /* reported below if these are the loads we use */ })
+  const { data: member, error: mErr } = await supabase
+    .from('org_members').select('org_id, role, display_name, email, permissions, phone').eq('user_id', uid).maybeSingle()
+  if (mErr) throw mErr
+  let me = member
+  if (!me) {
+    // First sign-in after accepting an invite (e.g. once email is confirmed):
+    // join the team the invite is for, then read the membership again.
+    try { await claimInvite() } catch { /* no invite for this email */ }
+    const again = await supabase.from('org_members').select('org_id, role, display_name, email, permissions, phone').eq('user_id', uid).maybeSingle()
+    me = again.data
+  }
+  if (!me) throw new Error('This login is not on a team yet. Ask your admin for an invite link.')
+  const orgId = me.org_id
+
+  // Everything below was already on its way if this browser remembered the
+  // company (see the top of loadOrg); otherwise it starts now.
+  const { members, settingsRow, collections } = await (early?.orgId === orgId ? early.loads : loadOrgData(orgId))
+  rememberOrg(uid, orgId)
 
   return {
     orgId,
