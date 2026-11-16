@@ -65,6 +65,7 @@ const ES = {
   'Paint': 'Pintura', 'Paint date': 'Fecha de pintura', 'Color not set': 'Color sin definir', 'Notes for the painter': 'Notas para el pintor', 'Touch-ups': 'Retoques',
   'Inspection results': 'Resultados de inspección', 'Passed': 'Aprobada', 'Did not pass': 'No aprobada', 'Recorded': 'Registrada',
   'Electrical items': 'Artículos eléctricos', 'Job checklist': 'Lista del trabajo',
+  'Close': 'Cerrar', 'Electrical spec sheet': 'Hoja de especificaciones eléctricas', 'Porch detail form': 'Formulario de detalles del porche',
   // inspection names (lib/subInspections)
   'Electrical rough': 'Eléctrica preliminar', 'Electrical final': 'Eléctrica final', 'Electrical slab': 'Eléctrica de losa',
   'Mechanical rough': 'Mecánica preliminar', 'Mechanical final': 'Mecánica final',

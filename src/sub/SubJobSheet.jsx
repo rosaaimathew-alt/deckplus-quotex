@@ -12,8 +12,8 @@
 //
 // A sub's login can't read the job itself; the database hands back just these
 // two things for their own tasks (supabase/sub_job_sheet.sql). No prices.
-import { useEffect, useState } from 'react'
-import { Zap, ListChecks, CheckCircle2, Circle, PaintRoller, ClipboardCheck } from 'lucide-react'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { Zap, ListChecks, CheckCircle2, Circle, PaintRoller, ClipboardCheck, FileText, ChevronRight, X } from 'lucide-react'
 import { useStore } from '../store'
 import { subJobSheet } from '../supabase'
 import { DEMO } from '../demo'
@@ -22,6 +22,45 @@ import { getStages } from '../pages/Jobs'
 import { electricalItemsOf } from '../lib/electricalItems'
 import { paintColorsOf, colorDetail } from '../lib/paintColors'
 import { tr, dayText as dayLabel } from '../lib/lang'
+
+// The contract's page renderer is only loaded when a sheet is opened
+const DeckPlusContract = lazy(() => import('../contract/DeckPlusContract'))
+const SHEET_NAMES = { electrical: 'Electrical spec sheet', porch: 'Porch detail form' }
+
+// The spec sheets of the job's contract for this trade (an electrician gets
+// the Electrical Specifications page, a roofer the Porch Detail Form), shown
+// as they print. The wording is the contract's own, so it is not translated.
+function SpecSheets({ specs }) {
+  const [open, setOpen] = useState(null)
+  const forms = (specs?.forms || []).filter(k => SHEET_NAMES[k])
+  if (!forms.length) return null
+  return (
+    <Card className="px-4">
+      <ul className="divide-y divide-gray-100">
+        {forms.map(k => (
+          <li key={k}>
+            <button type="button" onClick={() => setOpen(k)} className="w-full flex items-center gap-3 py-3.5 text-base text-gray-900 text-left">
+              <FileText size={20} className="text-[var(--brand-700)] shrink-0" /><span className="flex-1 font-semibold">{tr(SHEET_NAMES[k])}</span><ChevronRight size={16} className="text-gray-300" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {open && (
+        <div className="fixed inset-0 z-[60] bg-white overflow-y-auto" role="dialog" aria-label={tr(SHEET_NAMES[open])}>
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 h-14 flex items-center gap-3">
+            <p className="flex-1 text-base font-semibold text-gray-900 truncate">{tr(SHEET_NAMES[open])}</p>
+            <button type="button" onClick={() => setOpen(null)} className="h-10 w-10 -mr-2 rounded-full flex items-center justify-center text-gray-600" aria-label={tr('Close')}><X size={22} /></button>
+          </div>
+          <div className="qx-ink dp-signing max-w-3xl mx-auto">
+            <Suspense fallback={<p className="p-6 text-base text-gray-500">…</p>}>
+              <DeckPlusContract sheets={[open]} values={specs.values || {}} checks={specs.checks || {}} />
+            </Suspense>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
 
 const _cache = new Map()   // task id → sheet, so going back and forth doesn't blink
 
@@ -65,9 +104,11 @@ export function JobSheet({ task }) {
   const hasPaint = colors.length > 0 || paint?.notes || touchUps.length > 0 || paint?.date
   // Their own trade's inspection results on this job, newest first (lib/subInspections)
   const results = [...(Array.isArray(task.inspections) ? task.inspections : [])].reverse()
-  if (!items.length && !stages && !hasPaint && !results.length) return null
+  const hasSpecs = (sheet?.specs?.forms || []).some(k => SHEET_NAMES[k])
+  if (!items.length && !stages && !hasPaint && !results.length && !hasSpecs) return null
   return (
     <>
+      {hasSpecs && <SpecSheets specs={sheet.specs} />}
       {hasPaint && (
         <Card className="p-4 space-y-3">
           <p className="text-base font-semibold text-gray-900 flex items-center gap-2"><PaintRoller size={20} className="text-[var(--brand-700)]" /> {tr('Paint')}</p>
