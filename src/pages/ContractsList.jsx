@@ -53,9 +53,9 @@ function SignaturesModal({ recordId, onClose }) {
   const [record, setRecord]   = useState(null)
   const [error, setError]     = useState('')
 
+  // Mounted fresh for each record (keyed by record id), so it starts out loading
   useEffect(() => {
     if (!recordId) return
-    setLoading(true)
     fetch(`/api/sign/record-${recordId}`)
       .then(async r => {
         const text = await r.text()
@@ -507,7 +507,7 @@ export default function ContractsList({ initialFilter } = {}) {
       )}
 
       {viewingRecordId && (
-        <SignaturesModal recordId={viewingRecordId} onClose={() => setViewingRecordId(null)} />
+        <SignaturesModal key={viewingRecordId} recordId={viewingRecordId} onClose={() => setViewingRecordId(null)} />
       )}
       {viewingLinks && (
         <LinksModal links={viewingLinks} onClose={() => setViewingLinks(null)} />
