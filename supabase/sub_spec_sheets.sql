@@ -58,6 +58,9 @@ begin
     'completedStages', coalesce(jd->'completedStages', '[]'::jsonb),
     'stageDates', case when jsonb_typeof(jd->'stageDates') = 'object' then jd->'stageDates' else '{}'::jsonb end,
     'projectTypeOverride', jd->'projectTypeOverride',
+    -- several job types on one job, and the PM's own order of the steps (Jobs › Stages)
+    'projectTypeOverrides', case when jsonb_typeof(jd->'projectTypeOverrides') = 'array' then jd->'projectTypeOverrides' else '[]'::jsonb end,
+    'stageOrder', case when jsonb_typeof(jd->'stageOrder') = 'array' then jd->'stageOrder' else '[]'::jsonb end,
     'projectTypes', coalesce(d->'projectTypes', '[]'::jsonb),
     'hasWindows', (coalesce(d->'scopeBullets', '[]'::jsonb)::text || coalesce(d->'scopeLines', '[]'::jsonb)::text) ~* 'window|glass|enclos',
     -- What the job includes, as text, so the sub's checklist is the office's

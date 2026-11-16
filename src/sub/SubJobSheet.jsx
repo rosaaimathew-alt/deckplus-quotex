@@ -80,7 +80,7 @@ function useSheet(task) {
     const d = p.contractDraft || {}
     return {
       paint: task.paint ? { ...(p.jobData?.paint || {}), date: p.jobData?.stageDates?.paint || null, touchUps: (p.jobData?.touchUps || []).filter(t => !t.done) } : null,
-      electrical: d.dp?.values || {}, completedStages: p.jobData?.completedStages || [], stageDates: p.jobData?.stageDates || {}, projectTypeOverride: p.jobData?.projectTypeOverride || null,
+      electrical: d.dp?.values || {}, completedStages: p.jobData?.completedStages || [], stageDates: p.jobData?.stageDates || {}, projectTypeOverride: p.jobData?.projectTypeOverride || null, projectTypeOverrides: p.jobData?.projectTypeOverrides || null, stageOrder: p.jobData?.stageOrder || null,
       projectTypes: d.projectTypes || [], hasWindows: /window|glass|enclos/i.test(JSON.stringify([d.scopeBullets || [], d.scopeLines || []])),
     }
   }
@@ -93,7 +93,8 @@ export function JobSheet({ task }) {
   const stages = sheet ? getStages({
     // the job's own text (types, quote lines, summary, permits) when the database sends it
     ...(typeof sheet.checklistText === 'string' ? { checklistText: sheet.checklistText } : {}),
-    jobData: { projectTypeOverride: sheet.projectTypeOverride || undefined },
+    // the job types the PM picked and the order they put the steps in
+    jobData: { projectTypeOverride: sheet.projectTypeOverride || undefined, projectTypeOverrides: sheet.projectTypeOverrides || undefined, stageOrder: sheet.stageOrder || undefined },
     contractDraft: { projectTypes: sheet.projectTypes || [], scopeBullets: sheet.hasWindows ? ['window'] : [] },
   }) : null
   const done = new Set(sheet?.completedStages || [])
