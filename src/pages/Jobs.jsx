@@ -187,6 +187,16 @@ const STAGE_TEMPLATES = {
     { key: 'punch',      label: 'Punch List' },
     { key: 'closed',     label: 'Job Closed' },
   ],
+  hardscape: [
+    { key: 'hoa',        label: 'HOA Approval' },
+    { key: 'precon',     label: 'Pre-Con Scheduled' },
+    { key: 'start',      label: 'Start Date Given' },
+    { key: 'materials',  label: 'Material Ordered' },
+    { key: 'excavation', label: 'Excavation and Base' },
+    { key: 'pavers',     label: 'Pavers / Stone Installed' },
+    { key: 'punch',      label: 'Punch List' },
+    { key: 'closed',     label: 'Job Closed' },
+  ],
 }
 
 // A screen porch, sunroom or Eze-Breeze built on a deck: the office's own
@@ -258,20 +268,82 @@ export const JOB_TYPE_OPTIONS = [
   'Porch Over Deck + Windows',
   'Pergola',
   'Gazebo',
+  'Hardscape / Patio',
 ]
 
+// The job types picked on the job (Stages tab). A job with two kinds of work
+// (a porch conversion and a patio) has both, and gets the steps of both.
+// jobData.projectTypeOverride, the single type the app had first, is kept in
+// step as the first one picked.
+function jobTypesOf(proposal) {
+  const jd = proposal.jobData || {}
+  const many = Array.isArray(jd.projectTypeOverrides) ? jd.projectTypeOverrides.filter(t => JOB_TYPE_OPTIONS.includes(t)) : []
+  return many.length ? many : jd.projectTypeOverride ? [jd.projectTypeOverride] : []
+}
+
+function stagesForType(type, proposal) {
+  if (type === 'Porch Conversion')              return STAGE_TEMPLATES.porch_conversion
+  if (type === 'Deck (Resurface / Rebuild)')    return STAGE_TEMPLATES.deck_resurface
+  if (type === 'Deck (New)')                    return STAGE_TEMPLATES.deck_new
+  if (type === 'Ground Level Porch')            return STAGE_TEMPLATES.porch_ground
+  if (type === 'Ground Level Porch + Windows')  return STAGE_TEMPLATES.porch_ground_windows
+  if (type === 'Porch Over Deck' || type === 'Porch Over Deck + Windows') return porchOnDeckStages(jobScopeText(proposal))
+  if (type === 'Pergola')                       return STAGE_TEMPLATES.pergola
+  if (type === 'Gazebo')                        return STAGE_TEMPLATES.gazebo
+  if (type === 'Hardscape / Patio')             return STAGE_TEMPLATES.hardscape
+  return null
+}
+
+// Steps every kind of job has once, whatever each list calls them.
+const SHARED_STEPS = new Set(['hoa', 'zoning', 'building', 'precon', 'start', 'materials', 'paint', 'final_insp', 'punch', 'closed'])
+
+// A second job type's steps joined onto the first's. A step both have is kept
+// once. A step only the second has goes in just before the next step of its
+// own list that is already there, so the second kind of work follows the
+// first and they share one ending (punch list, job closed). Two different
+// steps that happen to share a key ("framing" on a porch and on a pergola)
+// are both kept; the second gets its own key so each is checked off on its own.
+function joinStages(first, second, tag) {
+  const out = [...first]
+  const same = (s) => out.find(x => x.key === s.key && (SHARED_STEPS.has(s.key) || x.label === s.label))
+  second.forEach((s, i) => {
+    if (same(s)) return
+    const step = out.some(x => x.key === s.key) ? { ...s, key: `${s.key}__${tag}` } : s
+    if (out.some(x => x.key === step.key)) return
+    const next = second.slice(i + 1).map(same).find(Boolean)
+    out.splice(next ? out.indexOf(next) : out.length, 0, step)
+  })
+  return out
+}
+
+// The PM's own order (jobData.stageOrder, the step keys top to bottom). A
+// step the saved order doesn't know yet (a job type was added since) goes
+// right after the step that comes before it in the standard order.
+function arrangeStages(list, order) {
+  if (!list || !Array.isArray(order) || !order.length) return list
+  const byKey = new Map(list.map(s => [s.key, s]))
+  const out = [...new Set(order)].filter(k => byKey.has(k)).map(k => byKey.get(k))
+  list.forEach((s, i) => {
+    if (out.includes(s)) return
+    const before = list.slice(0, i).reverse().find(x => out.includes(x))
+    out.splice(before ? out.indexOf(before) + 1 : 0, 0, s)
+  })
+  // Whatever the order, the job closes last
+  const closed = out.findIndex(x => x.key === 'closed')
+  if (closed >= 0 && closed !== out.length - 1) out.push(...out.splice(closed, 1))
+  return out
+}
+
 export function getStages(proposal) {
-  // Manual override set in the job card takes priority
-  const override = proposal.jobData?.projectTypeOverride
-  if (override) {
-    if (override === 'Porch Conversion')              return STAGE_TEMPLATES.porch_conversion
-    if (override === 'Deck (Resurface / Rebuild)')    return STAGE_TEMPLATES.deck_resurface
-    if (override === 'Deck (New)')                    return STAGE_TEMPLATES.deck_new
-    if (override === 'Ground Level Porch')            return STAGE_TEMPLATES.porch_ground
-    if (override === 'Ground Level Porch + Windows')  return STAGE_TEMPLATES.porch_ground_windows
-    if (override === 'Porch Over Deck' || override === 'Porch Over Deck + Windows') return porchOnDeckStages(jobScopeText(proposal))
-    if (override === 'Pergola')                       return STAGE_TEMPLATES.pergola
-    if (override === 'Gazebo')                        return STAGE_TEMPLATES.gazebo
+  return arrangeStages(standardStages(proposal), proposal.jobData?.stageOrder)
+}
+
+// The job's steps in their standard order, before the PM's own arrangement.
+function standardStages(proposal) {
+  // Job types picked on the job card take priority
+  const picked = jobTypesOf(proposal).map(t => ({ type: t, list: stagesForType(t, proposal) })).filter(x => x.list)
+  if (picked.length) {
+    return picked.slice(1).reduce((all, x) => joinStages(all, x.list, x.type.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')), picked[0].list)
   }
 
   // The quote's project types ("Screen Porches", "Open Deck"…) and the
@@ -1803,6 +1875,20 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
 
   const tabPages = TABS.find(t => t.pages?.some(pg => pg.value === tab))?.pages
 
+  // Stages tab: which job types the checklist is for, and the PM's own order
+  const pickedTypes = jobTypesOf(proposal)
+  const [pickingTypes, setPickingTypes] = useState(false)
+  const [arranging, setArranging] = useState(false)
+  const typesOpen = pickingTypes || noType
+  const setJobTypes = (list) => updateJobData(proposal.id, { projectTypeOverrides: list, projectTypeOverride: list[0] || null })
+  const moveStage = (i, by) => {
+    const keys = stages.map(st => st.key)
+    const j = i + by
+    if (j < 0 || j >= keys.length) return
+    ;[keys[i], keys[j]] = [keys[j], keys[i]]
+    updateJobData(proposal.id, { stageOrder: keys })
+  }
+
   // One soft-pill status system for the card badge.
   const statusPill = isClosed
     ? { label: 'Closed', cls: 'bg-green-100 text-green-700' }
@@ -1945,54 +2031,71 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
             {tabPages && <div className="border-b border-gray-100 mb-4"><QuickPicks value={tab} options={tabPages} onChange={setTab} /></div>}
             {tab === 'stages' && (
               <div className="space-y-3">
-                {/* Job type selector */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider shrink-0">Job Type</label>
-                  <select
-                    value={jobData.projectTypeOverride || ''}
-                    onChange={e => updateJobData(proposal.id, { projectTypeOverride: e.target.value || null })}
-                    className={`text-xs border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300 ${
-                      noType ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-gray-200 text-gray-700'
-                    }`}
-                  >
-                    <option value="">
-                      {(proposal.contractDraft?.projectTypes || []).join(', ') || '— auto-detect from contract —'}
-                    </option>
-                    {JOB_TYPE_OPTIONS.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                  {jobData.projectTypeOverride && (
-                    <button
-                      onClick={() => updateJobData(proposal.id, { projectTypeOverride: null })}
-                      className="text-xs text-gray-400 hover:text-red-500"
-                    >reset</button>
+                {/* Job types: one, or several for a job with more than one kind of work */}
+                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
+                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider shrink-0">Job Type</span>
+                  <span className={`text-xs ${noType ? 'text-amber-700' : 'text-gray-700'}`}>
+                    {pickedTypes.length ? pickedTypes.join(' + ') : ((proposal.contractDraft?.projectTypes || []).join(', ') || 'Not set')}
+                  </span>
+                  <button type="button" onClick={() => setPickingTypes(v => !v)} aria-expanded={typesOpen} className="text-xs text-[var(--brand-700)] hover:underline">{typesOpen ? 'Done' : 'Change'}</button>
+                  {pickedTypes.length > 0 && <button type="button" onClick={() => setJobTypes([])} className="text-xs text-gray-400 hover:text-red-500">reset</button>}
+                  <div className="flex-1" />
+                  {!noType && stages.length > 1 && (
+                    <button type="button" onClick={() => setArranging(v => !v)} aria-pressed={arranging} className="text-xs text-[var(--brand-700)] hover:underline">{arranging ? 'Done' : 'Reorder'}</button>
+                  )}
+                  {arranging && (jobData.stageOrder || []).length > 0 && (
+                    <button type="button" onClick={() => updateJobData(proposal.id, { stageOrder: null })} className="text-xs text-gray-400 hover:text-red-500">Standard order</button>
                   )}
                 </div>
+                {typesOpen && (
+                  <div className="flex flex-wrap gap-x-5 gap-y-1.5 max-w-2xl" role="group" aria-label="Job types">
+                    {JOB_TYPE_OPTIONS.map(t => (
+                      <label key={t} className="flex items-center gap-1.5 text-xs text-gray-700">
+                        <input type="checkbox" checked={pickedTypes.includes(t)}
+                          onChange={e => { setPickingTypes(true); setJobTypes(e.target.checked ? [...pickedTypes, t] : pickedTypes.filter(x => x !== t)) }} />
+                        {t}
+                      </label>
+                    ))}
+                  </div>
+                )}
 
                 {noType ? (
                   <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-3 border border-amber-200">
-                    Select the job type above to load the correct stage checklist.
+                    Pick the job type above to load its stage checklist.
                   </p>
                 ) : (
                 // One column, top to bottom, in the order the work happens
                 <ol className="flex flex-col gap-1.5 max-w-xl" aria-label="Job checklist">
                   {stages.map((stage, i) => {
                     const done = completedStages.includes(stage.key)
-                    return (
-                      <li key={stage.key}>
-                      <button onClick={() => toggleJobStage(proposal.id, stage.key)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-all ${
-                          done
-                            ? 'bg-green-50 text-green-800 border border-green-200'
-                            : 'bg-gray-50 text-gray-600 border border-gray-100 hover:border-blue-200 hover:bg-blue-50'
-                        }`}>
+                    const row = `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left transition-all ${
+                      done
+                        ? 'bg-green-50 text-green-800 border border-green-200'
+                        : 'bg-gray-50 text-gray-600 border border-gray-100'
+                    }`
+                    const inner = (
+                      <>
                         <span className="w-5 text-right text-xs tabular-nums text-gray-400 shrink-0">{i + 1}</span>
                         {done
                           ? <CheckCircle2 size={15} className="text-green-500 shrink-0" />
                           : <Circle size={15} className="text-gray-300 shrink-0" />}
-                        <span className={done ? 'line-through opacity-60' : ''}>{stage.label}</span>
-                      </button>
+                        <span className={`flex-1 min-w-0 ${done ? 'line-through opacity-60' : ''}`}>{stage.label}</span>
+                      </>
+                    )
+                    return (
+                      <li key={stage.key}>
+                        {arranging ? (
+                          // Arranging: the arrows move the step; ticking is off so a slip doesn't check one
+                          <div className={row}>
+                            {inner}
+                            <button type="button" onClick={() => moveStage(i, -1)} disabled={i === 0 || stage.key === 'closed'} aria-label={`Move ${stage.label} up`}
+                              className="h-7 w-7 rounded-md border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:border-gray-300 disabled:opacity-30"><ChevronUp size={15} /></button>
+                            <button type="button" onClick={() => moveStage(i, 1)} disabled={i === stages.length - 1 || stages[i + 1]?.key === 'closed'} aria-label={`Move ${stage.label} down`}
+                              className="h-7 w-7 rounded-md border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:border-gray-300 disabled:opacity-30"><ChevronDown size={15} /></button>
+                          </div>
+                        ) : (
+                          <button onClick={() => toggleJobStage(proposal.id, stage.key)} className={`${row} ${done ? '' : 'hover:border-blue-200 hover:bg-blue-50'}`}>{inner}</button>
+                        )}
                       </li>
                     )
                   })}
