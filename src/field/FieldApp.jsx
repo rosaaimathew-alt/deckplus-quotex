@@ -27,6 +27,7 @@ import { DEMO, resetDemo } from '../demo'
 import { setViewPref, usePaintView } from './fieldMode'
 import { PaintQueue, PaintSchedule, PaintTouchUps, PaintJob, PaintCrew } from './PaintApp'
 import InstallCard from './InstallCard'
+import PushCard from '../components/PushCard'
 import JobMoney from './JobMoney'
 import SubTasksCard from './SubTasksCard'
 import { needsInspection, statusKey, subNameOf } from '../lib/subTasks'
@@ -101,6 +102,7 @@ function TodayScreen() {
       <ScopeToggle scope={scope} setScope={setScope} hasMine={hasMine} />
 
       <InstallCard />
+      <PushCard installHint={false} />
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">

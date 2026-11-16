@@ -1,5 +1,7 @@
 /**
- * Alerts about a sub's job: email, and a text when texting is set up.
+ * Alerts about a sub's job: a pop-up on the phone for anyone who turned
+ * alerts on (api/_push.js); otherwise an email, and a text when texting is
+ * set up.
  *   POST /api/email  { action: 'notify', kind, id }
  *
  * Served by the email function (Vercel's Hobby plan allows 12 functions per
@@ -22,6 +24,7 @@
 import { verifyToken, asUser, staffMembership } from './_auth.js'
 import { sendMail } from './_mailer.js'
 import { sendSms, smsConfigured } from './_sms.js'
+import { pushToEmails } from './_push.js'
 import { getKV } from './_kv.js'
 
 const TEAL = '#1d758b'
@@ -236,9 +239,19 @@ export async function sendNotification(req, res, body) {
   const member = await staffMembership(token, user).catch(() => null)
   const mailSender = { orgId: member?.org_id || null, ...(info.senderIsStaff && sender.id ? { userId: sender.id, email: sender.email } : {}) }
 
-  let emailed = 0, texted = 0
+  let emailed = 0, texted = 0, pushed = 0
   const errors = []
+  // Phones first: someone whose phone gets the pop-up (they turned alerts on,
+  // api/_push.js) is not emailed or texted as well.
+  const byPhone = new Set()
+  try {
+    const out = await pushToEmails(people.map(p => p.email), { title: msg.subject, body: String(msg.sms || msg.en || '').replace(/^Deck Plus:\s*/, ''), url: link })
+    pushed = out.pushed
+    out.reached.forEach(e => byPhone.add(e))
+    errors.push(...out.errors)
+  } catch (err) { errors.push(String(err?.message || err).slice(0, 120)) }
   for (const p of people) {
+    if (byPhone.has(String(p.email).toLowerCase())) continue
     const { html, text } = buildAlertEmail({ msg, toName: p.name, sender, link, logoUrl })
     const out = await sendMail({
       to: p.email, subject: msg.subject, html, text,
@@ -253,5 +266,5 @@ export async function sendNotification(req, res, body) {
     }
   }
   if (errors.length) console.error('notify:', kind, id, errors.join(' | '))
-  res.status(200).json({ sent: emailed + texted > 0, emailed, texted, ...(errors.length && !emailed ? { error: errors[0] } : {}) })
+  res.status(200).json({ sent: emailed + texted + pushed > 0, emailed, texted, pushed, ...(errors.length && !emailed ? { error: errors[0] } : {}) })
 }

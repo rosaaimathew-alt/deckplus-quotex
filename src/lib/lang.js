@@ -65,6 +65,11 @@ const ES = {
   'Paint': 'Pintura', 'Paint date': 'Fecha de pintura', 'Color not set': 'Color sin definir', 'Notes for the painter': 'Notas para el pintor', 'Touch-ups': 'Retoques',
   'Inspection results': 'Resultados de inspección', 'Passed': 'Aprobada', 'Did not pass': 'No aprobada', 'Recorded': 'Registrada',
   'Electrical items': 'Artículos eléctricos', 'Job checklist': 'Lista del trabajo',
+  'Get alerts on this phone': 'Reciba avisos en este teléfono', 'Turn on alerts': 'Activar avisos', 'Not now': 'Ahora no',
+  'Tap': 'Toque', 'Share': 'Compartir', 'at the bottom of Safari': 'en la parte de abajo de Safari', 'Add to Home Screen': 'Agregar a inicio',
+  'Open Deck Plus from your Home Screen and turn on alerts': 'Abra Deck Plus desde su pantalla de inicio y active los avisos',
+  'Alerts are not set up yet. Try again later.': 'Los avisos aún no están listos. Intente más tarde.',
+  'Could not save this phone for alerts. Try again.': 'No se pudo guardar este teléfono para los avisos. Intente de nuevo.',
   'Close': 'Cerrar', 'Electrical spec sheet': 'Hoja de especificaciones eléctricas', 'Porch detail form': 'Formulario de detalles del porche',
   // inspection names (lib/subInspections)
   'Electrical rough': 'Eléctrica preliminar', 'Electrical final': 'Eléctrica final', 'Electrical slab': 'Eléctrica de losa',

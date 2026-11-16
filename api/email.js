@@ -13,6 +13,7 @@ import dotenv from 'dotenv'
 import { saveMessage } from './_store.js'
 import { sendMail, isMailerConfigured, smtpUser } from './_mailer.js'
 import { sendNotification } from './_notify.js'
+import { pushPublicKey } from './_push.js'
 import { requireAuth } from './_auth.js'
 import { getKV } from './_kv.js'
 import { buildProposalEmail, signatureOf, loadSignature, saveSignature } from './_proposalEmail.js'
@@ -162,6 +163,11 @@ export default async function handler(req, res) {
   // Alerts about a sub's job are open to every login on the team (a technician
   // tapping "Completed" tells the PM); the database decides who is told what.
   if (req.body?.action === 'notify') return sendNotification(req, res, req.body)
+  // The app's public push key, for a phone turning alerts on (src/lib/push.js).
+  // Public by nature: it only lets a phone accept messages from this app.
+  if (req.body?.action === 'push-key') {
+    try { return res.status(200).json({ key: await pushPublicKey() }) } catch { return res.status(200).json({ key: null }) }
+  }
   const staff = await requireAuth(req, res)
   if (!staff) return
   const { action, ...body } = req.body || {}
