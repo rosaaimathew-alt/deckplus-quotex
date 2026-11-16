@@ -1788,12 +1788,20 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
     ...(money ? [{ key: 'money', label: 'Money' }] : []),
     ...(showSubs ? [{ key: 'subs', label: `Subs${jobTasks.length ? ` (${jobTasks.length})` : ''}` }] : []),
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
-    { key: 'log',     label: `Daily Log${logCount ? ` (${logCount})` : ''}` },
-    { key: 'warranty',label: `Warranty${openWarranty ? ` (${openWarranty})` : ''}` },
-    { key: 'forms', label: 'Forms' },
-    { key: 'photos', label: `Photos${photoCount ? ` (${photoCount})` : ''}` },
-    { key: 'documents', label: `Documents${docCount ? ` (${docCount})` : ''}` },
+    // Two tabs hold several pages each, picked on a line under the tab bar:
+    // the daily log with warranty, and everything filed on the job.
+    { key: 'log', label: `Log${openWarranty ? ` (${openWarranty})` : ''}`, pages: [
+      { value: 'log', label: 'Daily log', count: logCount || null },
+      { value: 'warranty', label: 'Warranty', count: openWarranty || null },
+    ] },
+    { key: 'files', label: `Files${docCount ? ` (${docCount})` : ''}`, pages: [
+      { value: 'forms', label: 'Forms' },
+      { value: 'photos', label: 'Photos', count: photoCount || null },
+      { value: 'documents', label: 'Documents', count: docCount || null },
+    ] },
   ]
+
+  const tabPages = TABS.find(t => t.pages?.some(pg => pg.value === tab))?.pages
 
   // One soft-pill status system for the card badge.
   const statusPill = isClosed
@@ -1918,19 +1926,23 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
 
           {/* Tabs */}
           <div className="flex gap-0 border-b border-gray-100 px-4 overflow-x-auto">
-            {TABS.map(t => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  tab === t.key
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}>
-                {t.label}
-              </button>
-            ))}
+            {TABS.map(t => {
+              const on = t.pages ? t.pages.some(pg => pg.value === tab) : tab === t.key
+              return (
+                <button key={t.key} onClick={() => !on && setTab(t.pages ? t.pages[0].value : t.key)}
+                  className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                    on
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}>
+                  {t.label}
+                </button>
+              )
+            })}
           </div>
 
           <div className="px-4 py-4">
+            {tabPages && <div className="border-b border-gray-100 mb-4"><QuickPicks value={tab} options={tabPages} onChange={setTab} /></div>}
             {tab === 'stages' && (
               <div className="space-y-3">
                 {/* Job type selector */}
