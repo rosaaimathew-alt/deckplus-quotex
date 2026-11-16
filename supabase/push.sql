@@ -88,6 +88,19 @@ begin
   return (select value from public.server_vault where key = k);
 end $$;
 
+-- Server only: the email of the team member who made a proposal (its owner),
+-- so the server can tell them when their customer opens it.
+create or replace function public.proposal_owner_email_s(p_proposal_id text, s text)
+returns text language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.server_secret_ok(s) then raise exception 'Not allowed' using errcode = '42501'; end if;
+  return (select lower(m.email) from public.proposals p
+          join public.org_members m on m.user_id = p.owner_id and m.org_id = p.org_id
+          where p.id = p_proposal_id and p.deleted_at is null and coalesce(m.email, '') <> '' limit 1);
+end $$;
+revoke all on function public.proposal_owner_email_s(text, text) from public;
+grant execute on function public.proposal_owner_email_s(text, text) to anon, authenticated;
+
 -- The API reaches these with the public key; the secret check inside is the lock.
 revoke all on function public.push_subs_s(text[], text) from public;
 revoke all on function public.push_drop_s(text, text) from public;
