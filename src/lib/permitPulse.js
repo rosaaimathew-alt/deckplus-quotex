@@ -63,6 +63,20 @@ async function postBatch(body) {
   }
 }
 
+// What the office set on the job to point at its permit (Permits tab): the
+// permit's page on the county site ("Permit link or number"), else a number
+// typed there or on one of the job's permit cards. Sent with the job so the
+// county lookup opens that permit even when the address search finds nothing.
+export function permitPointer(p) {
+  const isNumber = (n) => /^(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,29}$/.test(n)
+  const set = String(p?.jobData?.countyLink || '').trim()
+  if (/^https?:\/\//i.test(set)) return { link: set.replace(/^http:/i, 'https:') }
+  if (isNumber(set.toUpperCase())) return { typed: set.toUpperCase() }
+  // A number on a permit card is only a hint: used when the address finds nothing
+  const hint = Object.values(p?.jobData?.permits || {}).map(x => String(x?.number || '').trim().toUpperCase()).find(isNumber)
+  return hint ? { hint } : {}
+}
+
 // ids: only these jobs (e.g. one job's "Check now"); otherwise every tracked job.
 export async function runPermitPulse({ ids, onProgress } = {}) {
   const { proposals, setCountyPermit } = useStore.getState()
@@ -103,6 +117,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
             jurisdiction: p.imported?.jurisdiction || '',
             pick: p.jobData?.countyPick || null,
             record: (String(p.imported?.permit || '').toUpperCase().match(/\b[A-Z]{1,5}-?(?:[A-Z]{2,5}-)?\d{2,4}-\d{3,7}\b/) || [])[0] || '',
+            ...permitPointer(p),
             knownNotes: Object.keys(knownNotes(p.countyPermit)),
           })),
         }))
