@@ -3,9 +3,9 @@
 // 3D model and 2D floor plan one click away. The model is drawn from the
 // proposal's own builder inputs (see src/lib/designLink.js).
 import { useMemo, useState } from 'react'
-import { Search, PenTool } from 'lucide-react'
+import { PenTool } from 'lucide-react'
 import { useScopedProposals } from '../lib/proposalScope'
-import { RepToggle } from '../components/FilterBar'
+import { RepToggle, SearchLine } from '../components/FilterBar'
 import { designSummary, editorUrl, hasDesign } from '../lib/designLink'
 
 const STATUS_TONE = {
@@ -33,14 +33,10 @@ export default function Designs() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl space-y-4">
-      {/* One flat line like every other list: whose designs and search on the left, the editor on the right */}
+      {/* One flat line like every other list: search and whose designs on the left, the editor on the right */}
       <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200">
+        <SearchLine value={q} onChange={setQ} placeholder="Search client or address" label="Search designs" />
         {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
-        <label className="flex items-center gap-2 h-9 text-sm min-w-0">
-          <Search size={14} className="text-gray-400 shrink-0" />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search client or address" aria-label="Search designs"
-            className="w-48 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none" />
-        </label>
         {/* Free-form editor: draw decks, stair runs and landings anywhere, with live 3D */}
         <a href="/design-editor.html" target="_blank" rel="noopener"
           className="ml-auto flex items-center gap-1.5 px-3 h-8 my-0.5 rounded-lg text-sm font-medium text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)] whitespace-nowrap">

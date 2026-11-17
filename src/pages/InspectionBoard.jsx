@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore, canDeleteProposal } from '../store'
-import { QuickPicks, MenuChip, SwitchChip } from '../components/FilterBar'
+import { QuickPicks, MenuChip, SwitchChip, SearchLine } from '../components/FilterBar'
 import { DEMO } from '../demo'
 import { getStages } from './Jobs'
 import PermitsTab from '../components/PermitsTab'
@@ -11,7 +11,7 @@ import {
   usePermitAccess, permitTracked, BOARD_COLUMNS, boardCells, countyFinaled, inspectionLabel, INSPECTION_TYPES,
   jobCounty, jobJurisdiction, countyConnected, CONNECTED_COUNTIES, closeIfFinaled,
 } from '../lib/permitTracking'
-import { Search, X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck, Printer, Plus, Trash2, Pencil } from 'lucide-react'
+import { X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck, Printer, Plus, Trash2, Pencil } from 'lucide-react'
 import { buildWeeklyReportHtml } from '../lib/inspectionReport'
 import { connectionAlerts } from '../lib/permitHealth'
 
@@ -435,11 +435,7 @@ export default function InspectionBoard() {
 
       {/* One flat line: search, what to show (with counts), then county / PM */}
       <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200">
-        <label className="flex items-center gap-2 h-9 text-sm min-w-0">
-          <Search size={14} className="text-gray-400 shrink-0" />
-          <input className="w-40 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-            placeholder="Search jobs or permits" aria-label="Search jobs or permits" value={query} onChange={e => setQuery(e.target.value)} />
-        </label>
+        <SearchLine value={query} onChange={setQuery} placeholder="Search jobs or permits" />
         <QuickPicks value={show} onChange={setShow} options={[
           { value: 'all', label: 'All', count: jobs.length },
           ...(counts.failed ? [{ value: 'failed', label: 'Failed', count: counts.failed }] : []),

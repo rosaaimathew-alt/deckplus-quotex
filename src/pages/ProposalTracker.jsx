@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import StatCard from '../components/StatCard'
 import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
-import { MenuChip, QuickPicks, SwitchChip, RepToggle } from '../components/FilterBar'
+import { MenuChip, QuickPicks, SwitchChip, RepToggle, SearchLine } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
 import { useIsPhone } from '../field/fieldMode'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
@@ -1510,15 +1510,9 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
             </button>
           ))}
         </div>
-        {/* Whose deals — always first, on the left */}
+        {/* Search first (top left, the same on every list), then whose deals */}
+        {tab === 'list' && <SearchLine value={query} onChange={setQuery} placeholder="Search clients" />}
         {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
-        {tab === 'list' && (
-          <label className="flex items-center gap-2 h-9 text-sm min-w-0">
-            <Search size={14} className="text-gray-400 shrink-0" />
-            <input className="w-36 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-              placeholder="Search clients" value={query} onChange={e => setQuery(e.target.value)} aria-label="Search clients" />
-          </label>
-        )}
         {tab === 'list' && !showOpens && (
           <>
             <QuickPicks value={QUICK_STATUS.includes(filterStatus) ? filterStatus : null} onChange={setFilterStatus}
