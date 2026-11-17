@@ -115,10 +115,10 @@ function ReviewModal({ id, onClose }) {
                 return (
                   <tr key={l.taskId}>
                     <td className="px-3 py-2.5"><p className="font-semibold text-gray-900">{l.title}</p><p className="text-gray-600">{job ? jobLabel(job) : [l.client, l.address].filter(Boolean).join(' · ')}</p>{l.note && <p className="text-gray-500 italic">{l.note}</p>}</td>
-                    <td className="px-3 text-right">{draw ? money(agreed) : '—'}</td>
+                    <td className={`px-3 text-right ${draw && !(agreed > 0) ? 'text-amber-700 font-semibold' : ''}`}>{!draw ? '—' : agreed > 0 ? money(agreed) : 'Not set'}</td>
                     <td className="px-3 text-right">{draw ? money(before) : '—'}</td>
                     <td className="px-3 text-right font-semibold">{money(l.amount)}</td>
-                    <td className={`px-3 text-right ${draw && agreed - before - l.amount < 0 ? 'text-red-600 font-semibold' : ''}`}>{draw ? money(agreed - before - l.amount) : '—'}</td>
+                    <td className={`px-3 text-right ${draw && agreed > 0 && agreed - before - l.amount < 0 ? 'text-red-600 font-semibold' : ''}`}>{draw && agreed > 0 ? money(agreed - before - l.amount) : '—'}</td>
                   </tr>
                 )
               })}

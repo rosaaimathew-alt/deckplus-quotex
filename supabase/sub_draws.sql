@@ -10,7 +10,7 @@
 --   sub_draws   office / admin: everything (approve or send back)
 --               sub: read their own; send (insert) a new one; never edit or
 --               delete one. The checks below refuse an invoice that would
---               take a task past its agreed amount, a second live one for
+--               take a task past its agreed amount (once one is set), a second live one for
 --               the same job in the same week, or one without the invoice
 --               file, date or work type.
 --               PMs, reps, paint PM: nothing (money stays with the office).
@@ -114,12 +114,13 @@ create policy sub_draws_sub_update on public.sub_draws for update
   with check (org_id = auth_org() and auth_role() = 'sub' and owner_id = auth.uid());
 
 -- 4. A sub's invoice must be sent Monday–Thursday and add up. A carpenter's draw stays inside
---    the agreed amount (once a week per job); any other trade sends one invoice per job.
+--    the agreed amount when the office has set one (once a week per job either way); any
+--    other trade sends one invoice per job.
 --    (Runs as the table owner so it can see every invoice on the task.)
 create or replace function public.check_sub_draw() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
-  l jsonb; f jsonb; t public.sub_tasks; amt numeric; drawn numeric; total numeric := 0; seen text[] := '{}';
+  l jsonb; f jsonb; t public.sub_tasks; amt numeric; drawn numeric; agreed numeric; total numeric := 0; seen text[] := '{}';
   bad constant text := 'permission denied: ';
 begin
   if auth_role() is distinct from 'sub' then return new; end if;
@@ -166,8 +167,11 @@ begin
       select coalesce(sum((x->>'amount')::numeric), 0) into drawn
         from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
         where d.org_id = new.org_id and d.deleted_at is null and d.data->>'status' <> 'rejected' and x->>'taskId' = t.id;
-      if drawn + amt > coalesce((select nullif(m.data->>'agreedAmount', '')::numeric from public.sub_task_terms m
-                                 where m.org_id = new.org_id and m.id = t.id and m.deleted_at is null), 0) then
+      -- The cap only exists once the office has set an agreed amount; until
+      -- then the invoice goes through and the office approves or sends it back.
+      agreed := coalesce((select nullif(m.data->>'agreedAmount', '')::numeric from public.sub_task_terms m
+                          where m.org_id = new.org_id and m.id = t.id and m.deleted_at is null), 0);
+      if agreed > 0 and drawn + amt > agreed then
         raise exception '%that''s more than is left on "%"', bad, t.data->>'title' using errcode = '42501';
       end if;
     else

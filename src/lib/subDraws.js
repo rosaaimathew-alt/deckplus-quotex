@@ -4,7 +4,8 @@
 // questions as the office's Google Form "Deckplus Subcontractor Invoice":
 // company, date, job name / address, work type, invoice amount, notes, and
 // the invoice itself (photo or PDF, optional). Any amount up to what's left
-// on the job; one invoice per job per week. Only carpenters draw like that:
+// on the job (when the office has set an agreed amount; any amount until it
+// has); one invoice per job per week. Only carpenters draw like that:
 // every other trade sends one invoice per job (drawsAllowed). A photo or PDF
 // of the invoice is optional. The office approves it (it
 // becomes a bill on that job in Money › Bills, the same layout as every
@@ -19,8 +20,8 @@
 //     status: 'submitted' | 'approved' | 'rejected',
 //     submittedAt, submittedBy, decidedAt, decidedBy, reason, billIds }
 // The database refuses an invoice that would take a job past its agreed
-// amount, a second live invoice for the same job in the same week, or one
-// with no invoice file (supabase/sub_draws.sql).
+// amount (once one is set) or a second live invoice for the same job in the
+// same week (supabase/sub_draws.sql).
 
 export const round2 = (x) => Math.round((Number(x) || 0) * 100) / 100
 export const money = (x) => `$${round2(x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -83,8 +84,13 @@ const stageOfTask = (task) => Math.max(1, Number(task?.stage) || 1)
 export const sentOnStage = (draws, task) =>
   (draws || []).find(d => live(d) && (d.lines || []).some(l => String(l.taskId) === String(task?.id)
     && Math.max(1, Number(l.stage) || 1) === stageOfTask(task))) || null
+// Is there an agreed amount to hold this carpenter's invoices to? The cap only
+// exists once the office has typed one in (Subs tab on the job). Until then a
+// carpenter can still send an invoice (the office approves or sends it back),
+// so a booking nobody priced yet doesn't quietly lose its "Send an invoice" button.
+export const capped = (task, terms) => drawsAllowed(task) && agreedOf(task?.id, terms) > 0
 export const canInvoice = (task, terms, draws) => (drawsAllowed(task)
-  ? remainingOn(task.id, terms, draws) > 0 && !sentThisWeek(draws, task.id)
+  ? (!capped(task, terms) || remainingOn(task.id, terms, draws) > 0) && !sentThisWeek(draws, task.id)
   : !sentOnStage(draws, task))
 
 // The live invoice already sent for this job this week, if any.
