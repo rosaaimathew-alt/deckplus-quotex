@@ -615,7 +615,7 @@ const CARD_ACTION = 'flex-1 min-w-0 overflow-hidden min-h-[44px] flex flex-col i
 // A single "⋯" dropdown holding secondary row actions. Fixed-positioned off the
 // button's rect so it never gets clipped by the table's overflow containers.
 // Click-outside / scroll / resize all close it.
-function RowMenu({ items, sheet = false, title = '' }) {
+function RowMenu({ items, sheet = false, compact = false, title = '' }) {
   const [open, setOpen] = useState(false)
   const [coords, setCoords] = useState(null)
   const btnRef = useRef(null)
@@ -653,9 +653,9 @@ function RowMenu({ items, sheet = false, title = '' }) {
   // full-width row a thumb can hit.
   if (sheet) return (
     <>
-      <button ref={btnRef} onClick={() => setOpen(true)} className={CARD_ACTION}>
-        <MoreHorizontal size={17} /> More
-      </button>
+      {compact
+        ? <button ref={btnRef} onClick={() => setOpen(true)} aria-label="More actions" className="shrink-0 w-11 h-11 flex items-center justify-center rounded-lg text-gray-500 active:bg-gray-100"><MoreHorizontal size={20} /></button>
+        : <button ref={btnRef} onClick={() => setOpen(true)} className={CARD_ACTION}><MoreHorizontal size={17} /> More</button>}
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end" onClick={() => setOpen(false)}>
           <div ref={menuRef} role="menu" onClick={e => e.stopPropagation()}
@@ -905,70 +905,40 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
     ['date:desc', 'Newest first'], ['date:asc', 'Oldest first'], ['client:asc', 'Client A–Z'],
     ['total:desc', 'Highest total'], ['status:desc', 'Status'], ...(showRep ? [['rep:asc', 'Sales rep']] : []),
   ]
-  // One proposal on a phone: who and how much on one line, the status as a
-  // colored dot (tap it to change the status), then one row of buttons. The
-  // rest (dates, other versions, reminders) opens from its own button.
+  // One proposal on a phone, on one line: the status as a colored dot (tap it
+  // to change the status), the name, the total, and ⋯ for everything else.
+  // Tapping the name opens the proposal.
   const renderProposalCard = ({ p, alt = false, altCount = 0, onMerge, groupProposals }) => {
     const isAltExpanded = expandedAlts === p.id
-    const rep = showRep ? repName(members, p.ownerId) : ''
     const due = alt ? [] : (p.reminders || []).filter(r => !r.dismissed)
-    const overdue = due.some(r => { const nd = nextReminderDate(r); return nd && isOverdue(nd) })
     const showDue = openReminders === p.id
+    const items = [
+      { label: 'Open', icon: Eye, onClick: () => onOpen(p) },
+      { label: 'Revise', icon: Copy, onClick: () => onRevise(p) },
+      ...(p.status === 'Won' && !alt ? [{ label: 'Contract', icon: FileSignature, onClick: () => onGenerateContract(p) }] : []),
+      ...(!alt ? [{ label: expandedLog === p.id ? 'Hide activity log' : 'Activity log', icon: MessageSquare, onClick: () => setExpandedLog(expandedLog === p.id ? null : p.id) }] : []),
+      ...(altCount > 0 ? [{ label: `${isAltExpanded ? 'Hide' : 'Show'} other versions (${altCount})`, icon: GitBranch, onClick: () => setExpandedAlts(isAltExpanded ? null : p.id) }] : []),
+      ...(due.length ? [{ label: `${showDue ? 'Hide' : 'Show'} reminders (${due.length})`, icon: Bell, onClick: () => setOpenReminders(showDue ? null : p.id) }] : []),
+      { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(p) },
+      ...(!alt ? [{ label: 'Add reminder', icon: Bell, onClick: () => onReminderOpen(p.id) }] : []),
+      ...(!alt && (p.status === 'Sent' || p.status === 'Followed Up') && p.email ? [{ label: 'Send follow-up', icon: Send, onClick: () => setFollowUpProposal(p) }] : []),
+      { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) },
+      ...(!alt ? [{ label: 'Merge into client', icon: GitMerge, onClick: onMerge }] : []),
+      ...(alt || altCount > 0 ? [{ label: 'Detach', icon: Unlink, onClick: () => handleDetach(p.id) }] : []),
+      ...removeItems(p),
+    ]
+    const name = p.client || 'No name'
     return (
-      <div className={alt ? 'border-t border-gray-100 bg-gray-50 pl-3' : ''}>
-        <div className="pl-1.5 pr-4 pt-1.5 flex items-center gap-0.5">
+      <div className={alt ? 'border-t border-gray-100 bg-gray-50 pl-4' : ''}>
+        <div className="flex items-center pr-1">
           <StatusSelect dot value={p.status} onChange={e => onStatusChange(p, e.target.value)} />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-gray-900 leading-snug break-words line-clamp-2">
-              {alt && <span className="inline-flex items-center gap-1 mr-1.5 text-xs font-semibold text-gray-500 align-middle"><GitBranch size={11} className="text-[var(--brand-300)]" /> Alt {p.version || '—'}</span>}
-              {p.client || <span className="text-gray-400 italic font-normal">No name</span>}
-            </p>
-            <p className="text-xs text-gray-500 leading-snug truncate">
-              <span className={STATUS_TEXT[p.status] || 'text-gray-500'}>{p.status}</span>{rep ? ` · ${rep}` : ''}
-            </p>
-          </div>
-          <p className="shrink-0 pl-2 font-semibold text-gray-900 whitespace-nowrap">${fmt(p.total || 0)}</p>
-        </div>
-        <div className="px-2 pb-1 flex items-stretch gap-1">
-          <button onClick={() => onOpen(p)} className={CARD_ACTION}><Eye size={17} /> Open</button>
-          <button onClick={() => onRevise(p)} className={CARD_ACTION}><Copy size={17} /> Revise</button>
-          {p.status === 'Won' && !alt && (
-            <button onClick={() => onGenerateContract(p)} className={`${CARD_ACTION} !text-[var(--brand-700)]`}><FileSignature size={17} /> Contract</button>
-          )}
-          {!alt && (
-            <button onClick={() => setExpandedLog(expandedLog === p.id ? null : p.id)} aria-expanded={expandedLog === p.id}
-              className={`${CARD_ACTION} ${expandedLog === p.id ? 'bg-gray-100' : ''}`}>
-              {expandedLog === p.id ? <ChevronUp size={17} /> : <MessageSquare size={17} />} Log
-            </button>
-          )}
-          {due.length > 0 && (
-            <button onClick={() => setOpenReminders(showDue ? null : p.id)} aria-expanded={showDue}
-              aria-label={`${due.length} reminder${due.length !== 1 ? 's' : ''}${overdue ? ', overdue' : ''}`}
-              className={`${CARD_ACTION} ${overdue ? '!text-red-600' : ''} ${showDue ? 'bg-gray-100' : ''}`}>
-              <Bell size={17} /> {overdue ? 'Overdue' : 'Reminder'}
-            </button>
-          )}
-          {altCount > 0 && (
-            <button onClick={() => setExpandedAlts(isAltExpanded ? null : p.id)} aria-expanded={isAltExpanded}
-              aria-label={`${altCount} other version${altCount !== 1 ? 's' : ''}`}
-              className={`${CARD_ACTION} ${isAltExpanded ? 'bg-gray-100' : ''}`}>
-              <span className="relative"><GitBranch size={17} /><span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-gray-700 text-white text-[10px] leading-[15px] text-center font-semibold">{altCount}</span></span> Versions
-            </button>
-          )}
-          <RowMenu sheet title={p.client || 'Proposal'} items={alt ? [
-            { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(p) },
-            { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) },
-            { label: 'Detach', icon: Unlink, onClick: () => handleDetach(p.id) },
-            ...removeItems(p),
-          ] : [
-            { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(p) },
-            { label: 'Add reminder', icon: Bell, onClick: () => onReminderOpen(p.id) },
-            ...((p.status === 'Sent' || p.status === 'Followed Up') && p.email ? [{ label: 'Send follow-up', icon: Send, onClick: () => setFollowUpProposal(p) }] : []),
-            { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) },
-            { label: 'Merge into client', icon: GitMerge, onClick: onMerge },
-            ...(altCount > 0 ? [{ label: 'Detach', icon: Unlink, onClick: () => handleDetach(p.id) }] : []),
-            ...removeItems(p),
-          ]} />
+          <button onClick={() => onOpen(p)} className="flex-1 min-w-0 min-h-[52px] flex items-center gap-3 text-left active:bg-gray-50">
+            <span className={`min-w-0 flex-1 truncate ${alt ? 'text-gray-700' : 'font-semibold text-gray-900'}`}>
+              {alt && <span className="text-gray-500 font-medium">Alt {p.version || '—'} · </span>}{name}
+            </span>
+            <span className={`shrink-0 tabular-nums ${alt ? 'text-gray-700' : 'font-semibold text-gray-900'}`}>${fmt(p.total || 0)}</span>
+          </button>
+          <RowMenu sheet compact title={`${name} · ${p.status}`} items={items} />
         </div>
         {showDue && <div className="px-4 pb-2"><ReminderBadges proposal={p} wide /></div>}
         {expandedLog === p.id && <div className="border-t border-gray-100"><ActivityLog proposal={p} groupProposals={groupProposals} /></div>}
