@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App'
+import Root from './Root'
 import { initAuth, getAccessToken } from './supabase'
 import { applyCachedBrand } from './brand'
 import { startAutoUpdate } from './lib/autoUpdate'
@@ -45,7 +45,7 @@ window.fetch = async (input, init = {}) => {
 initAuth().finally(() => {
   createRoot(document.getElementById('root')).render(
     <StrictMode>
-      <App />
+      <Root />
     </StrictMode>,
   )
 })
