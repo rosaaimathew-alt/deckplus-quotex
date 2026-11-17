@@ -2,8 +2,9 @@
 /**
  * Reminders to sign a contract.
  *
- * A contract sent for signature can nudge the customer by email every few days
- * until they sign (Contracts › Send to Client › Remind to sign). The daily
+ * A contract sent for signature nudges the customer by email until they sign:
+ * every morning by default (it turns on when the contract is sent), or every
+ * few days (Contracts › Send to Client › Remind to sign). The daily
  * cron (vercel.json → /api/booking?report=1) runs this: it asks the database
  * which reminders are due (supabase/contract_reminders.sql decides, and only
  * hands back contracts the customer has not signed), sends each one from the

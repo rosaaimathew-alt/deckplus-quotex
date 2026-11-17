@@ -11,8 +11,10 @@ import { useStore } from '../store'
 import { QuickPicks } from './FilterBar'
 import { loadContractReminders } from '../lib/contractReminders'
 
+const DAILY = 1
 const EVERY = [
   { value: 0, label: 'Off' },
+  { value: DAILY, label: 'Daily' },
   { value: 2, label: 'Every 2 days' },
   { value: 3, label: 'Every 3 days' },
   { value: 7, label: 'Weekly' },
@@ -39,9 +41,23 @@ export default function SendContract({ proposal, links, autoSigned = false, onRe
     return () => { live = false }
   }, [id])
 
+  // Sending a contract turns on a daily reminder by itself, so a customer who
+  // hasn't signed hears about it every morning until they do. It never
+  // overrides a choice already made: a reminder that is set stays as it is,
+  // and one switched Off for this contract stays off.
+  const startDaily = async (address) => {
+    if (reminder !== false || draft.signReminderOff || !validEmail(address) || id == null) return
+    const { data, error: err } = await supabase.rpc('contract_reminder_set', { p_proposal_id: String(id), p_every_days: DAILY, p_email: address.trim() })
+    if (err || !data) return
+    setReminder(data)
+    onReminder?.(String(id), data)
+  }
+
   const copy = (role) => {
     navigator.clipboard?.writeText(links[role])
     setCopied(role); setTimeout(() => setCopied(''), 2000)
+    // copying the customer's link is sending it another way
+    if (role === 'client') startDaily(to)
   }
   const send = async () => {
     if (!validEmail(to)) { setError("Enter the customer's email address."); return }
@@ -56,6 +72,7 @@ export default function SendContract({ proposal, links, autoSigned = false, onRe
       const at = new Date().toISOString()
       setSent({ at, to: to.trim() })
       if (id != null) saveContractDraft(id, { sentToClientAt: at, sentToClientEmail: to.trim() })
+      startDaily(to)
     } catch (e) { setError(e.message) }
     setSending(false)
   }
@@ -67,6 +84,8 @@ export default function SendContract({ proposal, links, autoSigned = false, onRe
     if (err) { setError('Could not save the reminder. Try again.'); return }
     setReminder(data || false)
     onReminder?.(String(id), data || null)
+    // remembered on the contract, so sending again doesn't switch it back on
+    if (!!draft.signReminderOff !== !days) saveContractDraft(id, { signReminderOff: !days })
   }
 
   const box = 'border border-gray-200 rounded-xl p-3 space-y-2'
@@ -102,7 +121,9 @@ export default function SendContract({ proposal, links, autoSigned = false, onRe
         {reminder === null
           ? <p className="text-xs text-gray-400">Loading…</p>
           : <QuickPicks value={reminder ? reminder.everyDays : 0} options={EVERY} onChange={setEvery} />}
-        {reminder ? <p className="text-xs text-gray-500">{reminder.sentCount || 0} of {reminder.maxCount || 3} sent{reminder.lastSentAt ? ` · last ${when(reminder.lastSentAt)}` : ''}. Stops when they sign.</p> : null}
+        {reminder
+          ? <p className="text-xs text-gray-500">{reminder.sentCount || 0} of {reminder.maxCount || 3} sent{reminder.lastSentAt ? ` · last ${when(reminder.lastSentAt)}` : ''}. Stops when they sign.</p>
+          : reminder === false && !draft.signReminderOff ? <p className="text-xs text-gray-500">Turns on daily when you send.</p> : null}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

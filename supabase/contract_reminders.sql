@@ -52,9 +52,10 @@ begin
     delete from public.contract_reminders where proposal_id = p_proposal_id;
     return null;
   end if;
-  insert into public.contract_reminders (proposal_id, org_id, every_days, email, set_by)
-  values (p_proposal_id, public.auth_org(), least(p_every_days, 30), nullif(trim(lower(p_email)), ''), auth.uid())
-  on conflict (proposal_id) do update set every_days = excluded.every_days, email = coalesce(excluded.email, public.contract_reminders.email),
+  -- A daily reminder runs for up to ten mornings; a slower one for three.
+  insert into public.contract_reminders (proposal_id, org_id, every_days, max_count, email, set_by)
+  values (p_proposal_id, public.auth_org(), least(p_every_days, 30), case when p_every_days = 1 then 10 else 3 end, nullif(trim(lower(p_email)), ''), auth.uid())
+  on conflict (proposal_id) do update set every_days = excluded.every_days, max_count = excluded.max_count, email = coalesce(excluded.email, public.contract_reminders.email),
     set_by = excluded.set_by, sent_count = 0, last_sent_at = null, started_at = now(), updated_at = now()
   returning * into r;
   return jsonb_build_object('proposalId', r.proposal_id, 'everyDays', r.every_days, 'maxCount', r.max_count, 'sentCount', r.sent_count, 'lastSentAt', r.last_sent_at, 'email', r.email);
@@ -80,7 +81,7 @@ grant execute on function public.contract_reminders_mine() to authenticated;
 
 -- Server only: the reminders due today. Due = turned on, fewer sent than the
 -- limit, at least every_days days since the last one (or since it was turned
--- on), the job still there, and the customer has not signed: not marked signed
+-- on), the job still there and still Won, and the customer has not signed: not marked signed
 -- on the job, and no client signature on the contract as it was last sent (a
 -- replaced send points at the newer one). Hands back what the email needs and
 -- nothing else: who to write to, the contract number, the customer's own
@@ -91,12 +92,15 @@ declare c record; p public.proposals; d jsonb; rec jsonb; nxt jsonb; rid text; m
 begin
   if not public.server_secret_ok(s) then raise exception 'Not allowed' using errcode = '42501'; end if;
   for c in select * from public.contract_reminders
-           where sent_count < max_count and current_date - (coalesce(last_sent_at, started_at))::date >= every_days
+           where sent_count < max_count
+             -- counted in whole days on the office's calendar (Eastern), so a
+             -- contract sent any time on Monday is reminded on Tuesday morning
+             and (now() at time zone 'America/New_York')::date - (coalesce(last_sent_at, started_at) at time zone 'America/New_York')::date >= every_days
            order by coalesce(last_sent_at, started_at) limit 50 loop
     select * into p from public.proposals where id = c.proposal_id and org_id = c.org_id and deleted_at is null;
     continue when not found;
     d := case when jsonb_typeof(p.data->'contractDraft') = 'object' then p.data->'contractDraft' else '{}'::jsonb end;
-    continue when coalesce((d->>'signed')::boolean, false) or (d->>'signRecordId') is null;
+    continue when coalesce((d->>'signed')::boolean, false) or (d->>'signRecordId') is null or p.status is distinct from 'Won';
     rid := d->>'signRecordId';
     select value into rec from public.app_kv where key = 'sign:' || rid and (expires_at is null or expires_at > now());
     for hop in 1..10 loop
