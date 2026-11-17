@@ -11,7 +11,7 @@ import JobSubsTab from '../components/JobSubsTab'
 import JobPhotosTab from '../components/JobPhotos'
 import JobForms from '../components/JobForms'
 import { jobPhotoCount } from '../lib/taskPhotos'
-import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel } from '../lib/permitTracking'
+import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel, noPermit, PERMIT_KEYS, isInspectionKey } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
 import { useNav, useJobMoney } from '../nav'
@@ -24,7 +24,7 @@ import {
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
   AlertTriangle, CheckCheck, Clock, Wrench, FileText, Mail, Send,
   Search, Trash2, Link2, ExternalLink, PenLine, RefreshCw,
-  HardHat, CloudSun, MoreHorizontal, Loader, Store, ShieldCheck,
+  HardHat, CloudSun, MoreHorizontal, Loader, Store, ShieldCheck, Ban, RotateCcw,
 } from 'lucide-react'
 
 const fmt    = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -336,7 +336,9 @@ function arrangeStages(list, order) {
 }
 
 export function getStages(proposal) {
-  return arrangeStages(standardStages(proposal), proposal.jobData?.stageOrder)
+  const list = arrangeStages(standardStages(proposal), proposal.jobData?.stageOrder)
+  // "No permit needed": no permit or inspection steps to wait on
+  return list && noPermit(proposal) ? list.filter(s => !PERMIT_KEYS.includes(s.key) && !isInspectionKey(s.key)) : list
 }
 
 // The job's steps in their standard order, before the PM's own arrangement.
@@ -1832,7 +1834,11 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const noType = stages.length === 0
   const done = stages.filter(s => completedStages.includes(s.key)).length
   const pct  = stages.length > 0 ? Math.round((done / stages.length) * 100) : 0
-  const isClosed = completedStages.includes('closed')
+  const isCanceled = proposal.status === 'Canceled'
+  const isClosed = completedStages.includes('closed') || isCanceled
+  const setJobCanceled = useStore(s => s.setJobCanceled)
+  const canCancel = useStore(s => s.role === 'manager' || s.role === 'office')
+  const me = useStore(s => s.me)
 
   const draft = proposal.contractDraft || {}
   const contractNum   = draft.contractNum || contractNumberFor(proposal.id)
@@ -1842,7 +1848,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const logCount      = (jobData.dailyLogs || []).length
   const docCount      = jobDocuments(proposal, money).length
   const costCount     = (allExpenses || []).filter(e => e.jobId === proposal.id).length
-  const showPermits   = !!permitAccess && permitTracked(proposal)
+  const showPermits   = !!permitAccess && (permitTracked(proposal) || noPermit(proposal))
   const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0, needsPick: false }
   const nextInsp      = showPermits ? jobData.nextInspection : null
 
@@ -1891,7 +1897,9 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   }
 
   // One soft-pill status system for the card badge.
-  const statusPill = isClosed
+  const statusPill = isCanceled
+    ? { label: 'Canceled', cls: 'bg-red-50 text-red-700' }
+    : isClosed
     ? { label: 'Closed', cls: 'bg-green-100 text-green-700' }
     : noType
       ? { label: 'Needs setup', cls: 'bg-amber-100 text-amber-700' }
@@ -1941,7 +1949,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
             </div>
           )}
 
-        {!isClosed && (
+        {(!isClosed || (isCanceled && canCancel)) && (
           <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
             <button onClick={() => setMenuOpen(o => !o)} title="More actions"
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
@@ -1951,6 +1959,12 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20">
+                  {isCanceled ? (
+                    <button onClick={() => { setMenuOpen(false); setJobCanceled(proposal.id, false) }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                      <RotateCcw size={14} className="text-gray-400 shrink-0" /> Restore job
+                    </button>
+                  ) : (<>
                   <button onClick={() => { setMenuOpen(false); setShowReminder(true) }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                     <Mail size={14} className="text-gray-400 shrink-0" /> Send payment reminder
@@ -1959,6 +1973,19 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                     <CheckCheck size={14} className="text-gray-400 shrink-0" /> Close out job
                   </button>
+                  {permitAccess === 'edit' && (
+                    <button onClick={() => { setMenuOpen(false); updateJobData(proposal.id, { noPermit: !noPermit(proposal) }) }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                      <ShieldCheck size={14} className="text-gray-400 shrink-0" /> {noPermit(proposal) ? 'Needs a permit after all' : 'No permit needed'}
+                    </button>
+                  )}
+                  {canCancel && (
+                    <button onClick={() => { setMenuOpen(false); if (window.confirm(`Cancel ${proposal.client || 'this job'}? It leaves the job lists and no longer counts as won revenue. You can restore it from Jobs › Canceled.`)) setJobCanceled(proposal.id, true, me?.displayName || me?.email || '') }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                      <Ban size={14} className="shrink-0" /> Cancel job
+                    </button>
+                  )}
+                  </>)}
                 </div>
               </>
             )}
@@ -2196,6 +2223,7 @@ export default function Jobs() {
   }
 
   const wonJobs = proposals.filter(isJob)
+  const canceledJobs = proposals.filter(p => p.status === 'Canceled')
   const stageGroups = (() => {
     const map = new Map()
     wonJobs.filter(p => phaseOf(p) !== 'closed').forEach(p => {
@@ -2204,7 +2232,7 @@ export default function Jobs() {
     })
     return [...map.entries()].sort((a, b) => b[1] - a[1])
   })()
-  const filtered = wonJobs.filter(p => {
+  const filtered = (filter === 'canceled' ? canceledJobs : wonJobs).filter(p => {
     if (focusId) return String(p.id) === focusId
     const phase = phaseOf(p)
     if (stageFilter && (phase === 'closed' || currentStageOf(p) !== stageFilter)) return false
@@ -2213,6 +2241,7 @@ export default function Jobs() {
     if (filter === 'in-progress' && phase !== 'in-progress')   return false
     if (filter === 'not-started' && phase !== 'not-started')   return false
     if (filter === 'closed'      && phase !== 'closed')        return false
+    if (filter === 'canceled')   return !query || [p.client, p.address, p.email].some(v => v?.toLowerCase().includes(query.toLowerCase()))
     if (query) {
       const q = query.toLowerCase()
       const contractNum = p.contractDraft?.contractNum || contractNumberFor(p.id)
@@ -2245,6 +2274,7 @@ export default function Jobs() {
             { value: 'not-started', label: 'Not started', count: counts['not-started'] },
             { value: 'closed',      label: 'Closed',      count: counts.closed },
             { value: 'all',         label: 'All',         count: counts.all },
+            ...(canceledJobs.length ? [{ value: 'canceled', label: 'Canceled', count: canceledJobs.length }] : []),
           ]} />
         </div>
         {permitAccess && (

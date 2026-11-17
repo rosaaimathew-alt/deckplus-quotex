@@ -581,6 +581,19 @@ export const useStore = create(
           }
         }),
 
+      // A job the customer canceled: it leaves the job lists and stops counting
+      // as won revenue (everything counts status 'Won' / an imported sale), and
+      // keeps what it was so it can be restored.
+      setJobCanceled: (id, on, by = '') =>
+        set((s) => ({
+          proposals: s.proposals.map((p) => {
+            if (p.id !== id) return p
+            const now = new Date().toISOString()
+            if (on) return p.status === 'Canceled' ? p : { ...p, status: 'Canceled', statusChangedAt: now, canceled: { at: now, by, from: p.status } }
+            return p.status !== 'Canceled' ? p : { ...p, status: p.canceled?.from || 'Won', statusChangedAt: now, canceled: null }
+          }),
+        })),
+
       setWinLossReason: (id, reason) =>
         set((s) => ({
           proposals: s.proposals.map((p) =>

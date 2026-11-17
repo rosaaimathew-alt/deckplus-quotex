@@ -8,7 +8,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const md = (d) => { if (!d) return ''; const [, m, day] = d.split('-'); return `${Number(m)}/${Number(day)}` }
 const long = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-const MARK = { pass: '✓', fail: '✗', sched: '◷', void: '–' }
+const MARK = { pass: '✓', partial: '◐', fail: '✗', sched: '◷', void: '–' }
 
 // "8/4/2026 4:35 PM" (as the county writes it) → sortable
 const noteTime = (at, fallback) => {
@@ -127,7 +127,7 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
   td.ins { line-height: 1.9; }
   .c { display: inline-block; white-space: nowrap; border-radius: 4px; padding: 0 4px; margin: 0 3px 0 0; font-size: 10px; line-height: 1.5; border: 1px solid; }
   .c b { font-weight: 700; }
-  .c.pass { background: #dcfce7; border-color: #86efac; } .c.fail { background: #fee2e2; border-color: #fca5a5; }
+  .c.pass { background: #dcfce7; border-color: #86efac; } .c.fail { background: #fee2e2; border-color: #fca5a5; } .c.partial { background: #fef3c7; border-color: #fcd34d; }
   .c.sched { background: #dbeafe; border-color: #93c5fd; } .c.void { background: #f3f4f6; border-color: #d1d5db; color: #666; }
   .job { overflow-wrap: anywhere; }
   .ok { color: #15803d; } .bad { color: #b91c1c; }
@@ -162,7 +162,7 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
       ${groups.map(g => `<tr class="pmrow"><td colspan="5">${g.pm === 'not assigned' ? 'No PM assigned' : `PM ${esc(g.pm)}`} · ${g.rows.length} job${g.rows.length === 1 ? '' : 's'}</td></tr>${g.rows.map(rowHtml).join('')}`).join('')}
     </tbody>
   </table>
-  <div class="legend">✓ passed · ✗ failed / inaccessible / partial (latest result) · ◷ scheduled at the county · – cancelled.
+  <div class="legend">✓ passed · ◐ partial pass · ✗ failed / inaccessible (latest result) · ◷ scheduled at the county · – cancelled.
     ${cols.map(c => `${esc(c.label)} ${esc(c.title.toLowerCase())}`).join(' · ')}.</div>
 </body></html>`
 }

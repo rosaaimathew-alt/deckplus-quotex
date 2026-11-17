@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store'
 import {
   PERMIT_KEYS, isInspectionKey, today, daysUntil, INSPECTION_TYPES, inspectionLabel,
-  countyByStage, countyPassed, countyLast, isFailResult, isPassResult, jobCounty, jobJurisdiction, countyConnected,
+  countyByStage, countyPassed, countyLast, isFailResult, isPassResult, isPartialResult, jobCounty, jobJurisdiction, countyConnected, noPermit,
 } from '../lib/permitTracking'
 import { runPermitPulse } from '../lib/permitPulse'
 import { DEMO } from '../demo'
@@ -12,17 +12,18 @@ import { CheckCircle2, AlertTriangle, Clock, Plus, X, FileText, ShieldCheck, Ext
 // The data model is described in lib/permitTracking.js. Results marked
 // "County" come from the Mecklenburg permit site via the twice-daily pulse.
 
-const RESULTS = ['Passed', 'Failed', 'Partial', 'Cancelled']
+const RESULTS = ['Passed', 'Partial Pass', 'Failed', 'Cancelled']
 const RESULT_STYLE = {
   Passed:    'bg-green-100 text-green-700',
   Failed:    'bg-red-100 text-red-700',
   Partial:   'bg-amber-100 text-amber-700',
+  'Partial Pass': 'bg-amber-100 text-amber-700',
   Cancelled: 'bg-gray-100 text-gray-600',
 }
 
 const fmtDate = d => d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 const fmtWhen = iso => iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
-const resultStyle = r => RESULT_STYLE[r] || (isPassResult(r) ? RESULT_STYLE.Passed : isFailResult(r) ? RESULT_STYLE.Failed : RESULT_STYLE.Cancelled)
+const resultStyle = r => RESULT_STYLE[r] || (isPassResult(r) ? RESULT_STYLE.Passed : isPartialResult(r) ? RESULT_STYLE.Partial : isFailResult(r) ? RESULT_STYLE.Failed : RESULT_STYLE.Cancelled)
 // "County" for what the county site posted, "Office" for a result recorded by hand
 const CountyTag = ({ office }) => office
   ? <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded">Office</span>
@@ -394,13 +395,40 @@ function NextInspection({ proposal, readOnly, upcoming }) {
   )
 }
 
+// "No permit needed": some jobs don't need one. The job leaves the inspections
+// board and the county checks; its permit and inspection steps drop out.
+function NoPermitToggle({ proposal, readOnly }) {
+  const updateJobData = useStore(s => s.updateJobData)
+  const none = noPermit(proposal)
+  if (none) return (
+    <div className="flex items-center gap-3 flex-wrap rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
+      <ShieldCheck size={16} className="text-gray-400 shrink-0" />
+      <p className="flex-1 min-w-0 text-sm font-medium text-gray-800">No permit needed for this job</p>
+      {!readOnly && <button onClick={() => updateJobData(proposal.id, { noPermit: false })} className="text-sm font-medium text-[var(--brand-700)] hover:underline">Needs a permit after all</button>}
+    </div>
+  )
+  if (readOnly) return null
+  return (
+    <div className="flex justify-end -mb-2">
+      <button onClick={() => { if (window.confirm(`No permit needed for ${proposal.client || 'this job'}? It leaves the inspections board and its permit and inspection steps are hidden.`)) updateJobData(proposal.id, { noPermit: true }) }}
+        className="text-sm font-medium text-gray-500 hover:text-gray-800">No permit needed</button>
+    </div>
+  )
+}
+
 export default function PermitsTab({ proposal, stages, readOnly }) {
+  if (noPermit(proposal)) return <NoPermitToggle proposal={proposal} readOnly={readOnly} />
+  return <PermitsTabBody proposal={proposal} stages={stages} readOnly={readOnly} />
+}
+
+function PermitsTabBody({ proposal, stages, readOnly }) {
   const permits = readOnly ? [] : stages.filter(s => PERMIT_KEYS.includes(s.key))
   const inspections = stages.filter(s => isInspectionKey(s.key))
   const county = countyByStage(proposal, stages.map(s => s.key))
 
   return (
     <div className="space-y-4">
+      <NoPermitToggle proposal={proposal} readOnly={readOnly} />
       <CountyPanel proposal={proposal} readOnly={readOnly} />
       <NextInspection key={JSON.stringify(proposal.jobData?.nextInspection || null)} proposal={proposal} readOnly={readOnly} upcoming={county.upcoming} />
       {permits.length === 0 && inspections.length === 0 && (
