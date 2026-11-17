@@ -182,7 +182,7 @@ function JobsScreen() {
           className="flex-1 bg-transparent text-base text-gray-900 outline-none" />
       </label>
       {anyInspections && (
-        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1">
+        <div className="flex flex-wrap gap-2 pb-1">
           {[['all', 'All jobs'], ['failed', `Failed inspection (${counts.failed})`], ['insp', `Inspection coming (${counts.insp})`]].map(([k, label]) => (
             <button key={k} onClick={() => setShow(k)}
               className={`h-10 px-4 rounded-full text-sm font-semibold whitespace-nowrap border ${show === k

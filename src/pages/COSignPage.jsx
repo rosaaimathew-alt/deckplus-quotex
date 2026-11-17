@@ -301,12 +301,12 @@ export default function COSignPage() {
               ) : (
                 <div className="mb-4">
                   <p className="text-sm font-semibold text-gray-700 mb-2">Sign as: <span className="text-indigo-600">{ROLE_LABEL[role]}</span></p>
-                  <div className="flex gap-3 mb-3">
+                  <div className="flex flex-wrap gap-3 mb-3">
                     <input
                       placeholder="Full name (printed)"
                       value={printedName}
                       onChange={e => setPrintedName(e.target.value)}
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      className="flex-1 min-w-[9rem] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     />
                     <button onClick={() => { sigRef.current?.clear(); setShowCapture(true) }}
                       className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">

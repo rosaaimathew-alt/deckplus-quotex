@@ -1,3 +1,4 @@
+import FitTable from './FitTable'
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, Check, Package, AlertTriangle, DollarSign, Store } from 'lucide-react'
 import { useStore } from '../store'
@@ -190,7 +191,7 @@ export default function JobFinancials({ proposal }) {
 
       {/* ── Cost log ───────────────────────────────────────────────── */}
       {entries.length > 0 && (
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <FitTable card={['plain', 'title', 'plain', 'amount', 'act']} className="border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <tbody className="divide-y divide-gray-50">
               {entries.map(e => (
@@ -205,7 +206,7 @@ export default function JobFinancials({ proposal }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </FitTable>
       )}
     </div>
   )

@@ -437,7 +437,7 @@ export default function ContractsList({ initialFilter } = {}) {
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-56">
           <Search size={14} className="text-gray-400 shrink-0" />
           <input
-            className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
+            className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder:text-gray-400"
             placeholder="Search contracts…"
             value={query}
             onChange={e => setQuery(e.target.value)}

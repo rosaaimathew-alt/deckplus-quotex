@@ -1,3 +1,4 @@
+import FitTable from '../components/FitTable'
 import React, { useState, useEffect, useRef } from 'react'
 import StatCard from '../components/StatCard'
 import { useNavigate } from 'react-router-dom'
@@ -157,18 +158,20 @@ const STATUS_TEXT = {
 
 // Status control styled like the prototype: a colored dot inside a colored pill,
 // with the native <select> overlaid transparently so clicking still changes it.
-function StatusSelect({ value, onChange, big = false }) {
+// dot: phone cards — only the colored dot, in a thumb-sized spot to tap.
+function StatusSelect({ value, onChange, dot = false }) {
   return (
-    <div className="relative inline-flex items-center">
-      <span className={`inline-flex items-center gap-1.5 font-medium rounded-full ${big ? 'text-sm px-3 py-2' : 'text-xs px-2.5 py-1'} ${STATUS_STYLES[value] || 'bg-gray-100 text-gray-600'}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[value] || 'bg-gray-400'}`} />
-        {value}
-        {big && <ChevronDown size={13} className="opacity-60" />}
-      </span>
+    <div className={`relative inline-flex items-center ${dot ? 'shrink-0 justify-center w-9 h-11' : ''}`}>
+      {dot ? <span className={`w-3 h-3 rounded-full ${STATUS_DOT[value] || 'bg-gray-400'}`} /> : (
+        <span className={`inline-flex items-center gap-1.5 font-medium rounded-full text-xs px-2.5 py-1 ${STATUS_STYLES[value] || 'bg-gray-100 text-gray-600'}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[value] || 'bg-gray-400'}`} />
+          {value}
+        </span>
+      )}
       <select
         value={value}
         onChange={onChange}
-        aria-label="Change status"
+        aria-label={dot ? `Status: ${value}. Change status` : 'Change status'}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
       >
         {PROPOSAL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -606,7 +609,7 @@ function MergeModal({ sourceGroup, allGroups, onMerge, onClose }) {
 
 // The action buttons along the bottom of a phone card: icon over label, a full
 // thumb tall, sharing the row equally.
-const CARD_ACTION = 'flex-1 min-w-0 min-h-[52px] flex flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium text-gray-600 active:bg-gray-100'
+const CARD_ACTION = 'flex-1 min-w-0 overflow-hidden min-h-[44px] flex flex-col items-center justify-center gap-0.5 rounded-lg text-[10.5px] font-medium text-gray-600 active:bg-gray-100'
 
 // ── Row Overflow Menu ───────────────────────────────────────────────────────
 // A single "⋯" dropdown holding secondary row actions. Fixed-positioned off the
@@ -651,7 +654,7 @@ function RowMenu({ items, sheet = false, title = '' }) {
   if (sheet) return (
     <>
       <button ref={btnRef} onClick={() => setOpen(true)} className={CARD_ACTION}>
-        <MoreHorizontal size={18} /> More
+        <MoreHorizontal size={17} /> More
       </button>
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end" onClick={() => setOpen(false)}>
@@ -766,6 +769,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
   }
   const [expandedLog, setExpandedLog] = useState(null)   // proposal id with activity log open
   const [expandedAlts, setExpandedAlts] = useState(null) // root id with alts expanded
+  const [openReminders, setOpenReminders] = useState(null) // phone: proposal id whose reminders are showing
   const [followUpProposal, setFollowUpProposal] = useState(null)
   const [mergeSource, setMergeSource] = useState(null)   // group {root, revisions} being merged
   // Default: most recent appointment first. Any column header can be clicked to re-sort.
@@ -901,51 +905,54 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
     ['date:desc', 'Newest first'], ['date:asc', 'Oldest first'], ['client:asc', 'Client A–Z'],
     ['total:desc', 'Highest total'], ['status:desc', 'Status'], ...(showRep ? [['rep:asc', 'Sales rep']] : []),
   ]
-  const dateLine = (p) => p.sentAt
-    ? `Sent ${new Date(p.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-    : 'Not sent'
+  // One proposal on a phone: who and how much on one line, the status as a
+  // colored dot (tap it to change the status), then one row of buttons. The
+  // rest (dates, other versions, reminders) opens from its own button.
   const renderProposalCard = ({ p, alt = false, altCount = 0, onMerge, groupProposals }) => {
     const isAltExpanded = expandedAlts === p.id
     const rep = showRep ? repName(members, p.ownerId) : ''
+    const due = alt ? [] : (p.reminders || []).filter(r => !r.dismissed)
+    const overdue = due.some(r => { const nd = nextReminderDate(r); return nd && isOverdue(nd) })
+    const showDue = openReminders === p.id
     return (
       <div className={alt ? 'border-t border-gray-100 bg-gray-50 pl-3' : ''}>
-        <div className="px-4 pt-3.5">
-          <div className="flex items-start justify-between gap-3">
-            <p className="min-w-0 font-semibold text-gray-900 break-words">
+        <div className="pl-1.5 pr-4 pt-1.5 flex items-center gap-0.5">
+          <StatusSelect dot value={p.status} onChange={e => onStatusChange(p, e.target.value)} />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-gray-900 leading-snug break-words line-clamp-2">
               {alt && <span className="inline-flex items-center gap-1 mr-1.5 text-xs font-semibold text-gray-500 align-middle"><GitBranch size={11} className="text-[var(--brand-300)]" /> Alt {p.version || '—'}</span>}
               {p.client || <span className="text-gray-400 italic font-normal">No name</span>}
             </p>
-            <p className="shrink-0 font-semibold text-gray-900 whitespace-nowrap">${fmt(p.total || 0)}</p>
-          </div>
-          <div className="mt-2 flex items-center gap-x-3 gap-y-1.5 flex-wrap">
-            <StatusSelect big value={p.status} onChange={e => onStatusChange(p, e.target.value)} />
-            <span className="text-xs text-gray-500">{[rep, dateLine(p)].filter(Boolean).join(' · ')}</span>
-          </div>
-          {p.closedAt && !alt && (
-            <p className="text-xs text-gray-400 mt-1.5">
-              Closed {new Date(p.closedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              {p.sentAt && daysBetween(p.sentAt, p.closedAt) != null && <span> · {daysBetween(p.sentAt, p.closedAt)}d</span>}
-              {p.winLossReason?.category && <span className={p.status === 'Won' ? 'text-green-700' : 'text-red-600'}> · {p.winLossReason.category}</span>}
+            <p className="text-xs text-gray-500 leading-snug truncate">
+              <span className={STATUS_TEXT[p.status] || 'text-gray-500'}>{p.status}</span>{rep ? ` · ${rep}` : ''}
             </p>
-          )}
-          {!alt && <ReminderBadges proposal={p} wide />}
-          {altCount > 0 && (
-            <button onClick={() => setExpandedAlts(isAltExpanded ? null : p.id)}
-              className="mt-2 min-h-[40px] inline-flex items-center gap-1.5 px-3 rounded-lg bg-gray-100 text-sm font-medium text-gray-700 active:bg-gray-200">
-              <GitBranch size={13} /> {altCount} other version{altCount !== 1 ? 's' : ''} {isAltExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-          )}
+          </div>
+          <p className="shrink-0 pl-2 font-semibold text-gray-900 whitespace-nowrap">${fmt(p.total || 0)}</p>
         </div>
-        <div className="mt-2 px-2 pb-1.5 flex items-stretch gap-1 border-t border-gray-100">
-          <button onClick={() => onOpen(p)} className={CARD_ACTION}><Eye size={18} /> Open</button>
-          <button onClick={() => onRevise(p)} className={CARD_ACTION}><Copy size={18} /> Revise</button>
+        <div className="px-2 pb-1 flex items-stretch gap-1">
+          <button onClick={() => onOpen(p)} className={CARD_ACTION}><Eye size={17} /> Open</button>
+          <button onClick={() => onRevise(p)} className={CARD_ACTION}><Copy size={17} /> Revise</button>
           {p.status === 'Won' && !alt && (
-            <button onClick={() => onGenerateContract(p)} className={`${CARD_ACTION} !text-[var(--brand-700)]`}><FileSignature size={18} /> Contract</button>
+            <button onClick={() => onGenerateContract(p)} className={`${CARD_ACTION} !text-[var(--brand-700)]`}><FileSignature size={17} /> Contract</button>
           )}
           {!alt && (
             <button onClick={() => setExpandedLog(expandedLog === p.id ? null : p.id)} aria-expanded={expandedLog === p.id}
               className={`${CARD_ACTION} ${expandedLog === p.id ? 'bg-gray-100' : ''}`}>
-              {expandedLog === p.id ? <ChevronUp size={18} /> : <MessageSquare size={18} />} Log
+              {expandedLog === p.id ? <ChevronUp size={17} /> : <MessageSquare size={17} />} Log
+            </button>
+          )}
+          {due.length > 0 && (
+            <button onClick={() => setOpenReminders(showDue ? null : p.id)} aria-expanded={showDue}
+              aria-label={`${due.length} reminder${due.length !== 1 ? 's' : ''}${overdue ? ', overdue' : ''}`}
+              className={`${CARD_ACTION} ${overdue ? '!text-red-600' : ''} ${showDue ? 'bg-gray-100' : ''}`}>
+              <Bell size={17} /> {overdue ? 'Overdue' : 'Reminder'}
+            </button>
+          )}
+          {altCount > 0 && (
+            <button onClick={() => setExpandedAlts(isAltExpanded ? null : p.id)} aria-expanded={isAltExpanded}
+              aria-label={`${altCount} other version${altCount !== 1 ? 's' : ''}`}
+              className={`${CARD_ACTION} ${isAltExpanded ? 'bg-gray-100' : ''}`}>
+              <span className="relative"><GitBranch size={17} /><span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-gray-700 text-white text-[10px] leading-[15px] text-center font-semibold">{altCount}</span></span> Versions
             </button>
           )}
           <RowMenu sheet title={p.client || 'Proposal'} items={alt ? [
@@ -963,6 +970,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
             ...removeItems(p),
           ]} />
         </div>
+        {showDue && <div className="px-4 pb-2"><ReminderBadges proposal={p} wide /></div>}
         {expandedLog === p.id && <div className="border-t border-gray-100"><ActivityLog proposal={p} groupProposals={groupProposals} /></div>}
       </div>
     )
@@ -1022,7 +1030,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
           </ul>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <FitTable>
         <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -1096,7 +1104,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
             })}
           </tbody>
         </table>
-        </div>
+        </FitTable>
       )}
     </div>
   )
@@ -1107,7 +1115,7 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
   const members = useStore(s => s.members)
   const phone = useIsPhone()
   return (
-    <div className={phone ? 'space-y-3 pb-4' : 'flex gap-3 overflow-x-auto pb-4'}>
+    <div className={phone ? 'space-y-3 pb-4' : 'grid gap-3 pb-4 items-start grid-cols-[repeat(auto-fill,minmax(13rem,1fr))]'}>
       {PROPOSAL_STATUSES.map(status => {
         const cards = proposals.filter(p => p.status === status)
         const colTotal = cards.reduce((s, p) => s + (p.total || 0), 0)
@@ -1119,7 +1127,7 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
           </div>
         )
         return (
-          <div key={status} className={phone ? '' : 'shrink-0 w-56'}>
+          <div key={status} className="min-w-0">
             {/* Column header */}
             <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border border-b-0 border-gray-200 bg-gray-50`}>
               <span className={`text-xs font-bold uppercase tracking-wider ${STATUS_STYLES[status].split(' ')[1]}`}>{status}</span>

@@ -4,6 +4,7 @@
 // the sub on that job, so it sits in the Bills list like any other bill and
 // counts toward job cost. Send back → the sub sees the reason and can send a
 // corrected invoice for the same job and week.
+import FitTable from '../../components/FitTable'
 import { useState } from 'react'
 import { FileText, Paperclip } from 'lucide-react'
 import { useStore } from '../../store'
@@ -100,7 +101,7 @@ function ReviewModal({ id, onClose }) {
           {d.email ? ` · ${d.email}` : ''}
           {' · '}sent {d.submittedAt ? new Date(d.submittedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}
         </p>
-        <div className="border border-gray-200 rounded-xl overflow-x-auto">
+        <FitTable card className="border border-gray-200 rounded-xl">
           <table className="w-full text-sm min-w-[620px]">
             <thead className="text-left text-gray-500 border-b border-gray-200">
               <tr><th className="px-3 py-2 font-medium">Job</th><th className="px-3 py-2 font-medium text-right">Agreed</th><th className="px-3 py-2 font-medium text-right">Drawn before</th><th className="px-3 py-2 font-medium text-right">This invoice</th><th className="px-3 py-2 font-medium text-right">Left after</th></tr>
@@ -124,7 +125,7 @@ function ReviewModal({ id, onClose }) {
               })}
             </tbody>
           </table>
-        </div>
+        </FitTable>
         {d.notes && <p className="text-sm text-gray-700"><span className="font-semibold">Notes from the sub:</span> {d.notes}</p>}
         {(d.files || []).length > 0 && <div className="flex flex-wrap gap-2">{d.files.map(f => <FileLink key={f.id} file={f} />)}</div>}
         {sendingBack && (

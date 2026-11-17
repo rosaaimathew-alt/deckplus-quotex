@@ -190,9 +190,11 @@ export default function SignPage() {
           </div>
         </div>
         {isContract && (
-          <div ref={signedDocRef} className="max-w-4xl mx-auto my-4 px-2 sm:px-4">
-            <SignedContractDoc record={record} />
-            <SignedAuditTrail url={`/api/sign/${token}?certificate=1`} refreshKey={record?.status} />
+          <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4 dp-signing">
+            <div ref={signedDocRef}>
+              <SignedContractDoc record={record} />
+              <SignedAuditTrail url={`/api/sign/${token}?certificate=1`} refreshKey={record?.status} />
+            </div>
           </div>
         )}
       </div>
@@ -265,11 +267,11 @@ export default function SignPage() {
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Line Items</p>
                 <div className="border border-gray-200 rounded-xl overflow-hidden text-sm">
-                  <div className="grid grid-cols-[1fr_36px_72px_80px] sm:grid-cols-[1fr_60px_90px_90px] gap-x-1 bg-gray-50 px-3 sm:px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <div className="grid grid-cols-[minmax(0,1fr)_28px_66px_74px] sm:grid-cols-[minmax(0,1fr)_60px_90px_90px] gap-x-1 bg-gray-50 px-3 sm:px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     <span>Description</span><span>Qty</span><span>Unit $</span><span className="text-right">Total</span>
                   </div>
                   {coLines.map((l, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_36px_72px_80px] sm:grid-cols-[1fr_60px_90px_90px] gap-x-1 px-3 sm:px-4 py-2 border-t border-gray-100 text-xs sm:text-sm">
+                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_28px_66px_74px] sm:grid-cols-[minmax(0,1fr)_60px_90px_90px] gap-x-1 px-3 sm:px-4 py-2 border-t border-gray-100 text-xs sm:text-sm">
                       <span className="text-gray-800 break-words min-w-0">{l.desc}</span>
                       <span className="text-gray-600">{l.qty}</span>
                       <span className="text-gray-600">${fmt(l.unitPrice)}</span>

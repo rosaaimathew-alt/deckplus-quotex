@@ -1,3 +1,4 @@
+import FitTable from './FitTable'
 import { useMemo, useState } from 'react'
 import { X, Lock, Plus, Trash2, Box, PenTool } from 'lucide-react'
 import { useStore } from '../store'
@@ -465,7 +466,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
       </Card>
 
       {/* ── Breakdown (office view) ───────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 overflow-hidden">
+      <FitTable className="rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[10px] uppercase tracking-wider text-gray-400 bg-gray-50">
@@ -481,7 +482,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </FitTable>
 
       {/* ── Scope preview ─────────────────────────────────────────────── */}
       <details className="rounded-xl border border-gray-200 p-4">

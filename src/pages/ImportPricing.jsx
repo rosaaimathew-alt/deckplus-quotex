@@ -1,3 +1,4 @@
+import FitTable from '../components/FitTable'
 import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { Upload, Table, CheckCircle, AlertCircle, Save, Trash2, RefreshCw, ChevronDown } from 'lucide-react'
@@ -341,7 +342,7 @@ export default function ImportPricing() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <FitTable>
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
@@ -421,7 +422,7 @@ export default function ImportPricing() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </FitTable>
 
           {/* Footer */}
           <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-wrap gap-3">

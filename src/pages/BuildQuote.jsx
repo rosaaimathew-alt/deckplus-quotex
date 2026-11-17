@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Trash2, GripVertical, GitMerge, Eye, EyeOff, BookTemplate, X, Save, Copy, BookPlus, Check, Calculator, Lock, Sparkles, Loader, RotateCcw, Landmark, Tag, ArrowDownToLine, ArrowUpToLine } from 'lucide-react'
-
+import FitTable from '../components/FitTable'
 const money2 = (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 // A saved discount line back into the builder's discount settings.
 const discountSpecFrom = (lines = []) => {
@@ -226,7 +226,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
       </div>
 
       {/* Component table */}
-      <div className="overflow-x-auto -mx-1 px-1">
+      <FitTable className="-mx-1 px-1">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[10px] uppercase tracking-wider text-gray-400">
@@ -265,7 +265,7 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
             <Lock size={12} /> Pricing locked by your manager — set in Catalog → Builder rates.
           </p>
         )}
-      </div>
+      </FitTable>
 
       <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 mt-3 border-t border-gray-200 pt-3">
         {showMoney && <span className="text-xs text-gray-400">Est. cost <span className="text-gray-600 font-medium">{money(cost)}</span></span>}
@@ -951,7 +951,7 @@ export default function BuildQuote() {
 
         {/* Lines */}
         <div className="bg-white rounded-xl border border-gray-200 flex-1">
-          <div className="sm:overflow-x-auto">
+          <div className="qx-stack-box">
             <table className="w-full text-sm qx-stack">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>

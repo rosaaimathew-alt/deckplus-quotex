@@ -42,13 +42,13 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
   if (layout === 'rail') return (
     <div className="min-h-full flex flex-col sm:flex-row">
       <nav aria-label={`${title} views`}
-        className="no-print shrink-0 bg-white border-b sm:border-b-0 sm:border-r border-gray-200 flex sm:flex-col gap-1 p-2 overflow-x-auto sm:overflow-visible sm:w-[96px] sm:sticky sm:top-0 sm:self-start sm:h-[calc(100dvh-3.5rem)]">
+        className="no-print shrink-0 bg-white border-b sm:border-b-0 sm:border-r border-gray-200 flex sm:flex-col gap-1 p-2 sm:w-[96px] sm:sticky sm:top-0 sm:self-start sm:h-[calc(100dvh-3.5rem)]">
         {visible.map(t => {
           const on = t.key === current.key
           const Icon = t.icon
           return (
             <button key={t.key} onClick={() => setActive(t.key)} aria-current={on ? 'page' : undefined} title={t.hint || t.label}
-              className={`relative shrink-0 w-[80px] flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl text-xs font-medium transition-colors ${
+              className={`relative flex-1 min-w-0 sm:flex-none sm:w-[80px] flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl text-xs font-medium transition-colors ${
                 on ? 'bg-[var(--brand-50)] text-[var(--brand-700)]' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`}>
               {Icon && <Icon size={24} strokeWidth={on ? 2.1 : 1.8} />}
@@ -75,7 +75,7 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
           {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
         </div>
         {visible.length > 1 && (
-          <nav className="flex flex-wrap sm:flex-nowrap gap-x-1 mt-4 -mb-px sm:overflow-x-auto qx-scroll-x" aria-label={`${title} views`}>
+          <nav className="flex flex-wrap gap-x-1 mt-4 -mb-px" aria-label={`${title} views`}>
             {visible.map(t => {
               const on = t.key === current.key
               const Icon = t.icon

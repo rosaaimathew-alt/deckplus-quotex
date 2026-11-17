@@ -1,4 +1,5 @@
 // ── One job's books: Summary, Transactions, Documents (Projects › Jobs) ──────
+import FitTable from '../../components/FitTable'
 import { useMemo, useRef, useState } from 'react'
 import { Plus, Loader, FileText, Folder, Trash2, Smartphone, Search } from 'lucide-react'
 import { useStore } from '../../store'
@@ -123,7 +124,7 @@ export function JobTransactions({ proposal }) {
         <button onClick={() => setOpen({ kind: 'invoice', isNew: true })} className={btnPrimary}><Plus size={14} /> Invoice</button>
       </div>
       {shown.length === 0 ? <p className="text-sm text-gray-400 text-center py-8 border border-dashed border-gray-200 rounded-xl">No transactions{view !== 'all' || range.from || range.to ? ' match' : ' on this job yet'}.</p> : (
-        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+        <FitTable card={['plain', 'plain', 'status', 'title', 'hide', 'amount']} className="border border-gray-200 rounded-xl">
           <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
               <tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Details</th><th className="px-3 py-2 text-right">Total</th><th className="px-3 py-2 text-right">To this job</th></tr>
@@ -141,7 +142,7 @@ export function JobTransactions({ proposal }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </FitTable>
       )}
       {open?.kind === 'invoice' && <InvoiceModal invoice={open.isNew ? null : open.rec} presetJobId={proposal.id} onClose={() => setOpen(null)} />}
       {open?.kind === 'purchase' && <PurchaseModal po={open.isNew ? null : open.rec} presetJobId={proposal.id} onClose={() => setOpen(null)} />}

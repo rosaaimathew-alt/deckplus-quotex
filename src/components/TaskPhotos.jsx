@@ -28,7 +28,7 @@ export function PhotoDays({ task, big = false, maxDays = 30 }) {
       {days.map(([day, list]) => (
         <div key={day}>
           <p className={`${big ? 'text-sm' : 'text-[11px]'} font-semibold text-gray-500 mb-1`}>{dayName(day)} · {list.length} photo{list.length > 1 ? 's' : ''}</p>
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
+          <div className="flex flex-wrap gap-1.5 pb-1">
             {list.map(p => <Thumb key={p.id} photo={p} size={size} onOpen={setOpen} />)}
           </div>
         </div>

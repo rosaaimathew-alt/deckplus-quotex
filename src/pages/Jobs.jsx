@@ -1,3 +1,4 @@
+import FitTable from '../components/FitTable'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useStore, contractNumberFor } from '../store'
@@ -829,7 +830,7 @@ function BudgetTab({ proposal }) {
       </button>
 
       {showBreakdown && (
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
+      <FitTable card className="rounded-xl border border-gray-200">
         <table className="w-full text-xs">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -873,7 +874,7 @@ function BudgetTab({ proposal }) {
             </tr>
           </tfoot>
         </table>
-      </div>
+      </FitTable>
       )}
     </div>
   )
@@ -2011,7 +2012,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-0 border-b border-gray-100 px-4 overflow-x-auto">
+          <div className="flex flex-wrap gap-0 border-b border-gray-100 px-4">
             {TABS.map(t => {
               const on = t.pages ? t.pages.some(pg => pg.value === tab) : tab === t.key
               return (
@@ -2237,7 +2238,7 @@ export default function Jobs() {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
-        <div className="overflow-x-auto qx-scroll-x -mx-1 px-1">
+        <div className="min-w-0">
           <QuickPicks value={filter} onChange={setFilter} options={[
             { value: 'active',      label: 'Active',      count: counts.active },
             { value: 'not-started', label: 'Not started', count: counts['not-started'] },

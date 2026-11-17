@@ -1,10 +1,10 @@
+import FitTable from '../components/FitTable'
 import { Fragment, useState, useMemo } from 'react'
 import StatCard from '../components/StatCard'
 import { useNavigate } from 'react-router-dom'
 import {
   DollarSign, TrendingUp, TrendingDown, Target, ChevronDown, ChevronUp, ChevronRight,
-  Edit3, Check, X, Trash2, Eye, AlertCircle, BarChart2, ArrowUpRight,
-  Package, Users, Hammer, MoreHorizontal,
+  Edit3, Check, X, Trash2, Eye, AlertCircle, BarChart2, ArrowUpRight, Package, Users, Hammer, MoreHorizontal,
 } from 'lucide-react'
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
@@ -175,9 +175,9 @@ function MonthlyChart({ jobs }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-      <div className="flex items-end gap-2 h-28 overflow-x-auto">
+      <div className="flex items-end gap-1 sm:gap-2 h-28">
         {months.map((m, i) => (
-          <div key={i} className="flex flex-col items-center gap-1 min-w-[40px] flex-1">
+          <div key={i} className="flex flex-col items-center gap-1 min-w-0 flex-1">
             <div className="w-full flex items-end justify-center gap-0.5" style={{ height: 90 }}>
               {/* Revenue bar */}
               <div
@@ -370,7 +370,7 @@ export default function ProfitabilityTracker() {
             <p className="text-xs mt-1">Mark a proposal as Won in the Proposal Tracker to see it here.</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <FitTable><table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
@@ -507,7 +507,7 @@ export default function ProfitabilityTracker() {
                 </Fragment>
               ))}
             </tbody>
-          </table>
+          </table></FitTable>
         )}
       </div>
 

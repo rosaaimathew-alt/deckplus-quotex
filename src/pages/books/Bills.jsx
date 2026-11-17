@@ -2,6 +2,7 @@
 // What vendors bill us. Tie a bill to its PO (and so its job), straight to a
 // job, or to company overhead (operating / subscription / inventory) — the
 // fixed and operating costs the CFO tracks.
+import FitTable from '../../components/FitTable'
 import { useMemo, useState } from 'react'
 import { Plus, CheckSquare, Trash2 } from 'lucide-react'
 import { useStore } from '../../store'
@@ -186,8 +187,8 @@ export default function Bills() {
         right={<><XlsButton onClick={exportCsv} />{pager}</>} />
 
       {shown.length === 0 ? <Empty>{bills.length ? 'No bills match.' : 'No bills yet.'}</Empty> : (
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
-          <table className="w-full text-[15px] min-w-[1060px]">
+        <FitTable cols={[112, 86, 92, 100, 100, '1.3fr', '1.5fr', '1.2fr', '0.8fr', 104]} card={['status', 'sub:Due', 'hide', 'amount', 'hide', 'title', 'long', 'hide', 'hide', 'act']} className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <table className="w-full text-[15px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
                 <Th className="text-center">Status</Th>
@@ -221,7 +222,7 @@ export default function Bills() {
               ))}
             </tbody>
           </table>
-        </div>
+        </FitTable>
       )}
       {editing && <BillModal bill={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
       {paying && <PayBillModal billId={paying} onClose={() => setPaying(null)} />}

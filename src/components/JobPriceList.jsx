@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { FileDown, Sheet, Loader, AlertTriangle } from 'lucide-react'
 import { useStore } from '../store'
 import { jobPriceList, priceListRows, TOOL_LABELS } from '../lib/priceList'
+import FitTable from './FitTable'
 
 // ── Price list for the office ────────────────────────────────────────────────
 // Every item on the won job with the calculator breakdown behind its price —
@@ -142,7 +143,7 @@ export default function JobPriceList({ proposal }) {
         </p>
       )}
 
-      <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white">
+      <FitTable className="border border-gray-200 rounded-xl bg-white">
         <table className="w-full min-w-[640px] border-collapse">
           <thead>
             <tr>
@@ -203,7 +204,7 @@ export default function JobPriceList({ proposal }) {
             )}
           </tbody>
         </table>
-      </div>
+      </FitTable>
     </div>
   )
 }

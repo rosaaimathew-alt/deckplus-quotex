@@ -1,3 +1,4 @@
+import FitTable from '../components/FitTable'
 import { useState, useMemo, useRef } from 'react'
 import StatCard from '../components/StatCard'
 import { loadPdfjs } from '../lib/pdfjs'
@@ -400,7 +401,7 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
       </div>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {rows.length === 0 ? <div className="py-12 text-center text-gray-400 text-sm">Nothing here for this period.</div> : (
-          <div className="overflow-x-auto">
+          <FitTable card={['plain', 'title', 'plain', 'plain', 'hide', 'amount', 'act']}>
             <table className="w-full text-sm min-w-[860px]">
               <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wider">
                 <tr>
@@ -437,7 +438,7 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
               </tbody>
               <tfoot><tr className="border-t border-gray-100"><td colSpan={5} className="px-3 py-2 text-xs text-gray-500">{rows.length} expense{rows.length === 1 ? '' : 's'}</td><td className="px-3 py-2 text-right font-bold text-gray-900">{money(total)}</td><td /></tr></tfoot>
             </table>
-          </div>
+          </FitTable>
         )}
       </div>
     </div>
@@ -455,7 +456,7 @@ function JobsTab({ jobs, costOf, rate }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <p className="px-4 py-3 text-xs text-gray-500 border-b border-gray-100">Adjusted margin takes this year's unaccounted rate (<strong className="text-red-700">{ratePct(rate)}</strong>) off each job. Click a job for its full financials.</p>
-      <div className="overflow-x-auto">
+      <FitTable card>
         <table className="w-full text-sm min-w-[900px]">
           <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wider">
             <tr>
@@ -492,7 +493,7 @@ function JobsTab({ jobs, costOf, rate }) {
             </tfoot>
           )}
         </table>
-      </div>
+      </FitTable>
     </div>
   )
 }
@@ -552,7 +553,7 @@ function SubscriptionsTab({ subscriptions, expenses, cards, period, onLogCharge 
       </div>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {sorted.length === 0 ? <p className="py-10 text-center text-sm text-gray-400">No subscriptions yet.</p> : (
-          <div className="overflow-x-auto">
+          <FitTable card>
             <table className="w-full text-sm min-w-[820px]">
               <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wider">
                 <tr>
@@ -584,7 +585,7 @@ function SubscriptionsTab({ subscriptions, expenses, cards, period, onLogCharge 
                 ))}
               </tbody>
             </table>
-          </div>
+          </FitTable>
         )}
       </div>
       {cards.length === 0 && null}
@@ -733,7 +734,7 @@ export default function Finance() {
         </div>
       </div>
 
-      <div className="flex gap-1 mb-5 border-b border-gray-200 overflow-x-auto">
+      <div className="flex flex-wrap gap-x-1 mb-5 border-b border-gray-200">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === t.key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>

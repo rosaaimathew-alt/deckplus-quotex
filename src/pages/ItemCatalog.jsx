@@ -1,3 +1,4 @@
+import FitTable from '../components/FitTable'
 import { useState, useRef, Fragment } from 'react'
 import { QuickPicks, MenuChip } from '../components/FilterBar'
 import {
@@ -254,7 +255,7 @@ function TableView({ filtered, editId, setEditId, onSave, onDelete, onMove, addi
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
+      <FitTable>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -351,7 +352,7 @@ function TableView({ filtered, editId, setEditId, onSave, onDelete, onMove, addi
             )}
           </tbody>
         </table>
-      </div>
+      </FitTable>
       {filtered.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No items match your search.</div>}
     </div>
   )
@@ -569,8 +570,8 @@ function FormulaCard({ title, defaults, rates, setRate, customComponents, addCus
     <div className="space-y-3">
       <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
         {/* Formula header + lock control */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <button className="flex items-center gap-3" onClick={() => setOpen(o => !o)}>
+        <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-3 border-b border-gray-100">
+          <button className="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0 text-left" onClick={() => setOpen(o => !o)}>
             {open ? <ChevronDown size={15} className="text-gray-400" /> : <ChevronRight size={15} className="text-gray-400" />}
             <span className="font-semibold text-gray-800">{title}</span>
             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{keys.length + customComponents.length} components</span>
@@ -593,7 +594,7 @@ function FormulaCard({ title, defaults, rates, setRate, customComponents, addCus
                 Pricing is locked by your manager. You can build quotes with these rates, but you can't change them.
               </div>
             )}
-            <div className="overflow-x-auto">
+            <FitTable>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[10px] uppercase tracking-wider text-gray-400 border-b border-gray-100">
@@ -653,7 +654,7 @@ function FormulaCard({ title, defaults, rates, setRate, customComponents, addCus
                   ))}
                 </tbody>
               </table>
-            </div>
+            </FitTable>
 
             {/* Add a shared component — appears on every deck quote */}
             {canEdit && (

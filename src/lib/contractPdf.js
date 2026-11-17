@@ -121,7 +121,9 @@ export async function buildContractPdf(root, { only, drop } = {}) {
   if (drop) clone.querySelectorAll(drop).forEach(el => el.remove())
   clone.querySelectorAll('.print-only').forEach(el => { el.style.display = el.tagName === 'SPAN' ? 'inline' : 'block' })
   // Wide tables (the audit log) fit the page instead of scrolling off its edge.
-  clone.querySelectorAll('[data-pdf-block] .overflow-x-auto').forEach(el => { el.style.overflow = 'visible'; el.style.margin = '0' })
+  // On paper a table is always a table, however narrow the screen it was made on.
+  clone.querySelectorAll('.qx-fit').forEach(el => { el.removeAttribute('data-stacked'); el.removeAttribute('data-compact') })
+  clone.querySelectorAll('[data-pdf-block] .overflow-x-auto, [data-pdf-block] .qx-fit').forEach(el => { el.style.overflow = 'visible'; el.style.margin = '0' })
   clone.querySelectorAll('[data-pdf-block] table').forEach(t => {
     t.style.width = '100%'
     // Long values (emails, IPs, hashes) may wrap anywhere; short ones stay on one line.
