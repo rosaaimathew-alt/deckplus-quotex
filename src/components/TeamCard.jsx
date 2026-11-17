@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Users, Copy, X, KeyRound, CheckCircle2, UserMinus, SlidersHorizontal } from 'lucide-react'
 import { useStore } from '../store'
-import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword, setMemberRole, setMemberPermissions, setMemberPhone } from '../supabase'
+import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword, setMemberRole, setMemberPermissions, setMemberPhone, setSubInvoiceFree } from '../supabase'
+import { NO_AMOUNT, invoiceFree } from '../lib/subDraws'
 import { permissionGroups, departmentAllows } from '../permissions'
 import { DEMO } from '../demo'
 
@@ -79,6 +80,21 @@ export function TeamCard() {
   // Admin: switch sections off for one person (Access). Not yourself, and not
   // the paint PM (Field mode only — nothing to switch).
   const [accessFor, setAccessFor] = useState('')
+  // Office: one sub may invoice bookings that have no agreed amount (lib/subDraws)
+  const [freeBusy, setFreeBusy] = useState('')
+  const setFree = async (m, on) => {
+    // The tick shows at once; it is put back if the save is refused.
+    const put = (permissions) => useStore.setState(s => ({ members: (s.members || []).map(x => x.id === m.id ? { ...x, permissions } : x) }))
+    const before = m.permissions || {}
+    const next = { ...before }
+    if (on) next[NO_AMOUNT] = true; else delete next[NO_AMOUNT]
+    put(next); setFreeBusy(m.id)
+    try {
+      const r = await setSubInvoiceFree(m.id, on)
+      if (r?.permissions) put(r.permissions)
+    } catch (e) { put(before); window.alert(e.message) }
+    setFreeBusy('')
+  }
   const canAccess = (m) => isAdmin && !DEMO && m.id !== me?.id && m.role !== 'paint' && m.role !== 'sub'
 
   // Admin: a new temporary password for someone who's locked out (no email needed).
@@ -220,6 +236,15 @@ export function TeamCard() {
                 </select>
               ) : (
                 <span className="text-xs text-gray-500">{roleLabel(m.role)}{m.id === me?.id ? ' (you)' : ''}</span>
+              )}
+              {/* A sub whose work moves too fast to price each booking first */}
+              {m.role === 'sub' && (isAdmin || me?.role === 'office') && !DEMO && (
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 shrink-0 cursor-pointer"
+                  title="Carpentry subs invoice against the agreed amount on each booking. Tick this to let this sub send an invoice on a booking that has no amount yet.">
+                  <input type="checkbox" checked={invoiceFree(m)} disabled={freeBusy === m.id} onChange={e => setFree(m, e.target.checked)}
+                    aria-label={`Invoice without an agreed amount: ${m.displayName || m.email}`} />
+                  Invoice without an agreed amount
+                </label>
               )}
               {canAccess(m) && (
                 <button onClick={() => setAccessFor(a => a === m.id ? '' : m.id)} aria-expanded={accessFor === m.id}
