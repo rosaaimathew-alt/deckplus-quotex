@@ -69,6 +69,10 @@ export const DESTINATIONS = [
       // Subs live here too (they used to be Projects › Subcontractors), so
       // project managers get this one tab: subs only, no money.
       { key: 'vendors',   label: 'Vendors',   icon: Truck, access: '/subs', hint: 'Suppliers, subs and their paperwork', keywords: 'vendor supplier w9 gl insurance workers comp subs subcontractors crews coi trades incidents rating' },
+      // Each job's money (it used to be the Summary and Money tabs on a job in
+      // Projects): revenue, cost and profit per job, then its summary, budget,
+      // costs, price list and invoices / POs / bills.
+      { key: 'jobs',      label: 'Jobs',      icon: Hammer, access: '/jobs', hint: "Each job's summary, budget, costs and price list", keywords: 'job budget cost costs summary price list profit margin revenue receipts' },
     ] },
 
   { key: 'catalog', to: '/catalog', label: 'Catalog', icon: Package,
@@ -126,7 +130,7 @@ export function visibleDestinations(plan, role, permissions = {}) {
 
 const NO_PERMS = {}
 // What jobs cost: hidden with "Job money & profit" (permissions.js).
-const COST_TABS = ['money.bills', 'money.purchases']
+const COST_TABS = ['money.bills', 'money.purchases', 'money.jobs']
 
 export function useNav() {
   const plan = useStore(s => s.branding?.plan || 'enterprise')
