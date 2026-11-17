@@ -1784,17 +1784,24 @@ function buildCloseOutHtml({ client, contractNum, address, projectType, completi
 }
 
 // ── Money tab: everything the job costs and brings in, one switch away ──────
-function JobMoneyTab({ proposal, books, costCount }) {
+// The office's books in Money (Money also has Jobs, which PMs get too).
+const BOOK_TABS = ['invoices', 'bills', 'purchases']
+
+// The job's Money tab. Money › Jobs shows the same, with the job's Summary
+// first (withSummary), so the office reaches it from either side.
+export function JobMoneyTab({ proposal, books, costCount, withSummary = false }) {
   const parts = [
+    ...(withSummary && books ? [{ value: 'summary', label: 'Summary' }] : []),
     { value: 'budget', label: 'Budget' },
     { value: 'costs', label: 'Costs', count: costCount || null },
     { value: 'pricelist', label: 'Price list' },
     ...(books ? [{ value: 'transactions', label: 'Invoices, POs & bills' }] : []),
   ]
-  const [part, setPart] = useState('budget')
+  const [part, setPart] = useState(withSummary && books ? 'summary' : 'budget')
   return (
     <div className="space-y-4">
       <div className="border-b border-gray-200"><QuickPicks value={part} onChange={setPart} options={parts} /></div>
+      {part === 'summary' && books && <JobSummary proposal={proposal} />}
       {part === 'budget' && <BudgetTab proposal={proposal} />}
       {part === 'costs' && <JobFinancials proposal={proposal} />}
       {part === 'pricelist' && <JobPriceList proposal={proposal} />}
@@ -1816,7 +1823,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const { tabsOf } = useNav()
   const money = useJobMoney()   // off: no Budget / Price list / Costs / Receipts (Settings › Team › Access)
   // Invoices, POs and bills: office / admin with the Money pages and job money on.
-  const books = money && tabsOf('money').some(t => t.key !== 'vendors')
+  const books = money && tabsOf('money').some(t => BOOK_TABS.includes(t.key))
   const [expanded, setExpanded] = useState(focus)
   const [tab, setTab] = useState(focus && books ? 'summary' : 'stages')
   const cardRef = useRef(null)
@@ -2183,7 +2190,7 @@ export default function Jobs() {
   const purchases = useStore(s => s.purchases)
   const bills     = useStore(s => s.bills)
   const { tabsOf } = useNav()
-  const showMoney = useJobMoney() && tabsOf('money').some(t => t.key !== 'vendors')
+  const showMoney = useJobMoney() && tabsOf('money').some(t => BOOK_TABS.includes(t.key))
   const costOf = useJobCostOf()
   const moneyIdx  = useMemo(() => (showMoney ? booksIndex({ invoices, purchases, bills }) : null), [showMoney, invoices, purchases, bills])
   const [params] = useSearchParams()
