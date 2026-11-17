@@ -18,7 +18,7 @@ import { useNav, useJobMoney } from '../nav'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
 import { useJobCostOf } from '../lib/jobCost'
 import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'
-import { QuickPicks } from '../components/FilterBar'
+import { QuickPicks, MenuChip, SearchLine } from '../components/FilterBar'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -2163,7 +2163,7 @@ export default function Jobs() {
   const focusId = params.get('job')
   const [filter, setFilter] = useState('active')
   const [query,  setQuery]  = useState('')
-  const [stageFilter, setStageFilter] = useState(null)   // current-stage chip (from the old Scheduler view)
+  const [stageFilter, setStageFilter] = useState(null)   // the Stage dropdown: only jobs on this step now
   const permitAccess = usePermitAccess()
   const [permitsOnly, setPermitsOnly] = useState(false)   // office: open Mecklenburg jobs only
   const permitPulse = useStore(s => s.permitPulse)
@@ -2237,7 +2237,8 @@ export default function Jobs() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-x-5 gap-y-1 mb-5 sm:flex-wrap">
+        <SearchLine value={query} onChange={setQuery} placeholder="Search name or contract #" />
         <div className="min-w-0">
           <QuickPicks value={filter} onChange={setFilter} options={[
             { value: 'active',      label: 'Active',      count: counts.active },
@@ -2246,19 +2247,18 @@ export default function Jobs() {
             { value: 'all',         label: 'All',         count: counts.all },
           ]} />
         </div>
-        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-52">
-          <Search size={13} className="text-gray-400 shrink-0" />
-          <input className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400"
-            placeholder="Search name or contract #…" value={query} onChange={e => setQuery(e.target.value)} />
-          {query && <button onClick={() => setQuery('')} className="text-gray-300 hover:text-gray-500"><X size={12} /></button>}
-        </div>
         {permitAccess && (
           <button onClick={() => setPermitsOnly(v => !v)}
-            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors self-start sm:self-auto ${permitsOnly
-              ? 'bg-[var(--brand-600)] border-[var(--brand-600)] text-white'
-              : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+            aria-pressed={permitsOnly} className={`flex items-center gap-1.5 h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap self-start sm:self-auto ${permitsOnly
+              ? 'border-[var(--brand-600)] text-gray-900'
+              : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
             <ShieldCheck size={13} /> Permit-tracked <span className="opacity-70">{wonJobs.filter(permitTracked).length}</span>
           </button>
+        )}
+        {/* Which step the job is on now: one dropdown, like County on the Inspections board */}
+        {stageGroups.length > 0 && (
+          <MenuChip label="Stage" placeholder="All stages" value={stageFilter} onChange={v => setStageFilter(v || null)}
+            options={[{ value: '', label: 'All stages' }, ...stageGroups.map(([label, n]) => ({ value: label, label, count: n }))]} />
         )}
       </div>
 
@@ -2276,21 +2276,6 @@ export default function Jobs() {
             </button>
           )}
           {pulseMsg && <span className="text-gray-600">{pulseMsg}</span>}
-        </div>
-      )}
-
-      {stageGroups.length > 0 && (
-        <div className="hidden sm:flex items-center gap-1.5 flex-wrap mb-4 -mt-1">
-          <span className="text-xs font-medium text-gray-500 mr-1">Current stage:</span>
-          {stageGroups.map(([label, n]) => (
-            <button key={label} onClick={() => setStageFilter(stageFilter === label ? null : label)}
-              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${stageFilter === label
-                ? 'bg-[var(--brand-600)] border-[var(--brand-600)] text-white'
-                : label === 'Needs setup' ? 'bg-amber-50 border-amber-200 text-amber-800 hover:border-amber-300' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-              {label} <span className="opacity-70">{n}</span>
-            </button>
-          ))}
-          {stageFilter && <button onClick={() => setStageFilter(null)} className="text-xs text-gray-400 hover:text-gray-600 underline ml-1">clear</button>}
         </div>
       )}
 

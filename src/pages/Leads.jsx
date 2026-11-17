@@ -5,7 +5,7 @@
 // online, already have a quote, or are a past customer.
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, CalendarDays, FileText, Hammer } from 'lucide-react'
+import { CalendarDays, FileText, Hammer } from 'lucide-react'
 import { useStore } from '../store'
 import { supabase, supabaseReady } from '../supabase'
 import { useScopedProposals } from '../lib/proposalScope'
@@ -13,7 +13,7 @@ import { latestIterations } from '../lib/proposalGroups'
 import { buildLeads, matchesLead } from '../lib/leads'
 import { openProposal } from '../lib/openProposal'
 import { money0 } from '../lib/books'
-import { QuickPicks, RepToggle } from '../components/FilterBar'
+import { QuickPicks, RepToggle, SearchLine } from '../components/FilterBar'
 import StatCard from '../components/StatCard'
 
 const TZ = 'America/New_York'
@@ -131,13 +131,8 @@ export default function Leads() {
       </div>
 
       <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
+        <SearchLine value={query} onChange={v => { setQuery(v); setLimit(PAGE) }} placeholder="Search name, phone, email or street" label="Search leads" autoFocus />
         {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
-        <label className="flex items-center gap-2 h-9 text-sm min-w-0">
-          <Search size={14} className="text-gray-400 shrink-0" />
-          <input className="w-56 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-            placeholder="Name, phone, email or street" value={query} autoFocus
-            onChange={e => { setQuery(e.target.value); setLimit(PAGE) }} aria-label="Search leads" />
-        </label>
         <QuickPicks value={show} onChange={(v) => { setShow(v); setLimit(PAGE) }} options={[
           { value: 'all', label: 'Everyone' },
           { value: 'online', label: 'Booked online', count: loading ? null : online },

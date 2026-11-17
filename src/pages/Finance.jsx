@@ -5,9 +5,10 @@ import { loadPdfjs } from '../lib/pdfjs'
 import { useStore } from '../store'
 import { useJobCostOf } from '../lib/jobCost'
 import {
-  Upload, Plus, X, Trash2, Pencil, CreditCard, Loader, Check, Search, Wallet, AlertTriangle,
+  Upload, Plus, X, Trash2, Pencil, CreditCard, Loader, Check, Wallet, AlertTriangle,
   ChevronDown, ChevronRight, Package, Repeat, Briefcase, LayoutDashboard, Receipt,
 } from 'lucide-react'
+import { SearchLine } from '../components/FilterBar'
 import {
   BUCKETS, CATEGORIES, bucketOf, isAllocation, inPeriod, periodFor, companySummary,
   adjustedForUnaccounted, monthlyCostOf, yearlyCostOf, nextRenewal, suggestBucket, matchSubscription, inventorySummary,
@@ -383,7 +384,8 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
   const total = rows.reduce((s, e) => s + Number(e.amount || 0), 0)
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
+      <div className="flex items-center gap-x-4 gap-y-2 mb-3 flex-wrap">
+        <SearchLine value={search} onChange={setSearch} placeholder="Search expenses" />
         <div className="flex flex-wrap gap-1">
           {[{ key: 'all', label: 'All' }, ...BUCKETS.map(b => ({ key: b.key, label: b.key === 'misc' ? 'Unaccounted' : b.label }))].map(b => (
             <button key={b.key} onClick={() => setBucketFilter(b.key)}
@@ -394,10 +396,6 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
           <option value="all">All cards</option>
           {cards.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
-        <div className="relative">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" className="pl-7 pr-2 py-1.5 border border-gray-200 rounded-lg text-xs w-40 focus:outline-none focus:ring-2 focus:ring-blue-300" />
-        </div>
       </div>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {rows.length === 0 ? <div className="py-12 text-center text-gray-400 text-sm">Nothing here for this period.</div> : (

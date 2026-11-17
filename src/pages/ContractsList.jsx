@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FileSignature, FilePen, CheckCircle2, Clock, Search, X, FileX, ExternalLink, Eye, Loader2, Copy, MoreHorizontal, ShieldCheck, Send } from 'lucide-react'
 import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf } from '../contractTotal'
-import { QuickPicks, RepToggle } from '../components/FilterBar'
+import { QuickPicks, RepToggle, SearchLine } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
 import { supabase } from '../supabase'
 import SendContract from '../components/SendContract'
@@ -420,9 +420,10 @@ export default function ContractsList({ initialFilter } = {}) {
         <h1 className="qx-title text-xl sm:text-2xl font-bold text-gray-900">Contracts</h1>
       </div>
 
-      {/* Filter tabs + search */}
+      {/* One flat line: search first, then whose contracts and which ones */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+          <SearchLine value={query} onChange={setQuery} placeholder="Search contracts" />
           {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
           <QuickPicks value={filter} onChange={setFilter} options={FILTERS.map(f => ({ value: f, label: f, count: counts[f] }))} />
           {supabase && (
@@ -433,21 +434,7 @@ export default function ContractsList({ initialFilter } = {}) {
           )}
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-1.5 bg-white w-full sm:w-56">
-          <Search size={14} className="text-gray-400 shrink-0" />
-          <input
-            className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder:text-gray-400"
-            placeholder="Search contracts…"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-          />
-          {query && (
-            <button onClick={() => setQuery('')} className="text-gray-300 hover:text-gray-500">
-              <X size={13} />
-            </button>
-          )}
-        </div>
+        <div className="flex items-center gap-2">
         {/* One-time backfill for deals signed before the app: tucked in the menu */}
         {notStartedProposals.length > 0 && (
           <RowMenu items={[{ icon: <CheckCircle2 size={14} className="text-gray-400" />, label: `Mark ${notStartedProposals.length} not-started as signed (off-platform)`, onClick: handleBulkSignOffPlatform }]} />

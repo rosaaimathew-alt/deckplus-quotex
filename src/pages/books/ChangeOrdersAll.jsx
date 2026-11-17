@@ -6,7 +6,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store'
 import { allChangeOrders, money, todayISO, downloadCsv, jobLabel } from '../../lib/books'
-import { SearchBox, DateRange, ExportButton, usePaged, Th, sortRows, Empty } from './ui'
+import { DateRange, ExportButton, usePaged, Th, sortRows, Empty } from './ui'
+import { SearchLine } from '../../components/FilterBar'
 
 const CO_STYLE = {
   Approved: 'bg-gray-500 text-white', Pending: 'bg-amber-100 text-amber-800', 'Sent for Signature': 'bg-blue-100 text-blue-700',
@@ -46,8 +47,8 @@ export default function ChangeOrdersAll() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBox value={q} onChange={setQ} placeholder="Search job or change order" />
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <SearchLine value={q} onChange={setQ} placeholder="Search job or change order" />
         <select value={status} onChange={e => setStatus(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2.5 py-2 bg-white" aria-label="Status">
           {statuses.map(s => <option key={s} value={s}>{s === 'all' ? 'All statuses' : s}</option>)}
         </select>

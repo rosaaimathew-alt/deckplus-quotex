@@ -1,8 +1,8 @@
 import FitTable from '../components/FitTable'
 import { useState, useRef, Fragment } from 'react'
-import { QuickPicks, MenuChip } from '../components/FilterBar'
+import { QuickPicks, MenuChip, SearchLine } from '../components/FilterBar'
 import {
-  Search, Edit2, Eye, Trash2, Plus, Check, X, GripVertical,
+  Edit2, Eye, Trash2, Plus, Check, X, GripVertical,
   ChevronDown, ChevronRight,
   Sparkles, Loader, MoveRight, Settings2, Pencil, Lock, Unlock,
 } from 'lucide-react'
@@ -813,11 +813,7 @@ export default function ItemCatalog({ mode: forcedMode } = {}) {
       <h2 className="qx-hide-embedded text-2xl font-bold text-gray-900 mb-3">Item Catalog</h2>
       {/* One flat line: search and categories left, view and actions right */}
       <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
-        <label className="flex items-center gap-2 h-9 text-sm text-gray-500 min-w-0">
-          <Search size={14} className="text-gray-400 shrink-0" />
-          <input className="w-40 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-            placeholder={`Search ${catalog.length} items`} value={search} onChange={e => setSearch(e.target.value)} />
-        </label>
+        <SearchLine value={search} onChange={setSearch} placeholder={`Search ${catalog.length} items`} />
         {view === 'table' && (
           <QuickPicks value={catFilter} onChange={setCatFilter} options={cats.map(c => ({ value: c, label: c }))} />
         )}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Check } from 'lucide-react'
+import { ChevronDown, Check, Search, X } from 'lucide-react'
 
 // ── Quiet filter controls ────────────────────────────────────────────────────
 // One flat line instead of walls of buttons: plain text choices with an
@@ -33,7 +33,7 @@ export function MenuChip({ label, value, options, onChange, placeholder, active,
         <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''} opacity-60`} />
       </button>
       {open && (
-        <div role="listbox" className={`absolute z-40 mt-1.5 min-w-[180px] bg-white rounded-xl border border-gray-200 shadow-xl py-1 ${align === 'right' ? 'right-0' : 'left-0'}`}>
+        <div role="listbox" className={`absolute z-40 mt-1.5 min-w-[180px] max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto bg-white rounded-xl border border-gray-200 shadow-xl py-1 ${align === 'right' ? 'right-0' : 'left-0'}`}>
           {options.map(o => (
             <button key={o.value} role="option" aria-selected={o.value === value} type="button"
               onClick={() => { onChange(o.value); setOpen(false) }}
@@ -46,6 +46,20 @@ export function MenuChip({ label, value, options, onChange, placeholder, active,
         </div>
       )}
     </div>
+  )
+}
+
+// The one search box: a magnifier and plain text on the filter line, no box.
+// Always the first thing on the line, so search is top left on every list.
+//   <SearchLine value={q} onChange={setQ} placeholder="Search clients" />
+export function SearchLine({ value, onChange, placeholder = 'Search', label, autoFocus = false }) {
+  return (
+    <label className="flex items-center gap-2 h-9 w-60 max-w-full min-w-0 text-sm">
+      <Search size={14} className="text-gray-400 shrink-0" />
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} aria-label={label || placeholder} autoFocus={autoFocus}
+        className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none" />
+      {value && <button type="button" onClick={() => onChange('')} aria-label="Clear search" className="shrink-0 text-gray-300 hover:text-gray-500"><X size={13} /></button>}
+    </label>
   )
 }
 
