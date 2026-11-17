@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileSignature, FilePen, CheckCircle2, Clock, Search, X, FileX, ExternalLink, Eye, Loader2, Copy, MoreHorizontal, ShieldCheck } from 'lucide-react'
+import { FileSignature, FilePen, CheckCircle2, Clock, Search, X, FileX, ExternalLink, Eye, Loader2, Copy, MoreHorizontal, ShieldCheck, Send } from 'lucide-react'
 import { useStore, contractNumberFor } from '../store'
 import { contractTotalOf } from '../contractTotal'
 import { QuickPicks, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
 import { supabase } from '../supabase'
+import SendContract from '../components/SendContract'
+import { loadContractReminders, reminderLine } from '../lib/contractReminders'
 
 const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -223,6 +225,14 @@ export default function ContractsList({ initialFilter } = {}) {
   const [query,  setQuery]   = useState('')
   const [viewingRecordId, setViewingRecordId] = useState(null)
   const [viewingLinks,    setViewingLinks]    = useState(null)
+  // "Send to Client": copy the link, email it, set reminders (components/SendContract)
+  const [sendingFor, setSendingFor] = useState(null)   // proposal id
+  const [reminders, setReminders] = useState({})       // proposal id → reminder
+  useEffect(() => {
+    let live = true
+    loadContractReminders().then(r => { if (live) setReminders(r) }).catch(() => {})
+    return () => { live = false }
+  }, [])
   const [recovering,      setRecovering]      = useState(null)
   const [remote,          setRemote]          = useState({})   // proposalId -> { status, clientSigned, recordId }
 
@@ -510,7 +520,8 @@ export default function ContractsList({ initialFilter } = {}) {
             const menu = []
             if (recId) menu.push({ icon: <Eye size={14} className="text-gray-400" />, label: 'Signatures', onClick: () => setViewingRecordId(recId) })
             if (recId) menu.push({ icon: <ShieldCheck size={14} className="text-gray-400" />, label: 'Audit certificate', onClick: () => navigate(`/certificate/contract/${recId}`) })
-            if (draft.signLinks)    menu.push({ icon: <Copy size={14} className="text-gray-400" />, label: 'Signing links', onClick: () => setViewingLinks(draft.signLinks) })
+            if (draft.signLinks?.client && status === 'in-progress') menu.push({ icon: <Send size={14} className="text-gray-400" />, label: 'Send to client', onClick: () => setSendingFor(p.id) })
+            else if (draft.signLinks) menu.push({ icon: <Copy size={14} className="text-gray-400" />, label: 'Signing links', onClick: () => setViewingLinks(draft.signLinks) })
             if (status === 'in-progress' && !draft.signLinks) menu.push({ icon: <Copy size={14} className="text-gray-400" />, label: recovering === p.id ? 'Finding…' : 'Find links', onClick: () => handleRecoverLinks(p), disabled: recovering === p.id })
             if (status === 'in-progress') menu.push({ icon: <CheckCircle2 size={14} className="text-gray-400" />, label: 'Mark signed', onClick: () => markContractSigned(p.id, true) })
             if (status === 'signed')      menu.push({ icon: <FileX size={14} className="text-gray-400" />, label: 'Undo signed', onClick: () => markContractSigned(p.id, false) })
@@ -539,6 +550,7 @@ export default function ContractsList({ initialFilter } = {}) {
                       {opened ? `Opened ${opened.count} time${opened.count === 1 ? '' : 's'} · last ${fmtOpen(opened.last)}` : 'Not opened yet'}
                     </p>
                   )}
+                  {status === 'in-progress' && reminders[String(p.id)] && <p className="text-xs text-gray-500 truncate">{reminderLine(reminders[String(p.id)])}</p>}
                 </div>
                 <div className="hidden sm:block shrink-0">
                 {clientSignedPending ? (
@@ -570,6 +582,28 @@ export default function ContractsList({ initialFilter } = {}) {
       {viewingLinks && (
         <LinksModal links={viewingLinks} onClose={() => setViewingLinks(null)} />
       )}
+
+      {sendingFor != null && (() => {
+        const p = proposals.find(x => x.id === sendingFor)
+        if (!p?.contractDraft?.signLinks?.client) return null
+        return (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" role="dialog" aria-label="Send to Client">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold text-gray-900">Send to Client</h2>
+                  <p className="text-xs text-gray-500 truncate">{p.client} · <span className="font-mono">{p.contractDraft.contractNum || contractNumberFor(p.id)}</span></p>
+                </div>
+                <button onClick={() => setSendingFor(null)} className="text-gray-400 hover:text-gray-600" aria-label="Close"><X size={18} /></button>
+              </div>
+              <div className="px-6 py-5">
+                <SendContract proposal={p} links={p.contractDraft.signLinks}
+                  onReminder={(id, r) => setReminders(prev => { const n = { ...prev }; if (r) n[id] = r; else delete n[id]; return n })} />
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
 
     </div>

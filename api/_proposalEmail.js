@@ -37,11 +37,12 @@ export const saveSignature = async (kv, userId, sig) => { if (userId) await kv.s
 const digits = (s) => String(s || '').replace(/[^\d+]/g, '')
 const siteHref = (s) => (/^https?:\/\//i.test(s) ? s : `https://${s}`)
 
-export function buildProposalEmail({ client, viewUrl, signature, logoUrl }) {
+// One email in the Deck Plus look: logo, a greeting, a paragraph, one button
+// to a link, a closing paragraph and the sender's signature. The proposal
+// email and the contract emails below are this with their own words.
+function buildLinkEmail({ client, url, signature, logoUrl, subject, p1, p2, button, linkLabel }) {
   const sig = signatureOf(signature)
   const name = tidy(client) || 'there'
-  const p1 = 'Thanks for welcoming me to your home to quote your project! It was great meeting with you. You can view your proposal online with the button below.'
-  const p2 = 'I\'m looking forward to our scheduled call to review your estimate. If you have any questions or would like a walkthrough of our showroom between now and then, feel free to contact me using the cell number below.'
 
   const sigLines = [
     sig.name,
@@ -50,7 +51,7 @@ export function buildProposalEmail({ client, viewUrl, signature, logoUrl }) {
     sig.office ? `Office: ${sig.office}` : '',
     sig.website,
   ].filter(Boolean)
-  const text = [`Hi ${name},`, '', p1, '', `View your proposal: ${viewUrl}`, '', p2, '', ...sigLines].join('\n')
+  const text = [`Hi ${name},`, '', p1, '', `${linkLabel}: ${url}`, '', p2, '', ...sigLines].join('\n')
 
   const link = `color:${TEAL};text-decoration:none;`
   const line = 'margin:0;font-size:14px;line-height:1.6;color:#374151;'
@@ -85,7 +86,7 @@ export function buildProposalEmail({ client, viewUrl, signature, logoUrl }) {
         <p style="${body}">${esc(p1)}</p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 28px;">
           <tr><td align="center" bgcolor="${TEAL}" style="background:${TEAL};border-radius:8px;">
-            <a href="${esc(viewUrl)}" style="display:inline-block;padding:14px 36px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">View Your Proposal</a>
+            <a href="${esc(url)}" style="display:inline-block;padding:14px 36px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">${esc(button)}</a>
           </td></tr>
         </table>
         <p style="${body}">${esc(p2)}</p>
@@ -99,5 +100,46 @@ export function buildProposalEmail({ client, viewUrl, signature, logoUrl }) {
   </td></tr>
 </table></body></html>`
 
-  return { subject: PROPOSAL_SUBJECT, html, text }
+  return { subject, html, text }
+}
+
+export function buildProposalEmail({ client, viewUrl, signature, logoUrl }) {
+  return buildLinkEmail({
+    client, url: viewUrl, signature, logoUrl, subject: PROPOSAL_SUBJECT,
+    p1: 'Thanks for welcoming me to your home to quote your project! It was great meeting with you. You can view your proposal online with the button below.',
+    p2: 'I\'m looking forward to our scheduled call to review your estimate. If you have any questions or would like a walkthrough of our showroom between now and then, feel free to contact me using the cell number below.',
+    button: 'View Your Proposal', linkLabel: 'View your proposal',
+  })
+}
+
+// The email a customer gets with the link to sign their agreement (Contracts ›
+// Send to Client), and the nudge that follows if they have not signed yet
+// (reminder: 1, 2, 3…). The nudge reads differently for someone who already
+// opened the agreement. These are the emails' own words, not the contract's.
+export const CONTRACT_SUBJECT = 'DeckPlus: Your agreement is ready to sign'
+export const CONTRACT_REMINDER_SUBJECT = 'DeckPlus: A reminder to sign your agreement'
+
+export function buildContractEmail({ client, signUrl, signature, logoUrl, reminder = 0, opened = false }) {
+  const p1 = !reminder
+    ? 'Thank you for choosing Deck Plus! Your agreement is ready. You can review and sign it online with the button below.'
+    : opened
+      ? 'Thanks for taking a look at your Deck Plus agreement. It hasn\'t been signed yet, so here is the link again to pick up where you left off.'
+      : 'Just a friendly reminder that your Deck Plus agreement is ready and waiting for your signature. You can review and sign it online with the button below.'
+  return buildLinkEmail({
+    client, url: signUrl, signature, logoUrl, subject: reminder ? CONTRACT_REMINDER_SUBJECT : CONTRACT_SUBJECT, p1,
+    p2: 'If you have any questions before signing, feel free to contact me using the cell number below.',
+    button: 'Review & Sign Your Agreement', linkLabel: 'Review and sign your agreement',
+  })
+}
+
+// Only this app's own signing links may be emailed from here: the link has to
+// be on this site (the host the request came to, or deckplus.app) and be a
+// /sign/<token> address. → the cleaned link, or null.
+export function ownSignLink(signLink, host = '') {
+  let u = null
+  try { u = new URL(String(signLink || '')) } catch { return null }
+  const hosts = new Set([host, 'deckplus.app', 'www.deckplus.app'].filter(Boolean))
+  if (!['https:', 'http:'].includes(u.protocol) || (u.protocol === 'http:' && !u.host.startsWith('localhost'))) return null
+  if (!hosts.has(u.host) || u.username || u.password || u.search || u.hash) return null
+  return /^\/sign\/[A-Za-z0-9_-]{8,}$/.test(u.pathname) ? u.href : null
 }
