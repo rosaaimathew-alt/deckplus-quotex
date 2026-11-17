@@ -3,7 +3,8 @@
 // as the office's Google Form "Deckplus Subcontractor Invoice" (English with
 // Spanish): company, date, job name / address, work type, invoice amount,
 // notes, and (optionally) a photo or PDF of the invoice. Carpenters draw any
-// amount up to what's left on the job, once per job per week; every other
+// amount up to what's left on the job (any amount while the office hasn't set
+// an agreed amount yet), once per job per week; every other
 // trade sends one invoice per job (lib/subDraws drawsAllowed). The office
 // approves it or sends it back with a reason.
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -14,7 +15,7 @@ import { useStore } from '../store'
 import { submitSubDraw } from '../supabase'
 import { DEMO } from '../demo'
 import { Card, BackButton, todayStr } from '../field/shared'
-import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday, tradeOf, tradeEs, drawsAllowed, canInvoice } from '../lib/subDraws'
+import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday, tradeOf, tradeEs, capped, canInvoice } from '../lib/subDraws'
 import { uploadInvoiceFile } from '../lib/taskPhotos'
 
 // Only tasks booked with this login carry money. An outside company's crew
@@ -173,7 +174,7 @@ export function NewInvoiceScreen() {
   // The trade booked for this job fills in the work type; picked only when there's none
   const trade = tradeOf(task) || (jobs.length && jobs.every(t => tradeOf(t) && tradeOf(t) === tradeOf(jobs[0])) ? tradeOf(jobs[0]) : '')
   const work = trade ? [trade] : workTypes
-  const draw = drawsAllowed(task)   // carpenters draw against the agreed amount
+  const draw = capped(task, terms)   // carpenters draw against the agreed amount, once the office has set one
   const left = task && draw ? remainingOn(task.id, terms, draws) : 0
   const amt = round2(amount)
   const over = task && draw && amt > left
@@ -316,7 +317,7 @@ export function TaskMoneyLine({ task }) {
   const draws = useStore(s => s.subDraws)
   const terms = useStore(s => s.subTerms)
   const agreed = agreedOf(task.id, terms)
-  if (!drawsAllowed(task) || !(agreed > 0)) return null
+  if (!capped(task, terms)) return null
   const left = remainingOn(task.id, terms, draws || [])
   return (
     <p className="text-base text-gray-800 flex items-center gap-2">
