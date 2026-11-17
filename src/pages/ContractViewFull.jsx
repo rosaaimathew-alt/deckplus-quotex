@@ -66,7 +66,7 @@ export default function ContractViewFull() {
   return (
     <div className="qx-ink min-h-screen bg-gray-100 pb-12">
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-20 shadow-sm no-print">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
+        <div className="max-w-4xl mx-auto flex flex-wrap justify-between items-center gap-x-3 gap-y-2">
           <div className="flex items-center gap-3">
             <img src={logo} alt="logo" className="h-8 object-contain" />
             <span className="text-xs text-gray-500">Contract #{contractNum} — {formsOnly ? 'Job forms' : 'Signed Document'}</span>
@@ -74,7 +74,7 @@ export default function ContractViewFull() {
               {record.status === 'signed' ? 'Fully Signed' : 'Partially Signed'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"><Printer size={14} /> Print</button>
             {!formsOnly && <button onClick={saveScope} disabled={!!pdfBusy} title="Just the scope of work, without prices — for the HOA" className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60">
               {pdfBusy === 'scope' ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Scope for HOA
@@ -86,7 +86,7 @@ export default function ContractViewFull() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4">
+      <div className="max-w-4xl mx-auto my-4 px-2 sm:px-4 dp-signing">
         <div ref={docRef}>
           <SignedContractDoc record={record} formsOnly={formsOnly} />
           {!formsOnly && Object.keys(signatures).length > 0 && <SignedAuditTrail url={`/api/sign/verify-${encodeURIComponent(recordId)}`} />}

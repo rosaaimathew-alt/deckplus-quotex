@@ -1,6 +1,7 @@
 // ── Change orders, every job (Projects › Change orders) ─────────────────────
 // Read across all jobs; a row opens its job (where change orders are built,
 // sent for signature and edited).
+import FitTable from '../../components/FitTable'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store'
@@ -56,7 +57,7 @@ export default function ChangeOrdersAll() {
       </div>
       {shown.length > 0 && <p className="text-xs text-gray-500">{shown.length} change order{shown.length === 1 ? '' : 's'} · approved {money(approvedTotal)}</p>}
       {shown.length === 0 ? <Empty>{all.length ? 'No change orders match.' : 'No change orders yet. They’re created on a job (Jobs › Change Orders).'}</Empty> : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+        <FitTable card={['title', 'status', 'sub:CO', 'amount', 'hide']} className="bg-white rounded-xl border border-gray-200">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
@@ -80,7 +81,7 @@ export default function ChangeOrdersAll() {
             </tbody>
           </table>
           <div className="flex justify-end px-3 py-2 border-t border-gray-100">{pager}</div>
-        </div>
+        </FitTable>
       )}
     </div>
   )

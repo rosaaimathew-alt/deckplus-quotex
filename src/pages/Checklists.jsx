@@ -30,13 +30,13 @@ export default function Checklists() {
       </div>
 
       {/* New checklist */}
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center flex-wrap gap-2 mb-6">
         <input
           value={newTitle}
           onChange={e => setNewTitle(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') createList() }}
           placeholder="New checklist name (e.g. Job Site Punch List)"
-          className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="flex-1 min-w-[10rem] text-sm border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
         <button onClick={createList} disabled={!newTitle.trim()}
           className="flex items-center gap-1.5 px-4 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors shrink-0">

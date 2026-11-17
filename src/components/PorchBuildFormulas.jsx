@@ -1,3 +1,4 @@
+import FitTable from './FitTable'
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Lock, Unlock } from 'lucide-react'
 import { useStore } from '../store'
@@ -30,8 +31,8 @@ export default function PorchBuildFormulaCard() {
   return (
     <div className="space-y-3">
       <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <button className="flex items-center gap-3" onClick={() => setOpen(o => !o)}>
+        <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-3 border-b border-gray-100">
+          <button className="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0 text-left" onClick={() => setOpen(o => !o)}>
             {open ? <ChevronDown size={15} className="text-gray-400" /> : <ChevronRight size={15} className="text-gray-400" />}
             <span className="font-semibold text-gray-800">Porch Builder — open, ScreenEze &amp; Eze-Breeze</span>
             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{keys.length} rates{changed ? ` · ${changed} edited` : ''}</span>
@@ -70,7 +71,7 @@ export default function PorchBuildFormulaCard() {
                     <span className="text-xs text-gray-400">{gk.length}</span>
                   </button>
                   {isOpen && (
-                    <table className="w-full text-sm">
+                    <FitTable><table className="w-full text-sm">
                       <thead>
                         <tr className="text-[10px] uppercase tracking-wider text-gray-400 border-b border-gray-100">
                           <th className="text-left font-semibold px-3 py-1.5">Item</th>
@@ -96,7 +97,7 @@ export default function PorchBuildFormulaCard() {
                           )
                         })}
                       </tbody>
-                    </table>
+                    </table></FitTable>
                   )}
                 </div>
               )

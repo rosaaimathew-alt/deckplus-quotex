@@ -6,6 +6,7 @@
 // missing; W9 is on file or not.
 // Project managers see this page too, for the subs only (the database keeps
 // suppliers, POs and bills to the office), and without the money columns.
+import FitTable from '../../components/FitTable'
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Download, Filter, Star, Upload, FileText, X, Package, Smartphone, CheckCircle2 } from 'lucide-react'
@@ -376,7 +377,7 @@ export default function Vendors() {
       </div>
 
       {shown.length === 0 ? <Empty>{list.length ? 'No vendors match.' : 'No vendors yet.'}</Empty> : (
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
+        <FitTable card={showMoney ? ['title', 'plain', 'long', 'hide', 'amount', 'act'] : ['title', 'plain', 'long', 'act']} className="bg-white border border-gray-200 rounded-2xl shadow-sm">
           <table className={`w-full text-[15px] ${showMoney ? 'min-w-[860px]' : 'min-w-[560px]'}`}>
             <thead className="border-b border-gray-200 text-left">
               <tr>
@@ -406,7 +407,7 @@ export default function Vendors() {
               ))}
             </tbody>
           </table>
-        </div>
+        </FitTable>
       )}
       {/* Just set up for the sub app: reopen it as the sub it now is, with the Invite box */}
       {editing && <VendorModal key={editing === 'new' ? 'new' : editing.ref} entry={editing === 'new' ? null : editing} subsOnly={subsOnly} onClose={() => setEditing(null)}

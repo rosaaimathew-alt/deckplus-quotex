@@ -59,7 +59,7 @@ export default function JobForms({ proposal, phone = false }) {
         <div className="flex-1" />
         {!phone && <a href={`/view/${record.recordId}?forms=1`} target="_blank" rel="noopener noreferrer" className={btnGhost}><Printer size={14} /> Print</a>}
       </div>
-      <div className="qx-ink dp-signing border border-gray-200 rounded-xl overflow-x-auto bg-white">
+      <div className="qx-ink dp-signing border border-gray-200 rounded-xl bg-white">
         <SignedContractDoc record={record} formsOnly />
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { ShieldCheck, ShieldAlert, CheckCircle2, XCircle, MinusCircle } from 'lucide-react'
+import FitTable from './FitTable'
 
 // ── Certificate of completion / audit trail ─────────────────────────────────
 // What was signed, by whom, from where, on what device, when to the
@@ -124,7 +125,7 @@ export default function AuditCertificate({ rep }) {
 
     <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6">
       <p className="text-sm font-bold text-gray-900 mb-3">Audit log ({rep.events.length} events)</p>
-      <div className="overflow-x-auto -mx-2">
+      <FitTable className="-mx-2">
         <table className="w-full text-xs">
           <thead>
             <tr className="text-left text-gray-400">
@@ -151,7 +152,7 @@ export default function AuditCertificate({ rep }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </FitTable>
       <p className="text-[11px] text-gray-400 mt-3">Each log entry's hash covers the entry before it, so changing or removing any entry breaks every hash after it. The log can't be edited or deleted.</p>
     </div>
     </div>

@@ -1,3 +1,4 @@
+import FitTable from '../components/FitTable'
 import { useState, useRef, useEffect } from 'react'
 import { runOverCatalog } from '../aiCatalog'
 import { useStore } from '../store'
@@ -86,7 +87,7 @@ function DiffTable({ changes, catalog, onApply, onDismiss, applied }) {
           </div>
         )}
       </div>
-      <div className="overflow-x-auto max-h-64 overflow-y-auto">
+      <FitTable className="max-h-64 overflow-y-auto">
         <table className="w-full text-xs">
           <thead className="bg-white bg-opacity-60 sticky top-0">
             <tr>
@@ -119,7 +120,7 @@ function DiffTable({ changes, catalog, onApply, onDismiss, applied }) {
             )}
           </tbody>
         </table>
-      </div>
+      </FitTable>
     </div>
   )
 }
@@ -356,7 +357,7 @@ export default function AiChat({ inline = false }) {
         </div>
 
         {/* Mobile suggestions */}
-        <div className="lg:hidden px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
+        <div className="lg:hidden px-4 pb-2 flex flex-wrap gap-2 shrink-0">
           {SUGGESTIONS.slice(0, 4).map(s => (
             <button
               key={s}

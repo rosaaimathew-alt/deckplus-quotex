@@ -561,7 +561,7 @@ export default function Settings() {
       <div className="flex gap-6 flex-wrap">
 
         {/* Left: form */}
-        <div className="flex-1 min-w-80 space-y-5">
+        <div className="flex-1 min-w-0 sm:min-w-80 space-y-5">
 
           {/* ── Branding ───────────────────────────────────────────── */}
           <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Branding</h3>

@@ -1,3 +1,4 @@
+import FitTable from './FitTable'
 import { useMemo, useState } from 'react'
 import { Plus, X, Lock, RotateCcw } from 'lucide-react'
 import { useStore } from '../store'
@@ -409,7 +410,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
       </details>
 
       {/* The math, line by line */}
-      <div className="overflow-x-auto -mx-1 px-1">
+      <FitTable className="-mx-1 px-1">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[10px] uppercase tracking-wider text-gray-400">
@@ -457,7 +458,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
             <Lock size={12} /> Prices are locked by your manager. They come from the item catalog.
           </p>
         )}
-      </div>
+      </FitTable>
 
       <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 mt-3 border-t border-gray-200 pt-3">
         {isManager && <span className="text-xs text-gray-400">Est. cost <span className="text-gray-600 font-medium">{money(cost)}</span> · margin <span className={marginPct >= 30 ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>{marginPct.toFixed(0)}%</span></span>}

@@ -2,6 +2,7 @@
 // What we've billed customers. Payments recorded here land on the job as
 // payments received (tagged with the invoice), so the job's "collected" and
 // the invoice's "paid" are the same money.
+import FitTable from '../../components/FitTable'
 import { useMemo, useState } from 'react'
 import { Plus, CheckSquare, Printer, Trash2 } from 'lucide-react'
 import { useStore } from '../../store'
@@ -237,8 +238,8 @@ export default function Invoices({ jobId = null }) {
   // Inside a job (Transactions) the list stays compact; the Money page gets
   // the Knowify layout: title + buttons, banner, toolbar, table.
   const rowsTable = shown.length === 0 ? <Empty>{invoices.length ? 'No invoices match.' : 'No invoices yet. Create one from a job’s payment schedule or a signed change order.'}</Empty> : (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
-      <table className="w-full text-[15px] min-w-[1000px]">
+    <FitTable cols={[112, 86, 92, 100, 100, '0.8fr', '1.5fr', '1.3fr', '0.9fr', 104]} card={['status', 'sub:Due', 'hide', 'amount', 'hide', 'long', 'title', 'hide', 'hide', 'act']} className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+      <table className="w-full text-[15px]">
         <thead className="border-b border-gray-200 text-left">
           <tr>
             <Th className="text-center">Status</Th>
@@ -262,7 +263,7 @@ export default function Invoices({ jobId = null }) {
               <td className="px-2 text-right text-gray-900">{money(r.balance)}</td>
               <td className="px-2 text-right text-gray-900">{money(r.total)}</td>
               <td className="px-2 text-gray-800">{r.inv.number}</td>
-              <td className="px-2 py-3 whitespace-nowrap"><p className="font-semibold text-gray-900">{r.jobName || '—'}</p><p className="text-gray-600 text-sm">{jobStreet(r.job)}</p></td>
+              <td className="px-2 py-3 whitespace-nowrap"><p className="font-semibold text-gray-900">{r.jobName || '—'}</p><p className="text-gray-600 text-sm qx-card-hide">{jobStreet(r.job)}</p></td>
               <td className="px-2 py-3" title={r.inv.memo || ''}><p className="text-gray-900 truncate max-w-[150px]">{jobLabel(r.job)}</p><p className="text-gray-600 text-sm truncate max-w-[150px]">{r.inv.memo || ''}</p></td>
               <td className="px-2 text-gray-800"><p className="max-w-[120px] truncate" title={r.rep}>{r.rep || <span className="text-gray-300">—</span>}</p></td>
               <td className="px-2 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
@@ -273,7 +274,7 @@ export default function Invoices({ jobId = null }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </FitTable>
   )
 
   if (jobId) return (

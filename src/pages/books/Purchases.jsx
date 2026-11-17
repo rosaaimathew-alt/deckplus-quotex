@@ -2,6 +2,7 @@
 // Money committed to a vendor: materials, subs, labor, equipment, commissions.
 // A PO can be split across several jobs; with no job it's company spend
 // (operating / inventory), which feeds fixed-cost tracking.
+import FitTable from '../../components/FitTable'
 import { useMemo, useState } from 'react'
 import { Plus, Mail, X, Trash2, Split, ClipboardList, Network } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
@@ -209,8 +210,8 @@ export default function Purchases() {
       {shown.length > 0 && filterCount + (jobFilter != null ? 1 : 0) + (q ? 1 : 0) > 0 && <p className="text-sm text-gray-500">{shown.length.toLocaleString()} purchase{shown.length === 1 ? '' : 's'} · {money(total)}</p>}
 
       {shown.length === 0 ? <Empty>{purchases.length ? 'No purchases match.' : 'No purchase orders yet.'}</Empty> : (
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-x-auto">
-          <table className="w-full text-[15px] min-w-[1060px]">
+        <FitTable cols={[112, 86, '1.5fr', '1.3fr', 100, '1fr', '1.3fr', '1.1fr', '0.8fr', 104]} card={['status', 'plain', 'long', 'hide', 'amount', 'hide', 'title', 'hide', 'hide', 'act']} className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <table className="w-full text-[15px]">
             <thead className="border-b border-gray-200 text-left">
               <tr>
                 <Th className="text-center">Status</Th>
@@ -246,7 +247,7 @@ export default function Purchases() {
               ))}
             </tbody>
           </table>
-        </div>
+        </FitTable>
       )}
       {billFor && <BillModal presetPo={billFor} onClose={() => setBillFor(null)} />}
       {editing && <PurchaseModal po={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}

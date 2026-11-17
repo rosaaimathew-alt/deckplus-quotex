@@ -133,7 +133,7 @@ class SignBoundary extends Component {
     if (this.state.err) return (
       <div style={{ padding: '2rem', fontFamily: 'monospace', color: '#dc2626' }}>
         <strong>Sign page error:</strong> {this.state.err.message}
-        <pre style={{ fontSize: 12, marginTop: 8, whiteSpace: 'pre-wrap' }}>{this.state.err.stack}</pre>
+        <pre style={{ fontSize: 12, marginTop: 8, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{this.state.err.stack}</pre>
       </div>
     )
     return this.props.children

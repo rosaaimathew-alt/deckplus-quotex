@@ -101,7 +101,7 @@
   }
 
   /* The audit log prints at full width instead of scrolling off the page. */
-  [data-pdf-block] .overflow-x-auto { overflow: visible !important; }
+  [data-pdf-block] .overflow-x-auto, [data-pdf-block] .qx-fit { overflow: visible !important; }
   [data-pdf-block] tr { break-inside: avoid !important; page-break-inside: avoid !important; }
 
   /* Signature blocks (name line + date line + label) must stay together. */
@@ -332,8 +332,15 @@ html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
    (justified text on a narrow column leaves big gaps), signature lines and
    two-column blocks stack, tables fit, and tap targets get bigger. Scoped to
    the signing view (.dp-signing) and screen only, so the PDF and print copy
-   are unchanged. */
-@media screen and (max-width: 640px) {
+   are unchanged. It goes by the width of the box the page sits in (.dp-signing),
+   so a narrow panel on a big screen reflows too. */
+.dp-signing { container: dpsign / inline-size; }
+/* a box a little narrower than a letter page: only the signature lines wrap */
+@media screen { @container dpsign (max-width: 899px) {
+  .dp-signing .dp-sigline, .dp-signing .dp-sigcol-line, .dp-signing .dp-sigcol-date { white-space: normal; }
+  .dp-signing img { max-width: 100%; }
+} }
+@media screen { @container dpsign (max-width: 640px) {
   .dp-signing .dp-doc { font-size: 12pt; line-height: 1.45; }
   .dp-signing .dp-page { padding: 22px 16px 26px; min-height: 0; }
   .dp-signing .dp-page + .dp-page { border-top: 6px solid #eae4d8; }
@@ -383,7 +390,7 @@ html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
 
   /* the field the "Next" button jumped to */
   .dp-signing .dp-sign-btn.qx-next { box-shadow: 0 0 0 3px #f59e0b; }
-}
+} }
 .dp-signing .dp-sign-btn.qx-next { animation: qx-next-pulse 1.2s ease-in-out 2; }
 @keyframes qx-next-pulse { 50% { background: #fde68a; } }
 
@@ -410,9 +417,12 @@ html.dark select:not([multiple]):not([size]):not(.appearance-none) {
 /* ── Tables that stack into cards on a phone (.qx-stack) ───────────────────
    The quote builder's line items: instead of a wide table you drag sideways,
    each line is a card — name and scope on top, then quantity / unit / price /
-   total in one row with their labels, then the line's buttons. Phone screens
-   only; the desktop table is untouched. Cells say where they go with data-c. */
-@media screen and (max-width: 639px) {
+   total in one row with their labels, then the line's buttons. Whenever the
+   box the lines sit in is narrow (a phone, or the builder beside the catalog
+   on a small laptop); a wide box keeps the table. Cells say where they go
+   with data-c. */
+.qx-stack-box { container: qxstack / inline-size; min-width: 0; }
+@container qxstack (max-width: 700px) {
   .qx-stack, .qx-stack tbody { display: block; width: 100%; }
   .qx-stack thead { display: none; }
   .qx-stack tr {
@@ -447,3 +457,106 @@ html.dark select:not([multiple]):not([size]):not(.appearance-none) {
   .qx-stack td[data-c="actions"] svg, .qx-stack td[data-c="grip"] svg { width: 18px; height: 18px; }
   .qx-stack td[data-c="actions"] button { color: #6b7280; }
 }
+
+/* ── Tables that never scroll sideways (components/FitTable.jsx) ───────────
+   .qx-fit is the box around a table. While the table fits, nothing here
+   applies. [data-stacked] is set when the box is too narrow: the header row
+   goes, every row becomes a card, and every cell a line with its column's
+   heading (data-label) on the left and its value on the right. */
+.qx-fit { max-width: 100%; min-width: 0; overflow-x: clip; }
+/* the Money pages: every column kept, sharing the width; long text ends in … */
+.qx-fit.qx-fixed:not([data-stacked]) table { table-layout: fixed; width: 100%; min-width: 0; }
+.qx-fit.qx-fixed:not([data-stacked]) th, .qx-fit.qx-fixed:not([data-stacked]) td { overflow: hidden; text-overflow: ellipsis; max-width: none; }
+.qx-fit.qx-fixed:not([data-stacked]) th { white-space: normal; vertical-align: bottom; }
+/* a mid-size screen: smaller type and tighter cells, so every column still reads */
+.qx-fit.qx-fixed[data-compact]:not([data-stacked]) table, .qx-fit.qx-fixed[data-compact]:not([data-stacked]) th,
+.qx-fit.qx-fixed[data-compact]:not([data-stacked]) td, .qx-fit.qx-fixed[data-compact]:not([data-stacked]) td * { font-size: 13px; }
+.qx-fit.qx-fixed[data-compact]:not([data-stacked]) th, .qx-fit.qx-fixed[data-compact]:not([data-stacked]) td { padding-left: 5px; padding-right: 5px; }
+.qx-fit.qx-fixed[data-compact]:not([data-stacked]) td:first-child { padding-left: 8px; }
+.qx-fit.qx-fixed[data-compact]:not([data-stacked]) td:first-child > span { min-height: 40px; padding-left: 4px; padding-right: 4px; }
+.qx-fit.qx-fixed[data-compact]:not([data-stacked]) td button svg { width: 20px; height: 20px; }
+
+.qx-fit[data-stacked] table, .qx-fit[data-stacked] tbody, .qx-fit[data-stacked] tfoot {
+  display: block; width: 100% !important; min-width: 0 !important;
+}
+.qx-fit[data-stacked] thead, .qx-fit[data-stacked] colgroup { display: none; }
+.qx-fit[data-stacked] tr { display: block; padding: 0.7rem 0.9rem; height: auto !important; }
+.qx-fit[data-stacked] tr + tr, .qx-fit[data-stacked] tbody + tbody, .qx-fit[data-stacked] tbody + tfoot { border-top: 1px solid rgb(120 120 120 / 0.22); }
+.qx-fit[data-stacked] td, .qx-fit[data-stacked] tbody th, .qx-fit[data-stacked] tfoot th {
+  display: grid; grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr); column-gap: 0.75rem; align-items: baseline;
+  width: auto !important; max-width: none !important; min-width: 0 !important; height: auto !important;
+  padding: 0.22rem 0 !important; border: 0 !important; text-align: left !important; white-space: normal !important;
+  overflow-wrap: anywhere; position: static !important;
+}
+.qx-fit[data-stacked] td::before, .qx-fit[data-stacked] tbody th::before, .qx-fit[data-stacked] tfoot th::before {
+  content: attr(data-label); grid-column: 1;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6b7280; font-style: normal; text-align: left;
+}
+.qx-fit[data-stacked] td > *, .qx-fit[data-stacked] tbody th > * { grid-column: 2; min-width: 0; max-width: 100%; }
+/* a cell with no heading (row buttons, a note that spans the row): the full width, its buttons side by side */
+.qx-fit[data-stacked] td[data-label=""], .qx-fit[data-stacked] td:not([data-label]) {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem;
+}
+.qx-fit[data-stacked] td[data-label=""]::before, .qx-fit[data-stacked] td:not([data-label])::before { content: none; }
+.qx-fit[data-stacked] td[data-label=""] > *, .qx-fit[data-stacked] td:not([data-label]) > * { grid-column: auto; }
+.qx-fit[data-stacked] td:empty { display: none; }
+/* text that was cut to fit a column gets its room back */
+.qx-fit[data-stacked] .truncate { white-space: normal; overflow: visible; text-overflow: clip; }
+.qx-fit[data-stacked] td input, .qx-fit[data-stacked] td select, .qx-fit[data-stacked] td textarea { max-width: 100%; min-width: 0; }
+
+/* Lists on a phone (FitTable card): a row is two short lines, not a line per
+   column. Line one: the name, and the amount at the right. Line two, small:
+   the status and the few details worth a glance, then the row's buttons.
+   Columns marked 'hide' are left for the row's own page. data-m says which
+   part each cell is (set by FitTable from its `card`). */
+.qx-fit[data-stacked][data-card] tr { padding: 0.55rem 0.9rem; align-items: center; row-gap: 0.1rem; }
+.qx-fit[data-stacked][data-card] td[data-m] { padding: 0 !important; font-size: 13px; line-height: 1.4; color: #4b5563; }
+.qx-fit[data-stacked][data-card] td[data-m] > * { grid-column: auto; }
+.qx-fit[data-stacked][data-card] td[data-m]::before { content: attr(data-label); margin-right: 0.3rem; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: #9ca3af; }
+.qx-fit[data-stacked][data-card] td[data-m="title"], .qx-fit[data-stacked][data-card] td[data-m="wide"] { display: block; font-size: 15px; font-weight: 600; color: #111827; }
+.qx-fit[data-stacked][data-card] td[data-m="amount"] { font-size: 15px; font-weight: 600; color: #111827; white-space: nowrap !important; }
+.qx-fit[data-stacked][data-card] td[data-m="hide"], .qx-fit[data-stacked] .qx-card-hide { display: none !important; }
+.qx-fit[data-stacked][data-card] td[data-m="act"] button { min-width: 2rem; min-height: 2rem; display: inline-flex; align-items: center; justify-content: center; }
+.qx-fit[data-stacked][data-card] td[data-m="title"]::before, .qx-fit[data-stacked][data-card] td[data-m="wide"]::before,
+.qx-fit[data-stacked][data-card] td[data-m="amount"]::before, .qx-fit[data-stacked][data-card] td[data-m="status"]::before,
+.qx-fit[data-stacked][data-card] td[data-m="plain"]::before, .qx-fit[data-stacked][data-card] td[data-m="act"]::before { content: none; }
+/* the status: a small tag, not a button the width of the screen */
+.qx-fit[data-stacked][data-card] td[data-m="status"] > span { display: inline-flex; min-height: 0; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 11px; line-height: 1.5; }
+
+/* card="…roles": exactly two lines. The parts of line two sit side by side;
+   a 'long' part (a name) gives way and ends in "…" so the row's buttons stay
+   on that line. */
+.qx-fit[data-stacked][data-card="lines"] tr { display: grid; grid-template-columns: repeat(5, auto) minmax(0, 1fr) auto; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m] {
+  display: block; grid-row: 2; padding-right: 0.7rem !important; white-space: nowrap !important; overflow-wrap: normal;
+}
+.qx-fit[data-stacked][data-card="lines"] td[data-m]:not([data-m="title"]):not([data-m="wide"]) * { white-space: nowrap !important; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="long"] { overflow: hidden; text-overflow: ellipsis; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="long"]::before { content: none; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m] > p, .qx-fit[data-stacked][data-card="lines"] td[data-m] > div { display: inline; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m]:not([data-m="title"]) > p + p { display: none; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="title"] { grid-column: 1 / -2; grid-row: 1; white-space: normal !important; overflow-wrap: anywhere; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="title"] > p { display: block; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="amount"] { grid-column: -2 / -1; grid-row: 1; justify-self: end; padding-right: 0 !important; overflow: visible; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="status"] { grid-column: 1; overflow: visible; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="act"] { grid-column: -2 / -1; display: flex; flex-wrap: nowrap; gap: 0; justify-self: end; align-items: center; padding-right: 0 !important; overflow: visible; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="wide"] { grid-column: 1 / -1; grid-row: auto; white-space: normal !important; }
+.qx-fit[data-stacked][data-card="lines"] td[data-m="hide"] { display: none; }
+/* a small phone: line two keeps the status, the date and the buttons */
+.qx-fit[data-card="lines"] { container: qxcard / inline-size; }
+@container qxcard (max-width: 345px) {
+  .qx-fit[data-stacked][data-card="lines"] td[data-m="long"] { display: none; }
+  .qx-fit[data-stacked][data-card="lines"] td[data-m]::before { content: none; }
+  .qx-fit[data-stacked][data-card="lines"] td[data-m] { padding-right: 0.45rem !important; }
+}
+
+/* card (worked out): the name on its own line, the rest small and side by
+   side, wrapping onto as many lines as they need. */
+.qx-fit[data-stacked][data-card="flow"] tr { display: flex; flex-wrap: wrap; column-gap: 0.8rem; }
+.qx-fit[data-stacked][data-card="flow"] tr::before { content: ''; flex-basis: 100%; height: 0; order: 3; }
+.qx-fit[data-stacked][data-card="flow"] td[data-m] { display: inline-flex; flex-wrap: nowrap; align-items: baseline; order: 4; flex: 0 1 auto; }
+.qx-fit[data-stacked][data-card="flow"] td[data-m]::before { flex: none; margin-right: 0; padding-right: 0.3rem; }
+.qx-fit[data-stacked][data-card="flow"] td[data-m="title"] { display: block; order: 1; flex: 1 1 0; }
+.qx-fit[data-stacked][data-card="flow"] td[data-m="wide"] { display: block; flex-basis: 100%; }
+.qx-fit[data-stacked][data-card="flow"] td[data-m="amount"] { order: 2; margin-left: auto; }
+.qx-fit[data-stacked][data-card="flow"] td[data-m="act"] { order: 5; margin-left: auto; align-items: center; column-gap: 0.25rem; }

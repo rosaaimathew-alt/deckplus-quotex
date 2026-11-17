@@ -382,7 +382,7 @@ export default function InspectionBoard() {
               : 'not checked yet'} · checks at 8 AM and 1 PM</>}
         </p>
         {msg && <span className="text-xs text-gray-600">{msg}</span>}
-        <div className="ml-auto flex items-center gap-x-5">
+        <div className="ml-auto flex items-center flex-wrap justify-end gap-x-5 gap-y-1">
           {access === 'edit' && !DEMO && (
             <button onClick={checkNow} disabled={busy} className="inline-flex items-center gap-1.5 h-8 font-medium text-gray-500 hover:text-gray-800 disabled:opacity-50 whitespace-nowrap">
               {busy ? <Loader size={14} className="animate-spin" /> : <RefreshCw size={14} />} {busy ? 'Checking…' : 'Check now'}
