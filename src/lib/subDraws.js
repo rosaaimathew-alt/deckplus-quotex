@@ -4,8 +4,8 @@
 // questions as the office's Google Form "Deckplus Subcontractor Invoice":
 // company, date, job name / address, work type, invoice amount, notes, and
 // the invoice itself (photo or PDF, optional). Any amount up to what's left
-// on the job (when the office has set an agreed amount; any amount until it
-// has); one invoice per job per week. Only carpenters draw like that:
+// on the job (the office sets the agreed amount first, unless it has let that
+// sub invoice without one); one invoice per job per week. Only carpenters draw like that:
 // every other trade sends one invoice per job (drawsAllowed). A photo or PDF
 // of the invoice is optional. The office approves it (it
 // becomes a bill on that job in Money › Bills, the same layout as every
@@ -20,8 +20,8 @@
 //     status: 'submitted' | 'approved' | 'rejected',
 //     submittedAt, submittedBy, decidedAt, decidedBy, reason, billIds }
 // The database refuses an invoice that would take a job past its agreed
-// amount (once one is set) or a second live invoice for the same job in the
-// same week (supabase/sub_draws.sql).
+// amount, one on a booking with no amount (unless that sub is exempt), or a
+// second live invoice for the same job in the same week (supabase/sub_draws.sql).
 
 export const round2 = (x) => Math.round((Number(x) || 0) * 100) / 100
 export const money = (x) => `$${round2(x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -84,15 +84,19 @@ const stageOfTask = (task) => Math.max(1, Number(task?.stage) || 1)
 export const sentOnStage = (draws, task) =>
   (draws || []).find(d => live(d) && (d.lines || []).some(l => String(l.taskId) === String(task?.id)
     && Math.max(1, Number(l.stage) || 1) === stageOfTask(task))) || null
-// Is there an agreed amount to hold this carpenter's invoices to? The cap only
-// exists once the office has typed one in (Subs tab on the job). Until then a
-// carpenter can still send an invoice (the office approves or sends it back),
-// so a booking nobody priced yet doesn't quietly lose its "Send an invoice" button.
+// A carpenter invoices against the agreed amount the office typed on the booking
+// (Subs tab on the job): no amount, no invoice. The office can switch that off
+// for one sub (Settings › Team, "Invoice without an agreed amount") when their
+// work moves too fast to price each booking first. That sub can then invoice a
+// booking with no amount; a booking that has one is still held to it.
+export const NO_AMOUNT = 'invoice.noAmount'   // org_members.permissions[NO_AMOUNT] === true
+export const invoiceFree = (member) => member?.permissions?.[NO_AMOUNT] === true
 export const capped = (task, terms) => drawsAllowed(task) && agreedOf(task?.id, terms) > 0
-export const canInvoice = (task, terms, draws) => (drawsAllowed(task)
-  ? (!capped(task, terms) || remainingOn(task.id, terms, draws) > 0) && !sentThisWeek(draws, task.id)
+// A carpenter's booking the office hasn't priced yet (and this sub isn't exempt).
+export const waitingOnAmount = (task, terms, free = false) => drawsAllowed(task) && !free && !capped(task, terms)
+export const canInvoice = (task, terms, draws, free = false) => (drawsAllowed(task)
+  ? (capped(task, terms) ? remainingOn(task.id, terms, draws) > 0 : free) && !sentThisWeek(draws, task.id)
   : !sentOnStage(draws, task))
-
 // The live invoice already sent for this job this week, if any.
 export const sentThisWeek = (draws, taskId, monday = weekOf()) =>
   (draws || []).find(d => live(d) && d.weekOf === monday && (d.lines || []).some(l => String(l.taskId) === String(taskId))) || null

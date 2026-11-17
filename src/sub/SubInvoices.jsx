@@ -3,8 +3,8 @@
 // as the office's Google Form "Deckplus Subcontractor Invoice" (English with
 // Spanish): company, date, job name / address, work type, invoice amount,
 // notes, and (optionally) a photo or PDF of the invoice. Carpenters draw any
-// amount up to what's left on the job (any amount while the office hasn't set
-// an agreed amount yet), once per job per week; every other
+// amount up to what's left on the job (the office sets the amount first, unless
+// it lets that sub invoice without one), once per job per week; every other
 // trade sends one invoice per job (lib/subDraws drawsAllowed). The office
 // approves it or sends it back with a reason.
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -15,7 +15,7 @@ import { useStore } from '../store'
 import { submitSubDraw } from '../supabase'
 import { DEMO } from '../demo'
 import { Card, BackButton, todayStr } from '../field/shared'
-import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday, tradeOf, tradeEs, capped, canInvoice } from '../lib/subDraws'
+import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday, tradeOf, tradeEs, capped, canInvoice, invoiceFree, waitingOnAmount } from '../lib/subDraws'
 import { uploadInvoiceFile } from '../lib/taskPhotos'
 
 // Only tasks booked with this login carry money. An outside company's crew
@@ -29,11 +29,26 @@ const useMine = () => {
     tasks: (tasks || []).filter(t => t && (DEMO || !me?.id || t.subUserId === me.id)),
     draws: (draws || []).filter(Boolean),
     terms: terms || [],
+    free: invoiceFree(me),   // the office lets this sub invoice without an agreed amount
   }
 }
 // Jobs that can be invoiced now: a carpenter's with money left and no draw yet
 // this week; any other trade's that hasn't been invoiced yet (lib/subDraws).
-const invoiceable = (tasks, terms, draws) => tasks.filter(t => canInvoice(t, terms, draws))
+const invoiceable = (tasks, terms, draws, free) => tasks.filter(t => canInvoice(t, terms, draws, free))
+// A carpenter's jobs the office hasn't put an amount on yet: said out loud, so
+// a missing "Send an invoice" button is never a mystery.
+const waiting = (tasks, terms, free) => tasks.filter(t => waitingOnAmount(t, terms, free))
+function WaitingOnAmount({ jobs }) {
+  if (!jobs.length) return null
+  return (
+    <div className="rounded-xl bg-gray-100 px-4 py-3 text-base text-gray-800">
+      <p className="font-semibold">{tr('The office has not set the amount for these jobs yet. You can invoice them once it does.')}</p>
+      <ul className="mt-1 text-sm text-gray-600">
+        {jobs.map(t => <li key={t.id} className="truncate">{jobName(t)}{t.title ? ` — ${t.title}` : ''}</li>)}
+      </ul>
+    </div>
+  )
+}
 
 const jobName = (l) => [l.client, l.address].filter(Boolean).join(' · ') || l.title || 'Job'
 const dateLabel = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '')
@@ -72,11 +87,12 @@ function SendButton() {
 // On the task list: this week's invoices, and the button to send one.
 export function WeekInvoiceCard() {
   const navigate = useNavigate()
-  const { tasks, draws, terms } = useMine()
+  const { tasks, draws, terms, free } = useMine()
   const monday = weekOf()
   const sent = draws.filter(d => d.status !== 'rejected' && d.weekOf === monday)
-  const open = invoiceable(tasks, terms, draws)
-  if (!sent.length && !open.length && !draws.length) return null
+  const open = invoiceable(tasks, terms, draws, free)
+  const unpriced = waiting(tasks, terms, free)
+  if (!sent.length && !open.length && !draws.length && !unpriced.length) return null
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center gap-2">
@@ -90,20 +106,22 @@ export function WeekInvoiceCard() {
           <StatusPill d={d} />
         </button>
       ))}
-      {open.length > 0 ? <SendButton /> : !sent.length && <p className="text-sm text-gray-500">{tr('Nothing left to invoice on your jobs this week.')}</p>}
+      {open.length > 0 ? <SendButton /> : !sent.length && !unpriced.length && <p className="text-sm text-gray-500">{tr('Nothing left to invoice on your jobs this week.')}</p>}
+      <WaitingOnAmount jobs={unpriced} />
     </Card>
   )
 }
 
 // Every invoice this sub has sent, newest first.
 export function InvoicesScreen() {
-  const { tasks, draws, terms } = useMine()
+  const { tasks, draws, terms, free } = useMine()
   const list = [...draws].sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')))
   return (
     <div className="space-y-4">
       <BackButton />
       <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
-      {invoiceable(tasks, terms, draws).length > 0 && <SendButton />}
+      {invoiceable(tasks, terms, draws, free).length > 0 && <SendButton />}
+      <WaitingOnAmount jobs={waiting(tasks, terms, free)} />
       {list.length === 0 && <p className="text-sm text-gray-500 px-1">No invoices sent yet.</p>}
       {list.map(d => (
         <Card key={d.id} className="p-4 space-y-1.5">
@@ -153,11 +171,11 @@ function PickedFile({ f, onRemove }) {
 // The invoice form.
 export function NewInvoiceScreen() {
   const navigate = useNavigate()
-  const { tasks, draws, terms } = useMine()
+  const { tasks, draws, terms, free } = useMine()
   const me = useStore(s => s.me)
   const orgId = useStore(s => s.orgId)
   const addSubDraw = useStore(s => s.addSubDraw)
-  const jobs = useMemo(() => invoiceable(tasks, terms, draws), [tasks, terms, draws])
+  const jobs = useMemo(() => invoiceable(tasks, terms, draws, free), [tasks, terms, draws, free])
   const company = tasks.find(t => t.subName)?.subName || ''
   const [taskId, setTaskId] = useState(() => (jobs.length === 1 ? jobs[0].id : ''))
   const [date, setDate] = useState(todayStr())
@@ -221,10 +239,11 @@ export function NewInvoiceScreen() {
     )
   }
   if (!jobs.length) {
+    const unpriced = waiting(tasks, terms, free)
     return (
       <div className="space-y-4">
         <BackButton />
-        <p className="text-base text-gray-700">Nothing left to invoice on your jobs this week.</p>
+        {unpriced.length ? <WaitingOnAmount jobs={unpriced} /> : <p className="text-base text-gray-700">Nothing left to invoice on your jobs this week.</p>}
       </div>
     )
   }

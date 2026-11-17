@@ -10,7 +10,7 @@
 --   sub_draws   office / admin: everything (approve or send back)
 --               sub: read their own; send (insert) a new one; never edit or
 --               delete one. The checks below refuse an invoice that would
---               take a task past its agreed amount (once one is set), a second live one for
+--               take a task past its agreed amount, a carpenter's with no amount set (unless the office exempted that sub), a second live one for
 --               the same job in the same week, or one without the invoice
 --               file, date or work type.
 --               PMs, reps, paint PM: nothing (money stays with the office).
@@ -114,8 +114,8 @@ create policy sub_draws_sub_update on public.sub_draws for update
   with check (org_id = auth_org() and auth_role() = 'sub' and owner_id = auth.uid());
 
 -- 4. A sub's invoice must be sent Monday–Thursday and add up. A carpenter's draw stays inside
---    the agreed amount when the office has set one (once a week per job either way); any
---    other trade sends one invoice per job.
+--    the agreed amount, which the office sets first unless it exempted that sub (once a
+--    week per job either way); any other trade sends one invoice per job.
 --    (Runs as the table owner so it can see every invoice on the task.)
 create or replace function public.check_sub_draw() returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -167,12 +167,18 @@ begin
       select coalesce(sum((x->>'amount')::numeric), 0) into drawn
         from public.sub_draws d, jsonb_array_elements(d.data->'lines') x
         where d.org_id = new.org_id and d.deleted_at is null and d.data->>'status' <> 'rejected' and x->>'taskId' = t.id;
-      -- The cap only exists once the office has set an agreed amount; until
-      -- then the invoice goes through and the office approves or sends it back.
+      -- The office sets the agreed amount first. A sub the office has let
+      -- invoice without one (set_sub_invoice_free below) may send an invoice
+      -- on a booking that has no amount; one that has an amount is held to it.
       agreed := coalesce((select nullif(m.data->>'agreedAmount', '')::numeric from public.sub_task_terms m
                           where m.org_id = new.org_id and m.id = t.id and m.deleted_at is null), 0);
-      if agreed > 0 and drawn + amt > agreed then
-        raise exception '%that''s more than is left on "%"', bad, t.data->>'title' using errcode = '42501';
+      if agreed > 0 then
+        if drawn + amt > agreed then
+          raise exception '%that''s more than is left on "%"', bad, t.data->>'title' using errcode = '42501';
+        end if;
+      elsif not coalesce((select (om.permissions->>'invoice.noAmount')::boolean from public.org_members om
+                          where om.org_id = new.org_id and om.user_id = auth.uid()), false) then
+        raise exception '%the office hasn''t set the amount for "%" yet', bad, t.data->>'title' using errcode = '42501';
       end if;
     else
       -- Every other trade: one invoice per stage of the job (a sent-back one can
@@ -212,6 +218,28 @@ revoke execute on function public.check_sub_draw() from public, anon, authentica
 drop trigger if exists sub_draws_check on public.sub_draws;
 create trigger sub_draws_check before insert or update on public.sub_draws
   for each row execute function public.check_sub_draw();
+
+-- 4b. The office lets one sub invoice a booking that has no agreed amount
+--     (Settings › Team). Kept on that sub's own team row, which they can read
+--     and only an admin's functions can change.
+create or replace function public.set_sub_invoice_free(p_user uuid, p_free boolean) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare me public.org_members; perms jsonb;
+begin
+  select * into me from public.org_members where user_id = auth.uid();
+  if not found or me.role not in ('admin', 'office') then
+    raise exception 'Only the office can change how a sub invoices.' using errcode = '42501';
+  end if;
+  update public.org_members
+     set permissions = case when p_free then coalesce(permissions, '{}'::jsonb) || jsonb_build_object('invoice.noAmount', true)
+                            else coalesce(permissions, '{}'::jsonb) - 'invoice.noAmount' end
+   where user_id = p_user and org_id = me.org_id and role = 'sub'
+   returning permissions into perms;
+  if not found then raise exception 'That sub is not on your team.' using errcode = '42501'; end if;
+  return jsonb_build_object('ok', true, 'user_id', p_user, 'permissions', perms);
+end $$;
+revoke all on function public.set_sub_invoice_free(uuid, boolean) from public, anon;
+grant execute on function public.set_sub_invoice_free(uuid, boolean) to authenticated;
 
 -- 5. (Agreed amounts used to live on the task; they're in sub_task_terms now.)
 drop trigger if exists sub_tasks_agreed_guard on public.sub_tasks;

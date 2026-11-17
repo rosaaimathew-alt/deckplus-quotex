@@ -127,6 +127,8 @@ export async function resetMemberPassword(userId) {
 }
 // Admin: switch sections off for one person (permissions.js). { key: false }.
 export const setMemberPermissions = (userId, permissions) => rpc('set_member_permissions', { p_user: userId, p_permissions: permissions })
+// Office: let one sub invoice a booking that has no agreed amount (sub_draws.sql).
+export const setSubInvoiceFree = (userId, free) => rpc('set_sub_invoice_free', { p_user: userId, p_free: !!free })
 // Admin / office: change someone's team role (office: non-admins only).
 export const setMemberRole = (userId, role) => rpc('set_member_role', { p_user: userId, p_role: role })
 // A team member's phone (their own, or anyone's for the office): subs see their PM's number (supabase/notify.sql).
