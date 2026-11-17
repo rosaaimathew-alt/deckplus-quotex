@@ -1,7 +1,8 @@
 // ── Paint view ───────────────────────────────────────────────────────────────
 // Field mode for the paint PM. Three tabs and a paint-only job page:
 //
-//   Queue      — jobs ready for paint now, and the ones a few steps away
+//   Queue      — jobs being painted, jobs ready to start, and the ones a few
+//                steps away; the paint PM moves jobs up and down in each list
 //   Schedule   — paint dates and crews for the next two weeks
 //   Touch-ups  — every open touch-up, across jobs
 //   Paint job  — date + crew, Mark paint done, paint details (product,
@@ -13,7 +14,8 @@
 //
 // Data (all on the job, so the office sees it too):
 //   jobData.stageDates.paint      paint date (same as the PM calendar)
-//   jobData.paint                 { crew, colors: [{ color, areas, brand, product, sheen }], notes }
+//   jobData.paint                 { crew, colors: [{ color, areas, brand, product, sheen }], notes,
+//                                   rank: the job's place in its queue list (lowest first) }
 //                                 (+ the first color in product / color / sheen / areas)
 //   jobData.touchUps              [{ id, text, done, createdAt, doneAt, by }]
 //   jobData.paymentsReceived      the Pre-Paint payment, when collected
@@ -21,7 +23,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Check, CheckCircle2, Circle, CalendarDays, Users, Phone, MessageSquare, Navigation,
-  PaintRoller, Plus, Wallet, ChevronRight, UserPlus,
+  PaintRoller, Plus, Wallet, ChevronRight, ChevronUp, ChevronDown, UserPlus,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { createPaintCrewInvite } from '../supabase'
@@ -72,13 +74,41 @@ function usePaintJobs() {
 // Every painter put on the job has tapped Completed (and there is at least one).
 const paintersDone = (painters) => (painters || []).length > 0 && painters.every(t => statusKey(t) === 'done')
 
-function PaintRow({ j, sub, tone }) {
+// The paint PM's own order within a list of the queue: jobs they have moved
+// first, in the order they left them; jobs never moved after, as they came.
+const rankOf = (j) => { const r = j.p.jobData?.paint?.rank; return Number.isFinite(r) ? r : null }
+const inOrder = (list) => list.map((j, i) => ({ j, i })).sort((a, b) => {
+  const ra = rankOf(a.j), rb = rankOf(b.j)
+  if (ra !== null && rb !== null) return ra - rb || a.i - b.i
+  if (ra !== null || rb !== null) return ra !== null ? -1 : 1
+  return a.i - b.i
+}).map(x => x.j)
+
+// move(i, -1 | 1): swap a job with its neighbour and save the list's new order
+// on the jobs (only the ones whose place changed).
+function useMove(list) {
+  const updateJobData = useStore(s => s.updateJobData)
+  return (i, dir) => {
+    const k = i + dir
+    if (k < 0 || k >= list.length) return
+    const next = [...list]
+    ;[next[i], next[k]] = [next[k], next[i]]
+    next.forEach((j, n) => { if (rankOf(j) !== n) updateJobData(j.p.id, { paint: { ...(j.p.jobData?.paint || {}), rank: n } }) })
+  }
+}
+
+// onUp / onDown: the row is in a list the paint PM orders. undefined = no
+// arrows at all (Schedule); null = at the top / bottom of its list.
+function PaintRow({ j, sub, tone, onUp, onDown }) {
   const navigate = useNavigate()
   const finished = !j.painted && paintersDone(j.painters)
   const toneCls = { green: 'border-l-green-500', amber: 'border-l-amber-400', blue: 'border-l-[var(--brand-600)]' }[finished ? 'green' : tone] || 'border-l-transparent'
+  const ordered = onUp !== undefined || onDown !== undefined
+  const arrow = 'flex-1 w-12 flex items-center justify-center text-gray-600 active:bg-gray-100 disabled:text-gray-200 disabled:active:bg-transparent'
   return (
+    <div className={`bg-white rounded-2xl border border-gray-200 border-l-4 ${toneCls} shadow-sm flex items-stretch overflow-hidden`}>
     <button onClick={() => navigate(`/field/job/${j.p.id}`)}
-      className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${toneCls} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
+      className="flex-1 min-w-0 text-left px-4 py-3.5 flex items-center gap-3 active:bg-gray-50">
       <div className="flex-1 min-w-0">
         <p className="text-base font-semibold text-gray-900 truncate">{j.p.client || 'Unnamed job'}</p>
         {j.p.address && <p className="text-sm text-gray-500 truncate">{j.p.address}</p>}
@@ -89,8 +119,30 @@ function PaintRow({ j, sub, tone }) {
         {(j.painters || []).some(missingTodaysPhotos) && <p className="text-sm font-semibold text-red-600">Photos needed today</p>}
         {finished && <p className="text-sm font-semibold text-green-700">Painters finished. Mark paint done.</p>}
       </div>
-      <ChevronRight size={20} className="text-gray-300 shrink-0" />
+      {!ordered && <ChevronRight size={20} className="text-gray-300 shrink-0" />}
     </button>
+    {ordered && (
+      <div className="shrink-0 flex flex-col border-l border-gray-100 divide-y divide-gray-100">
+        <button onClick={onUp || undefined} disabled={!onUp} aria-label={`Move ${j.p.client || 'job'} up`} className={arrow}><ChevronUp size={22} /></button>
+        <button onClick={onDown || undefined} disabled={!onDown} aria-label={`Move ${j.p.client || 'job'} down`} className={arrow}><ChevronDown size={22} /></button>
+      </div>
+    )}
+    </div>
+  )
+}
+
+// One list of the queue, in the paint PM's order, with the arrows to change it.
+function QueueList({ title, jobs, empty, tone, sub }) {
+  const move = useMove(jobs)
+  return (
+    <div className="space-y-2.5">
+      <H2>{title} ({jobs.length})</H2>
+      {jobs.length === 0 && <p className="text-sm text-gray-500 px-1">{empty}</p>}
+      {jobs.map((j, i) => (
+        <PaintRow key={j.p.id} j={j} tone={tone(j)} sub={sub(j)}
+          onUp={i > 0 ? () => move(i, -1) : null} onDown={i < jobs.length - 1 ? () => move(i, 1) : null} />
+      ))}
+    </div>
   )
 }
 
@@ -101,10 +153,14 @@ const whenLine = (j) => [
 
 // ── Queue ───────────────────────────────────────────────────────────────────
 export function PaintQueue() {
-  const jobs = usePaintJobs()
-  const ready = jobs.filter(j => !j.painted && j.paintIndex === 0)
-  const soon = jobs.filter(j => !j.painted && j.paintIndex > 0 && j.paintIndex <= 3)
-    .sort((a, b) => a.paintIndex - b.paintIndex)
+  const jobs = usePaintJobs().filter(j => !j.painted)
+  // Ongoing: a painter on the job has started. Ready to start: paint is the
+  // next step. In queue: one to three steps before paint.
+  const started = (j) => (j.painters || []).some(t => statusKey(t) !== 'booked')
+  const ongoing = inOrder(jobs.filter(started))
+  const ready = inOrder(jobs.filter(j => !started(j) && j.paintIndex === 0))
+  const queue = inOrder(jobs.filter(j => !started(j) && j.paintIndex > 0 && j.paintIndex <= 3)
+    .sort((a, b) => a.paintIndex - b.paintIndex))
   const unscheduled = ready.filter(j => !j.paintDate).length
 
   return (
@@ -114,25 +170,17 @@ export function PaintQueue() {
         <p className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Card className="p-4"><p className="text-3xl font-bold text-gray-900">{ready.length}</p><p className="text-sm text-gray-500">ready to paint</p></Card>
+        <Card className="p-4"><p className="text-3xl font-bold text-gray-900">{ready.length}</p><p className="text-sm text-gray-500">ready to start</p></Card>
         <Card className={`p-4 ${unscheduled ? 'border-amber-300' : ''}`}>
           <p className={`text-3xl font-bold ${unscheduled ? 'text-amber-600' : 'text-green-600'}`}>{unscheduled}</p>
           <p className="text-sm text-gray-500">need a date</p>
         </Card>
       </div>
-      <div className="space-y-2.5">
-        <H2>Ready for paint</H2>
-        {ready.length === 0 && <p className="text-sm text-gray-500 px-1">Nothing is waiting on paint.</p>}
-        {ready.map(j => <PaintRow key={j.p.id} j={j} tone={j.paintDate ? 'blue' : 'amber'} sub={whenLine(j)} />)}
-      </div>
-      <div className="space-y-2.5">
-        <H2>Coming up</H2>
-        {soon.length === 0 && <p className="text-sm text-gray-500 px-1">Nothing lined up behind those.</p>}
-        {soon.map(j => (
-          <PaintRow key={j.p.id} j={j}
-            sub={`${j.paintIndex} step${j.paintIndex > 1 ? 's' : ''} before paint · now: ${j.next?.label || ''}`} />
-        ))}
-      </div>
+      {ongoing.length > 0 && <QueueList title="Ongoing" jobs={ongoing} tone={() => 'blue'} sub={whenLine} />}
+      <QueueList title="Ready to start" jobs={ready} empty="Nothing is waiting on paint."
+        tone={j => (j.paintDate ? 'blue' : 'amber')} sub={whenLine} />
+      <QueueList title="In queue" jobs={queue} empty="Nothing lined up behind those." tone={() => null}
+        sub={j => `${j.paintIndex} step${j.paintIndex > 1 ? 's' : ''} before paint · now: ${j.next?.label || ''}`} />
     </div>
   )
 }
