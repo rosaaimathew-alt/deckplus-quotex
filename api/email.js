@@ -4,6 +4,7 @@
  *   'payment-reminder'    → payment milestone reminder
  *   'followup'            → quote follow-up
  *   'closeout'            → project completion email
+ *   'contract-send'       → the link to sign a contract
  *
  * Consolidates 4 endpoints into 1 to stay within Vercel Hobby's 12-function limit.
  */
@@ -16,7 +17,7 @@ import { sendNotification } from './_notify.js'
 import { pushPublicKey, pushToEmails } from './_push.js'
 import { requireAuth, verifyToken } from './_auth.js'
 import { getKV } from './_kv.js'
-import { buildProposalEmail, signatureOf, loadSignature, saveSignature } from './_proposalEmail.js'
+import { buildProposalEmail, buildContractEmail, ownSignLink, signatureOf, loadSignature, saveSignature } from './_proposalEmail.js'
 
 // Company name shown in customer emails (per-instance; set COMPANY_NAME in the env).
 const COMPANY = process.env.COMPANY_NAME || 'Your Company'
@@ -203,6 +204,25 @@ export default async function handler(req, res) {
   const mailSender = { userId: staff.sub, email: staff.email }
   if (!(await isMailerConfigured(mailSender))) {
     return res.status(500).json({ error: 'No email account connected. Connect your mailbox in Settings › Email Account.' })
+  }
+
+  // ── The link to sign a contract (Contracts › Send to Client) ──────────────
+  // The customer gets the signing link in the Deck Plus look, signed by the
+  // person sending it. Only this app's own signing links can be sent.
+  if (action === 'contract-send') {
+    const to = String(body.to || '').trim()
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return res.status(400).json({ error: 'Enter the customer\'s email address.' })
+    const host = req.headers['x-forwarded-host'] || req.headers.host || ''
+    const signUrl = ownSignLink(body.signLink, host)
+    if (!signUrl) return res.status(400).json({ error: 'That is not a signing link from this app, so nothing was sent.' })
+    const fromName = String(body.fromName || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80)
+    let signature = signatureOf(null, null, fromName)
+    try { signature = signatureOf(null, await loadSignature(await getKV(), staff.sub), fromName) } catch (err) { console.error('Email signature:', err.message) }
+    const logoUrl = host ? `${host.includes('localhost') ? 'http' : 'https'}://${host}/deckplus-logo.png` : ''
+    const mail = buildContractEmail({ client: body.client, signUrl, signature, logoUrl })
+    const result = await sendMail({ to, subject: mail.subject, html: mail.html, text: mail.text, fromName: signature.name.replace(/["<>]/g, '') || COMPANY, sender: mailSender })
+    if (result.error) return res.status(500).json({ error: result.error })
+    return res.status(200).json({ success: true, sentFrom: result.sentFrom || null })
   }
 
   // ── Payment reminder ──────────────────────────────────────────────────────

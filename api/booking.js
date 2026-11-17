@@ -15,6 +15,7 @@ import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, build
 import { sendMail } from './_mailer.js'
 import { sendDueReport } from './_lead-report.js'
 import { verifyStaff, staffRole } from './_auth.js'
+import { sendDueContractReminders } from './_contractReminders.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
@@ -426,7 +427,13 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Unauthorized' })
     }
     if (req.method === 'GET' && req.query?.check === 'google') return await checkGoogle(res)
-    if (req.method === 'GET' && req.query?.report)             return await sendDueReport(res)
+    if (req.method === 'GET' && req.query?.report) {
+      // The daily run also sends the reminders to sign a contract that are due
+      // (api/_contractReminders.js). It never throws, so the report still goes.
+      const reminders = await sendDueContractReminders()
+      if (reminders.due) console.log('contract reminders:', JSON.stringify(reminders))
+      return await sendDueReport(res)
+    }
     if (req.method === 'GET' && req.query?.check === 'alert') {
       // Sends a sample "booking failed" alert through the real path; at most once an hour.
       await alertOffice({ throttle: true, ...failedBookingAlert({ firstName: 'TEST', lastName: 'Customer', phone: '(704) 555-0100',

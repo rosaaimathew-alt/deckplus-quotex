@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer, Send, ChevronDown, ChevronUp, Sparkles, Loader2, X, Save, BookOpen, RotateCcw, FileText } from 'lucide-react'
+import SendContract from '../components/SendContract'
 import { useStore } from '../store'
 import { DEMO } from '../demo'
 import DeckPlusContract from '../contract/DeckPlusContract'
@@ -256,10 +257,10 @@ export default function ContractView() {
   const [signError, setSignError]         = useState('')
   const [signTab, setSignTab]             = useState('link')
   const [signingLinks, setSigningLinks]   = useState(null)
+  const [linksAreOld, setLinksAreOld]     = useState(false)
   const [autoSigned, setAutoSigned]       = useState(false)
   const companySignature = useStore(s => s.companySignature)
   const [linkLoading, setLinkLoading]     = useState(false)
-  const [copiedRole, setCopiedRole]       = useState('')
   const [propLookup, setPropLookup]       = useState('')   // '' | 'busy' | error text
 
   useEffect(() => {
@@ -462,6 +463,22 @@ export default function ContractView() {
     }
   }
 
+  // "Send to Client": the two ways to send (copy the link, or email it) show
+  // straight away. Links this contract already has are reused; a contract
+  // that has none gets them made on opening.
+  const openSend = () => {
+    setSignResult(null); setSignError(''); setSignTab('link'); setShowSignModal(true)
+    if (signingLinks) return
+    const d = proposals.find(p => p.id === data?.proposalId)?.contractDraft
+    if (d?.signLinks?.client && !d.signed) {
+      setSigningLinks(d.signLinks)
+      // saved again more than a minute after the links were made: it may have changed
+      setLinksAreOld(!!(d.savedAt && d.linksSentAt && new Date(d.savedAt) - new Date(d.linksSentAt) > 60_000))
+    } else {
+      handleGetSigningLink()
+    }
+  }
+
   const handleConnectGoogle = async () => {
     try {
       const origin = window.location.origin
@@ -621,10 +638,6 @@ export default function ContractView() {
     </div>
   )
 
-  const roleRows = [
-    { role: 'client',  label: 'Client',    color: 'bg-blue-50 border-blue-200' },
-    { role: 'builder', label: 'Deck Plus', color: 'bg-emerald-50 border-emerald-200' },
-  ]
   const btn = (on, onCls = 'bg-blue-600 text-white border-blue-600') => `px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${on ? onCls : 'bg-white text-gray-600 border-gray-300 hover:border-blue-300'}`
 
   return (
@@ -645,9 +658,9 @@ export default function ContractView() {
           {scopeBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Scope for HOA
         </button>
         <button onClick={() => window.print()} className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"><Printer size={14} /> Print / Save PDF</button>
-        <button onClick={() => { setSignResult(null); setSignError(''); setShowSignModal(true) }}
+        <button onClick={openSend}
           className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold text-white" style={{ background: '#16a34a' }}>
-          <Send size={14} /> Send for Signature
+          <Send size={14} /> Send to Client
         </button>
       </div>
 
@@ -1024,7 +1037,7 @@ export default function ContractView() {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 no-print">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-base font-bold text-gray-900">Send for Signature</h2>
+              <h2 className="text-base font-bold text-gray-900">Send to Client</h2>
               <button onClick={() => { setShowSignModal(false); setSigningLinks(null); setSignResult(null); setSignError('') }} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="flex border-b border-gray-100">
@@ -1036,30 +1049,24 @@ export default function ContractView() {
               {signTab === 'link' ? (
                 signingLinks ? (
                   <>
-                    <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-4 py-3 rounded-xl text-sm font-medium">✓ 2 unique signing links generated</div>
-                    {autoSigned
-                      ? <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3"><b>Already signed for Deck Plus</b> with the company signature on file. Just send the <b>Client</b> link — once the customer signs, the contract is complete.</p>
-                      : <p className="text-sm text-gray-500">Send each link to the right party — they can only sign their own fields.</p>}
-                    {roleRows.map(({ role, label, color }) => (
-                      <div key={role} className={`border rounded-xl p-3 ${color}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold uppercase tracking-wider text-gray-600">{label}</span>
-                          <button onClick={() => { navigator.clipboard.writeText(signingLinks[role]); setCopiedRole(role); setTimeout(() => setCopiedRole(''), 2000) }} className="px-2.5 py-1 bg-[var(--brand-600)] text-white rounded-md text-[11px] font-semibold hover:bg-[var(--brand-700)]">{copiedRole === role ? 'Copied!' : 'Copy Link'}</button>
-                        </div>
-                        <div className="text-[11px] text-gray-600 break-all bg-white/50 rounded px-2 py-1 select-all">{signingLinks[role]}</div>
-                      </div>
-                    ))}
-                    <button onClick={() => { setSigningLinks(null); setAutoSigned(false) }} className="text-xs text-gray-400 underline">Generate new set of links</button>
+                    {autoSigned && <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3"><b>Already signed for Deck Plus</b> with the company signature on file. Once the customer signs, the contract is complete.</p>}
+                    {linksAreOld && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">This contract was saved after these links were made. If you changed it, make new links so the customer signs the current version.</p>}
+                    <SendContract proposal={proposal} links={signingLinks} autoSigned={autoSigned} />
+                    <button onClick={() => { setSigningLinks(null); setAutoSigned(false); setLinksAreOld(false); handleGetSigningLink() }} disabled={linkLoading} className="text-xs text-gray-400 underline disabled:opacity-50">
+                      {linkLoading ? 'Making new links…' : 'Make new links (the old ones stop working)'}
+                    </button>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm text-gray-600">Generate two separate signing links — one for the Client and one for Deck Plus. Each link only lets that party sign and initial their own fields.</p>
-                    <p className="text-xs text-gray-400">IP address + timestamp recorded for the audit trail.</p>
-                    {companySignature?.enabled && companySignature?.signatureDataUrl && <p className="text-xs text-emerald-700">Deck Plus's part will be signed automatically with the company signature on file ({companySignature.printedName}).</p>}
-                    {signError && <p className="text-sm text-red-600">{signError}</p>}
-                    <button onClick={handleGetSigningLink} disabled={linkLoading} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--brand-600)] text-white rounded-xl text-sm font-semibold hover:bg-[var(--brand-700)] disabled:opacity-50">
-                      {linkLoading ? <><Loader2 size={15} className="animate-spin" /> Creating links…</> : 'Generate Signing Links'}
-                    </button>
+                    {linkLoading
+                      ? <p className="flex items-center gap-2 text-sm text-gray-600"><Loader2 size={15} className="animate-spin" /> Creating the signing links…</p>
+                      : (
+                        <>
+                          {signError && <p className="text-sm text-red-600">{signError}</p>}
+                          {companySignature?.enabled && companySignature?.signatureDataUrl && <p className="text-xs text-emerald-700">Deck Plus's part will be signed automatically with the company signature on file ({companySignature.printedName}).</p>}
+                          <button onClick={handleGetSigningLink} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--brand-600)] text-white rounded-xl text-sm font-semibold hover:bg-[var(--brand-700)]">Create signing links</button>
+                        </>
+                      )}
                   </>
                 )
               ) : !googleAuthed ? (
