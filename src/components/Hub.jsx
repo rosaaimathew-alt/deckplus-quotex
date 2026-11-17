@@ -75,7 +75,7 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
           {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
         </div>
         {visible.length > 1 && (
-          <nav className="flex gap-1 mt-4 -mb-px overflow-x-auto qx-scroll-x" aria-label={`${title} views`}>
+          <nav className="flex flex-wrap sm:flex-nowrap gap-x-1 mt-4 -mb-px sm:overflow-x-auto qx-scroll-x" aria-label={`${title} views`}>
             {visible.map(t => {
               const on = t.key === current.key
               const Icon = t.icon
@@ -84,7 +84,7 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
                   className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                     on ? 'border-[var(--brand-600)] text-[var(--brand-700)]' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
                   }`}>
-                  {Icon && <Icon size={15} className={on ? '' : 'opacity-70'} />}
+                  {Icon && <Icon size={15} className={`hidden sm:block ${on ? '' : 'opacity-70'}`} />}
                   {t.label}
                   {t.count ? (
                     <span className={`ml-0.5 text-[11px] font-semibold rounded-full px-1.5 min-w-[18px] text-center ${t.countTone === 'alert' ? 'qx-badge' : on ? 'bg-[var(--brand-100)] text-[var(--brand-700)]' : 'bg-gray-100 text-gray-500'}`}>{t.count}</span>

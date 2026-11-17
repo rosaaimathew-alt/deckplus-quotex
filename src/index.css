@@ -369,6 +369,9 @@ html:not(.dark) .qx-ink .text-gray-900 { color: #000 !important; }
   .dp-signing .dp-formtitle { font-size: 17pt; }
   .dp-signing .dp-headerfields, .dp-signing .dp-proc-top { grid-template-columns: 1fr; }
   .dp-signing .dp-proc-block { grid-template-columns: 1fr !important; }
+  /* a long fill-in box (an address) stays inside its column instead of stretching it past the screen */
+  .dp-signing .dp-proc-top, .dp-signing .dp-proc-block { grid-template-columns: minmax(0, 1fr) !important; }
+  .dp-signing .dp-proc-cell { min-width: 0; }
   .dp-signing .dp-grid th, .dp-signing .dp-grid td { font-size: 10.5pt; padding: 0.25em 0.35em; overflow-wrap: anywhere; }
   .dp-signing .dp-pricing .dp-price { width: 38%; }
   .dp-signing .dp-gcell { overflow-wrap: anywhere; }
@@ -403,3 +406,44 @@ html.dark select:not([multiple]):not([size]):not(.appearance-none) {
 /* Contract payment schedule: the % column the office sees in the contract
    editor (screen only — .no-print keeps it off prints and PDFs). */
 .dp-grid th.dp-office-only, .dp-grid td.dp-office-only { background: #fffbeb; color: #92400e; }
+
+/* ── Tables that stack into cards on a phone (.qx-stack) ───────────────────
+   The quote builder's line items: instead of a wide table you drag sideways,
+   each line is a card — name and scope on top, then quantity / unit / price /
+   total in one row with their labels, then the line's buttons. Phone screens
+   only; the desktop table is untouched. Cells say where they go with data-c. */
+@media screen and (max-width: 639px) {
+  .qx-stack, .qx-stack tbody { display: block; width: 100%; }
+  .qx-stack thead { display: none; }
+  .qx-stack tr {
+    display: grid; grid-template-columns: 2rem 0.7fr 1fr 1.5fr 1.6fr;
+    column-gap: 0.5rem; row-gap: 0.45rem; align-items: end; padding: 0.75rem 0.75rem 0.5rem;
+  }
+  .qx-stack td { display: block; padding: 0 !important; min-width: 0; }
+  .qx-stack td[data-c="none"] { display: none; }
+  .qx-stack td[data-c="grip"] { grid-column: 1; grid-row: 1; align-self: start; }
+  .qx-stack td[data-c="item"] { grid-column: 2 / -1; grid-row: 1; }
+  .qx-stack td[data-c="qty"] { grid-column: 1 / 3; grid-row: 2; }
+  .qx-stack td[data-c="unit"] { grid-column: 3; grid-row: 2; }
+  .qx-stack td[data-c="price"] { grid-column: 4; grid-row: 2; }
+  .qx-stack td[data-c="total"] { grid-column: 5; grid-row: 2; padding-bottom: 0.55rem !important; }
+  .qx-stack td[data-c="actions"] { grid-column: 1 / -1; grid-row: 3; }
+  .qx-stack td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 0.15rem;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #6b7280; font-style: normal;
+  }
+  /* boxes look like boxes (on a desktop they only show an outline on hover) and are a thumb tall */
+  .qx-stack td input, .qx-stack td select, .qx-stack td textarea {
+    border-color: rgb(120 120 120 / 0.28); border-radius: 0.5rem; padding: 0.45rem 0.5rem; font-size: 15px;
+  }
+  .qx-stack td input, .qx-stack td select { min-height: 2.6rem; width: 100%; }
+  .qx-stack td[data-c="item"] textarea { font-size: 14px; margin-top: 0.35rem; }
+  .qx-stack td[data-c="actions"] > div { flex-direction: row; justify-content: flex-end; gap: 0.15rem; }
+  .qx-stack td[data-c="actions"] { text-align: right; }
+  .qx-stack td[data-c="actions"] button, .qx-stack td[data-c="actions"] > div > span,
+  .qx-stack td[data-c="grip"] button {
+    min-width: 2.6rem; min-height: 2.6rem; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .qx-stack td[data-c="actions"] svg, .qx-stack td[data-c="grip"] svg { width: 18px; height: 18px; }
+  .qx-stack td[data-c="actions"] button { color: #6b7280; }
+}

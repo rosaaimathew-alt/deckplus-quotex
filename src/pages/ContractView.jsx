@@ -581,14 +581,14 @@ export default function ContractView() {
           <span>✏️</span><span>Start a line with <strong>--</strong> to make it a bullet point. Plain lines print as text. Enter = new line. **bold** and __underline__ work.</span>
           {scopeExamples.length > 0 && <span className="text-purple-500 font-medium ml-1">· {scopeExamples.length} example{scopeExamples.length !== 1 ? 's' : ''} learned</span>}
         </div>
-        <div className="flex items-center gap-2" style={{ fontFamily: 'system-ui, sans-serif' }}>
+        <div className="flex items-center gap-2 flex-wrap" style={{ fontFamily: 'system-ui, sans-serif' }}>
           <button onClick={fillFromPastContracts} disabled={scopeExamples.length === 0}
             title={scopeExamples.length === 0 ? 'Save a contract draft first to build your example library' : 'Fill from your past contracts — no AI needed'}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed">
+            className="flex items-center gap-1.5 px-3 py-2.5 sm:py-1.5 bg-emerald-600 text-white rounded-lg text-sm sm:text-xs font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed">
             <BookOpen size={12} /> Fill from Past Contracts
           </button>
           <button onClick={generateSuggestions} disabled={isGenerating}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 disabled:opacity-50">
+            className="flex items-center gap-1.5 px-3 py-2.5 sm:py-1.5 bg-purple-600 text-white rounded-lg text-sm sm:text-xs font-medium hover:bg-purple-700 disabled:opacity-50">
             {isGenerating ? <><Loader2 size={12} className="animate-spin" /> Generating…</> : <><Sparkles size={12} /> AI Suggest</>}
           </button>
         </div>
@@ -613,24 +613,24 @@ export default function ContractView() {
         </div>
       )}
       <textarea
-        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 leading-relaxed"
+        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 leading-relaxed"
         style={{ minHeight: '14rem', resize: 'vertical', fontFamily: 'system-ui, sans-serif' }}
         placeholder={'Use -- to create a bullet point:\n\n-- Build 16×16 gable-roof screen porch on new pressure-treated deck\n-- Install ScreenEze system with charcoal fiberglass screen…'}
         value={scopeLines.filter(l => !l.isDiscount && !l.textless).map(l => l.text).join('\n')}
         onChange={e => { const texts = e.target.value.split('\n'); setScopeLines(prev => remapEdit(prev, texts)) }}
       />
       <div className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontFamily: 'system-ui, sans-serif' }}>
-        <button onClick={addLine} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded px-2 py-1.5"><span className="text-base leading-none">+</span> Add bullet</button>
-        <button onClick={() => setShowScopeTemplates(true)} className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded px-2 py-1.5"><BookOpen size={12} /> Load template</button>
-        {scopeLines.length > 0 && <button onClick={() => setShowSaveScopeTemplate(true)} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded px-2 py-1.5"><Save size={12} /> Save as template</button>}
+        <button onClick={addLine} className="flex items-center gap-1.5 text-sm sm:text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded px-2 py-2.5 sm:py-1.5"><span className="text-base leading-none">+</span> Add bullet</button>
+        <button onClick={() => setShowScopeTemplates(true)} className="flex items-center gap-1.5 text-sm sm:text-xs text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded px-2 py-2.5 sm:py-1.5"><BookOpen size={12} /> Load template</button>
+        {scopeLines.length > 0 && <button onClick={() => setShowSaveScopeTemplate(true)} className="flex items-center gap-1.5 text-sm sm:text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded px-2 py-2.5 sm:py-1.5"><Save size={12} /> Save as template</button>}
       </div>
       <div className="mt-3 text-xs text-gray-500" style={{ fontFamily: 'system-ui, sans-serif' }}>
         Item names and prices in the table below come from the proposal. Edit a name inline:
         <div className="mt-1 space-y-1">
           {scopeLines.filter(l => (l.name || '').trim() || Number(l.price) > 0).map(line => (
             <div key={line.id} className="flex items-center gap-2">
-              <input className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs" value={line.name || ''} onChange={e => setScopeLines(prev => prev.map(l => l.id === line.id ? { ...l, name: e.target.value } : l))} />
-              <span className="w-24 text-right">{Number(line.price) < 0 ? `−$${fmt(-line.price)}` : `$${fmt(line.price)}`}</span>
+              <input className="flex-1 min-w-0 border border-gray-200 rounded px-2 h-11 sm:h-auto sm:py-1 text-base sm:text-xs" value={line.name || ''} onChange={e => setScopeLines(prev => prev.map(l => l.id === line.id ? { ...l, name: e.target.value } : l))} />
+              <span className="shrink-0 sm:w-24 text-right">{Number(line.price) < 0 ? `−$${fmt(-line.price)}` : `$${fmt(line.price)}`}</span>
             </div>
           ))}
         </div>
@@ -638,30 +638,36 @@ export default function ContractView() {
     </div>
   )
 
-  const btn = (on, onCls = 'bg-blue-600 text-white border-blue-600') => `px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${on ? onCls : 'bg-white text-gray-600 border-gray-300 hover:border-blue-300'}`
+  // Thumb-sized on a phone, compact on a desktop
+  const btn = (on, onCls = 'bg-blue-600 text-white border-blue-600') => `px-3 py-2.5 sm:py-1.5 rounded-lg border text-sm sm:text-xs font-medium transition-colors ${on ? onCls : 'bg-white text-gray-600 border-gray-300 hover:border-blue-300'}`
 
   return (
     <div className="qx-ink min-h-screen bg-gray-100">
 
       {/* ── Toolbar ─────────────────────────────────────────────────── */}
-      <div className="no-print bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={() => navigate('/tracker')} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900"><ArrowLeft size={15} /> Back to Tracker</button>
+      {/* On a phone the bar is two rows (Back + contract number, then the
+          actions as thumb-sized buttons) and scrolls away with the page. */}
+      <div className="no-print bg-white border-b border-gray-200 px-3 sm:px-6 py-2 sm:py-3 flex flex-wrap items-center gap-2 sm:gap-3 sm:sticky top-0 z-10">
+        <button onClick={() => navigate('/tracker')} className="flex items-center gap-1.5 min-h-[44px] sm:min-h-0 pr-2 text-sm text-gray-600 hover:text-gray-900"><ArrowLeft size={15} /> <span className="sm:hidden">Back</span><span className="hidden sm:inline">Back to Tracker</span></button>
         <div className="flex-1" />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <label className="text-xs text-gray-500 font-medium shrink-0">Contract #</label>
-          <input className="border border-gray-300 rounded px-2 py-1 text-sm font-mono w-36 focus:outline-none focus:ring-2 focus:ring-blue-300" value={contractNum} onChange={e => setContractNum(e.target.value)} placeholder="e.g. DP-2026-041" />
+          <input className="border border-gray-300 rounded px-2 py-1 h-11 sm:h-auto text-base sm:text-sm font-mono w-32 sm:w-36 min-w-0 focus:outline-none focus:ring-2 focus:ring-blue-300" value={contractNum} onChange={e => setContractNum(e.target.value)} placeholder="e.g. DP-2026-041" />
         </div>
-        <button onClick={() => saveDraft()} className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"><Save size={14} /> Save Draft</button>
-        {savedAt && <span className="text-xs text-gray-400">Saved {new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
-        <button onClick={saveScopeForHoa} disabled={scopeBusy} title="Just the scope of work, without prices — for the HOA"
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60">
-          {scopeBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Scope for HOA
-        </button>
-        <button onClick={() => window.print()} className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"><Printer size={14} /> Print / Save PDF</button>
+        <div className="basis-full flex items-stretch gap-2 sm:basis-auto sm:contents">
+          <button onClick={() => saveDraft()} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 sm:px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"><Save size={14} /> <span className="sm:hidden">Save</span><span className="hidden sm:inline">Save Draft</span></button>
+          {savedAt && <span className="hidden sm:inline text-xs text-gray-400">Saved {new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+          <button onClick={saveScopeForHoa} disabled={scopeBusy} title="Just the scope of work, without prices — for the HOA"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60">
+            {scopeBusy ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} <span className="sm:hidden">HOA</span><span className="hidden sm:inline">Scope for HOA</span>
+          </button>
+          <button onClick={() => window.print()} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 sm:px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"><Printer size={14} /> <span className="sm:hidden">PDF</span><span className="hidden sm:inline">Print / Save PDF</span></button>
+        </div>
         <button onClick={openSend}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold text-white" style={{ background: '#16a34a' }}>
+          className="basis-full sm:basis-auto flex items-center justify-center gap-1.5 min-h-[48px] sm:min-h-0 px-4 py-1.5 rounded-lg text-base sm:text-sm font-semibold text-white" style={{ background: '#16a34a' }}>
           <Send size={14} /> Send to Client
         </button>
+        {savedAt && <p className="sm:hidden basis-full text-center text-xs text-gray-400 -mt-0.5">Saved {new Date(savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
       </div>
 
       {/* ── À la carte item picker ───────────────────────────────────── */}
@@ -705,8 +711,8 @@ export default function ContractView() {
       )}
 
       {/* ── Project type, spec sheets & payment schedule ─────────────── */}
-      <div className="no-print max-w-4xl mx-auto mt-6 px-4">
-        <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 space-y-4">
+      <div className="no-print max-w-4xl mx-auto mt-3 sm:mt-6 px-3 sm:px-4">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 sm:px-5 py-4 space-y-4">
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Project Type <span className="font-normal text-gray-400 normal-case">(drives the payment schedule)</span></label>
             <div className="flex gap-2 flex-wrap">
@@ -729,7 +735,7 @@ export default function ContractView() {
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">Job Location <span className="font-normal text-gray-400 normal-case">(state from the address; county picks the permit forms)</span></label>
             <div className="flex gap-2 flex-wrap items-center mb-4">
               {STATES.map(st => <button key={st} onClick={() => setValue('jobState', st)} className={btn(values.jobState === st, 'bg-[var(--brand-600)] text-white border-[var(--brand-600)]')}>{st}</button>)}
-              <select className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs" value={values.county || ''}
+              <select className="border border-gray-300 rounded-lg px-2 h-11 sm:h-auto sm:py-1.5 text-base sm:text-xs" value={values.county || ''}
                 onChange={e => {
                   const c = e.target.value
                   setValue('county', c)
@@ -741,7 +747,7 @@ export default function ContractView() {
                 <option value="__other">Other…</option>
               </select>
               {(values.county === '__other' || (values.county && !Object.values(COUNTIES).flat().includes(values.county))) && (
-                <input className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs w-36" placeholder="County name" value={values.county === '__other' ? '' : values.county} onChange={e => setValue('county', e.target.value)} />
+                <input className="border border-gray-300 rounded-lg px-2 h-11 sm:h-auto sm:py-1.5 text-base sm:text-xs w-36" placeholder="County name" value={values.county === '__other' ? '' : values.county} onChange={e => setValue('county', e.target.value)} />
               )}
             </div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">
@@ -750,7 +756,7 @@ export default function ContractView() {
             </label>
             <div className="flex gap-2 flex-wrap">
               {PACKET_FORMS.map(f => <button key={f.key} onClick={() => togglePacket(f.key)} className={btn(packetKeys.includes(f.key), 'bg-amber-500 text-white border-amber-500')}><FileText size={12} className="inline mr-1 -mt-0.5" />{f.label}</button>)}
-              {packet !== null && <button onClick={() => setPacket(null)} className="text-xs text-gray-400 hover:text-gray-600 underline">reset to auto</button>}
+              {packet !== null && <button onClick={() => setPacket(null)} className="min-h-[44px] sm:min-h-0 px-2 text-sm sm:text-xs text-gray-400 hover:text-gray-600 underline">reset to auto</button>}
             </div>
             {specCount > 0 && (
               <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
@@ -781,7 +787,7 @@ export default function ContractView() {
               )
             })()}
             <div className="mt-3">
-              <button onClick={() => setShowMilestoneEditor(v => !v)} className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800">
+              <button onClick={() => setShowMilestoneEditor(v => !v)} className="flex items-center gap-1.5 min-h-[44px] sm:min-h-0 text-sm sm:text-xs font-medium text-blue-600 hover:text-blue-800">
                 <ChevronDown size={13} className={`transition-transform ${showMilestoneEditor ? 'rotate-180' : ''}`} />{showMilestoneEditor ? 'Hide' : 'Edit'} milestone details
               </button>
               {showMilestoneEditor && (
@@ -790,23 +796,23 @@ export default function ContractView() {
                   {milestones.map((m, i) => {
                     const currentPct = milestonePcts[i] != null ? milestonePcts[i] : Math.round(m.pct * 1000) / 10
                     return (
-                      <div key={i} className="flex gap-2 items-center">
+                      <div key={i} className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
                         <div className="flex items-center gap-1 shrink-0">
-                          <input type="number" min={1} max={99} step="0.1" className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center" value={currentPct}
+                          <input type="number" min={1} max={99} step="0.1" className="w-20 sm:w-16 border border-gray-200 rounded-lg px-2 h-11 sm:h-auto sm:py-1.5 text-base sm:text-xs text-center" value={currentPct}
                             onChange={e => { const v = Number(e.target.value); setMilestonePcts(prev => { const n = [...prev]; n[i] = isNaN(v) ? Math.round(m.pct * 100) : v; return n }) }} />
                           <span className="text-xs text-gray-400">%</span>
                         </div>
-                        <input className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs" value={milestoneLabels[i] ?? m.label}
+                        <input className="order-last basis-full sm:order-none sm:basis-auto sm:flex-1 min-w-0 border border-gray-200 rounded-lg px-2 h-11 sm:h-auto sm:py-1.5 text-base sm:text-xs" value={milestoneLabels[i] ?? m.label}
                           onChange={e => setMilestoneLabels(prev => { const n = [...prev]; n[i] = e.target.value; return n })} />
-                        <span className="text-xs text-gray-400 shrink-0 w-24 text-right">${fmt(total * (milestonePcts[i] != null ? milestonePcts[i] / 100 : m.pct))}</span>
+                        <span className="text-sm sm:text-xs text-gray-400 shrink-0 ml-auto sm:ml-0 sm:w-24 text-right">${fmt(total * (milestonePcts[i] != null ? milestonePcts[i] / 100 : m.pct))}</span>
                       </div>
                     )
                   })}
-                  <div className="flex gap-2 items-center pt-2 border-t border-gray-100 mt-1">
-                    <input className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs" placeholder="Name this schedule (e.g. Deck Standard, HOA Porch…)" value={schedSaveName} onChange={e => { setSchedSaveName(e.target.value); setSchedSaved(false) }} />
+                  <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center pt-2 border-t border-gray-100 mt-1">
+                    <input className="basis-full sm:basis-auto sm:flex-1 min-w-0 border border-gray-200 rounded-lg px-2 h-11 sm:h-auto sm:py-1.5 text-base sm:text-xs" placeholder="Name this schedule (e.g. Deck Standard, HOA Porch…)" value={schedSaveName} onChange={e => { setSchedSaveName(e.target.value); setSchedSaved(false) }} />
                     <button disabled={!schedSaveName.trim() || pctSum !== 100}
                       onClick={() => { savePaymentSchedule({ name: schedSaveName.trim(), milestones: milestones.map((m, i) => ({ label: milestoneLabels[i] ?? m.label, pct: milestonePcts[i] != null ? milestonePcts[i] / 100 : m.pct })) }); setSchedSaved(true); setSchedSaveName('') }}
-                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40">{schedSaved ? '✓ Saved' : 'Save schedule'}</button>
+                      className="shrink-0 px-3 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-lg text-sm sm:text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40">{schedSaved ? '✓ Saved' : 'Save schedule'}</button>
                   </div>
                 </div>
               )}
@@ -817,10 +823,10 @@ export default function ContractView() {
                     {paymentSchedules.map(sched => (
                       <div key={sched.id} className="flex items-center gap-1">
                         <button onClick={() => { setPaymentScheduleOverride('auto'); setMilestoneLabels(sched.milestones.map(m => m.label)); setMilestonePcts(sched.milestones.map(m => Math.round(m.pct * 100))) }}
-                          className="px-3 py-1.5 rounded-l-lg border border-r-0 text-xs font-medium bg-white text-gray-700 border-gray-300 hover:bg-gray-50">
+                          className="px-3 py-2.5 sm:py-1.5 rounded-l-lg border border-r-0 text-sm sm:text-xs font-medium bg-white text-gray-700 border-gray-300 hover:bg-gray-50">
                           {sched.name}<span className="ml-1.5 text-gray-400">{sched.milestones.map(m => Math.round(m.pct * 100)).join('/')}</span>
                         </button>
-                        <button onClick={() => deletePaymentSchedule(sched.id)} className="px-2 py-1.5 rounded-r-lg border text-xs text-gray-400 border-gray-300 hover:text-red-500">×</button>
+                        <button onClick={() => deletePaymentSchedule(sched.id)} aria-label={`Delete ${sched.name}`} className="px-3 sm:px-2 py-2.5 sm:py-1.5 rounded-r-lg border text-sm sm:text-xs text-gray-400 border-gray-300 hover:text-red-500">×</button>
                       </div>
                     ))}
                   </div>
@@ -841,8 +847,8 @@ export default function ContractView() {
       {/* ── Fill-ins (auto-populated, editable) ─────────────────────── */}
       <div className="no-print max-w-4xl mx-auto mt-6 mb-2 px-4">
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <button onClick={() => setShowFillins(v => !v)} className="w-full flex items-center justify-between px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
-            <span>Contract fill-ins <span className="font-normal text-gray-400">— auto-filled from the proposal; change anything here or directly on the document</span></span>
+          <button onClick={() => setShowFillins(v => !v)} className="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3 text-sm font-medium text-gray-700 text-left hover:bg-gray-50">
+            <span>Contract fill-ins <span className="hidden sm:inline font-normal text-gray-400">— auto-filled from the proposal; change anything here or directly on the document</span></span>
             {showFillins ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
           {showFillins && (
@@ -859,11 +865,11 @@ export default function ContractView() {
                     {g.fields.map(([name, label]) => {
                       const overridden = fieldOverrides[name] !== undefined && fieldOverrides[name] !== '' && name !== 'contractNum'
                       return (
-                        <div key={name} className="flex items-center gap-2">
-                          <label className="text-xs text-gray-500 w-40 shrink-0">{label}</label>
-                          <input className={`flex-1 border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${overridden ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}
+                        <div key={name} className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-0.5">
+                          <label className="text-xs text-gray-500 basis-full sm:basis-auto sm:w-40 shrink-0">{label}</label>
+                          <input className={`flex-1 min-w-0 border rounded-lg px-2 h-11 sm:h-auto sm:py-1 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 ${overridden ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`}
                             value={values[name] ?? ''} onChange={e => setValue(name, e.target.value)} />
-                          {overridden && <button onClick={() => resetValue(name)} title={`Back to auto: ${autoValues[name] || '(blank)'}`} className="text-gray-400 hover:text-gray-600"><RotateCcw size={13} /></button>}
+                          {overridden && <button onClick={() => resetValue(name)} title={`Back to auto: ${autoValues[name] || '(blank)'}`} className="shrink-0 w-11 h-11 sm:w-auto sm:h-auto flex items-center justify-center text-gray-400 hover:text-gray-600"><RotateCcw size={13} /></button>}
                         </div>
                       )
                     })}
@@ -879,7 +885,7 @@ export default function ContractView() {
       </div>
 
       {/* ── The packet ──────────────────────────────────────────────── */}
-      <div className="max-w-4xl mx-auto my-6 px-4 pb-16">
+      <div className="max-w-4xl mx-auto my-3 sm:my-6 px-0 sm:px-4 pb-16 dp-signing">
         {DEMO ? (
           <DemoContractDoc innerRef={contractDocRef} companyName={companyName} client={client} address={data.address} contractNum={contractNum} scopeLines={scopeLines} total={total} />
         ) : (

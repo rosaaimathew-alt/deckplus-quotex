@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
 import { MenuChip, QuickPicks, SwitchChip, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
+import { useIsPhone } from '../field/fieldMode'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { headlineNumbers } from '../lib/headline'
 import { buildProposalSnapshot } from '../proposalSnapshot'
@@ -18,7 +19,7 @@ import {
   DollarSign, FileText, Plus, ChevronDown, ChevronUp, MessageSquare,
   Phone, Mail, Send, Users, BarChart2, Columns, List, Award, ThumbsDown,
   Eye, Copy, GitBranch, FileSignature, ShoppingCart,
-  GitMerge, Unlink, Search, MoreHorizontal, Link2, Archive, ReceiptText,
+  GitMerge, Unlink, Search, MoreHorizontal, Link2, Archive, ReceiptText, ArrowUpDown,
 } from 'lucide-react'
 import JobPriceList from '../components/JobPriceList'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
@@ -156,12 +157,13 @@ const STATUS_TEXT = {
 
 // Status control styled like the prototype: a colored dot inside a colored pill,
 // with the native <select> overlaid transparently so clicking still changes it.
-function StatusSelect({ value, onChange }) {
+function StatusSelect({ value, onChange, big = false }) {
   return (
     <div className="relative inline-flex items-center">
-      <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_STYLES[value] || 'bg-gray-100 text-gray-600'}`}>
+      <span className={`inline-flex items-center gap-1.5 font-medium rounded-full ${big ? 'text-sm px-3 py-2' : 'text-xs px-2.5 py-1'} ${STATUS_STYLES[value] || 'bg-gray-100 text-gray-600'}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[value] || 'bg-gray-400'}`} />
         {value}
+        {big && <ChevronDown size={13} className="opacity-60" />}
       </span>
       <select
         value={value}
@@ -420,7 +422,7 @@ function ActivityLog({ proposal, groupProposals }) {
 }
 
 // ── Reminder Badge ─────────────────────────────────────────────────────────
-function ReminderBadges({ proposal }) {
+function ReminderBadges({ proposal, wide = false }) {
   const { dismissReminder } = useStore()
   const active = (proposal.reminders || []).filter(r => !r.dismissed)
   if (active.length === 0) return null
@@ -434,8 +436,9 @@ function ReminderBadges({ proposal }) {
             {overdue ? <AlertCircle size={11} /> : <Clock size={11} />}
             <span>{nd ? new Date(nd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}</span>
             {r.frequency !== 'once' && <span className="opacity-60">· {FREQUENCIES.find(f => f.value === r.frequency)?.label}</span>}
-            {r.note && <span className="opacity-70 truncate max-w-[80px]">· {r.note}</span>}
-            <button onClick={() => dismissReminder(proposal.id, r.id)} className="ml-auto opacity-50 hover:opacity-100"><X size={10} /></button>
+            {r.note && <span className={`opacity-70 truncate ${wide ? 'min-w-0 flex-1' : 'max-w-[80px]'}`}>· {r.note}</span>}
+            <button onClick={() => dismissReminder(proposal.id, r.id)} aria-label="Dismiss reminder"
+              className={`ml-auto opacity-50 hover:opacity-100 ${wide ? 'shrink-0 -my-1 -mr-2 w-9 h-9 flex items-center justify-center' : ''}`}><X size={wide ? 14 : 10} /></button>
           </div>
         )
       })}
@@ -601,11 +604,15 @@ function MergeModal({ sourceGroup, allGroups, onMerge, onClose }) {
   )
 }
 
+// The action buttons along the bottom of a phone card: icon over label, a full
+// thumb tall, sharing the row equally.
+const CARD_ACTION = 'flex-1 min-w-0 min-h-[52px] flex flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium text-gray-600 active:bg-gray-100'
+
 // ── Row Overflow Menu ───────────────────────────────────────────────────────
 // A single "⋯" dropdown holding secondary row actions. Fixed-positioned off the
 // button's rect so it never gets clipped by the table's overflow containers.
 // Click-outside / scroll / resize all close it.
-function RowMenu({ items }) {
+function RowMenu({ items, sheet = false, title = '' }) {
   const [open, setOpen] = useState(false)
   const [coords, setCoords] = useState(null)
   const btnRef = useRef(null)
@@ -619,6 +626,7 @@ function RowMenu({ items }) {
       setOpen(false)
     }
     const onDismiss = () => setOpen(false)
+    if (sheet) return   // the sheet has its own backdrop and Cancel
     document.addEventListener('mousedown', onDown)
     window.addEventListener('resize', onDismiss)
     window.addEventListener('scroll', onDismiss, true)
@@ -627,7 +635,7 @@ function RowMenu({ items }) {
       window.removeEventListener('resize', onDismiss)
       window.removeEventListener('scroll', onDismiss, true)
     }
-  }, [open])
+  }, [open, sheet])
 
   const toggle = () => {
     if (!open && btnRef.current) {
@@ -638,6 +646,34 @@ function RowMenu({ items }) {
   }
 
   if (!items.length) return null
+  // Phone: one big "More" button; the actions slide up from the bottom, each a
+  // full-width row a thumb can hit.
+  if (sheet) return (
+    <>
+      <button ref={btnRef} onClick={() => setOpen(true)} className={CARD_ACTION}>
+        <MoreHorizontal size={18} /> More
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end" onClick={() => setOpen(false)}>
+          <div ref={menuRef} role="menu" onClick={e => e.stopPropagation()}
+            className="w-full bg-white rounded-t-2xl shadow-2xl pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-h-[80dvh] overflow-y-auto">
+            <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-gray-200" />
+            {title && <p className="px-5 pt-1 pb-2 text-sm font-semibold text-gray-900 truncate">{title}</p>}
+            {items.map((it, i) => {
+              const Icon = it.icon
+              return (
+                <button key={i} role="menuitem" onClick={() => { setOpen(false); it.onClick() }}
+                  className={`w-full flex items-center gap-3 px-5 py-3.5 text-base text-left active:bg-gray-100 ${it.danger ? 'text-red-600' : 'text-gray-800'}`}>
+                  <Icon size={19} className="shrink-0 opacity-70" /> {it.label}
+                </button>
+              )
+            })}
+            <button onClick={() => setOpen(false)} className="w-full px-5 py-3.5 mt-1 border-t border-gray-100 text-base font-medium text-gray-500">Cancel</button>
+          </div>
+        </div>
+      )}
+    </>
+  )
   return (
     <>
       <button
@@ -700,6 +736,7 @@ const repName = (members, id) => {
 
 function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onOpen, onRevise, onGenerateContract, showRep }) {
   const { deleteProposal, detachProposal, mergeProposalGroups, members } = useStore()
+  const phone = useIsPhone()
   const [priceListFor, setPriceListFor] = useState(null)
   const me = useStore(s => s.me)
   const allProposals = useStore(s => s.proposals)
@@ -856,6 +893,81 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
     )
   }
 
+  // ── Phone: one card per client instead of a table ────────────────────────
+  // Everything in the row is on the card (nothing off to the side), and the
+  // things people do most — open, revise, contract — are thumb-sized buttons.
+  // Like renderProposalRow this is a render helper, not a component.
+  const SORTS = [
+    ['date:desc', 'Newest first'], ['date:asc', 'Oldest first'], ['client:asc', 'Client A–Z'],
+    ['total:desc', 'Highest total'], ['status:desc', 'Status'], ...(showRep ? [['rep:asc', 'Sales rep']] : []),
+  ]
+  const dateLine = (p) => p.sentAt
+    ? `Sent ${new Date(p.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    : 'Not sent'
+  const renderProposalCard = ({ p, alt = false, altCount = 0, onMerge, groupProposals }) => {
+    const isAltExpanded = expandedAlts === p.id
+    const rep = showRep ? repName(members, p.ownerId) : ''
+    return (
+      <div className={alt ? 'border-t border-gray-100 bg-gray-50 pl-3' : ''}>
+        <div className="px-4 pt-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <p className="min-w-0 font-semibold text-gray-900 break-words">
+              {alt && <span className="inline-flex items-center gap-1 mr-1.5 text-xs font-semibold text-gray-500 align-middle"><GitBranch size={11} className="text-[var(--brand-300)]" /> Alt {p.version || '—'}</span>}
+              {p.client || <span className="text-gray-400 italic font-normal">No name</span>}
+            </p>
+            <p className="shrink-0 font-semibold text-gray-900 whitespace-nowrap">${fmt(p.total || 0)}</p>
+          </div>
+          <div className="mt-2 flex items-center gap-x-3 gap-y-1.5 flex-wrap">
+            <StatusSelect big value={p.status} onChange={e => onStatusChange(p, e.target.value)} />
+            <span className="text-xs text-gray-500">{[rep, dateLine(p)].filter(Boolean).join(' · ')}</span>
+          </div>
+          {p.closedAt && !alt && (
+            <p className="text-xs text-gray-400 mt-1.5">
+              Closed {new Date(p.closedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {p.sentAt && daysBetween(p.sentAt, p.closedAt) != null && <span> · {daysBetween(p.sentAt, p.closedAt)}d</span>}
+              {p.winLossReason?.category && <span className={p.status === 'Won' ? 'text-green-700' : 'text-red-600'}> · {p.winLossReason.category}</span>}
+            </p>
+          )}
+          {!alt && <ReminderBadges proposal={p} wide />}
+          {altCount > 0 && (
+            <button onClick={() => setExpandedAlts(isAltExpanded ? null : p.id)}
+              className="mt-2 min-h-[40px] inline-flex items-center gap-1.5 px-3 rounded-lg bg-gray-100 text-sm font-medium text-gray-700 active:bg-gray-200">
+              <GitBranch size={13} /> {altCount} other version{altCount !== 1 ? 's' : ''} {isAltExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          )}
+        </div>
+        <div className="mt-2 px-2 pb-1.5 flex items-stretch gap-1 border-t border-gray-100">
+          <button onClick={() => onOpen(p)} className={CARD_ACTION}><Eye size={18} /> Open</button>
+          <button onClick={() => onRevise(p)} className={CARD_ACTION}><Copy size={18} /> Revise</button>
+          {p.status === 'Won' && !alt && (
+            <button onClick={() => onGenerateContract(p)} className={`${CARD_ACTION} !text-[var(--brand-700)]`}><FileSignature size={18} /> Contract</button>
+          )}
+          {!alt && (
+            <button onClick={() => setExpandedLog(expandedLog === p.id ? null : p.id)} aria-expanded={expandedLog === p.id}
+              className={`${CARD_ACTION} ${expandedLog === p.id ? 'bg-gray-100' : ''}`}>
+              {expandedLog === p.id ? <ChevronUp size={18} /> : <MessageSquare size={18} />} Log
+            </button>
+          )}
+          <RowMenu sheet title={p.client || 'Proposal'} items={alt ? [
+            { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(p) },
+            { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) },
+            { label: 'Detach', icon: Unlink, onClick: () => handleDetach(p.id) },
+            ...removeItems(p),
+          ] : [
+            { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(p) },
+            { label: 'Add reminder', icon: Bell, onClick: () => onReminderOpen(p.id) },
+            ...((p.status === 'Sent' || p.status === 'Followed Up') && p.email ? [{ label: 'Send follow-up', icon: Send, onClick: () => setFollowUpProposal(p) }] : []),
+            { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) },
+            { label: 'Merge into client', icon: GitMerge, onClick: onMerge },
+            ...(altCount > 0 ? [{ label: 'Detach', icon: Unlink, onClick: () => handleDetach(p.id) }] : []),
+            ...removeItems(p),
+          ]} />
+        </div>
+        {expandedLog === p.id && <div className="border-t border-gray-100"><ActivityLog proposal={p} groupProposals={groupProposals} /></div>}
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       {followUpProposal && <FollowUpModal proposal={followUpProposal} onClose={() => setFollowUpProposal(null)} />}
@@ -882,6 +994,32 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
         <div className="py-16 text-center text-gray-400">
           <FileText size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">No proposals match this filter.</p>
+        </div>
+      ) : phone ? (
+        <div>
+          <label className="flex items-center justify-end gap-2 px-4 h-11 border-b border-gray-100 text-xs text-gray-500">
+            <ArrowUpDown size={13} /> Sort
+            <select aria-label="Sort proposals" value={`${sortKey}:${sortDir}`}
+              onChange={e => { const [k, d] = e.target.value.split(':'); setSortKey(k); setSortDir(d) }}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700">
+              {!SORTS.some(([v]) => v === `${sortKey}:${sortDir}`) && <option value={`${sortKey}:${sortDir}`}>Custom</option>}
+              {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </label>
+          <ul className="divide-y divide-gray-200">
+            {groups.map(({ root, revisions, primary }) => {
+              const all = [root, ...revisions]
+              const alts = all.filter(p => p.id !== primary.id)
+              return (
+                <li key={root.id}>
+                  {renderProposalCard({ p: primary, altCount: alts.length, onMerge: () => setMergeSource({ root, revisions }), groupProposals: all })}
+                  {expandedAlts === primary.id && alts.map(alt => (
+                    <React.Fragment key={alt.id}>{renderProposalCard({ p: alt, alt: true, groupProposals: all })}</React.Fragment>
+                  ))}
+                </li>
+              )
+            })}
+          </ul>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -967,26 +1105,34 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
 // ── Pipeline / Kanban View ─────────────────────────────────────────────────
 function PipelineView({ proposals, onStatusChange, showRep }) {
   const members = useStore(s => s.members)
+  const phone = useIsPhone()
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4">
+    <div className={phone ? 'space-y-3 pb-4' : 'flex gap-3 overflow-x-auto pb-4'}>
       {PROPOSAL_STATUSES.map(status => {
         const cards = proposals.filter(p => p.status === status)
         const colTotal = cards.reduce((s, p) => s + (p.total || 0), 0)
+        // Phone: an empty stage is one thin line, so the stages with deals in them come first to the eye
+        if (phone && cards.length === 0) return (
+          <div key={status} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 bg-gray-50">
+            <span className={`text-xs font-bold uppercase tracking-wider opacity-60 ${STATUS_STYLES[status].split(' ')[1]}`}>{status}</span>
+            <span className="text-xs text-gray-400 font-medium">0</span>
+          </div>
+        )
         return (
-          <div key={status} className="shrink-0 w-56">
+          <div key={status} className={phone ? '' : 'shrink-0 w-56'}>
             {/* Column header */}
             <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border border-b-0 border-gray-200 bg-gray-50`}>
               <span className={`text-xs font-bold uppercase tracking-wider ${STATUS_STYLES[status].split(' ')[1]}`}>{status}</span>
-              <span className="text-xs text-gray-400 font-medium">{cards.length}</span>
+              <span className="text-xs text-gray-400 font-medium">{cards.length}{phone && cards.length > 0 ? ` · ${fmtShort(colTotal)}` : ''}</span>
             </div>
             {/* Cards */}
-            <div className={`border border-t-0 rounded-b-lg min-h-32 space-y-2 p-2 border-gray-200 bg-gray-50`}>
+            <div className={`border border-t-0 rounded-b-lg space-y-2 p-2 border-gray-200 bg-gray-50 ${phone ? '' : 'min-h-32'}`}>
               {cards.length === 0 && (
                 <p className="text-xs text-gray-300 text-center py-4 italic">Empty</p>
               )}
               {cards.map(p => (
                 <div key={p.id} className="bg-white rounded-lg border border-gray-100 shadow-sm p-3">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{p.client || 'Unnamed'}</p>
+                  <p className={`text-sm font-semibold text-gray-800 ${phone ? 'break-words' : 'truncate'}`}>{p.client || 'Unnamed'}</p>
                   <p className="text-xs text-[var(--brand-600)] font-medium mt-0.5">${fmt(p.total || 0)}</p>
                   {showRep && repName(members, p.ownerId) && <p className="text-xs text-gray-500 mt-0.5">Rep: {repName(members, p.ownerId)}</p>}
                   {p.email && <p className="text-xs text-gray-400 truncate mt-0.5">{p.email}</p>}
@@ -1006,7 +1152,7 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
                     <select
                       value=""
                       onChange={e => { if (e.target.value) onStatusChange(p, e.target.value) }}
-                      className="w-full text-xs bg-white border border-gray-200 rounded-md px-2 py-1 text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)]"
+                      className={`w-full bg-white border border-gray-200 rounded-md px-2 text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] ${phone ? 'h-10 text-sm' : 'py-1 text-xs'}`}
                     >
                       <option value="">Move to…</option>
                       {PROPOSAL_STATUSES.filter(s => s !== status).map(s => (
@@ -1016,7 +1162,7 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
                   </div>
                 </div>
               ))}
-              {cards.length > 0 && (
+              {cards.length > 0 && !phone && (
                 <p className="text-xs text-gray-400 text-right font-medium px-1 pt-1">{fmtShort(colTotal)}</p>
               )}
             </div>

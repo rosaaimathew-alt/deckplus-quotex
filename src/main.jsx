@@ -6,6 +6,14 @@ import { initAuth, getAccessToken } from './supabase'
 import { applyCachedBrand } from './brand'
 import { startAutoUpdate } from './lib/autoUpdate'
 
+// iPhone zooms the whole page in when you tap a box whose text is under 16px
+// and leaves it zoomed, so the screen then has to be dragged sideways. Turn that
+// zoom off on iPhone / iPad only (pinching to zoom still works there; other
+// phones don't zoom on a tap, so they keep the standard setting).
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+  document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover')
+}
+
 // Company colors from the last visit, before anything paints (login page too).
 applyCachedBrand()
 // Open tabs pick up a new version on the next page change (lib/autoUpdate.js)
