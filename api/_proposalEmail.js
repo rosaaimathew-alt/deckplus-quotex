@@ -125,7 +125,7 @@ export function buildContractEmail({ client, signUrl, signature, logoUrl, remind
     return buildLinkEmail({
       client, url: signUrl, signature, logoUrl, subject: CONTRACT_REMINDER_SUBJECT,
       p1: 'Just a friendly reminder: we noticed your project documents haven\'t been signed yet. Whenever you\'re ready, you can review and sign them online with the button below. Once they\'re signed, we can move ahead with the next steps on your project.',
-      p2: 'Feel free to reach out if you have any questions about your documents. I\'m happy to go over anything with you, and you can reach me at the cell number below. Thanks!',
+      p2: 'Feel free to reach out if you have any questions about your documents. I\'m happy to go over any details with you, and you can reach me at the cell number below. Thanks!',
       button: 'Review & Sign Your Documents', linkLabel: 'Review and sign your documents',
     })
   }
