@@ -11,7 +11,8 @@ import { PhotoDays } from './TaskPhotos'
 import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, tasksForJob, needsInspection, subNameOf, stageOf } from '../lib/subTasks'
 import SendBack from './SendBack'
 import { ELECTRICAL_ITEM_NAMES, jobElectricalItems, cleanElectricalItems, isElectricalBooking } from '../lib/electricalItems'
-import { changeStamp, techPhone } from '../lib/subTasks'
+import { changeStamp, techPhone, isPriority } from '../lib/subTasks'
+import PriorityButton from './PriorityButton'
 import { SubChats } from './JobChat'
 
 const fmt = (ymd) => (ymd ? new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
@@ -159,6 +160,7 @@ export default function JobSubsTab({ proposal }) {
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                {isPriority(t) && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Priority</span>}
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_PILL[st]}`}>{statusLabel(t)}</span>
                 <button onClick={() => setEditingId(id => (id === t.id ? null : t.id))}
                   className="text-gray-300 hover:text-gray-700" aria-label={`Edit booking: ${t.title}`}><Pencil size={13} /></button>
@@ -187,6 +189,8 @@ export default function JobSubsTab({ proposal }) {
                     ? 'border-[var(--brand-600)] bg-[var(--brand-600)] text-white'
                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{s.label}</button>
               ))}
+              <span className="flex-1" />
+              <PriorityButton task={t} />
             </div>
             {st === 'done' && <SendBack task={t} />}
             {(st === 'near' || st === 'done') && (

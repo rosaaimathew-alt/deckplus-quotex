@@ -93,6 +93,16 @@ export function messageFor(info) {
           path: taskPath, cta: 'Open the job / Abrir el trabajo',
         }
       }
+      // Marked Priority by the PM (lib/subTasks priorityChanges)
+      if (t.changeNote === 'priority') {
+        return {
+          subject: `Priority: ${job}`,
+          en: `${who} marked ${tidy(t.title)} at ${at} as a priority. Please do it next.`,
+          es: `${who} marcó ${tidy(t.title)} en ${at} como prioridad. Por favor hágalo primero.`,
+          sms: `Deck Plus: PRIORITY from ${who}: ${tidy(t.title)} at ${tidy(t.client, 40)}. Please do it next.`,
+          path: taskPath, cta: 'Open the job / Abrir el trabajo',
+        }
+      }
       const what = tidy(t.changeNote) || 'details'
       return {
         subject: `Job updated: ${job}`,

@@ -71,7 +71,22 @@ export function sendBackChanges(task, { note, startDate = null, endDate = null, 
     statusDates: { booked: { at: now, by } },
     returns: [...(Array.isArray(task?.returns) ? task.returns : []), { stage, note: String(note || '').trim(), at: now, by, startDate: startDate || null }],
     changedAt: now, changeNote: 'next stage',
+    priority: false, priorityAt: null, priorityBy: null,
   }
+}
+
+// ── Priority ────────────────────────────────────────────────────────────────
+// A small thing that is holding a job up (a missing board, one outlet) gets
+// lost under a sub's bigger bookings. The PM marks the booking Priority: it
+// goes to the top of the sub's list with a red label, and the sub is told
+// (the usual "job updated" alert, worded for it). It stops counting once the
+// booking is done, and a booking sent back for its next stage starts clean.
+export const isPriority = (t) => !!t?.priority && statusKey(t) !== 'done'
+export const priorityFirst = (a, b) => (isPriority(b) ? 1 : 0) - (isPriority(a) ? 1 : 0)
+export function priorityChanges(on, by = '', now = new Date().toISOString()) {
+  return on
+    ? { priority: true, priorityAt: now, priorityBy: by, changedAt: now, changeNote: 'priority' }
+    : { priority: false, priorityAt: null, priorityBy: null }
 }
 
 // The cell of the technician on a booking, from the sub company's crew list.

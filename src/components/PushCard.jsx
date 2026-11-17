@@ -12,14 +12,21 @@ const DISMISS_KEY = 'qx.pushDismissed'
 const BLOCKED_COMPUTER = 'Your browser is blocking notifications for this site. Click "Notifications blocked" at the left of the address bar, choose Allow, then try again.'
 const BLOCKED_PHONE = "Notifications are blocked for Deck Plus. Allow them in this phone's settings, then try again."
 const readDismissed = () => { try { return localStorage.getItem(DISMISS_KEY) === '1' } catch { return false } }
+// Asked already since the app was opened (per visit, not for good)
+const ASKED_KEY = 'qx.pushAsked'
+const readAsked = () => { try { return sessionStorage.getItem(ASKED_KEY) === '1' } catch { return false } }
 
 // compact: the office pages, where it sits as a slim card and not a phone-sized one
 // keep: the sub app. "Not now" folds the card down to one line that stays on
 // the page, so a sub who waved it away can still turn alerts on later; without
 // alerts they only hear about a booking or a message by email.
-export default function PushCard({ installHint = true, compact = false, keep = false }) {
+// prompt: the sub app. Each time the app is opened with alerts still off, the
+// card comes up over the page and asks, once; a phone only shows its own
+// "Allow notifications?" question after a tap, so this is that tap.
+export default function PushCard({ installHint = true, compact = false, keep = false, prompt = false }) {
   const [status, setStatus] = useState(pushStatus)
   const [dismissed, setDismissed] = useState(readDismissed)
+  const [asked, setAsked] = useState(readAsked)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { syncPush(getLang()) }, [])
@@ -29,14 +36,15 @@ export default function PushCard({ installHint = true, compact = false, keep = f
   if (status === 'on' || status === 'none' || (status === 'blocked' && !error)) return null
   if (status === 'install' && !installHint) return null
   const dismiss = () => {
-    try { localStorage.setItem(DISMISS_KEY, '1') } catch { /* not remembered: fine */ }
-    setDismissed(true)
+    try { localStorage.setItem(DISMISS_KEY, '1'); sessionStorage.setItem(ASKED_KEY, '1') } catch { /* not remembered: fine */ }
+    setDismissed(true); setAsked(true)
   }
+  const asking = prompt && !asked && (status === 'ask' || status === 'install')
   const reopen = () => {
     try { localStorage.removeItem(DISMISS_KEY) } catch { /* fine */ }
     setDismissed(false)
   }
-  if (dismissed) return !keep ? null : (
+  if (dismissed && !asking) return !keep ? null : (
     <button onClick={reopen}
       className="w-full min-h-[48px] px-4 rounded-xl border border-[var(--brand-300)] bg-white flex items-center gap-2 text-base text-gray-800 text-left active:bg-gray-50">
       <Bell size={18} className="text-[var(--brand-700)] shrink-0" />
@@ -54,10 +62,11 @@ export default function PushCard({ installHint = true, compact = false, keep = f
     } catch (e) { setError(tr(e.message)) }
     setStatus(pushStatus()); setBusy(false)
   }
-  return (
-    <section className={`relative bg-white rounded-2xl border-2 border-[var(--brand-300)] shadow-sm p-4 space-y-3 ${compact ? 'max-w-md' : ''}`} aria-label={title}>
+  const card = (
+    <section className={`relative bg-white rounded-2xl border-2 border-[var(--brand-300)] shadow-sm p-4 space-y-3 ${compact ? 'max-w-md' : ''} ${asking ? 'w-full max-w-md shadow-2xl' : ''}`} aria-label={title}>
       <button onClick={dismiss} aria-label={tr('Not now')} className="absolute top-2 right-2 h-9 w-9 flex items-center justify-center text-gray-400"><X size={18} /></button>
       <p className="flex items-center gap-2 pr-8 text-base font-bold text-gray-900"><Bell size={20} className="text-[var(--brand-700)] shrink-0" /> {title}</p>
+      {asking && <p className="text-base text-gray-700">{tr('Know right away when your PM books you or sends you a message.')}</p>}
       {status === 'install' ? (
         <ol className="space-y-2 text-base text-gray-800">
           <li className="flex items-center gap-2 flex-wrap">
@@ -79,7 +88,14 @@ export default function PushCard({ installHint = true, compact = false, keep = f
           {busy ? <Loader2 size={20} className="animate-spin" /> : <Bell size={20} />} {tr('Turn on alerts')}
         </button>
       )}
+      {asking && <button onClick={dismiss} className="w-full h-11 text-base font-semibold text-gray-500">{tr('Not now')}</button>}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </section>
+  )
+  // Asking: over the page, so it is seen before anything else
+  return !asking ? card : (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" role="dialog" aria-modal="true" aria-label={title}>
+      {card}
+    </div>
   )
 }

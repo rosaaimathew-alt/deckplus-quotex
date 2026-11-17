@@ -20,12 +20,12 @@
 // ("Schedule inspection"), and in the job's Subs tab in the office.
 import { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Menu, Check, HardHat, Camera, Lock, MessageSquare, Phone } from 'lucide-react'
+import { Navigation, ChevronRight, CheckCircle2, CalendarDays, LogOut, Menu, Check, HardHat, Camera, Lock, MessageSquare, Phone, Flag } from 'lucide-react'
 import { useStore } from '../store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from '../brand'
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
-import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, statusIndex, stageOf } from '../lib/subTasks'
+import { SUB_STATUSES, STATUS_PILL, statusKey, statusLabel, statusIndex, stageOf, isPriority, priorityFirst } from '../lib/subTasks'
 import { Card, mapsUrl, telUrl, todayStr, addDays, useUndo, BackButton } from '../field/shared'
 import { tr, trList, dayText as dayLabel, startLang, setLang, useLang } from '../lib/lang'
 import { photosOn, hasPhotosToday, missingTodaysPhotos } from '../lib/taskPhotos'
@@ -66,7 +66,8 @@ function TaskList() {
   const lang = useLang()
   const [showDone, setShowDone] = useState(false)
   const recent = addDays(-14)
-  const byStart = (a, b) => (a.startDate || '9999').localeCompare(b.startDate || '9999')
+  // A booking the PM marked Priority is first in line, then by start date
+  const byStart = (a, b) => priorityFirst(a, b) || (a.startDate || '9999').localeCompare(b.startDate || '9999')
   const working = tasks.filter(t => ['started', 'near'].includes(statusKey(t))).sort(byStart)
   const next = tasks.filter(t => statusKey(t) === 'booked').sort(byStart)
   const done = tasks.filter(t => statusKey(t) === 'done' && (t.statusDates?.done?.at || '').slice(0, 10) >= recent)
@@ -88,7 +89,7 @@ function TaskList() {
         <p className="text-sm text-gray-500">{new Date().toLocaleDateString(lang === 'es' ? 'es-US' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </div>
 
-      <PushCard keep />
+      <PushCard keep prompt />
       <WeekInvoiceCard />
       <CrewLink />
 
@@ -122,13 +123,15 @@ function TaskRow({ t, needsTech = false }) {
   const late = st !== 'done' && t.endDate && t.endDate < todayStr()
   const noPhotos = missingTodaysPhotos(t)
   const fresh = freshness(t)   // never opened on this phone, or changed by the PM since
+  const first = isPriority(t)  // the PM needs this one done next
   const unread = useStore(s => (t.subUserId && t.subUserId === s.me?.id ? unreadCount(s.subMessages, t.proposalId, t.subId, 'sub') : 0))
   return (
     <button onClick={() => navigate(`/task/${t.id}`)}
-      className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${noPhotos ? 'border-l-red-500' : late || needsTech ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
+      className={`w-full text-left bg-white rounded-2xl border border-gray-200 border-l-4 ${noPhotos || first ? 'border-l-red-500' : late || needsTech ? 'border-l-amber-400' : 'border-l-transparent'} shadow-sm px-4 py-3.5 flex items-center gap-3 active:bg-gray-50`}>
       <div className="flex-1 min-w-0">
         <p className="text-base font-semibold text-gray-900 truncate">
-          {fresh && <span className="mr-2 align-middle text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--brand-600)] text-white">{tr(fresh === 'new' ? 'New' : 'Updated')}</span>}
+          {first && <span className="mr-2 align-middle text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-red-600 text-white">{tr('Priority')}</span>}
+          {fresh && !first && <span className="mr-2 align-middle text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--brand-600)] text-white">{tr(fresh === 'new' ? 'New' : 'Updated')}</span>}
           {t.title}
         </p>
         <p className="text-sm text-gray-600 truncate">{t.client || t.address || tr('Job')}{t.assignment ? ` · ${t.assignment}` : ''}{t.crewName ? ` · ${t.crewName}` : ''}</p>
@@ -189,7 +192,12 @@ function TaskScreen() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 leading-tight">{t.title}{stageOf(t) > 1 && <span className="font-semibold text-gray-500"> · {tr('Stage')} {stageOf(t)}</span>}</h1>
         <p className="text-base text-gray-600 mt-0.5">{t.client}</p>
-        {t.changedAt && t.changeNote && t.changedAt.slice(0, 10) >= addDays(-7) && (
+        {isPriority(t) && (
+          <p className="mt-2 rounded-xl bg-red-600 text-white px-4 py-3 text-base font-bold flex items-center gap-2">
+            <Flag size={18} className="shrink-0" /> {tr('Priority. Your PM needs this done next.')}
+          </p>
+        )}
+        {t.changedAt && t.changeNote && t.changeNote !== 'priority' && t.changedAt.slice(0, 10) >= addDays(-7) && (
           <p className="text-sm font-medium text-amber-700 mt-1">{tr('Updated')} {dayLabel(t.changedAt.slice(0, 10))}: {trList(t.changeNote)}</p>
         )}
       </div>

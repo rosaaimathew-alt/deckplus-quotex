@@ -1,71 +1,30 @@
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, ListChecks, Wallet, ClipboardList, Wrench, Smartphone } from 'lucide-react'
-import { Component, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import PMHome from './pages/PMHome'
 import BuildQuote from './pages/BuildQuote'
 import ProposalView from './pages/ProposalView'
 import SettingsPage from './pages/Settings'
 import ContractView from './pages/ContractView'
-import Login from './pages/Login'
-import Signup from './pages/Signup'
-import ResetPassword from './pages/ResetPassword'
-import Landing from './pages/Landing'
-import SignPage from './pages/SignPage'
-import COSignPage from './pages/COSignPage'
-import ContractViewFull from './pages/ContractViewFull'
-import PublicProposal from './pages/PublicProposal'
-import Legal from './pages/Legal'
 import EsignCertificate from './pages/EsignCertificate'
 import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub, MoneyHub } from './pages/hubs/Hubs'
 import OfficeHome from './pages/OfficeHome'
 import CommandPalette from './components/CommandPalette'
 import PermitPulse from './components/PermitPulse'
-import AuthGuard, { logout } from './components/AuthGuard'
-import { useStore, bootstrapOrg } from './store'
+import { logout } from './components/AuthGuard'
+import { useStore } from './store'
 import { applyBrandStyles, applyTheme, brandOptions, DEFAULT_BRAND_COLOR } from './brand'
 import { canAccessRoute, landingRoute } from './plans'
 import { canRoleAccess, roleLanding } from './roles'
 import { useNav, LEGACY_REDIRECTS } from './nav'
 import { nextReminderDate, contractStatusOf, isJobClosed } from './lib/attention'
 import { TodoDock } from './components/TodoPanel'
-import { DEMO, DEMO_BASENAME, resetDemo } from './demo'
-import FieldApp from './field/FieldApp'
+import { DEMO, resetDemo } from './demo'
 import PushCard from './components/PushCard'
-import SubApp from './sub/SubApp'
-import { useFieldHome, useIsPhone, canUseField, setViewPref, readViewPref } from './field/fieldMode'
+import { useIsPhone, canUseField, setViewPref } from './field/fieldMode'
 
 const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
-
-// Loads the signed-in user's org rows into the store (once) before the shell
-// renders, so every page starts from real data. Demo builds skip it.
-function BootGate({ children }) {
-  const orgLoaded = useStore(s => s.orgLoaded)
-  const [bootError, setBootError] = useState('')
-  useEffect(() => {
-    if (DEMO) return
-    bootstrapOrg().catch(e => setBootError(e?.message || 'Could not load your organization.'))
-  }, [])
-  if (DEMO || orgLoaded) return children
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="text-center max-w-sm">
-        {bootError ? (
-          <>
-            <p className="text-sm font-semibold text-red-700 mb-2">Could not load your data</p>
-            <p className="text-xs text-gray-500 mb-4">{bootError}</p>
-            <button onClick={() => logout()} className="text-xs underline text-gray-500">Sign out</button>
-          </>
-        ) : (
-          <>
-            <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-sm text-gray-500">Loading your organization…</p>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // Home depends on role: project managers plan from the job calendar.
 // Office logins get the office manager home (anyone can preview it at /?home=office).
@@ -138,35 +97,11 @@ function NavItem({ d, badge, onClick }) {
   )
 }
 
-// Phone field mode vs. the full app. /field/* is always field mode; '/' is
-// field mode on a PM's phone (unless they switched to the full app); every
-// other address — and every desktop — gets the full app, so emailed links
-// and bookmarks keep working everywhere.
-function ShellSwitch() {
-  const location = useLocation()
-  const fieldHome = useFieldHome()
-  const role = useStore(s => s.role)
-  const path = location.pathname
-  // The paint PM only ever gets Field mode — at every address, on every
-  // device — so typing /sales or /settings can't reach the full app.
-  if (role === 'paint') return <FieldApp />
-  // A sub only ever gets the sub app (src/sub), the same way.
-  if (role === 'sub') return <SubApp />
-  if (path === '/field' || path.startsWith('/field/')) {
-    // The phone home-screen app used to open at /field for everyone. Field mode
-    // is the PM's screen: anyone else lands in the full app, unless they picked
-    // Field mode themselves on this phone.
-    if (role === 'pm' || (canUseField(role) && readViewPref() === 'field')) return <FieldApp />
-    // An emailed link to a job (e.g. a sub's message) opens that job in the full app
-    const jobId = /^\/field\/job\/([^/]+)/.exec(path)?.[1]
-    return <Navigate to={jobId ? `/projects?tab=jobs&job=${encodeURIComponent(jobId)}` : '/'} replace />
-  }
-  if (path === '/' && fieldHome) return <FieldApp />
-  return <AppShell />
-}
-
 // ── App Shell ────────────────────────────────────────────────────────────────
-function AppShell() {
+// The full office app: sidebar, top bar and every page. Loaded on demand by
+// src/Root.jsx, so the sub app, Field mode and the customer pages (signing, a
+// proposal link) don't download it.
+export default function AppShell() {
   const branding       = useStore(s => s.branding)
   const theme          = useStore(s => s.theme)
   const setTheme       = useStore(s => s.setTheme)
@@ -390,66 +325,5 @@ function MobileTab({ d, badge }) {
       <span className="text-[10px] font-medium mt-0.5">{d.label}</span>
       {badge > 0 && <span className="absolute top-1 right-1/2 translate-x-4 qx-badge text-[9px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badge}</span>}
     </NavLink>
-  )
-}
-
-class SignBoundary extends Component {
-  state = { err: null }
-  static getDerivedStateFromError(e) { return { err: e } }
-  render() {
-    if (this.state.err) return (
-      <div style={{ padding: '2rem', fontFamily: 'monospace', color: '#dc2626' }}>
-        <strong>Sign page error:</strong> {this.state.err.message}
-        <pre style={{ fontSize: 12, marginTop: 8, whiteSpace: 'pre-wrap' }}>{this.state.err.stack}</pre>
-      </div>
-    )
-    return this.props.children
-  }
-}
-
-// Recoverable boundary for the main app — shows a friendly message with a way
-// back instead of a blank white screen when a page component throws.
-class AppBoundary extends Component {
-  state = { err: null }
-  static getDerivedStateFromError(e) { return { err: e } }
-  handleReset = () => { this.setState({ err: null }); window.location.href = '/' }
-  render() {
-    if (this.state.err) return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: '1.5rem' }}>
-        <div style={{ maxWidth: 440, textAlign: 'center', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Something went wrong on this page</h1>
-          <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 20px', lineHeight: 1.6 }}>
-            Your data is safe. This screen hit an error, but nothing was lost — you can head back and keep working.
-          </p>
-          <button onClick={this.handleReset}
-            style={{ background: '#0f172a', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 22px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            Back to Dashboard
-          </button>
-          <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 16, fontFamily: 'monospace', wordBreak: 'break-word' }}>{this.state.err.message}</p>
-        </div>
-      </div>
-    )
-    return this.props.children
-  }
-}
-
-export default function App() {
-  return (
-    <BrowserRouter basename={DEMO_BASENAME}>
-      <Routes>
-        <Route path="/welcome"     element={<Landing />} />
-        <Route path="/login"       element={<Login />} />
-        <Route path="/signup"      element={<Signup />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/sign/:token" element={<SignBoundary><SignPage /></SignBoundary>} />
-        <Route path="/p/:token"    element={<PublicProposal />} />
-        <Route path="/legal"       element={<Legal />} />
-        <Route path="/legal/:doc"  element={<Legal />} />
-        <Route path="/co/:token"   element={<SignBoundary><COSignPage /></SignBoundary>} />
-        <Route path="/view/:recordId" element={<SignBoundary><ContractViewFull /></SignBoundary>} />
-        <Route path="*"            element={<AuthGuard><AppBoundary><BootGate><ShellSwitch /></BootGate></AppBoundary></AuthGuard>} />
-      </Routes>
-    </BrowserRouter>
   )
 }
