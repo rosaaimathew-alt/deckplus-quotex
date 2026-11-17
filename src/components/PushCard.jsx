@@ -14,7 +14,10 @@ const BLOCKED_PHONE = "Notifications are blocked for Deck Plus. Allow them in th
 const readDismissed = () => { try { return localStorage.getItem(DISMISS_KEY) === '1' } catch { return false } }
 
 // compact: the office pages, where it sits as a slim card and not a phone-sized one
-export default function PushCard({ installHint = true, compact = false }) {
+// keep: the sub app. "Not now" folds the card down to one line that stays on
+// the page, so a sub who waved it away can still turn alerts on later; without
+// alerts they only hear about a booking or a message by email.
+export default function PushCard({ installHint = true, compact = false, keep = false }) {
   const [status, setStatus] = useState(pushStatus)
   const [dismissed, setDismissed] = useState(readDismissed)
   const [busy, setBusy] = useState(false)
@@ -23,12 +26,24 @@ export default function PushCard({ installHint = true, compact = false }) {
 
   // Blocked in the browser or phone settings: nothing to offer, unless they
   // just tapped and need to be told why nothing happened.
-  if (dismissed || status === 'on' || status === 'none' || (status === 'blocked' && !error)) return null
+  if (status === 'on' || status === 'none' || (status === 'blocked' && !error)) return null
   if (status === 'install' && !installHint) return null
   const dismiss = () => {
     try { localStorage.setItem(DISMISS_KEY, '1') } catch { /* not remembered: fine */ }
     setDismissed(true)
   }
+  const reopen = () => {
+    try { localStorage.removeItem(DISMISS_KEY) } catch { /* fine */ }
+    setDismissed(false)
+  }
+  if (dismissed) return !keep ? null : (
+    <button onClick={reopen}
+      className="w-full min-h-[48px] px-4 rounded-xl border border-[var(--brand-300)] bg-white flex items-center gap-2 text-base text-gray-800 text-left active:bg-gray-50">
+      <Bell size={18} className="text-[var(--brand-700)] shrink-0" />
+      <span className="flex-1">{tr('Alerts are off on this phone')}</span>
+      <span className="font-bold text-[var(--brand-700)]">{tr('Turn on')}</span>
+    </button>
+  )
   const title = tr(isPhone() ? 'Get alerts on this phone' : 'Get alerts on this computer')
   const turnOn = async () => {
     setBusy(true); setError('')

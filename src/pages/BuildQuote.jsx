@@ -767,7 +767,7 @@ export default function BuildQuote() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap w-full sm:w-auto">
             {/* Item breakdown toggle */}
             <button
               onClick={() => setShowBreakdown(v => !v)}
@@ -816,7 +816,7 @@ export default function BuildQuote() {
             <button
               onClick={goToProposal}
               disabled={!lines.length}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="basis-full sm:basis-auto min-h-[48px] sm:min-h-0 px-4 py-2 bg-blue-600 text-white rounded-lg text-base sm:text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Preview Proposal →
             </button>
@@ -826,7 +826,7 @@ export default function BuildQuote() {
         {/* Customer info */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Customer Info</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 [&>div]:col-span-2 sm:[&>div]:col-span-1 sm:[&>div.col-span-2]:col-span-2">
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">Customer Name</label>
               <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="John Smith" value={client} onChange={e => setClient(e.target.value)} />
@@ -875,7 +875,7 @@ export default function BuildQuote() {
             <div className="flex items-center gap-2 mb-2">
               <Sparkles size={15} className="text-[var(--brand-600)]" />
               <p className="text-sm font-semibold text-gray-800">Quick Build</p>
-              <span className="text-xs text-gray-400">— say or type the job; the deck, porch, sunroom, under-deck and hardscape tools fill themselves</span>
+              <span className="hidden sm:inline text-xs text-gray-400">— say or type the job; the deck, porch, sunroom, under-deck and hardscape tools fill themselves</span>
             </div>
             <div className="flex gap-2">
               <input
@@ -883,7 +883,7 @@ export default function BuildQuote() {
                 onChange={e => { setQuickText(e.target.value); if (quickErr) setQuickErr('') }}
                 onKeyDown={e => { if (e.key === 'Enter') runQuickBuild() }}
                 placeholder='e.g. “20 by 16 Trex Enhance deck, 4 feet high, hybrid rail, plus a 14 by 12 brick paver patio”'
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] bg-white"
+                className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] bg-white"
               />
               <button onClick={runQuickBuild} disabled={quickBusy || !quickText.trim()}
                 className="flex items-center gap-1.5 px-4 py-2.5 bg-[var(--brand-600)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors whitespace-nowrap">
@@ -951,8 +951,8 @@ export default function BuildQuote() {
 
         {/* Lines */}
         <div className="bg-white rounded-xl border border-gray-200 flex-1">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="sm:overflow-x-auto">
+            <table className="w-full text-sm qx-stack">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase w-8">#</th>
@@ -968,7 +968,7 @@ export default function BuildQuote() {
                 {lines.map((line, idx) => (
                   <tr key={line.id} data-line-idx={idx}
                     className={`hover:bg-gray-50 align-top ${(summed && line.hidden) || mergedTarget(line) ? 'bg-gray-50 opacity-60' : ''} ${drag?.from === idx ? 'opacity-40' : ''} ${drag && drag.over === idx && drag.from !== idx ? (drag.over < drag.from ? 'shadow-[inset_0_3px_0_var(--brand-500)]' : 'shadow-[inset_0_-3px_0_var(--brand-500)]') : ''}`}>
-                    <td className="px-2 pt-3">
+                    <td data-c="grip" className="px-2 pt-3">
                       <button type="button" title="Drag to reorder" aria-label={`Move ${line.name || 'line'} (drag, or use the arrow keys)`}
                         onPointerDown={e => dragStart(e, idx)} onPointerMove={dragMove} onPointerUp={dragEnd} onPointerCancel={() => setDrag(null)}
                         onKeyDown={e => dragKey(e, idx)}
@@ -976,7 +976,7 @@ export default function BuildQuote() {
                         <GripVertical size={15} />
                       </button>
                     </td>
-                    <td className="px-4 py-2">
+                    <td data-c="item" className="px-4 py-2">
                       <input
                         className="w-full border border-transparent rounded px-1 py-0.5 hover:border-gray-200 focus:border-blue-300 focus:outline-none text-sm font-medium text-gray-800"
                         value={line.name}
@@ -1010,27 +1010,27 @@ export default function BuildQuote() {
                         placeholder="Scope detail (prints on proposal)..."
                       />
                     </td>
-                    <td className="px-4 pt-3">
-                      <input type="number" min="0"
+                    <td data-c="qty" data-label="Qty" className="px-4 pt-3">
+                      <input type="number" min="0" aria-label="Quantity"
                         className="w-full border border-transparent rounded px-1 py-0.5 hover:border-gray-200 focus:border-blue-300 focus:outline-none text-sm text-center"
                         value={line.qty} onChange={e => updateLine(line.id, 'qty', e.target.value)} />
                     </td>
-                    <td className="px-4 pt-3">
-                      <select
+                    <td data-c="unit" data-label="Unit" className="px-4 pt-3">
+                      <select aria-label="Unit"
                         className="text-sm border border-transparent rounded px-1 py-0.5 hover:border-gray-200 focus:border-blue-300 focus:outline-none"
                         value={line.unit} onChange={e => updateLine(line.id, 'unit', e.target.value)}>
                         {['LF','SF','EA','LS'].map(u => <option key={u}>{u}</option>)}
                       </select>
                     </td>
-                    <td className="px-4 pt-3">
+                    <td data-c="price" data-label="Unit price" className="px-4 pt-3">
                       <div className="flex items-center gap-0.5">
                         <span className="text-gray-400 text-sm">$</span>
-                        <input type="number" min="0"
+                        <input type="number" min="0" aria-label="Unit price"
                           className="w-full border border-transparent rounded px-1 py-0.5 hover:border-gray-200 focus:border-blue-300 focus:outline-none text-sm"
                           value={line.unitPrice} onChange={e => updateLine(line.id, 'unitPrice', e.target.value)} />
                       </div>
                     </td>
-                    <td className="px-4 pt-3 text-right font-medium text-gray-800 whitespace-nowrap">
+                    <td data-c="total" data-label="Line total" className="px-4 pt-3 text-right font-medium text-gray-800 whitespace-nowrap">
                       ${(line.qty * line.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       {mergedInto(line).length > 0 && (
                         <p className="text-[11px] font-normal text-gray-500" title="What the customer sees for this line">
@@ -1038,7 +1038,7 @@ export default function BuildQuote() {
                         </p>
                       )}
                     </td>
-                    <td className="px-2 pt-2.5">
+                    <td data-c="actions" className="px-2 pt-2.5">
                       <div className="flex flex-col gap-1">
                         {line.catalogId === null && !savedToLog.has(line.id) && line.name?.trim() && (
                           <button
@@ -1090,7 +1090,7 @@ export default function BuildQuote() {
                             <ArrowDownToLine size={13} />
                           </button>
                         )}
-                        <button onClick={() => removeLine(line.id)} className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50">
+                        <button onClick={() => removeLine(line.id)} aria-label={`Remove ${line.name || 'line'}`} className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50">
                           <Trash2 size={13} />
                         </button>
                       </div>
@@ -1099,29 +1099,29 @@ export default function BuildQuote() {
                 ))}
                 {feeLine && (
                   <tr className="bg-amber-50/70 border-t-2 border-amber-100">
-                    <td className="px-4 py-2 text-xs text-amber-600"><Landmark size={13} /></td>
-                    <td className="px-4 py-2" colSpan={4}>
+                    <td data-c="grip" className="px-4 py-2 text-xs text-amber-600"><Landmark size={13} /></td>
+                    <td data-c="item" className="px-4 py-2" colSpan={4}>
                       <p className="text-sm font-semibold text-gray-800">Permits &amp; fees</p>
                       <p className="text-xs text-amber-700/80">One line on the proposal. Adjust or remove the parts below.</p>
                     </td>
-                    <td className="px-4 pt-3 text-right font-semibold text-gray-800 whitespace-nowrap">
+                    <td data-c="total" data-label="Line total" className="px-4 pt-3 text-right font-semibold text-gray-800 whitespace-nowrap">
                       ${Number(feeLine.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td />
+                    <td data-c="none" />
                   </tr>
                 )}
                 {feeLines.map((f) => (
                   <tr key={f.id} className="bg-amber-50/30 border-t border-gray-50">
-                    <td className="px-4 py-2 text-xs text-amber-500" title="Added from the job address">
+                    <td data-c="grip" className="px-4 py-2 text-xs text-amber-500" title="Added from the job address">
                       <Landmark size={13} />
                     </td>
-                    <td className="px-4 py-2 pl-8">
+                    <td data-c="item" className="px-4 py-2 pl-8">
                       <p className="text-sm font-medium text-gray-700">{f.name}</p>
                       <p className="text-xs text-amber-700/80">Auto-added · {f.why}</p>
                     </td>
-                    <td className="px-4 pt-3 text-sm text-center text-gray-500">1</td>
-                    <td className="px-4 pt-3 text-sm text-gray-500">LS</td>
-                    <td className="px-4 pt-3">
+                    <td data-c="none" className="px-4 pt-3 text-sm text-center text-gray-500">1</td>
+                    <td data-c="none" className="px-4 pt-3 text-sm text-gray-500">LS</td>
+                    <td data-c="price" data-label="Price" className="px-4 pt-3">
                       <div className="flex items-center gap-0.5">
                         <span className="text-gray-400 text-sm">$</span>
                         <input type="number" min="0" aria-label={`${f.name} price`}
@@ -1129,10 +1129,10 @@ export default function BuildQuote() {
                           value={f.unitPrice} onChange={e => setFeeEdits(cur => ({ ...cur, [f.autoFee]: parseFloat(e.target.value) || 0 }))} />
                       </div>
                     </td>
-                    <td className="px-4 pt-3 text-right font-medium text-gray-800 whitespace-nowrap">
+                    <td data-c="none" className="px-4 pt-3 text-right font-medium text-gray-800 whitespace-nowrap">
                       ${Number(f.unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="px-2 pt-2.5">
+                    <td data-c="actions" className="px-2 pt-2.5">
                       <button onClick={() => setFeeDismissed(cur => [...cur, f.autoFee])} title="Remove this fee from the quote" aria-label={`Remove ${f.name}`}
                         className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50">
                         <Trash2 size={13} />

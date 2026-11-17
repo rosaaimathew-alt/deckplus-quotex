@@ -220,8 +220,8 @@ export function TeamCard() {
         <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
           {members.map(m => (
             <div key={m.id}>
-            <div className="flex items-center gap-3 px-3 py-2 text-sm">
-              <p className="flex-1 min-w-0 truncate text-gray-800">{m.displayName || m.email}<span className="text-gray-400"> · {m.email}</span></p>
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1.5 px-3 py-2 text-sm">
+              <p className="basis-full sm:basis-0 flex-1 min-w-0 truncate text-gray-800">{m.displayName || m.email}<span className="text-gray-400"> · {m.email}</span></p>
               {/* Their cell: subs see their PM's number on the job, and alerts are signed with it */}
               {(isAdmin || me?.role === 'office' || m.id === me?.id) && m.role !== 'sub' && (
                 <input type="tel" defaultValue={m.phone || ''} key={m.phone || ''} placeholder="Cell" aria-label={`Cell for ${m.displayName || m.email}`}

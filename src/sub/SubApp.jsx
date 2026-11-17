@@ -88,7 +88,7 @@ function TaskList() {
         <p className="text-sm text-gray-500">{new Date().toLocaleDateString(lang === 'es' ? 'es-US' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </div>
 
-      <PushCard />
+      <PushCard keep />
       <WeekInvoiceCard />
       <CrewLink />
 

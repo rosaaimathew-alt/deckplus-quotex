@@ -66,6 +66,7 @@ const ES = {
   'Inspection results': 'Resultados de inspección', 'Passed': 'Aprobada', 'Did not pass': 'No aprobada', 'Recorded': 'Registrada',
   'Electrical items': 'Artículos eléctricos', 'Job checklist': 'Lista del trabajo',
   'Get alerts on this phone': 'Reciba avisos en este teléfono', 'Get alerts on this computer': 'Reciba avisos en esta computadora', 'Turn on alerts': 'Activar avisos', 'Not now': 'Ahora no',
+  'Alerts are off on this phone': 'Los avisos están apagados en este teléfono', 'Turn on': 'Activar',
   'Tap': 'Toque', 'Share': 'Compartir', 'at the bottom of Safari': 'en la parte de abajo de Safari', 'Add to Home Screen': 'Agregar a inicio',
   'Open Deck Plus from your Home Screen and turn on alerts': 'Abra Deck Plus desde su pantalla de inicio y active los avisos',
   'Your browser is blocking notifications for this site. Click "Notifications blocked" at the left of the address bar, choose Allow, then try again.': 'Su navegador bloquea los avisos de este sitio. Haga clic en "Notificaciones bloqueadas" a la izquierda de la barra de direcciones, elija Permitir e intente de nuevo.',

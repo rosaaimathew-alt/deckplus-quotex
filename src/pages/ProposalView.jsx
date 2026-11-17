@@ -268,48 +268,52 @@ export default function ProposalView() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Toolbar */}
-      <div className="no-print bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3">
-        <button onClick={() => (data.fromBuilder ? navigate('/quote') : navigate(-1))} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900">
+      {/* Toolbar. On a phone it is two rows: Back and Send on top, the other
+          actions as full-width thumb-sized buttons underneath — nothing runs
+          off the side of the screen. */}
+      <div className="no-print bg-white border-b border-gray-200 px-3 sm:px-6 py-2 sm:py-3 flex flex-wrap items-center gap-2 sm:gap-3">
+        <button onClick={() => (data.fromBuilder ? navigate('/quote') : navigate(-1))} className="flex items-center gap-1.5 min-h-[44px] sm:min-h-0 pr-2 text-sm text-gray-600 hover:text-gray-900">
           <ArrowLeft size={15} /> {data.fromBuilder ? 'Back to quote' : 'Back'}
         </button>
         <div className="flex-1" />
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
-        >
-          {copied ? <CheckCircle size={14} className="text-[var(--brand-500)]" /> : <Copy size={14} />}
-          {copied ? 'Copied!' : 'Copy text'}
-        </button>
-        <button
-          onClick={() => {
-            if (proposalIdRef.current) markProposalSent(proposalIdRef.current)
-            if (data?.fromBuilder) localStorage.removeItem('quotex:draft-proposal')
-            window.print()
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
-        >
-          <Printer size={14} /> Print / Save PDF
-        </button>
-        <DesignShareToggle proposalId={proposalIdRef.current ?? data?.id ?? null} className="px-1" />
-        <button
-          onClick={handleGetLink}
-          disabled={gettingLink}
-          title="Create a tracked link you can paste into your own email"
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        >
-          {linkCopied ? <CheckCircle size={14} className="text-[var(--brand-500)]" /> : <Link2 size={14} />}
-          {gettingLink ? 'Creating…' : linkCopied ? 'Link copied!' : 'Get link'}
-        </button>
+        <div className="order-last basis-full flex items-stretch gap-2 sm:order-none sm:basis-auto sm:contents">
+          <button
+            onClick={handleCopy}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+          >
+            {copied ? <CheckCircle size={14} className="text-[var(--brand-500)]" /> : <Copy size={14} />}
+            {copied ? 'Copied!' : 'Copy text'}
+          </button>
+          <button
+            onClick={() => {
+              if (proposalIdRef.current) markProposalSent(proposalIdRef.current)
+              if (data?.fromBuilder) localStorage.removeItem('quotex:draft-proposal')
+              window.print()
+            }}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Printer size={14} /> <span className="sm:hidden">PDF</span><span className="hidden sm:inline">Print / Save PDF</span>
+          </button>
+          <DesignShareToggle proposalId={proposalIdRef.current ?? data?.id ?? null} className="px-1" />
+          <button
+            onClick={handleGetLink}
+            disabled={gettingLink}
+            title="Create a tracked link you can paste into your own email"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {linkCopied ? <CheckCircle size={14} className="text-[var(--brand-500)]" /> : <Link2 size={14} />}
+            {gettingLink ? 'Creating…' : linkCopied ? 'Link copied!' : 'Get link'}
+          </button>
+        </div>
         <button
           onClick={() => { setShowSend(true); setSendSuccess(false); setSendError('') }}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)]"
+          className="flex items-center gap-1.5 min-h-[44px] sm:min-h-0 px-4 py-1.5 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)]"
         >
           <Send size={14} /> Send to Client
         </button>
       </div>
       {range && (
-        <div className="no-print bg-[var(--brand-50)] border-b border-[var(--brand-200)] px-6 py-2 text-sm text-gray-700">
+        <div className="no-print bg-[var(--brand-50)] border-b border-[var(--brand-200)] px-3 sm:px-6 py-2 text-sm text-gray-700">
           The customer sees <strong>{rangeText(range)}</strong>. Exact price on our side: <strong>${fmt(subtotal)}</strong> (not shown to the customer).
         </div>
       )}
@@ -389,10 +393,10 @@ export default function ProposalView() {
       {/* Proposal document */}
       {/* White page, black text; the brand blue only for the PROPOSAL title and
           the rules, so it reads the same on screen, printed and downloaded. */}
-      <div ref={proposalDocRef} className="qx-ink max-w-3xl mx-auto my-8 shadow-lg rounded-xl overflow-hidden print:shadow-none print:rounded-none print:my-0" style={{ backgroundColor: '#fff', color: '#000' }}>
+      <div ref={proposalDocRef} className="qx-ink max-w-3xl mx-auto my-3 sm:my-8 shadow-lg sm:rounded-xl overflow-hidden print:shadow-none print:rounded-none print:my-0" style={{ backgroundColor: '#fff', color: '#000' }}>
 
         {/* Header — white bar */}
-        <div className="bg-white px-10 py-7">
+        <div className="bg-white px-5 sm:px-10 py-6 sm:py-7">
           <div className="flex justify-between items-start gap-4">
             <div>
               <h1 className="qx-title text-2xl font-bold tracking-tight" style={{ color: blue }}>PROPOSAL</h1>
@@ -411,17 +415,17 @@ export default function ProposalView() {
 
         {/* Customer info */}
         {(client || email || phone || address) && (
-          <div className="px-10 py-5 border-b border-gray-300">
+          <div className="px-5 sm:px-10 py-5 border-b border-gray-300">
             <p className="text-xs font-semibold uppercase tracking-widest mb-3 text-black">Prepared For</p>
             <div className="flex justify-between items-start flex-wrap gap-4">
-              <div>
-                {client && <p className="font-semibold text-black text-lg">{client}</p>}
+              <div className="min-w-0">
+                {client && <p className="font-semibold text-black text-lg break-words">{client}</p>}
                 {address && <p className="text-black text-sm mt-0.5">{address}</p>}
               </div>
               {(email || phone) && (
-                <div className="text-right text-sm text-black">
+                <div className="min-w-0 sm:text-right text-sm text-black">
                   {phone && <p>{phone}</p>}
-                  {email && <p>{email}</p>}
+                  {email && <p className="[overflow-wrap:anywhere]">{email}</p>}
                 </div>
               )}
             </div>
@@ -430,7 +434,7 @@ export default function ProposalView() {
 
         {/* Scope of Work — always shown (broken down by item); the toggle only
             controls whether the PRICE table is itemized or a single lump sum. */}
-        <div className="px-10 py-7 border-b border-gray-300">
+        <div className="px-5 sm:px-10 py-6 sm:py-7 border-b border-gray-300">
           <p className="text-xs font-semibold uppercase tracking-widest mb-5 text-black">Scope of Work</p>
           <div className="space-y-2">
             {shownLines.map(line => (
@@ -445,7 +449,7 @@ export default function ProposalView() {
         </div>
 
         {/* Pricing Table */}
-        <div className="px-10 py-7">
+        <div className="px-5 sm:px-10 py-6 sm:py-7">
           {isAlaCarte && (
             <p className="text-xs text-black italic mb-4">
               The following options are priced individually — please indicate which you would like to proceed with.
@@ -532,7 +536,7 @@ export default function ProposalView() {
         </div>
 
         {/* Terms & Signature */}
-        <div className="px-10 pb-10">
+        <div className="px-5 sm:px-10 pb-10">
           <div className="border border-gray-300 rounded-lg p-4 text-xs text-black leading-relaxed space-y-2">
             <p className="font-semibold text-black">Terms & Conditions</p>
             <p>
@@ -547,7 +551,7 @@ export default function ProposalView() {
             <p className="font-semibold text-black pt-1">Addendums</p>
             <p>Any changes resulting in additional charges must be paid at the time of the change. If the inspector requires engineering, it will result in an additional charge.</p>
           </div>
-          <div className="mt-8 grid grid-cols-2 gap-10">
+          <div className="mt-8 grid grid-cols-2 gap-5 sm:gap-10">
             <div>
               <div className="border-b border-black mb-1.5 pb-6" />
               <p className="text-xs text-black">Client Signature & Date</p>
