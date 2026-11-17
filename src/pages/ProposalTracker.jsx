@@ -121,6 +121,7 @@ const STATUS_STYLES = {
   Lost:          'bg-red-100 text-red-700',
   MIA:           'bg-slate-100 text-slate-700',
   Archived:      'bg-zinc-100 text-zinc-700',
+  Canceled:      'bg-red-50 text-red-700',
 }
 
 const STATUS_COLORS = {
@@ -143,6 +144,7 @@ const STATUS_DOT = {
   Lost:          'bg-red-500',
   MIA:           'bg-slate-400',
   Archived:      'bg-zinc-400',
+  Canceled:      'bg-red-300',
 }
 
 const STATUS_TEXT = {
@@ -154,6 +156,7 @@ const STATUS_TEXT = {
   Lost:          'text-red-600',
   MIA:           'text-slate-500',
   Archived:      'text-zinc-500',
+  Canceled:      'text-red-600',
 }
 
 // Status control styled like the prototype: a colored dot inside a colored pill,
@@ -174,7 +177,7 @@ function StatusSelect({ value, onChange, dot = false }) {
         aria-label={dot ? `Status: ${value}. Change status` : 'Change status'}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
       >
-        {PROPOSAL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        {(PROPOSAL_STATUSES.includes(value) ? PROPOSAL_STATUSES : [...PROPOSAL_STATUSES, value]).map(s => <option key={s} value={s}>{s}</option>)}
       </select>
     </div>
   )

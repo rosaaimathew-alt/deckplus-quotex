@@ -44,8 +44,13 @@ export const jobJurisdiction = (p) => p.imported?.jurisdiction || ''
 export const countyConnected = (p) => CONNECTED_COUNTIES.includes(jobJurisdiction(p) || jobCounty(p))
 
 // Every ongoing job in a county we work in is on the inspections board.
+// The office marked the job "No permit needed" (Permits tab or the job's menu):
+// it leaves the inspections board and the county checks, and the job's permit
+// and inspection steps are left out (Jobs › getStages).
+export const noPermit = (proposal) => proposal?.jobData?.noPermit === true
+
 export function permitTracked(proposal) {
-  if ((proposal.jobData?.completedStages || []).includes('closed')) return false
+  if ((proposal.jobData?.completedStages || []).includes('closed') || noPermit(proposal)) return false
   return !!jobCounty(proposal)
 }
 
@@ -169,7 +174,10 @@ export function countyStageKey(ins, permit, stageKeys) {
 }
 
 const PASSED = /^pass/i
-const FAILED = /fail|partial|inaccessible|not ready|disapprov/i
+// A partial pass ("Partial Pass", the county's "Partial Approval") is neither:
+// part of the work passed, the rest needs the inspector back.
+const FAILED = /fail|inaccessible|not ready|disapprov/i
+const PARTIAL = /partial/i
 
 // County inspections grouped by job stage, plus the ones no stage covers.
 export function countyByStage(proposal, stageKeys) {
@@ -190,6 +198,7 @@ export const countyPassed = (list = []) => list.some(i => PASSED.test(i.result))
 export const countyLast = (list = []) => list[list.length - 1] || null
 export const isFailResult = (r) => FAILED.test(r || '')
 export const isPassResult = (r) => PASSED.test(r || '')
+export const isPartialResult = (r) => PARTIAL.test(r || '')
 
 // Stages the county has passed — the pulse checks these off.
 export function countyPassedStages(proposal, stageKeys) {
@@ -240,7 +249,7 @@ function boardColumnOf(permit, ins) {
   return null
 }
 
-// { FT: { state: 'pass'|'fail'|'sched'|'void', result, date, list }, … }
+// { FT: { state: 'pass'|'partial'|'fail'|'sched'|'void', result, date, list }, … }
 export function boardCells(proposal) {
   const cols = {}
   for (const p of allPermits(proposal)) {
@@ -259,6 +268,7 @@ export function boardCells(proposal) {
     const passed = c.list.filter(i => isPassResult(i.result)).pop()
     if (passed) Object.assign(c, { state: 'pass', result: passed.result, date: passed.date })
     else if (c.upcoming.length) Object.assign(c, { state: 'sched', result: 'Scheduled', date: c.upcoming[0].date })
+    else if (last && isPartialResult(last.result)) Object.assign(c, { state: 'partial', result: last.result, date: last.date })
     else if (last && isFailResult(last.result)) Object.assign(c, { state: 'fail', result: last.result, date: last.date })
     else if (last) Object.assign(c, { state: 'void', result: last.result, date: last.date })
   }

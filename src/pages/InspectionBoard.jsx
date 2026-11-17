@@ -24,10 +24,11 @@ const md = (d) => { if (!d) return ''; const [, m, day] = d.split('-'); return `
 const CELL = {
   pass:  'bg-green-100 text-green-800 border-green-200',
   fail:  'bg-red-100 text-red-800 border-red-200',
+  partial: 'bg-amber-100 text-amber-800 border-amber-200',
   sched: 'bg-blue-100 text-blue-800 border-blue-200',
   void:  'bg-gray-100 text-gray-500 border-gray-200',
 }
-const MARK = { pass: '✓', fail: '✗', sched: '◷', void: '–' }
+const MARK = { pass: '✓', partial: '◐', fail: '✗', sched: '◷', void: '–' }
 
 function Cell({ cell, title }) {
   if (!cell?.state) return <span className="block text-center text-gray-200">·</span>
@@ -230,7 +231,7 @@ function OfficeResultForm({ proposal, connected }) {
             {BOARD_COLUMNS.map(c => <option key={c.key} value={c.key}>{c.label} · {c.title}</option>)}
           </select>
           <select className={input} value={f.result} onChange={set('result')}>
-            {['Passed', 'Failed', 'Partial Approval', 'Inaccessible', 'Cancelled'].map(r => <option key={r}>{r}</option>)}
+            {['Passed', 'Partial Pass', 'Failed', 'Inaccessible', 'Cancelled'].map(r => <option key={r}>{r}</option>)}
           </select>
           <input type="date" className={input} value={f.date} onChange={set('date')} />
           <input className={`${input} w-32`} value={f.inspector} onChange={set('inspector')} placeholder="Inspector" />
@@ -536,7 +537,7 @@ export default function InspectionBoard() {
       {adding && <AddJobModal onClose={() => setAdding(false)} onAdded={onAdded} />}
 
       <p className="text-[11px] text-gray-400 flex items-center gap-1.5">
-        <ShieldCheck size={12} /> ✓ green passed · ✗ red failed / inaccessible / partial (latest result) · ◷ blue scheduled at the county · – gray cancelled. Hover a cell for the result.
+        <ShieldCheck size={12} /> ✓ green passed · ◐ amber partial pass · ✗ red failed / inaccessible (latest result) · ◷ blue scheduled at the county · – gray cancelled. Hover a cell for the result.
         FT footing · SL slab · FR framing · ER / EF electrical rough / final · MI / MF mechanical rough / final · FI building final.
       </p>
     </div>
