@@ -16,12 +16,21 @@ import { useStore } from '../store'
 const KEY = 'qx.view' // 'field' | 'full'
 const PHONE_QUERY = '(max-width: 767px)'
 
+// Roles that get field mode by default on a phone.
+const FIELD_ROLES = new Set(['pm'])
+
+// Only a PM's choice is remembered on the phone. For anyone else (an owner or
+// manager looking at what the PMs see) Field mode is a visit: it ends when the
+// app is closed, so the app always reopens as the full app and nobody is left
+// in Field mode by a stray tap.
+const prefStore = () => (FIELD_ROLES.has(useStore.getState().role) ? localStorage : sessionStorage)
+
 export function readViewPref() {
-  try { return localStorage.getItem(KEY) } catch { return null }
+  try { return prefStore().getItem(KEY) } catch { return null }
 }
 
 export function setViewPref(v) {
-  try { localStorage.setItem(KEY, v) } catch { /* private mode — fine, just not remembered */ }
+  try { prefStore().setItem(KEY, v) } catch { /* private mode — fine, just not remembered */ }
 }
 
 export function useIsPhone() {
@@ -37,8 +46,6 @@ export function useIsPhone() {
   return phone
 }
 
-// Roles that get field mode by default on a phone.
-const FIELD_ROLES = new Set(['pm'])
 // Roles that can switch to it at all (managers like to see what PMs see).
 export const canUseField = (role) => role === 'pm' || role === 'manager'
 

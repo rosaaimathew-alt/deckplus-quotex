@@ -568,11 +568,6 @@ export default function FieldApp() {
                     <PaintRoller size={18} className="text-gray-500" /> {paint ? 'Back to PM screens' : 'I manage paint'}
                   </button>
                 )}
-                {!locked && (
-                  <button onClick={toFullApp} className="w-full px-4 h-14 flex items-center gap-3 text-base text-left border-b border-gray-100 active:bg-gray-50">
-                    <Monitor size={18} className="text-gray-500" /> Switch to full app
-                  </button>
-                )}
                 <button onClick={DEMO ? resetDemo : logout} className="w-full px-4 h-14 flex items-center gap-3 text-base text-left active:bg-gray-50">
                   <LogOut size={18} className="text-gray-500" /> {DEMO ? 'Reset demo' : 'Log out'}
                 </button>
@@ -581,6 +576,16 @@ export default function FieldApp() {
           )}
         </div>
       </header>
+
+      {/* The way out of Field mode stays on screen for the owner, managers and
+          PMs. The paint manager's screens are all they use, so they get none. */}
+      {!locked && (
+        <button onClick={toFullApp}
+          className="sticky z-20 w-full h-11 flex items-center justify-center gap-2 text-sm font-semibold bg-[var(--brand-50)] text-[var(--brand-700)] border-b border-[var(--brand-100)] active:bg-[var(--brand-100)]"
+          style={{ top: 'calc(3.5rem + env(safe-area-inset-top))' }}>
+          <Monitor size={16} /> Exit Field mode
+        </button>
+      )}
 
       <main className="max-w-xl mx-auto px-4 pt-4 pb-28">
         {paint ? (
