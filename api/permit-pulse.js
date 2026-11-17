@@ -22,7 +22,7 @@ import dotenv from 'dotenv'
 import { requireAuth, staffRole } from './_auth.js'
 import { sendPermitAlert } from './_permit-alert.js'
 import { EVOLVE_SITES, searchAddress as evolveSearch, permitDetails as evolveDetails } from './_evolve.js'
-import { SITES, searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, RECORD_RE, setPatience } from './_accela.js'
+import { SITES, searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, capIdsFromUrl, RECORD_RE, setPatience } from './_accela.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
@@ -83,8 +83,8 @@ async function checkEvolveJob(job, site) {
   if (Array.isArray(job.pick) && job.pick.length === 1) {
     main = building.find(r => r.record === job.pick[0]) || null
     if (!main) return { error: 'The permit picked for this job is no longer listed at its address.', candidates: building.map(sum), needsPick: building.length > 0 }
-  } else if (job.record) {
-    main = building.find(r => r.record === job.record) || null
+  } else if (job.typed || job.hint || job.record) {
+    main = building.find(r => r.record === job.typed) || building.find(r => r.record === job.hint) || building.find(r => r.record === job.record) || null
   }
   if (!main) {
     const ours = building.filter(r => OUR_CONTRACTOR.test(r.contractor))
@@ -159,20 +159,71 @@ const summary = (r, site) => ({
 })
 
 // ── One job ──────────────────────────────────────────────────────────────────
+// The connected Accela county a pasted permit link belongs to (by the agency in
+// its address: .../MECKLENBURG/Cap/CapDetail.aspx?...), or null.
+function ruleOfLink(link) {
+  try {
+    const agency = new URL(link).pathname.split('/').filter(Boolean)[0] || ''
+    return Object.values(COUNTIES).find(c => c.site && c.site.agency.toLowerCase() === agency.toLowerCase()) || null
+  } catch { return null }
+}
+
 export async function checkJob(job) {
   // A city that inspects its own jobs (Rock Hill) is looked up before its county
   const rule = (job.jurisdiction ? COUNTIES[job.jurisdiction] : COUNTIES[job.county || 'Mecklenburg'])
   if (!rule) return { unsupported: true, error: `${job.jurisdiction || job.county || 'This county'}'s permit site isn't connected yet. Record its results by hand.` }
   if (rule.evolve) return checkEvolveJob(job, rule.evolve)
-  const { site } = rule
-  const sum = (r) => summary(r, site)
-  const addr = parseAddress(job.address)
-  if (!addr.number || !addr.name) return { error: 'The job has no street address to search the county by.' }
+  // The office pointed at the permit itself, on this job: its page pasted
+  // from the county site, or its number typed in. That permit is the job's,
+  // whatever address the county filed it under (a lot number, a new street, a
+  // different spelling), so the search below runs on the county's address for
+  // it and not ours. What the county has is shown beside it for the office to see.
+  let pointed = null, pointedRule = rule, missed = ''
+  if (job.link) {
+    const ids = capIdsFromUrl(job.link)
+    const linkRule = ids && ruleOfLink(job.link)
+    if (!ids || !linkRule) return { error: "That link isn't a permit page on a connected county site. Open the permit on the county site and copy the address from the top of the browser." }
+    pointedRule = linkRule
+    const page = await fetchPermit(ids, linkRule.site)
+    const [hit] = await searchByRecord(page.record, linkRule.site)
+    pointed = hit ? { ...hit, capIds: ids } : { record: page.record, type: '', description: '', projectName: '', address: '', status: page.recordStatus || '', date: '', capIds: ids }
+  } else if (job.typed) {
+    const [hit] = await searchByRecord(job.typed, rule.site)
+    if (hit) pointed = hit
+    else missed = ` Permit # ${job.typed} isn't on the county site either: check the number, or paste the permit's link.`
+  }
+  if (pointed && !pointedRule.building.test(pointed.record)) {
+    return { error: `${pointed.record} is not a building permit. Paste the link (or number) of the building permit; its electrical and other trade permits are found from it.` }
+  }
 
-  let rows = await searchByAddress(addr.number, addr.name, site)
-  if (!rows.length && addr.name.includes(' ')) rows = await searchByAddress(addr.number, addr.name.split(' ')[0], site)
-  rows = rows.filter(r => sameAddress(addr, r.address))
-  const building = rows.filter(r => rule.building.test(r.record))
+  const { site } = pointedRule
+  const sum = (r) => summary(r, site)
+  const addr = parseAddress(pointed?.address || job.address)
+  if (!pointed && (!addr.number || !addr.name)) return { error: 'The job has no street address to search the county by.' }
+
+  const at = async (a) => {
+    let found = a.number && a.name ? await searchByAddress(a.number, a.name, site) : []
+    if (!found.length && a.name.includes(' ')) found = await searchByAddress(a.number, a.name.split(' ')[0], site)
+    return found.filter(r => sameAddress(a, r.address))
+  }
+  let rows = await at(addr)
+  let building = rows.filter(r => pointedRule.building.test(r.record))
+  // Nothing at the address, and a permit number is on one of the job's permit
+  // cards: if that is a building permit on the county site, it is this job's.
+  // (Only then, and quietly: a zoning or HOA number there is simply not it.)
+  if (!pointed && !building.length && job.hint) {
+    const [hit] = await searchByRecord(job.hint, site)
+    if (hit && pointedRule.building.test(hit.record)) {
+      pointed = hit
+      rows = await at(parseAddress(hit.address))
+      building = rows.filter(r => pointedRule.building.test(r.record))
+    }
+  }
+  if (pointed) {
+    job.pick = pointed.capIds
+    if (!rows.some(r => r.record === pointed.record)) rows.push(pointed)
+    if (!building.some(r => r.record === pointed.record)) building.push(pointed)
+  }
 
   // A permit # the office typed in: used only if it's for this same house
   // number, so it can never land on another customer's permit.
@@ -196,7 +247,7 @@ export async function checkJob(job) {
     const open = named.filter(r => !/closed|finaled|void|withdrawn|expired|cancel/i.test(r.status))
     const pool = open.length ? open : named
     if (pool.length === 1) main = pool[0]
-    else if (!building.length) return { error: 'No building permit found at this address on the county site.' }
+    else if (!building.length) return { error: `No building permit found at this address on the county site.${missed}` }
     else return { needsPick: true, candidates: building.map(sum) }
   }
 
@@ -204,7 +255,7 @@ export async function checkJob(job) {
   // 60 days of the building permit, and — where project names are clients —
   // the same project name.
   const near = (d) => !d || !main.date || Math.abs(new Date(d) - new Date(main.date)) <= 60 * 86400000
-  const trades = rows.filter(r => rule.trade.test(r.record) && near(r.date) && (!rule.byName ||
+  const trades = rows.filter(r => pointedRule.trade.test(r.record) && near(r.date) && (!pointedRule.byName ||
     nameWords(r.projectName).join(' ') === nameWords(main.projectName).join(' ') || r.description === main.description))
 
   // The permits side by side, then the notes we don't have yet, a few at a
@@ -224,7 +275,8 @@ export async function checkJob(job) {
     const r = k === 0 ? main : trades[k - 1]
     return { ...sum(r), role: k === 0 ? 'building' : 'trade', recordStatus: p.recordStatus, expires: p.expires, upcoming: p.upcoming, completed: p.completed }
   })
-  return { permits }
+  // pointed: the office named this permit (link or number); it wasn't matched by address
+  return pointed ? { permits, pointed: true } : { permits }
 }
 
 async function inBatches(items, size, fn) {
@@ -253,6 +305,10 @@ export default async function handler(req, res) {
     jurisdiction: String(j?.jurisdiction || '').slice(0, 40),
     pick: Array.isArray(j?.pick) ? j.pick.map(String).slice(0, 3) : null,
     record: RECORD_RE.test(String(j?.record || '').trim().toUpperCase()) ? String(j.record).trim().toUpperCase() : '',
+    // Set by the office on this job (Permits tab): the permit's page on the county site, or its number
+    link: /^https:\/\//i.test(String(j?.link || '').trim()) ? String(j.link).trim().slice(0, 500) : '',
+    typed: RECORD_RE.test(String(j?.typed || '').trim().toUpperCase()) ? String(j.typed).trim().toUpperCase() : '',
+    hint: RECORD_RE.test(String(j?.hint || '').trim().toUpperCase()) ? String(j.hint).trim().toUpperCase() : '',
     knownNotes: Array.isArray(j?.knownNotes) ? j.knownNotes.slice(0, 500) : [],
   })).filter(j => j.id)
 

@@ -244,6 +244,16 @@ function CountyPanel({ proposal, readOnly }) {
   const cp = proposal.countyPermit
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // The permit's page on the county site, or its number, when the address doesn't find it
+  const saved = proposal.jobData?.countyLink || ''
+  const [link, setLink] = useState(saved)
+  const applyLink = async () => {
+    const v = link.trim()
+    if (v === saved) return
+    // a new pointer replaces an earlier pick among the permits at the address
+    updateJobData(proposal.id, { countyLink: v || null, countyPick: null })
+    await check()
+  }
 
   const check = async () => {
     setBusy(true); setErr('')
@@ -278,6 +288,24 @@ function CountyPanel({ proposal, readOnly }) {
         <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 flex items-start gap-1.5">
           <AlertTriangle size={12} className="mt-0.5 shrink-0" /> {err || cp.error}
         </p>
+      )}
+
+      {!readOnly && !DEMO && countyConnected(proposal) && (
+        <form onSubmit={e => { e.preventDefault(); applyLink() }} className="flex items-end gap-2 flex-wrap">
+          <label className="flex-1 min-w-[12rem]">
+            <Label>Permit link or number</Label>
+            <input value={link} onChange={e => setLink(e.target.value)} onBlur={applyLink} disabled={busy}
+              placeholder="Paste the permit's page from the county site, or its number" aria-label="Permit link or number" className={inputCls} />
+          </label>
+          {link.trim() !== saved && (
+            <button type="submit" disabled={busy} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)] disabled:opacity-50">
+              {link.trim() ? 'Use this permit' : 'Clear'}
+            </button>
+          )}
+        </form>
+      )}
+      {cp?.pointed && cp?.permits?.length > 0 && (
+        <p className="text-xs text-gray-500">Linked by the office. The county has it under the name and address shown below.</p>
       )}
 
       {(cp?.permits || []).map(p => (
