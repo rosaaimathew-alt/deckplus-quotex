@@ -41,8 +41,9 @@ $$;
 revoke all on function public.can_edit_proposal(text) from public, anon;
 grant execute on function public.can_edit_proposal(text) to authenticated;
 
--- Turn reminders on (every N days), change them, or off (0). Turning them on
--- or changing them starts the count again from today.
+-- Turn reminders on (daily, or every 2 days), change them, or off (0). Turning
+-- them on, changing them, or sending the contract again starts the count
+-- again from today. One row per job, so a job never has two reminders.
 create or replace function public.contract_reminder_set(p_proposal_id text, p_every_days integer, p_email text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare r public.contract_reminders;
@@ -52,9 +53,10 @@ begin
     delete from public.contract_reminders where proposal_id = p_proposal_id;
     return null;
   end if;
-  -- A daily reminder runs for up to ten mornings; a slower one for three.
+  -- Daily or every 2 days, never slower. Either way it runs for up to ten
+  -- days: ten daily reminders, or five every other day.
   insert into public.contract_reminders (proposal_id, org_id, every_days, max_count, email, set_by)
-  values (p_proposal_id, public.auth_org(), least(p_every_days, 30), case when p_every_days = 1 then 10 else 3 end, nullif(trim(lower(p_email)), ''), auth.uid())
+  values (p_proposal_id, public.auth_org(), least(p_every_days, 2), case when p_every_days = 1 then 10 else 5 end, nullif(trim(lower(p_email)), ''), auth.uid())
   on conflict (proposal_id) do update set every_days = excluded.every_days, max_count = excluded.max_count, email = coalesce(excluded.email, public.contract_reminders.email),
     set_by = excluded.set_by, sent_count = 0, last_sent_at = null, started_at = now(), updated_at = now()
   returning * into r;
@@ -85,7 +87,8 @@ grant execute on function public.contract_reminders_mine() to authenticated;
 -- on the job, and no client signature on the contract as it was last sent (a
 -- replaced send points at the newer one). Hands back what the email needs and
 -- nothing else: who to write to, the contract number, the customer's own
--- signing link token, whether they have opened it, and who made the contract.
+-- signing link token, and who made the contract. (Never whether they opened
+-- it: the reminder must read the same either way.)
 create or replace function public.contract_reminders_due_s(s text)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare c record; p public.proposals; d jsonb; rec jsonb; nxt jsonb; rid text; maker public.org_members; out jsonb := '[]'::jsonb; to_email text;
@@ -118,7 +121,6 @@ begin
     out := out || jsonb_build_object(
       'proposalId', c.proposal_id, 'to', to_email, 'client', coalesce(rec->'contractData'->'dp'->'values'->>'clientName', p.data->>'client'),
       'contractNum', coalesce(rec->>'contractNum', d->>'contractNum'), 'token', rec->'roleTokens'->>'client',
-      'opened', exists (select 1 from public.esign_events e where e.record_type = 'contract' and e.record_id = rid and e.event = 'opened' and e.role = 'client'),
       'number', c.sent_count + 1, 'makerEmail', maker.email, 'makerName', maker.display_name, 'makerId', maker.user_id);
   end loop;
   return out;

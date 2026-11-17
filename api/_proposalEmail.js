@@ -113,20 +113,25 @@ export function buildProposalEmail({ client, viewUrl, signature, logoUrl }) {
 }
 
 // The email a customer gets with the link to sign their agreement (Contracts ›
-// Send to Client), and the nudge that follows if they have not signed yet
-// (reminder: 1, 2, 3…). The nudge reads differently for someone who already
-// opened the agreement. These are the emails' own words, not the contract's.
+// Send to Client), and the friendly reminder that follows if they have not
+// signed yet (reminder: 1, 2, 3…). The reminder only ever says the documents
+// are not signed: it never says or hints whether the customer opened them.
+// These are the emails' own words, not the contract's.
 export const CONTRACT_SUBJECT = 'DeckPlus: Your agreement is ready to sign'
-export const CONTRACT_REMINDER_SUBJECT = 'DeckPlus: A reminder to sign your agreement'
+export const CONTRACT_REMINDER_SUBJECT = 'DeckPlus: A friendly reminder about your project documents'
 
-export function buildContractEmail({ client, signUrl, signature, logoUrl, reminder = 0, opened = false }) {
-  const p1 = !reminder
-    ? 'Thank you for choosing Deck Plus! Your agreement is ready. You can review and sign it online with the button below.'
-    : opened
-      ? 'Thanks for taking a look at your Deck Plus agreement. It hasn\'t been signed yet, so here is the link again to pick up where you left off.'
-      : 'Just a friendly reminder that your Deck Plus agreement is ready and waiting for your signature. You can review and sign it online with the button below.'
+export function buildContractEmail({ client, signUrl, signature, logoUrl, reminder = 0 }) {
+  if (reminder) {
+    return buildLinkEmail({
+      client, url: signUrl, signature, logoUrl, subject: CONTRACT_REMINDER_SUBJECT,
+      p1: 'Just a friendly reminder: we noticed your project documents haven\'t been signed yet. Whenever you\'re ready, you can review and sign them online with the button below. Once they\'re signed, we can move ahead with the next steps on your project.',
+      p2: 'Feel free to reach out if you have any questions about your documents. I\'m happy to go over anything with you, and you can reach me at the cell number below. Thanks!',
+      button: 'Review & Sign Your Documents', linkLabel: 'Review and sign your documents',
+    })
+  }
   return buildLinkEmail({
-    client, url: signUrl, signature, logoUrl, subject: reminder ? CONTRACT_REMINDER_SUBJECT : CONTRACT_SUBJECT, p1,
+    client, url: signUrl, signature, logoUrl, subject: CONTRACT_SUBJECT,
+    p1: 'Thank you for choosing Deck Plus! Your agreement is ready. You can review and sign it online with the button below.',
     p2: 'If you have any questions before signing, feel free to contact me using the cell number below.',
     button: 'Review & Sign Your Agreement', linkLabel: 'Review and sign your agreement',
   })

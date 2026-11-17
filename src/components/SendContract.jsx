@@ -1,7 +1,7 @@
 // ── Send to Client (contract editor and Contracts list) ─────────────────────
 // What to do with a contract's signing link once it exists: copy it, or email
 // it to the customer from here in the Deck Plus look (api/email.js
-// 'contract-send'), and optionally have the app nudge them every few days
+// 'contract-send'), and have the app remind them daily (or every 2 days)
 // until they sign (supabase/contract_reminders.sql; the server sends them each
 // morning, api/_contractReminders.js).
 import { useEffect, useState } from 'react'
@@ -16,8 +16,6 @@ const EVERY = [
   { value: 0, label: 'Off' },
   { value: DAILY, label: 'Daily' },
   { value: 2, label: 'Every 2 days' },
-  { value: 3, label: 'Every 3 days' },
-  { value: 7, label: 'Weekly' },
 ]
 const validEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim())
 const when = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` }
@@ -43,11 +41,14 @@ export default function SendContract({ proposal, links, autoSigned = false, onRe
 
   // Sending a contract turns on a daily reminder by itself, so a customer who
   // hasn't signed hears about it every morning until they do. It never
-  // overrides a choice already made: a reminder that is set stays as it is,
-  // and one switched Off for this contract stays off.
-  const startDaily = async (address) => {
-    if (reminder !== false || draft.signReminderOff || !validEmail(address) || id == null) return
-    const { data, error: err } = await supabase.rpc('contract_reminder_set', { p_proposal_id: String(id), p_every_days: DAILY, p_email: address.trim() })
+  // overrides a choice already made: a reminder that is set keeps its pace,
+  // and one switched Off for this contract stays off. A job has one reminder,
+  // so sending again (a changed contract, say) never adds a second one: with
+  // `again` it starts the same reminder over from today.
+  const startReminder = async (address, { again = false } = {}) => {
+    if (reminder === null || draft.signReminderOff || !validEmail(address) || id == null) return
+    if (reminder && !again) return
+    const { data, error: err } = await supabase.rpc('contract_reminder_set', { p_proposal_id: String(id), p_every_days: reminder ? Math.min(reminder.everyDays || DAILY, 2) : DAILY, p_email: address.trim() })
     if (err || !data) return
     setReminder(data)
     onReminder?.(String(id), data)
@@ -57,7 +58,7 @@ export default function SendContract({ proposal, links, autoSigned = false, onRe
     navigator.clipboard?.writeText(links[role])
     setCopied(role); setTimeout(() => setCopied(''), 2000)
     // copying the customer's link is sending it another way
-    if (role === 'client') startDaily(to)
+    if (role === 'client') startReminder(to)
   }
   const send = async () => {
     if (!validEmail(to)) { setError("Enter the customer's email address."); return }
@@ -72,7 +73,7 @@ export default function SendContract({ proposal, links, autoSigned = false, onRe
       const at = new Date().toISOString()
       setSent({ at, to: to.trim() })
       if (id != null) saveContractDraft(id, { sentToClientAt: at, sentToClientEmail: to.trim() })
-      startDaily(to)
+      startReminder(to, { again: true })
     } catch (e) { setError(e.message) }
     setSending(false)
   }
