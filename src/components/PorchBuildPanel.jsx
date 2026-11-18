@@ -1,6 +1,6 @@
 import FitTable from './FitTable'
 import { useMemo, useState } from 'react'
-import { X, Lock, Plus, Trash2, Box, PenTool } from 'lucide-react'
+import { X, Lock, Plus, Trash2, Box } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
@@ -10,6 +10,8 @@ import {
   PORCH_BUILD_GROUPS, computePorchBuild, buildPorchScope, PORCH_WINDOW_MAX_H,
 } from '../porchBuild'
 import { toBreakdown } from '../lib/priceList'
+import { useDrawingLink, porchFromDrawing, porchParts } from '../lib/drawingLink'
+import DrawingStrip, { DrawButton } from './DrawingStrip'
 
 // ── Porch Builder panel ──────────────────────────────────────────────────────
 // The rep enters what they know on site; every price comes from the org's rate
@@ -94,6 +96,30 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
   const [jic, setJic] = useState(saved?.jic ?? JIC_DEFAULT)
   const set = (patch) => setInp(p => ({ ...p, ...patch }))
   const setSub = (k, patch) => setInp(p => ({ ...p, [k]: { ...(p[k] || {}), ...patch } }))
+  // The drawing drives the porch and its roof: size, type, roof style and tie-in, floor and
+  // height, walls, door wall, gable-end glass, step width and landing, while following it.
+  const [drawPorch, setDrawPorch] = useState(null)
+  const draw = useDrawingLink(saved?.drawLink, (d) => {
+    const g = porchFromDrawing(d, drawPorch)
+    if (!g) return
+    setDrawPorch(g.id)
+    setInp(p => ({
+      ...p, ...g.patch,
+      ...(g.stairWidthFt ? { steps: { ...(p.steps || {}), stairWidthFt: g.stairWidthFt } } : {}),
+      landings: { ...(p.landings || {}), count: g.landings },
+    }))
+  })
+  const drawn = draw.last ? porchFromDrawing(draw.last, drawPorch) : null
+  const ROOF = { shed: 'shed roof', gable: 'gable roof', semivault: 'semi-vaulted roof', hip: 'hip roof' }
+  const TIE = { wall: 'wall tie', roof: 'roof tie', free: 'freestanding' }
+  const drawSummary = drawn && [
+    `${drawn.patch.width}′×${drawn.patch.depth}′ ${PORCH_TYPES.find(t => t.key === drawn.patch.type)?.label || 'porch'}`,
+    `${ROOF[drawn.patch.roof] || 'roof'}${drawn.pitch ? ` ${drawn.pitch}/12` : ''}`,
+    TIE[drawn.patch.tie],
+    drawn.patch.floor === 'deck' ? `${drawn.patch.deckHeightFt}′ deck` : 'on a patio',
+  ].filter(Boolean).join(' · ')
+  const drawNote = draw.last && !drawn ? 'There is no porch in the drawing.'
+    : (draw.last?.porches || []).length > 1 ? 'More than one porch is drawn: this builder follows the first. Add the others as their own porch.' : ''
 
   const result = useMemo(() => computePorchBuild(inp, rates), [inp, rates])
   const floorUnpriced = !!(inp.flooring && rates[inp.flooring]?.deckColl && !(Number(rates[inp.flooring]?.rate) > 0))
@@ -178,7 +204,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
       costSub: 0,
       porchBuild: inp,
       breakdown: toBreakdown(result.lines, { jic, groups: PORCH_BUILD_GROUPS }),   // the office's price list
-      builder: { tool: 'porchbuild', state: { inp, jic } },
+      builder: { tool: 'porchbuild', state: { inp, jic, ...(draw.link ? { drawLink: draw.link } : {}) } },
     }])
   }
 
@@ -197,20 +223,16 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
               flooring: inp.flooring, railing: { product: inp.railing?.product || '' }, sides: inp.sides,
             }))}`}
             target="_blank" rel="noopener"
-            className="flex items-center gap-1 text-xs font-semibold text-[var(--brand-700)] border border-[var(--brand-200)] rounded-full px-2.5 py-1 hover:bg-[var(--brand-50)]"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-[var(--brand-700)] border border-[var(--brand-200)] rounded-full px-2.5 py-1 hover:bg-[var(--brand-50)]"
             title="Open this porch in the 3D builder"
           ><Box size={13} /> View in 3D</a>
-          {/* The free-form design editor with this porch's footprint. It saves once the quote is a proposal (Sales → Designs → Design). */}
-          <a
-            href={`/design-editor.html?design=${encodeURIComponent(JSON.stringify({ porches: [{ width: inp.width, depth: inp.depth, floor: inp.floor, deckHeightFt: inp.deckHeightFt }] }))}`}
-            target="_blank" rel="noopener"
-            className="flex items-center gap-1 text-xs font-semibold text-[var(--brand-700)] border border-[var(--brand-200)] rounded-full px-2.5 py-1 hover:bg-[var(--brand-50)]"
-            title="Open this porch in the design editor"
-          ><PenTool size={13} /> Design</a>
+          <DrawButton onClick={() => draw.open(porchParts(inp))} />
           {locked && <span className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><Lock size={11} /> Rates locked</span>}
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
       </div>
+
+      <DrawingStrip draw={draw} summary={drawSummary} note={drawNote} />
 
       {/* ── The porch: type, size and what it sits on ─────────────────── */}
       <Card title="Porch" total={groupTotal('structure')}>

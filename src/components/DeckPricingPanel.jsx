@@ -12,6 +12,8 @@ import {
 } from '../lib/deckPricing'
 import { deckPriceRows } from '../lib/deckRows'
 import { toBreakdown } from '../lib/priceList'
+import { useDrawingLink, deckFromDrawing, deckParts } from '../lib/drawingLink'
+import DrawingStrip, { DrawButton } from './DrawingStrip'
 
 // ── Deck Builder — priced like the Deck Plus price list ──────────────────────
 // Square feet × the collection's $/SF for the deck, steps (×1.5) and landings;
@@ -154,7 +156,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
       costSub: 0,
       // Everything needed to reopen this deck in the builder (never shown to the customer).
       breakdown: toBreakdown(rows, { jic }),   // the price list the office gets with the job
-      builder: { tool: 'deck', state: { jobType, collKey, width, depth, height, sizeMode, areaSF, openEdgeLF, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv, jic } },
+      builder: { tool: 'deck', state: { jobType, collKey, width, depth, height, sizeMode, areaSF, openEdgeLF, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv, jic, ...(draw.link ? { drawLink: draw.link } : {}) } },
     }])
   }
 
@@ -215,6 +217,26 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
     setStairs(cur => autoStairSteps(cur, v, landings))
     clearOv(...STAIR_ROWS)
   }
+  // The drawing drives the deck: size, height, stairs, landings and the open edge come
+  // from it while "Follow the drawing" is on; typed quantity overrides give way to it.
+  const draw = useDrawingLink(S?.drawLink, (d) => {
+    const g = deckFromDrawing(d)
+    if (!g) return
+    setSizeMode(g.sizeMode); setWidth(g.width); setDepth(g.depth); setAreaSF(g.areaSF); setOpenEdgeLF(g.openEdgeLF)
+    setHeight(g.height); setSections([]); setFreestanding(g.freestanding)
+    setLandings(g.landings); setStairs(autoStairSteps(g.stairs, g.height, g.landings))
+    setQtyOv({})
+  })
+  const drawn = draw.last ? deckFromDrawing(draw.last) : null
+  const drawSummary = drawn && [
+    drawn.sizeMode === 'dims' ? `${drawn.width}′×${drawn.depth}′` : `${drawn.areaSF} SF`,
+    `${drawn.height}′ high`,
+    drawn.stairs.length ? `${drawn.stairs.length} stair run${drawn.stairs.length > 1 ? 's' : ''}` : null,
+    drawn.landings.length ? `${drawn.landings.length} landing${drawn.landings.length > 1 ? 's' : ''}` : null,
+    drawn.railLF ? `${drawn.railLF}′ railing` : null,
+  ].filter(Boolean).join(' · ')
+  const drawNote = draw.last && !drawn ? 'There is no deck in the drawing.'
+    : drawn?.others.length ? `Also drawn: ${drawn.others.map(o => `${o.size} at ${o.h}′`).join(', ')}. Add ${drawn.others.length > 1 ? 'them' : 'it'} as another deck.` : ''
   const levelName = (id) => { const i = landings.findIndex(l => l.id === id); return i >= 0 ? `Landing ${i + 1}` : null }
   const extra = (key, label, unit) => (
     <label className="block">
@@ -236,8 +258,12 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
           <h2 className="text-lg font-bold text-gray-900">Deck Builder</h2>
           <p className="text-xs text-gray-400">Priced from the Deck Plus price list: square feet × $/SF, railing and fascia × $/LF.</p>
         </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100" title="Close builder"><X size={18} /></button>
+        <div className="flex items-center gap-2">
+          <DrawButton onClick={() => draw.open(deckParts({ width, depth, height, collKey, rail, freestanding, skirt, sizeMode, areaSF, sections, stairs, landings }))} />
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100" title="Close builder"><X size={18} /></button>
+        </div>
       </div>
+      {draw.link && <div className="-mt-1 mb-4"><DrawingStrip draw={draw} summary={drawSummary} note={drawNote} /></div>}
 
       {/* Job + collection */}
       <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 mb-3">
