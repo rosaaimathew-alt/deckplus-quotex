@@ -748,43 +748,9 @@ export default function BuildQuote() {
   }
 
   return (
-    <div className="p-4 sm:p-6 flex flex-col lg:flex-row gap-5 h-full min-h-screen">
-      {/* Left: Catalog picker (on a phone it comes after the customer and the
-          quote, so the form isn't buried under 20 catalog cards) */}
-      <div className="order-2 lg:order-1 lg:w-64 shrink-0 flex flex-col gap-3">
-        <h3 className="font-semibold text-gray-900 text-[15px]">Catalog</h3>
-        <div className="relative">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            placeholder="Search..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 border-b border-gray-200">
-          {cats.map(c => (
-            <button key={c} onClick={() => setCatFilter(c)}
-              className={`-mb-px pb-1.5 text-[13px] border-b-2 transition-colors ${catFilter === c ? 'border-[var(--brand-600)] text-gray-900 font-medium' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
-              {c}
-            </button>
-          ))}
-        </div>
-        <div className="overflow-y-auto max-h-[50vh] lg:max-h-[calc(100vh-220px)] bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-          {filtered.map(item => (
-            <button key={item.id} onClick={() => addItem(item)}
-              className="w-full text-left px-3 py-2.5 hover:bg-[var(--brand-50)] transition-colors group flex items-baseline gap-2">
-              <span className="flex-1 min-w-0 text-[13px] text-gray-800 group-hover:text-[var(--brand-700)] leading-snug">{item.name}</span>
-              {item.assembly
-                ? <span className="shrink-0 inline-flex items-center gap-1 text-[11px] text-gray-400 group-hover:text-[var(--brand-600)]"><Calculator size={11} /> Builder</span>
-                : <span className="shrink-0 text-[11px] text-gray-400 tabular-nums">${item.unitPrice}/{item.unit}</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Right: Quote builder */}
-      <div className="order-1 lg:order-2 flex-1 flex flex-col gap-4">
+    <div className="p-4 sm:p-6 flex flex-col lg:flex-row lg:items-start gap-5 min-h-full bg-[#f3f5f6]">
+      {/* The quote sheet */}
+      <div className="order-1 flex-1 min-w-0 flex flex-col gap-4">
         {revisingParentId && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
             <Copy size={13} className="shrink-0" />
@@ -803,36 +769,15 @@ export default function BuildQuote() {
         )}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-semibold text-gray-900">Build quote</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 truncate max-w-[60vw]">{draftProposalId || revisingParentId ? 'Edit quote' : client.trim() || lines.length ? 'Quote' : 'New quote'}</h2>
             {(client || lines.length > 0 || draftProposalId || revisingParentId) && (
               <button onClick={() => { if (window.confirm('Start a new quote for a new customer? The quote on screen is cleared (anything already saved stays in the tracker).')) startFresh() }}
                 className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
                 <Plus size={12} /> New quote
               </button>
             )}
-            <DrawButton onClick={drawQuote} label="Draw the job" title="Each deck and porch you draw becomes a priced line" />
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap w-full sm:w-auto">
-            {/* How the price shows: one lump sum or itemized; one summed total or à la carte */}
-            <Segmented value={showBreakdown} onChange={setShowBreakdown} options={[[false, 'Lump sum'], [true, 'Itemized']]} />
-            <Segmented value={isAlaCarte} onChange={setIsAlaCarte} options={[[false, 'Summed total'], [true, 'À la carte']]} />
-            {/* Template buttons */}
-            {templates.length > 0 && (
-              <button
-                onClick={() => setShowLoadTemplate(true)}
-                className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-              >
-                <BookTemplate size={14} /> Load template
-              </button>
-            )}
-            {lines.length > 0 && (
-              <button
-                onClick={() => { setTemplateName(''); setTemplateDesc(''); setShowSaveTemplate(true) }}
-                className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-              >
-                <Save size={14} /> Save as template
-              </button>
-            )}
             <button
               onClick={goToProposal}
               disabled={!lines.length}
@@ -844,31 +789,22 @@ export default function BuildQuote() {
         </div>
 
         {/* Customer info */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5">
-          <p className="text-[15px] font-semibold text-gray-900 mb-3">Customer</p>
-          <div className="grid grid-cols-2 gap-3 [&>div]:col-span-2 sm:[&>div]:col-span-1 sm:[&>div.col-span-2]:col-span-2">
-            <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Name</label>
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="John Smith" value={client} onChange={e => setClient(e.target.value)} />
+        <div className="bg-white rounded-lg border border-gray-200 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 [&>div]:col-span-2 sm:[&>div]:col-span-1 sm:[&>div.col-span-2]:col-span-2">
+            <div className="col-span-2">
+              <input aria-label="Customer name" className="w-full border-0 border-b border-transparent hover:border-gray-200 focus:border-[var(--brand-500)] px-0 py-1 text-2xl font-semibold text-gray-900 placeholder:text-gray-300 bg-transparent focus:outline-none focus:ring-0" placeholder="Customer name" value={client} onChange={e => setClient(e.target.value)} />
+              <input aria-label="Project address" className="w-full border-0 border-b border-transparent hover:border-gray-200 focus:border-[var(--brand-500)] px-0 py-1 text-[15px] text-gray-600 placeholder:text-gray-300 bg-transparent focus:outline-none focus:ring-0" placeholder="Project address" value={address} onChange={e => setAddress(e.target.value)} />
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Project address</label>
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="123 Main St" value={address} onChange={e => setAddress(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Email</label>
-              <input type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="john@example.com" value={email} onChange={e => setEmail(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Phone</label>
-              <input type="tel" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="(555) 000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Quote expires</label>
-              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" value={expiration} onChange={e => setExpiration(e.target.value)} />
+            <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 border-y border-gray-100 py-3">
+              <label className="block"><span className="text-xs text-gray-500">Email</span>
+                <input type="email" className="w-full border-0 border-b border-transparent hover:border-gray-200 focus:border-[var(--brand-500)] px-0 py-1 text-sm bg-transparent focus:outline-none focus:ring-0" placeholder="name@email.com" value={email} onChange={e => setEmail(e.target.value)} /></label>
+              <label className="block"><span className="text-xs text-gray-500">Phone</span>
+                <input type="tel" className="w-full border-0 border-b border-transparent hover:border-gray-200 focus:border-[var(--brand-500)] px-0 py-1 text-sm bg-transparent focus:outline-none focus:ring-0" placeholder="(704) 000-0000" value={phone} onChange={e => setPhone(e.target.value)} /></label>
+              <label className="block"><span className="text-xs text-gray-500">Quote expires</span>
+                <input type="date" className="w-full border-0 border-b border-transparent hover:border-gray-200 focus:border-[var(--brand-500)] px-0 py-1 text-sm bg-transparent focus:outline-none focus:ring-0" value={expiration} onChange={e => setExpiration(e.target.value)} /></label>
             </div>
             <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Project type</label>
+              <label className="text-xs text-gray-500 block mb-1.5">Project type</label>
               <div className="flex flex-wrap gap-1.5">
                 {PROJECT_TYPE_OPTIONS.map(t => (
                   <button key={t} type="button" onClick={() => toggleProjectType(t)}
@@ -884,7 +820,7 @@ export default function BuildQuote() {
               </div>
             </div>
             <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Project summary <span className="text-gray-400">(shows on the scope of work)</span></label>
+              <label className="text-xs text-gray-500 block mb-1">Project summary <span className="text-gray-400">(shows on the scope of work)</span></label>
               <textarea rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" placeholder="e.g. 16'x16' Gable Roof Eze-Breeze Porch with vaulted ceilings…" value={projectSummary} onChange={e => setProjectSummary(e.target.value)} />
             </div>
           </div>
@@ -892,32 +828,6 @@ export default function BuildQuote() {
 
         {quoteDraw.link && <DrawingStrip draw={quoteDraw} summary={quoteDraw.last ? `${drawingSummary(quoteDraw.last) || 'nothing drawn yet'}` : null}
           idle="Linked to the drawing. Each deck and porch you draw becomes a priced line." />}
-        {/* Quick Build — type or dictate (Wispr Flow) a job; AI fills the matching tool */}
-        {!activeAssembly && (
-          <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 mb-1">
-            <div className="flex items-center gap-2 mb-2.5">
-              <Sparkles size={15} className="text-[var(--brand-600)]" />
-              <p className="text-[15px] font-semibold text-gray-900">Quick build</p>
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={quickText}
-                onChange={e => { setQuickText(e.target.value); if (quickErr) setQuickErr('') }}
-                onKeyDown={e => { if (e.key === 'Enter') runQuickBuild() }}
-                placeholder='e.g. “20 by 16 Trex Enhance deck, 4 feet high, hybrid rail, plus a 14 by 12 brick paver patio”'
-                className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] bg-white"
-              />
-              <button onClick={runQuickBuild} disabled={quickBusy || !quickText.trim()}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-[var(--brand-600)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors whitespace-nowrap">
-                {quickBusy ? <Loader size={15} className="animate-spin" /> : <Sparkles size={15} />}
-                {quickBusy ? 'Reading…' : 'Build'}
-              </button>
-            </div>
-            {quickErr && <p className="text-xs text-red-500 mt-2">{quickErr}</p>}
-            {quickNote && <p className="text-xs text-green-700 mt-2">{quickNote}</p>}
-          </div>
-        )}
-
         {/* Inline formula-item builder (opened from the catalog) — sits in the scope area */}
         {activeAssembly && quickStep && !editingLine && (
           <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-[var(--brand-50)] border border-[var(--brand-200)] rounded-lg text-sm text-gray-700">
@@ -972,7 +882,7 @@ export default function BuildQuote() {
         )}
 
         {/* Lines */}
-        <div className="bg-white rounded-xl border border-gray-200 flex-1">
+        <div className="bg-white rounded-lg border border-gray-200">
           <div className="qx-stack-box">
             <table className="w-full text-sm qx-stack">
               <thead className="bg-gray-50 border-b border-gray-100">
@@ -1197,16 +1107,17 @@ export default function BuildQuote() {
 
           {lines.length === 0 && (
             <div className="text-center py-12 text-gray-400">
-              <p className="text-sm">Click items from the catalog on the left to add them.</p>
+              <p className="text-[15px] text-gray-500">Nothing on this quote yet.</p>
+              <p className="text-sm mt-1">Quick build it, draw it, or pick from the catalog on the right.</p>
               {templates.length > 0 && (
                 <button onClick={() => setShowLoadTemplate(true)} className="mt-2 text-sm text-blue-500 hover:underline">
-                  Or load a saved template →
+                  Or load a saved template
                 </button>
               )}
             </div>
           )}
 
-          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+          <div className="px-5 py-4 border-t border-gray-200 flex items-end justify-between">
             <button onClick={addBlankLine} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
               <Plus size={14} /> Add blank line
             </button>
@@ -1218,8 +1129,8 @@ export default function BuildQuote() {
                   <p className="text-sm font-semibold text-green-700">{discountLine.name} −${money2(-discountLine.unitPrice)}</p>
                 </>
               )}
-              <p className="text-lg font-bold text-gray-900">
-                ${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <p className="text-3xl font-semibold text-gray-900 tabular-nums tracking-tight">
+                <span className="text-sm font-normal text-gray-500 mr-2 align-middle">Total</span>${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -1356,6 +1267,93 @@ export default function BuildQuote() {
         </div>
         )}
       </div>
+
+      {/* Right panel: everything that adds to the quote, then how the proposal shows it.
+          On a phone it comes after the quote. */}
+      <aside className="order-2 lg:w-80 shrink-0 flex flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
+        <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col gap-3">
+          <p className="text-[15px] font-semibold text-gray-900">Add to this quote</p>
+          <DrawButton onClick={drawQuote} label="Draw the job" title="Each deck and porch you draw becomes a priced line" />
+        {/* Quick Build — type or dictate (Wispr Flow) a job; AI fills the matching tool */}
+        {!activeAssembly && (
+          <div>
+            <div className="flex items-center gap-2 mb-2.5">
+              <Sparkles size={15} className="text-[var(--brand-600)]" />
+              <p className="text-[13px] font-semibold text-gray-900">Quick build</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                value={quickText}
+                onChange={e => { setQuickText(e.target.value); if (quickErr) setQuickErr('') }}
+                onKeyDown={e => { if (e.key === 'Enter') runQuickBuild() }}
+                placeholder='“20 by 16 Trex Enhance deck, 4 ft high, hybrid rail”'
+                className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] bg-white"
+              />
+              <button onClick={runQuickBuild} disabled={quickBusy || !quickText.trim()}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[var(--brand-600)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors whitespace-nowrap">
+                {quickBusy ? <Loader size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                {quickBusy ? 'Reading…' : 'Build'}
+              </button>
+            </div>
+            {quickErr && <p className="text-xs text-red-500 mt-2">{quickErr}</p>}
+            {quickNote && <p className="text-xs text-green-700 mt-2">{quickNote}</p>}
+          </div>
+        )}
+
+          <p className="text-[13px] font-semibold text-gray-900 mt-1">Catalog</p>
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            placeholder="Search..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 border-b border-gray-200">
+          {cats.map(c => (
+            <button key={c} onClick={() => setCatFilter(c)}
+              className={`-mb-px pb-1.5 text-[13px] border-b-2 transition-colors ${catFilter === c ? 'border-[var(--brand-600)] text-gray-900 font-medium' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+              {c}
+            </button>
+          ))}
+        </div>
+        <div className="overflow-y-auto max-h-[50vh] lg:max-h-[42vh] bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+          {filtered.map(item => (
+            <button key={item.id} onClick={() => addItem(item)}
+              className="w-full text-left px-3 py-2.5 hover:bg-[var(--brand-50)] transition-colors group flex items-baseline gap-2">
+              <span className="flex-1 min-w-0 text-[13px] text-gray-800 group-hover:text-[var(--brand-700)] leading-snug">{item.name}</span>
+              {item.assembly
+                ? <span className="shrink-0 inline-flex items-center gap-1 text-[11px] text-gray-400 group-hover:text-[var(--brand-600)]"><Calculator size={11} /> Builder</span>
+                : <span className="shrink-0 text-[11px] text-gray-400 tabular-nums">${item.unitPrice}/{item.unit}</span>}
+            </button>
+          ))}
+        </div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col gap-3">
+          <p className="text-[15px] font-semibold text-gray-900">On the proposal</p>
+            {/* How the price shows: one lump sum or itemized; one summed total or à la carte */}
+            <div className="flex flex-wrap gap-2"><Segmented value={showBreakdown} onChange={setShowBreakdown} options={[[false, 'Lump sum'], [true, 'Itemized']]} />
+            <Segmented value={isAlaCarte} onChange={setIsAlaCarte} options={[[false, 'Summed total'], [true, 'À la carte']]} /></div>
+            {/* Template buttons */}
+            {templates.length > 0 && (
+              <button
+                onClick={() => setShowLoadTemplate(true)}
+                className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+              >
+                <BookTemplate size={14} /> Load template
+              </button>
+            )}
+            {lines.length > 0 && (
+              <button
+                onClick={() => { setTemplateName(''); setTemplateDesc(''); setShowSaveTemplate(true) }}
+                className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+              >
+                <Save size={14} /> Save as template
+              </button>
+            )}
+        </div>
+      </aside>
 
       {/* Save Template Modal */}
       {showSaveTemplate && (
