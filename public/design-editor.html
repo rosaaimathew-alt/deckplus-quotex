@@ -265,6 +265,8 @@
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="#fff" stroke="#111827" stroke-width="2.4"/><rect x="8.5" y="8.5" width="7" height="7" fill="#111827"/></svg>Post on concrete footing</span>
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18M3 12h18M3 15h18" stroke="#2f6fd1" stroke-width="1.6"/></svg>Drop beam</span>
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M10 3v18M15 3v18M17 3v18" stroke="#8fb2e8" stroke-width="1.4"/></svg>Joists 16″ o.c.</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="#8fb2e8" stroke-width="1.4"/><rect x="5.8" y="8.5" width="5.4" height="3" fill="#dbe7fb" stroke="#2f6fd1" stroke-width="1"/><rect x="12.8" y="12.5" width="5.4" height="3" fill="#dbe7fb" stroke="#2f6fd1" stroke-width="1"/></svg>Blocking at mid-span (joist spans over 8′)</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v18M15 3v18M9 7h6M9 12h6M9 17h6" stroke="#2f6fd1" stroke-width="1.6"/></svg>Transition board over a doubled joist</span>
         <em>Framing preview: sizes follow the state code once it is loaded</em></div>
       <div class="zoomc" aria-label="Zoom"><button type="button" id="z-out" aria-label="Zoom out">−</button><span id="z-pct">100%</span><button type="button" id="z-in" aria-label="Zoom in">+</button></div>
     </div>
@@ -453,6 +455,16 @@
     return inside;
   }
   const edges = (pts) => pts.map((p, i) => [p, pts[(i + 1) % pts.length]]);
+  // Transition (breaker) boards across the decking where a run is longer than one board,
+  // each over a doubled joist ladder. Per deck: auto (over 20′), none, one centered, or two.
+  const BOARD_MAX = 20;
+  function transitionsOf(e) {
+    const xs = e.pts.map(q => q[0]), x0 = Math.min(...xs), run = Math.max(...xs) - x0, mode = e.trans || 'auto', oc = 16 / 12;
+    const n = mode === 'none' ? 0 : mode === 'center' ? 1 : mode === 'two' ? 2 : Math.max(0, Math.ceil(run / BOARD_MAX - 1e-6) - 1);
+    const out = [];
+    for (let k = 1; k <= n; k++) out.push(x0 + Math.max(1, Math.round(run * k / (n + 1) / oc)) * oc);
+    return out;
+  }
   function projSeg(px, pz, a, b) {
     const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1;
     const t = Math.max(0, Math.min(1, ((px - a[0]) * dx + (pz - a[1]) * dz) / L2));
@@ -646,6 +658,12 @@
       const JL = '#8fb2e8', BM = '#2f6fd1', fg = el('g', { 'pointer-events': 'none' }, grp);
       // joists 16″ o.c., out from the house
       for (let x = x0 + 16 / 12; x < x1 - 0.2; x += 16 / 12) clipLine(pts, 'x', x).forEach(([a, b]) => [-0.06, 0.06].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: JL, 'stroke-width': P * 0.9 }, fg)));
+      // a doubled joist ladder under each transition board
+      transitionsOf(e).forEach(x => clipLine(pts, 'x', x).forEach(([a, b]) => {
+        [-0.25, 0.25].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: '#2f6fd1', 'stroke-width': P * 1.4 }, fg));
+        for (let z = a + 16 / 12; z < b - 0.3; z += 16 / 12) el('line', { x1: x - 0.25, y1: z, x2: x + 0.25, y2: z, stroke: '#2f6fd1', 'stroke-width': P * 1.4 }, fg);
+        if (b - a > 4) tag(x, a + Math.min(3.2, (b - a) * 0.25), 'Transition board', '#0f766e', -90);
+      }));
       // ledger on the house
       house.forEach(([a, b]) => el('line', { x1: a[0], y1: 0.14, x2: b[0], y2: 0.14, stroke: '#7c3aed', 'stroke-width': P * 2.2, 'stroke-dasharray': `${P * 7} ${P * 3}` }, fg));
       // a drop beam inside each side that faces the yard (angled sides too), set back by the joist cantilever
@@ -683,7 +701,13 @@
         // blocking halfway between this beam and the one behind it
         if (r.flat && back != null) {
           const from = r.mid ? back : (beamRuns.find(o => o.mid && Math.abs(o.A[0] - A[0]) < 0.01)?.A[1] ?? back), bz = (from + A[1]) / 2;
-          if (A[1] - from > 8) clipLine(pts, 'z', bz).forEach(([c, d]) => { const lo = Math.max(c, Math.min(A[0], B[0])), hi = Math.min(d, Math.max(A[0], B[0])); if (hi - lo > 1) [-0.06, 0.06].forEach(o => el('line', { x1: lo, y1: bz + o, x2: hi, y2: bz + o, stroke: JL, 'stroke-width': P * 0.9 }, fg)); });
+          // a block between each pair of joists, staggered so each can be end-nailed
+          if (A[1] - from > 8) clipLine(pts, 'z', bz).forEach(([c, d]) => {
+            const lo = Math.max(c, Math.min(A[0], B[0])), hi = Math.min(d, Math.max(A[0], B[0])); if (hi - lo < 1) return;
+            const stops = [lo]; for (let x = x0 + 16 / 12; x < hi - 0.1; x += 16 / 12) if (x > lo + 0.1) stops.push(x); stops.push(hi);
+            const th = Math.max(0.125, P * 5), st = Math.max(0.1, P * 3.5);
+            for (let i = 0; i + 1 < stops.length; i++) el('rect', { x: stops[i] + 0.08, y: bz - th / 2 + (i % 2 ? st : -st), width: Math.max(0.05, stops[i + 1] - stops[i] - 0.16), height: th, fill: '#dbe7fb', stroke: '#2f6fd1', 'stroke-width': P * 0.9 }, fg);
+          });
           if (!r.mid && A[1] - from > 2.5) tag(Math.min(A[0], B[0]) + Math.abs(B[0] - A[0]) * 0.22, (from + A[1]) / 2, `${fmt(A[1] - from)} Joist Span`, '#1d4ed8', -90);
         }
       });
@@ -743,6 +767,7 @@
           const clip = `clip${e.id}`; const cp = el('clipPath', { id: clip }, grp); el('polygon', { points: ptsAttr(pts) }, cp);
           const bl = el('g', { 'clip-path': `url(#${clip})` }, grp);
           for (let z = Math.min(...zs) + 5.75 / 12; z < Math.max(...zs); z += 5.75 / 12) el('line', { x1: Math.min(...xs), y1: z, x2: Math.max(...xs), y2: z, stroke: '#d9cbb3', 'stroke-width': P * 0.8 }, bl);
+          if (e.type === 'deck') transitionsOf(e).forEach(x => clipLine(pts, 'x', x).forEach(([a, b]) => el('rect', { x: x - 0.23, y: a, width: 0.46, height: b - a, fill: '#eadbbf', stroke: '#b49a6c', 'stroke-width': P * 0.8 }, bl)));
         }
         const [cx, cz] = centroid(pts);
         const t1 = el('text', { x: cx, y: cz - P * 4, 'font-size': P * 13, 'text-anchor': 'middle', fill: '#1a1c38', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 700 }, grp);
@@ -1293,6 +1318,8 @@
       const pts = e.pts, area = Math.abs(pts.reduce((a, q, i) => { const r = pts[(i + 1) % pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2);
       const xs = pts.map(q => q[0]), zs = pts.map(q => q[1]);
       h = `<b class="ptitle">Deck</b>` + grp('Size', `${num('h', 'Height (ft)', e.h, 0.25)}${num('dw', 'Width', Math.max(...xs) - Math.min(...xs), 0.5, 3)}${num('dd', 'Depth', Math.max(...zs) - Math.min(...zs), 0.5, 3)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`, 'drag a side or corner on the plan to reshape')
+        + grp('Decking', pick('trans', 'Transition boards', [['auto', `Auto (runs over ${BOARD_MAX}′)`], ['none', 'None'], ['center', 'One, centered'], ['two', 'Two']], e.trans || 'auto')
+          + `<label>On this deck<span class="ro">${transitionsOf(e).length || 'None'}</span></label>`, 'each sits on a doubled joist')
         + grp('Skirting', pick('skirt', 'Skirting', [['', 'Same as all decks'], ...[['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']]], e.skirt || ''));
     } else if (e.type === 'landing') {
       h = `<b class="ptitle">Landing</b>${pick('skirt', 'Skirting', [['', 'Same as all decks'], ...[['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']]], e.skirt || '')}${num('h', 'Height (ft)', e.h, 0.25)}${num('w', 'Width', e.w, 0.5, 3)}${num('d', 'Depth', e.d, 0.5, 3)}${num('rot', 'Angle°', e.rot, 1, -180)}`;
@@ -1417,7 +1444,7 @@
       const rect = pts.length === 4 && edges(pts).every(([a, b]) => Math.abs(a[0] - b[0]) < 0.01 || Math.abs(a[1] - b[1]) < 0.01);
       const area = Math.abs(pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
       return { id: e.id, h: r1(Number(e.h) || 0), rect, width: r1(Math.max(...xs) - Math.min(...xs)), depth: r1(Math.max(...zs) - Math.min(...zs)),
-        area: Math.round(area), railLF: Math.round(M.rail), openLF: Math.round(M.open), house: M.house };
+        area: Math.round(area), railLF: Math.round(M.rail), openLF: Math.round(M.open), house: M.house, transitions: transitionsOf(e).length };
     });
     const stairs = S.els.filter(e => e.type === 'stairs' && e.of == null).map(e => { const i = stairInfo(e);
       return { id: e.id, from: i.host?.el.id ?? null, to: i.foot ? i.foot.id : 'grade', across: r1(Number(e.w) || 4), steps: i.n, boxed: !!e.boxed }; });
