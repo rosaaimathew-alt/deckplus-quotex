@@ -144,7 +144,11 @@ export function applyBrandStyles(primaryHex, opts = {}, { remember = true } = {}
     }
     .brand-nav-inactive        { color: ${navText}; }
     .brand-nav-inactive:hover  { background-color: ${sidebarHover}; color: #fff; }
-    .brand-nav-active          { background-color: ${isLight(sidebar) ? p[50] : '#fff'}; color: ${p[700]}; box-shadow: ${isLight(sidebar) ? `inset 3px 0 0 ${p[600]}` : 'none'}; }
+    .brand-nav-active          { background-color: ${isLight(sidebar) ? p[50] : 'rgba(255,255,255,0.13)'}; color: ${isLight(sidebar) ? p[700] : '#fff'}; }
+    /* The menu's New quote button: the brand color on a light menu, white on a dark one */
+    .qx-rail-cta               { background-color: ${isLight(sidebar) ? accent : '#ffffff'}; color: ${isLight(sidebar) ? '#fff' : p[800]}; }
+    /* On a dark menu the logo sits on a white plate so its colors read */
+    .qx-logo-plate             { ${isLight(sidebar) ? '' : 'background:#fff; border-radius:8px; padding:8px 12px;'} }
     .brand-badge               { color: ${p[700]}; }
     .brand-footer              { color: ${navText}; }
     ${opts.sidebarDark ? (() => {

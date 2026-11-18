@@ -748,7 +748,7 @@ export default function BuildQuote() {
   }
 
   return (
-    <div className="p-4 sm:p-6 flex flex-col lg:flex-row lg:items-start gap-5 min-h-full bg-[#f3f5f6]">
+    <div className="p-4 sm:p-6 flex flex-col lg:flex-row lg:items-start gap-5 min-h-full">
       {/* The quote sheet */}
       <div className="order-1 flex-1 min-w-0 flex flex-col gap-4">
         {revisingParentId && (
