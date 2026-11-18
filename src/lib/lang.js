@@ -88,9 +88,9 @@ const ES = {
   'Invoices': 'Facturas', 'All invoices': 'Todas las facturas', 'Send an invoice': 'Enviar una factura',
   'Nothing left to invoice on your jobs this week.': 'No queda nada por facturar en sus trabajos esta semana.',
   'Agreed': 'Acordado', 'left to invoice': 'por facturar',
-  'Invoices can be sent Monday through Thursday.': 'Las facturas se pueden enviar de lunes a jueves.',
+  'Invoices can be sent Monday through Wednesday.': 'Las facturas se pueden enviar de lunes a miércoles.',
   'The office has not set the amount for these jobs yet. You can invoice them once it does.': 'La oficina aún no ha puesto el monto de estos trabajos. Podrá facturarlos cuando lo haga.',
-  'Next:': 'Próxima:', 'Send by Thursday at midnight.': 'Envíela antes del jueves a medianoche.',
+  'Next:': 'Próxima:', 'Send by Wednesday at midnight.': 'Envíela antes del miércoles a medianoche.',
   // the job checklist (stage names from the office's checklists)
   'HOA Approval': 'Aprobación del HOA', 'Zoning Permit': 'Permiso de zonificación', 'Building Permit': 'Permiso de construcción',
   'Pre-Con Scheduled': 'Reunión previa programada', 'Start Date Given': 'Fecha de inicio dada', 'Demo': 'Demolición', 'Demo and Footings': 'Demolición y cimientos',

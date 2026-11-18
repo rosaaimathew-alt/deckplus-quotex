@@ -58,13 +58,13 @@ function StatusPill({ d }) {
   return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${st.cls}`}>{st.label}</span>
 }
 
-// Outside Monday–Thursday: when they can send next, instead of the button.
+// Outside Monday–Wednesday: when they can send next, instead of the button.
 function WindowClosed() {
   const next = new Date(`${nextInvoiceMonday()}T12:00:00`)
     .toLocaleDateString(getLang() === 'es' ? 'es-US' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   return (
     <div className="rounded-xl bg-amber-50 px-4 py-3 text-base text-amber-900">
-      <p className="font-semibold">{tr('Invoices can be sent Monday through Thursday.')}</p>
+      <p className="font-semibold">{tr('Invoices can be sent Monday through Wednesday.')}</p>
       <p>{tr('Next:')} {next}</p>
     </div>
   )
@@ -79,7 +79,7 @@ function SendButton() {
         className="w-full h-14 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold flex items-center justify-center gap-2">
         <Send size={20} /> {tr('Send an invoice')}
       </button>
-      <p className="text-sm text-gray-500 text-center">{tr('Send by Thursday at midnight.')}</p>
+      <p className="text-sm text-gray-500 text-center">{tr('Send by Wednesday at midnight.')}</p>
     </div>
   )
 }
