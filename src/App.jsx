@@ -186,7 +186,7 @@ export default function AppShell() {
         <div className="px-5 pt-5 pb-4 flex items-center justify-between">
           <button onClick={() => navigate('/')} className="flex-1 flex justify-center" aria-label="Home">
             {logo
-              ? <span className="qx-logo-plate inline-flex"><img src={logo} alt={companyName} className="h-11 object-contain" /></span>
+              ? <img src={logo} alt={companyName} className="h-11 object-contain" />
               : <span className="text-xl font-black text-white tracking-widest leading-tight">{companyName}</span>}
           </button>
           <button onClick={closeSidebar} className="lg:hidden text-white/60 hover:text-white ml-2" aria-label="Close menu"><X size={18} /></button>
@@ -195,7 +195,8 @@ export default function AppShell() {
         {canQuote && (
           <div className="px-3 pb-3">
             <button onClick={() => { navigate('/quote'); closeSidebar() }}
-              className="qx-rail-cta w-full flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-semibold hover:brightness-105 transition active:scale-[0.98]">
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-semibold text-white hover:brightness-110 transition active:scale-[0.98]"
+              style={{ background: 'var(--accent)' }}>
               <Plus size={17} /> New quote
             </button>
           </div>
