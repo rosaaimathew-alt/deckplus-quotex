@@ -13,7 +13,7 @@ const discountSpecFrom = (lines = []) => {
 }
 import { useStore, DECK_COMPONENT_DEFAULTS, PORCH_COMPONENT_DEFAULTS } from '../store'
 import { parseBuildSpec, quickToolFor } from '../buildParse'
-import PorchBuildPanel from '../components/PorchBuildPanel'
+import PorchBuildPanel from '../components/PorchBuildPanel'; import DrawingStrip, { DrawButton } from '../components/DrawingStrip'; import { useDrawingLink } from '../lib/drawingLink'; import { syncLinesFromDrawing, drawingSummary } from '../lib/drawingQuote'; import { designParts } from '../lib/designLink'
 import UnderDeckPanel from '../components/UnderDeckPanel'
 import HardscapePanel from '../components/HardscapePanel'
 import DeckPricingPanel from '../components/DeckPricingPanel'
@@ -362,11 +362,32 @@ export default function BuildQuote() {
   const [draftClient, setDraftClient] = useState('')
   const [revisingClient, setRevisingClient] = useState('')
   const [restoredFrom, setRestoredFrom] = useState(null)   // banner: "picked up where you left off"
+  // The drawing this quote follows (lib/drawingQuote.js): each deck and porch in it is a priced line.
+  const [drawLink, setDrawLink] = useState(null)
 
   const DRAFT_KEY = 'quotex:draft-proposal'
 
   // Pre-fill when opening a revision from the Proposal Tracker; otherwise restore draft
   useEffect(() => {
+    // From a customer's profile: a new quote for them (Start with the builders / with a drawing).
+    const forRaw = sessionStorage.getItem('quote-for')
+    if (forRaw) {
+      sessionStorage.removeItem('quote-for')
+      try {
+        const f = JSON.parse(forRaw)
+        const prev = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
+        const key = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        const same = !!prev && key(prev.client) === key(f.client)
+        const busy = !!prev && !same && ((prev.lines || []).length > 0 || !!prev.client)
+        if (f.drawLink) setDrawLink(f.drawLink)
+        if (!same && (!busy || window.confirm(`Start a quote for ${f.client}? The unsent quote for ${prev.client || 'another customer'} on screen is cleared (anything already saved stays in the tracker).`))) {
+          localStorage.removeItem(DRAFT_KEY)
+          setClient(f.client || ''); setEmail(f.email || ''); setPhone(f.phone || ''); setAddress(f.address || '')
+          setDraftClient(f.client || '')
+          return
+        }
+      } catch { /* not a usable hand-off: carry on as usual */ }
+    }
     const raw = sessionStorage.getItem('revise-proposal')
     if (raw) {
       sessionStorage.removeItem('revise-proposal')
@@ -420,6 +441,7 @@ export default function BuildQuote() {
       setRevisingClient(d.revisingClient ?? d.client ?? '')
       setDraftProposalId(d.draftProposalId || null)
       setDraftClient(d.draftClient ?? d.client ?? '')
+      setDrawLink(cur => cur || d.drawLink || null)
       if (d.client || (d.lines || []).length) setRestoredFrom(d.client || 'your last quote')
     } catch {}
   }, [])
@@ -431,7 +453,7 @@ export default function BuildQuote() {
     setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false); setPriceRange(null); setUpgrades([])
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
     setDraftProposalId(null); setDraftClient(''); setRevisingClient(''); setRestoredFrom(null)
-    setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({}); setDiscount(null)
+    setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({}); setDiscount(null); setDrawLink(null)
   }
 
   // Auto-save draft to localStorage whenever form state changes
@@ -441,9 +463,9 @@ export default function BuildQuote() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
       isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
-      feeDismissed, feeEdits, feeOverrides, discount,
+      feeDismissed, feeEdits, feeOverrides, discount, drawLink,
     }))
-  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount])
+  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount, drawLink])
 
   // Permit fees for this address + work, as quote lines (derived, never stored twice)
   const feePlan = useMemo(() => requiredFees({ address, lines, projectTypes, catalog: catalogRaw, overrides: feeOverrides }),
@@ -551,6 +573,14 @@ export default function BuildQuote() {
   const [editingLineId, setEditingLineId] = useState(null)
   const editingLine = editingLineId ? lines.find(l => l.id === editingLineId) : null
   const editSaved = editingLine?.builder?.state || assemblySaved
+  // ── The quote's drawing: a change there re-prices its lines (a line open in a builder waits) ──
+  const deckCustom = useStore(s => s.deckCustomComponents)
+  const deckScopeTpl = useStore(s => s.deckScopeTemplate)
+  const porchRatesSaved = useStore(s => s.porchBuildRates)
+  const porchScopes = useStore(s => s.porchBuildScopes)
+  const quoteDraw = useDrawingLink(null, (d, link) => setLines(ls => syncLinesFromDrawing(ls, d, link,
+    { catalog: catalogRaw, customComponents: deckCustom || [], scopeTemplate: deckScopeTpl, savedRates: porchRatesSaved || {}, scopes: porchScopes }, editingLineId)), [drawLink, setDrawLink])
+  const drawQuote = () => quoteDraw.open({ ...designParts(lines), client, address, phone, email })
   const openTool = (t) => {
     setEditingLineId(null)
     setAssemblyInitial(t.initial || null)
@@ -766,6 +796,7 @@ export default function BuildQuote() {
                 <Plus size={12} /> New quote
               </button>
             )}
+            <DrawButton onClick={drawQuote} label="Draw the job" title="Each deck and porch you draw becomes a priced line" />
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap w-full sm:w-auto">
             {/* Item breakdown toggle */}
@@ -869,6 +900,8 @@ export default function BuildQuote() {
           </div>
         </div>
 
+        {quoteDraw.link && <DrawingStrip draw={quoteDraw} summary={quoteDraw.last ? `${drawingSummary(quoteDraw.last) || 'nothing drawn yet'}` : null}
+          idle="Linked to the drawing. Each deck and porch you draw becomes a priced line." />}
         {/* Quick Build — type or dictate (Wispr Flow) a job; AI fills the matching tool */}
         {!activeAssembly && (
           <div className="bg-[var(--brand-50)] border-2 border-[var(--brand-200)] rounded-2xl p-4 mb-1">

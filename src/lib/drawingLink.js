@@ -18,14 +18,16 @@ export function drawUrl(link, parts) {
 export const deckParts = (state) => ({ decks: designParts([{ builder: { tool: 'deck', state } }]).decks })
 export const porchParts = (inp) => ({ porches: designParts([{ porchBuild: inp }]).porches })
 
-// Follow the drawing: `apply` runs with each new set of measurements while `follow` is on.
-export function useDrawingLink(savedLink, apply) {
-  const [link, setLink] = useState(savedLink || null)
+// Follow the drawing: `apply(drawing, link)` runs with each new set of measurements while
+// `follow` is on. `linkState` ([link, setLink]) lets the page hold the link itself.
+export function useDrawingLink(savedLink, apply, linkState) {
+  const own = useState(savedLink || null)
+  const [link, setLink] = linkState || own
   const [last, setLast] = useState(null)
   const [follow, setFollow] = useState(true)
   const onDrawing = useEffectEvent((d) => {
     setLast(d)
-    if (follow) apply(d)
+    if (follow) apply(d, link)
   })
   useEffect(() => {
     if (!link) return undefined
@@ -46,24 +48,35 @@ export function useDrawingLink(savedLink, apply) {
   // Pick up the drawing again (after following was off): apply what it shows now.
   const resume = () => {
     setFollow(true)
-    if (last) apply(last)
+    if (last) apply(last, link)
   }
-  return { link, last, follow, setFollow, open, resume }
+  return { link, setLink, last, follow, setFollow, open, resume }
 }
 
 const r1 = (v) => Math.round((Number(v) || 0) * 10) / 10
 
-// Decks → the Deck Builder. The main deck is the height with the most deck; pieces at that
-// height price together (one rectangle → W × D; anything else → total SF and open edge).
-// Stair runs off it, and landings they reach, come with their links. Other heights are
-// listed so the rep can add them as their own deck line.
-export function deckFromDrawing(d) {
+// Decks → the Deck Builder. Pieces at one height are one deck (one line on the quote): one
+// rectangle → W × D; anything else → total SF and open edge. Stair runs off it, and the
+// landings they reach, come with their links. Each deck is known by `deck:<id of its
+// largest piece>`, so the quote line it made keeps following it.
+export function deckGroups(d) {
   const decks = d?.decks || []
-  if (!decks.length) return null
   const byH = new Map()
-  decks.forEach(x => byH.set(x.h, (byH.get(x.h) || 0) + x.area))
-  const H = [...byH.entries()].sort((a, b) => b[1] - a[1])[0][0]
-  const main = decks.filter(x => x.h === H)
+  decks.forEach(x => { if (!byH.has(x.h)) byH.set(x.h, []); byH.get(x.h).push(x) })
+  return [...byH.entries()]
+    .map(([H, pieces]) => ({ H, pieces, area: pieces.reduce((a, x) => a + x.area, 0), lead: [...pieces].sort((a, b) => b.area - a.area || a.id - b.id)[0] }))
+    .sort((a, b) => a.lead.id - b.lead.id)
+    .map(g => groupTakeoff(d, g))
+}
+// The deck `key` names, or the one with the most deck. Other heights are listed so the rep
+// can add them as their own deck.
+export function deckFromDrawing(d, key) {
+  const all = deckGroups(d)
+  if (!all.length) return null
+  const g = all.find(x => x.key === key) || [...all].sort((a, b) => b.areaAll - a.areaAll)[0]
+  return { ...g, others: all.filter(x => x !== g).map(x => ({ size: x.sizeMode === 'dims' ? `${x.width}′×${x.depth}′` : `${x.areaSF} SF`, h: x.height })) }
+}
+function groupTakeoff(d, { H, pieces: main, area: areaAll, lead }) {
   const one = main.length === 1 && main[0].rect ? main[0] : null
   const lid = (id) => `dl${id}`
   const stairs = [], landings = [], seen = new Set()
@@ -79,18 +92,17 @@ export function deckFromDrawing(d) {
     }
   }
   walk(new Set(main.map(x => x.id)), () => 'deck')
-  const area = main.reduce((a, x) => a + x.area, 0)
   return {
+    key: `deck:${lead.id}`, areaAll,
     sizeMode: one ? 'dims' : 'sf',
     width: one ? one.width : Math.max(...main.map(x => x.width)),
     depth: one ? one.depth : Math.max(...main.map(x => x.depth)),
-    areaSF: one ? '' : area,
+    areaSF: one ? '' : areaAll,
     openEdgeLF: one ? '' : main.reduce((a, x) => a + x.openLF, 0),
     height: H,
     freestanding: !main.some(x => x.house),
     stairs, landings,
     railLF: main.reduce((a, x) => a + x.railLF, 0),
-    others: decks.filter(x => x.h !== H).map(x => ({ size: x.rect ? `${x.width}′×${x.depth}′` : `${x.area} SF`, h: x.h })),
   }
 }
 

@@ -4,7 +4,7 @@
 // street before booking them, and sees right away if they already booked
 // online, already have a quote, or are a past customer.
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CalendarDays, FileText, Hammer } from 'lucide-react'
 import { useStore } from '../store'
 import { supabase, supabaseReady } from '../supabase'
@@ -15,6 +15,7 @@ import { openProposal } from '../lib/openProposal'
 import { money0 } from '../lib/books'
 import { QuickPicks, RepToggle, SearchLine } from '../components/FilterBar'
 import StatCard from '../components/StatCard'
+import CustomerProfile from './CustomerProfile'
 
 const TZ = 'America/New_York'
 const day = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric', year: 'numeric' }) : '')
@@ -63,7 +64,7 @@ function RecordLine({ r, onOpen, leadName }) {
   )
 }
 
-function LeadRow({ lead, onOpen }) {
+function LeadRow({ lead, onOpen, onProfile }) {
   const [all, setAll] = useState(false)
   const shown = all ? lead.records : lead.records.slice(0, 4)
   const other = lead.names.filter(n => n.toLowerCase() !== lead.name.toLowerCase())
@@ -72,7 +73,7 @@ function LeadRow({ lead, onOpen }) {
       <div className="flex items-start gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-gray-900">
-            {lead.name}
+            <button type="button" onClick={onProfile} className="font-semibold text-gray-900 hover:text-[var(--brand-700)] hover:underline text-left">{lead.name}</button>
             {other.length > 0 && <span className="ml-2 text-sm font-normal text-gray-400">also {other.slice(0, 2).join(', ')}</span>}
           </p>
           <p className="text-sm text-gray-500 truncate">{[lead.phone, lead.email, lead.address].filter(Boolean).join(' · ')}</p>
@@ -102,6 +103,10 @@ export default function Leads() {
   const [query, setQuery] = useState('')
   const [show, setShow] = useState('all')
   const [limit, setLimit] = useState(PAGE)
+  // ?person=<any of their record keys>: that person's profile
+  const [params, setParams] = useSearchParams()
+  const person = params.get('person')
+  const showPerson = (key) => setParams(p => { const n = new URLSearchParams(p); if (key) n.set('person', key); else n.delete('person'); return n })
 
   const leads = useMemo(() => {
     const quotes = latestIterations(proposals.filter(p => p.status !== 'Imported'))
@@ -120,6 +125,9 @@ export default function Leads() {
     if (r.kind === 'job' || r.status === 'Won') navigate(`/projects?tab=jobs&job=${encodeURIComponent(r.proposal.id)}`)
     else openProposal(r.proposal, navigate)
   }
+
+  const profile = person ? leads.find(l => l.records.some(r => r.key === person)) : null
+  if (profile) return <CustomerProfile lead={profile} onBack={() => showPerson(null)} onOpen={open} />
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl">
@@ -145,7 +153,7 @@ export default function Leads() {
         ? <p className="text-sm text-gray-500 py-8 text-center">{query ? `No one matches “${query}”.` : 'No one here yet.'}</p>
         : (
           <ul className="space-y-2">
-            {shown.slice(0, limit).map(l => <LeadRow key={l.id} lead={l} onOpen={open} />)}
+            {shown.slice(0, limit).map(l => <LeadRow key={l.id} lead={l} onOpen={open} onProfile={() => showPerson(l.records[0].key)} />)}
           </ul>
         )}
       {shown.length > limit && (

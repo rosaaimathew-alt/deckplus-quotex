@@ -98,7 +98,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
   const setSub = (k, patch) => setInp(p => ({ ...p, [k]: { ...(p[k] || {}), ...patch } }))
   // The drawing drives the porch and its roof: size, type, roof style and tie-in, floor and
   // height, walls, door wall, gable-end glass, step width and landing, while following it.
-  const [drawPorch, setDrawPorch] = useState(null)
+  const [drawPorch, setDrawPorch] = useState(() => (/^porch:/.test(saved?.drawKey || '') ? Number(saved.drawKey.slice(6)) : null))
   const draw = useDrawingLink(saved?.drawLink, (d) => {
     const g = porchFromDrawing(d, drawPorch)
     if (!g) return
@@ -204,7 +204,7 @@ export default function PorchBuildPanel({ onClose, onAdd, initial, saved }) {
       costSub: 0,
       porchBuild: inp,
       breakdown: toBreakdown(result.lines, { jic, groups: PORCH_BUILD_GROUPS }),   // the office's price list
-      builder: { tool: 'porchbuild', state: { inp, jic, ...(draw.link ? { drawLink: draw.link } : {}) } },
+      builder: { tool: 'porchbuild', state: { inp, jic, ...(draw.link ? { drawLink: draw.link, ...(saved?.drawKey && draw.link === saved.drawLink ? { drawKey: saved.drawKey } : {}) } : {}) } },
     }])
   }
 

@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react'
 import { Plus, X, Lock, RotateCcw } from 'lucide-react'
 import { useStore } from '../store'
 import { JicField } from './Jic'
-import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
 import {
   DECK_COLLECTIONS, DECK_RAILS, BRONZE_BALUSTERS, DECK_FASCIA, DECK_SKIRT_OPTIONS, DECK_PAINT_OPTIONS, DECK_ITEMS,
@@ -12,6 +11,7 @@ import {
 } from '../lib/deckPricing'
 import { deckPriceRows } from '../lib/deckRows'
 import { toBreakdown } from '../lib/priceList'
+import { deckScope } from '../lib/builderLines'
 import { useDrawingLink, deckFromDrawing, deckParts } from '../lib/drawingLink'
 import DrawingStrip, { DrawButton } from './DrawingStrip'
 
@@ -24,7 +24,6 @@ import DrawingStrip, { DrawButton } from './DrawingStrip'
 const n = (v) => Number(v) || 0
 const money = (v) => '$' + Math.round(v).toLocaleString('en-US')
 const money2 = (v) => '$' + (Math.round(n(v) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-const ft = (v) => `${n(v)}’`
 const fmtQty = (v) => (Math.round(n(v) * 100) / 100).toString()
 let seq = 0
 const uid = () => `${Date.now()}-${++seq}`
@@ -102,42 +101,9 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
   const jicAmt = jicAmount(jic, price)
   const total  = price + jicAmt                     // what the customer is quoted
   const marginPct = total > 0 ? ((total - cost) / total) * 100 : 0
-  const row = (k) => rows.find(r => r.key === k)
 
   // ── Scope, in the catalog's own wording ──────────────────────────────────
-  const description = (() => {
-    const lines = (scopeTemplate || '').split('\n').map(s => s.trim()).filter(Boolean)
-    const fb = (r, text) => r ? scopeFor(catalog, r.item, { sqft: r.qty, lf: r.qty, count: r.qty }, text) : null
-    // An irregular deck (total SF) is sized by its square feet, not W × D.
-    const size = t.bySF ? `${t.deckSF} SF` : `${ft(W)}x${ft(D)}`
-    const sized = (text) => (t.bySF ? text.replace(/__’x__’/g, size) : text)
-    if (redeck && canRedeck) lines.push(sized(scopeFor(catalog, coll.redeck.item, { size: t.bySF ? null : [W, D], sqft: t.deckSF },
-      `Remove the existing decking and install new ${coll.key} decking on the existing joists, approximately ${size}.`)))
-    else lines.push(sized(scopeFor(catalog, `${coll.fam} Deck`, { size: t.bySF ? null : [W, D] },
-      `Build a pressure treated wood deck platform approximately ${size}.\n• ${coll.key} decking as flooring, installed with hidden fasteners.`)))
-    if (t.bySF || sections.length) lines.push('Deck layout as per drawing.')
-    if (row('border')) lines.push(fb(row('border'), `${border} border.`))
-    if (row('fascia')) lines.push(fb(row('fascia'), `${row('fascia').label} around the deck.`))
-    for (const s of stairs) {
-      const steps = n(s.steps)
-      if (steps <= 0) continue
-      const text = s.style === 'Box'
-        ? scopeFor(catalog, DECK_ITEMS.boxstep.item, { count: steps, width: s.across }, `Approximately ${countWords(steps)} ${ft(s.across)} wide BOX steps to grade.`)
-        : scopeFor(catalog, coll.steps ? `${coll.fam} Steps` : null, { count: steps, width: s.across }, `Approximately ${countWords(steps)} ${ft(s.across)} wide steps to grade.`).replace(/^__’x__’ landing and a/, 'A')
-      // Runs that meet a landing say so instead of "to grade".
-      const toLanding = landings.some(l => l.id === s.to), fromLanding = landings.some(l => l.id === s.from)
-      lines.push(toLanding ? text.replace(/ to grade/, fromLanding ? ' down to the next landing' : ' down to the landing')
-        : fromLanding ? text.replace(/ to grade/, ' from the landing to grade') : text)
-    }
-    for (const l of landings) lines.push(scopeFor(catalog, coll.landing ? `${coll.fam} Landing` : null, { size: [l.width, l.depth] }, `${ft(l.width)}x${ft(l.depth)} landing.`))
-    if (row('rail')) lines.push(fb(row('rail'), `Install ${rail}.`))
-    if (row('bronze')) lines.push(fb(row('bronze'), 'Bronze balusters (special order).'))
-    for (const k of ['cortex', 'skirt', 'paint', 'high', 'freestand', 'demoDeck', 'demoConc', 'footings', 'lvl', 'hottub', 'bracePlate', 'braceLetter', 'posts8x8', 'gate', 'privacy']) {
-      const r = row(k)
-      if (r) lines.push(fb(r, `${r.label}.`))
-    }
-    return lines.filter(Boolean).join('\n')
-  })()
+  const description = deckScope({ jobType, collKey, width, depth, height, sizeMode, areaSF, openEdgeLF, sections, stairs, landings, rail, border }, rows, catalog, scopeTemplate)
 
   const add = () => {
     // JIC is built into the deck's price — never its own line, so the customer
@@ -156,7 +122,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
       costSub: 0,
       // Everything needed to reopen this deck in the builder (never shown to the customer).
       breakdown: toBreakdown(rows, { jic }),   // the price list the office gets with the job
-      builder: { tool: 'deck', state: { jobType, collKey, width, depth, height, sizeMode, areaSF, openEdgeLF, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv, jic, ...(draw.link ? { drawLink: draw.link } : {}) } },
+      builder: { tool: 'deck', state: { jobType, collKey, width, depth, height, sizeMode, areaSF, openEdgeLF, sections, stairs, landings, rail, bronze, fascia, border, cortex, skirt, paint, freestanding, extras, qtyOv, rateOv, jic, ...(draw.link ? { drawLink: draw.link, ...(S?.drawKey && draw.link === S.drawLink ? { drawKey: S.drawKey } : {}) } : {}) } },
     }])
   }
 
@@ -220,14 +186,14 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
   // The drawing drives the deck: size, height, stairs, landings and the open edge come
   // from it while "Follow the drawing" is on; typed quantity overrides give way to it.
   const draw = useDrawingLink(S?.drawLink, (d) => {
-    const g = deckFromDrawing(d)
+    const g = deckFromDrawing(d, S?.drawKey)
     if (!g) return
     setSizeMode(g.sizeMode); setWidth(g.width); setDepth(g.depth); setAreaSF(g.areaSF); setOpenEdgeLF(g.openEdgeLF)
     setHeight(g.height); setSections([]); setFreestanding(g.freestanding)
     setLandings(g.landings); setStairs(autoStairSteps(g.stairs, g.height, g.landings))
     setQtyOv({})
   })
-  const drawn = draw.last ? deckFromDrawing(draw.last) : null
+  const drawn = draw.last ? deckFromDrawing(draw.last, S?.drawKey) : null
   const drawSummary = drawn && [
     drawn.sizeMode === 'dims' ? `${drawn.width}′×${drawn.depth}′` : `${drawn.areaSF} SF`,
     `${drawn.height}′ high`,

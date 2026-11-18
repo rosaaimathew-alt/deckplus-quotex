@@ -264,7 +264,7 @@
         enclose: /front only/i.test(p.sides || '') ? 'front0' : /1 side/i.test(p.sides || '') ? 'front1' : 'front2',
         gableEnd: (Number(p.glassEnds) || 0) > 0 ? 'glass' : (type === 'screen' ? 'screen' : 'siding'),
         stairW: Math.min(30, Math.max(3, Number(p.stairWidthFt) || 4)), landing: (Number(p.landings) || 0) > 0 ? 'straight' : 'none', doorWall: p.doorWall,
-        stepsQuoted: p.stepsQuoted !== false };
+        stepsQuoted: p.stepsQuoted !== false, ...(p.conversion ? { conv: true } : {}) };
     }).map(q => {
       // No steps on the porch quote and a deck on the job: the porch walks out level onto the deck
       // (same floor height, no gap), its door opens onto the deck, and the deck has the steps down.
@@ -446,7 +446,7 @@
   if (DESIGN) {
     const els = layoutFrom(DESIGN);
     S.els = els; nextId = Math.max(0, ...els.map(e => e.id)) + 1;
-    if (!els.length) EMPTY_NOTE = 'Nothing on this proposal came from the deck, porch or hardscape builders. Draw it with the tools on the left.';
+    if (!els.length) EMPTY_NOTE = LINK ? 'Draw the deck or porch with the tools on the left: the quote fills itself in.' : 'Nothing on this proposal came from the deck, porch or hardscape builders. Draw it with the tools on the left.';
     const coll = String((DESIGN.decks || [])[0]?.collKey || '').toLowerCase();
     const named = COLORS.find(([n]) => coll.includes(n.toLowerCase()));
     if (named) S.color = named[0]; else if (/\bpt\b|pressure/.test(coll)) S.color = 'PT';
@@ -1241,8 +1241,8 @@
     const landings = S.els.filter(e => e.type === 'landing').map(e => ({ id: e.id, width: r1(e.w), depth: r1(e.d), h: r1(Number(e.h) || 0) }));
     const porches = S.els.filter(e => e.type === 'porch').map(e => ({ id: e.id, w: e.w, d: e.d, ptype: e.ptype, tie: e.tie, roof: e.roof,
       pitch: Number(e.pitch) > 0 ? Number(e.pitch) : null, floor: e.floor, h: e.h, wallH: e.wallH, enclose: e.enclose, doorWall: e.doorWall || 'front',
-      gableEnd: e.gableEnd || null, steps: e.floor === 'deck' && e.steps !== false, stairW: e.stairW || 4, landing: e.landing || 'none' }));
-    return { decks, stairs, landings, porches };
+      gableEnd: e.gableEnd || null, steps: e.floor === 'deck' && e.steps !== false, stairW: e.stairW || 4, landing: e.landing || 'none', ...(e.conv ? { conv: true } : {}) }));
+    return { decks, stairs, landings, porches, build: { decking: S.build.decking, rail: S.build.rail, skirt: S.build.skirt } };
   }
   function send3D(force) {
     clearTimeout(sendT);
@@ -1337,7 +1337,7 @@
   document.addEventListener('keydown', (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); saveNow(); } });
   window.addEventListener('beforeunload', (ev) => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
   if (CUSTOMER) setStatus('');
-  else if (!PID) setStatus(LINK ? 'Linked to the builder: changes update its price' : 'Open from Sales → Designs to save');
+  else if (!PID) setStatus(LINK ? 'Linked to the quote: changes update its price' : 'Open from Sales → Designs to save');
   else if (!store) setStatus('Saving is unavailable here');
   else {
     setStatus('Loading…');
