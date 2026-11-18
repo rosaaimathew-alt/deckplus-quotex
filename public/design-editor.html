@@ -266,7 +266,8 @@
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18M3 12h18M3 15h18" stroke="#2f6fd1" stroke-width="1.6"/></svg>Drop beam</span>
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M10 3v18M15 3v18M17 3v18" stroke="#8fb2e8" stroke-width="1.4"/></svg>Joists 16″ o.c.</span>
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="#8fb2e8" stroke-width="1.4"/><rect x="5.8" y="8.5" width="5.4" height="3" fill="#dbe7fb" stroke="#2f6fd1" stroke-width="1"/><rect x="12.8" y="12.5" width="5.4" height="3" fill="#dbe7fb" stroke="#2f6fd1" stroke-width="1"/></svg>Blocking at mid-span (joist spans over 8′)</span>
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v18M15 3v18M9 7h6M9 12h6M9 17h6" stroke="#2f6fd1" stroke-width="1.6"/></svg>Transition board over a doubled joist</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M16 3v18" stroke="#2f6fd1" stroke-width="1.6"/><rect x="9" y="6" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/><rect x="9" y="11" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/><rect x="9" y="16" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/></svg>Ladder: under transition boards and at joist splices</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v15" stroke="#111827" stroke-width="2"/><path d="M3 8h15v12M3 11h12v9" stroke="#2f6fd1" stroke-width="1.4"/></svg>Double rim joist</span>
         <em>Framing preview: sizes follow the state code once it is loaded</em></div>
       <div class="zoomc" aria-label="Zoom"><button type="button" id="z-out" aria-label="Zoom out">−</button><span id="z-pct">100%</span><button type="button" id="z-in" aria-label="Zoom in">+</button></div>
     </div>
@@ -658,10 +659,36 @@
       const JL = '#8fb2e8', BM = '#2f6fd1', fg = el('g', { 'pointer-events': 'none' }, grp);
       // joists 16″ o.c., out from the house
       for (let x = x0 + 16 / 12; x < x1 - 0.2; x += 16 / 12) clipLine(pts, 'x', x).forEach(([a, b]) => [-0.06, 0.06].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: JL, 'stroke-width': P * 0.9 }, fg)));
-      // a doubled joist ladder under each transition board
+      const th = Math.max(0.125, P * 4.5);
+      const block = (x, z, w) => el('rect', { x, y: z - th / 2, width: Math.max(0.05, w), height: th, fill: '#dbe7fb', stroke: '#2f6fd1', 'stroke-width': P * 0.9 }, fg);
+      // a row of blocks between each pair of joists from lo to hi at z, staggered so each can be end-nailed
+      const blockRow = (z, lo, hi, stagger = true) => {
+        const stops = [lo]; for (let x = x0 + 16 / 12; x < hi - 0.1; x += 16 / 12) if (x > lo + 0.1) stops.push(x); stops.push(hi);
+        const st = stagger ? Math.max(0.1, P * 3.5) : 0;
+        for (let i = 0; i + 1 < stops.length; i++) block(stops[i] + 0.08, z + (i % 2 ? st : -st), stops[i + 1] - stops[i] - 0.16);
+      };
+      // double rim joist on every side but the house (the ledger is there)
+      const insetPts = (d) => {
+        const n = pts.length, lines = edges(pts).map(([a, b]) => {
+          const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+          let nx = -uz, nz = ux; const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+          if (!inPoly(mx + nx * 0.05, mz + nz * 0.05, pts)) { nx = -nx; nz = -nz; }
+          return { p: [a[0] + nx * d, a[1] + nz * d], u: [ux, uz] };
+        });
+        return lines.map((l2, i) => {
+          const l1 = lines[(i - 1 + n) % n], den = l1.u[0] * l2.u[1] - l1.u[1] * l2.u[0];
+          if (Math.abs(den) < 1e-6) return l2.p;
+          const t = ((l2.p[0] - l1.p[0]) * l2.u[1] - (l2.p[1] - l1.p[1]) * l2.u[0]) / den;
+          return [l1.p[0] + l1.u[0] * t, l1.p[1] + l1.u[1] * t];
+        });
+      };
+      [Math.max(0.125, P * 3.5), Math.max(0.25, P * 7)].forEach(d => { const r = insetPts(d);
+        edges(pts).forEach((ed, i) => { if (isHouse(ed)) return; const q1 = r[i], q2 = r[(i + 1) % r.length]; el('line', { x1: q1[0], y1: q1[1], x2: q2[0], y2: q2[1], stroke: '#2f6fd1', 'stroke-width': P * 1.4 }, fg); }); });
+      // a ladder under each transition board: two joists with a block every 12″
       transitionsOf(e).forEach(x => clipLine(pts, 'x', x).forEach(([a, b]) => {
-        [-0.25, 0.25].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: '#2f6fd1', 'stroke-width': P * 1.4 }, fg));
-        for (let z = a + 16 / 12; z < b - 0.3; z += 16 / 12) el('line', { x1: x - 0.25, y1: z, x2: x + 0.25, y2: z, stroke: '#2f6fd1', 'stroke-width': P * 1.4 }, fg);
+        const w = 0.9;
+        [-w / 2, w / 2].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: '#2f6fd1', 'stroke-width': P * 1.5 }, fg));
+        for (let z = a + 1; z < b - 0.4; z += 1) block(x - w / 2 + 0.06, z, w - 0.12);
         if (b - a > 4) tag(x, a + Math.min(3.2, (b - a) * 0.25), 'Transition board', '#0f766e', -90);
       }));
       // ledger on the house
@@ -698,15 +725,18 @@
         });
         const ang = Math.atan2(uz, ux) * 180 / Math.PI, up = ang > 90 || ang < -90 ? ang + 180 : ang;
         for (let i = 0; i < m; i++) { const [qx, qz] = at((posts[i] + posts[i + 1]) / 2); tag(qx - px * (0.45 + P * 8), qz - pz * (0.45 + P * 8), `${fmt(posts[i + 1] - posts[i])} Beam Span`, '#b42318', up); }
+        // joists splice (lap) over an inner beam: a ladder of blocks each side of it
+        if (r.mid) {
+          const lo = Math.min(A[0], B[0]), hi = Math.max(A[0], B[0]);
+          [-0.5, 0.5].forEach(o => clipLine(pts, 'z', A[1] + o).forEach(([c, d]) => { const l2 = Math.max(c, lo), h2 = Math.min(d, hi); if (h2 - l2 > 1) blockRow(A[1] + o, l2, h2, false); }));
+          tag(lo + (hi - lo) * 0.62, A[1] - 0.5 - P * 9, 'Joist splice', '#0f766e');
+        }
         // blocking halfway between this beam and the one behind it
         if (r.flat && back != null) {
           const from = r.mid ? back : (beamRuns.find(o => o.mid && Math.abs(o.A[0] - A[0]) < 0.01)?.A[1] ?? back), bz = (from + A[1]) / 2;
-          // a block between each pair of joists, staggered so each can be end-nailed
+          // a row of blocks between each pair of joists, staggered so each can be end-nailed
           if (A[1] - from > 8) clipLine(pts, 'z', bz).forEach(([c, d]) => {
-            const lo = Math.max(c, Math.min(A[0], B[0])), hi = Math.min(d, Math.max(A[0], B[0])); if (hi - lo < 1) return;
-            const stops = [lo]; for (let x = x0 + 16 / 12; x < hi - 0.1; x += 16 / 12) if (x > lo + 0.1) stops.push(x); stops.push(hi);
-            const th = Math.max(0.125, P * 5), st = Math.max(0.1, P * 3.5);
-            for (let i = 0; i + 1 < stops.length; i++) el('rect', { x: stops[i] + 0.08, y: bz - th / 2 + (i % 2 ? st : -st), width: Math.max(0.05, stops[i + 1] - stops[i] - 0.16), height: th, fill: '#dbe7fb', stroke: '#2f6fd1', 'stroke-width': P * 0.9 }, fg);
+            const lo = Math.max(c, Math.min(A[0], B[0])), hi = Math.min(d, Math.max(A[0], B[0])); if (hi - lo > 1) blockRow(bz, lo, hi);
           });
           if (!r.mid && A[1] - from > 2.5) tag(Math.min(A[0], B[0]) + Math.abs(B[0] - A[0]) * 0.22, (from + A[1]) / 2, `${fmt(A[1] - from)} Joist Span`, '#1d4ed8', -90);
         }
