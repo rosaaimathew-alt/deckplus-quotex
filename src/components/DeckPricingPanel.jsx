@@ -189,7 +189,7 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
     const g = deckFromDrawing(d, S?.drawKey)
     if (!g) return
     setSizeMode(g.sizeMode); setWidth(g.width); setDepth(g.depth); setAreaSF(g.areaSF); setOpenEdgeLF(g.openEdgeLF)
-    setHeight(g.height); setSections([]); setFreestanding(g.freestanding)
+    setHeight(g.height); setSections([]); setFreestanding(g.freestanding); if (g.border) setBorder(g.border)
     setLandings(g.landings); setStairs(autoStairSteps(g.stairs, g.height, g.landings))
     setQtyOv({})
   })

@@ -264,10 +264,10 @@
       <div class="keyc" id="keyc" hidden><b>Key</b>
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="#fff" stroke="#111827" stroke-width="2.4"/><rect x="8.5" y="8.5" width="7" height="7" fill="#111827"/></svg>Post on concrete footing</span>
         <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18M3 12h18M3 15h18" stroke="#2f6fd1" stroke-width="1.6"/></svg>Drop beam</span>
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M10 3v18M15 3v18M17 3v18" stroke="#8fb2e8" stroke-width="1.4"/></svg>Joists 16″ o.c.</span>
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="#8fb2e8" stroke-width="1.4"/><rect x="5.8" y="8.5" width="5.4" height="3" fill="#dbe7fb" stroke="#2f6fd1" stroke-width="1"/><rect x="12.8" y="12.5" width="5.4" height="3" fill="#dbe7fb" stroke="#2f6fd1" stroke-width="1"/></svg>Blocking at mid-span (joist spans over 8′)</span>
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M16 3v18" stroke="#2f6fd1" stroke-width="1.6"/><rect x="9" y="6" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/><rect x="9" y="11" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/><rect x="9" y="16" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/></svg>Ladder: under transition boards and at joist splices</span>
-        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v15" stroke="#111827" stroke-width="2"/><path d="M3 8h15v12M3 11h12v9" stroke="#2f6fd1" stroke-width="1.4"/></svg>Double rim joist</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M10 3v18M15 3v18M17 3v18" stroke="#8fb2e8" stroke-width="1.4"/></svg>Joists 12″ o.c.</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M12 3v18M19 3v18" stroke="#8fb2e8" stroke-width="1.4"/><rect x="5.8" y="8.5" width="5.4" height="3" fill="#dbe7fb" stroke="#2f6fd1" stroke-width="1"/><rect x="12.8" y="12.5" width="5.4" height="3" fill="#dbe7fb" stroke="#2f6fd1" stroke-width="1"/></svg>Blocking at mid-span (spans over 10′)</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M16 3v18" stroke="#2f6fd1" stroke-width="1.6"/><rect x="9" y="6" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/><rect x="9" y="11" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/><rect x="9" y="16" width="6" height="2.4" fill="#dbe7fb" stroke="#2f6fd1"/></svg>Ladder: under transition boards and where joists lap</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v15" stroke="#111827" stroke-width="2"/><path d="M3 8h15v12M3 11h12v9" stroke="#2f6fd1" stroke-width="1.4"/></svg>Rim joist: single, double with a border, triple at a porch</span>
         <em>Framing preview: sizes follow the state code once it is loaded</em></div>
       <div class="zoomc" aria-label="Zoom"><button type="button" id="z-out" aria-label="Zoom out">−</button><span id="z-pct">100%</span><button type="button" id="z-in" aria-label="Zoom in">+</button></div>
     </div>
@@ -360,7 +360,7 @@
     porchEls.forEach(q => { delete q.joined; delete q.stepsQuoted; });
     plats.forEach(p => {
       const W = Number(p.width) || 12, D0 = Number(p.depth) || 10, H = Number(p.height) || 3, zA = p.freestanding ? 3 : 0, D = zA + D0;
-      els.push({ id: id++, type: 'deck', h: H, pts: [[x, zA], [x + W, zA], [x + W, D], [x, D]] });
+      els.push({ id: id++, type: 'deck', h: H, pts: [[x, zA], [x + W, zA], [x + W, D], [x, D]], ...(p.border === '2-board' ? { border: '2' } : p.border === '1-board' ? { border: '1' } : {}) });
       // Bump-out sections on the same quote line: along the front, from the left, same height.
       let used = 0; const fronts = [];
       (p.sections || []).forEach(q => {
@@ -456,15 +456,47 @@
     return inside;
   }
   const edges = (pts) => pts.map((p, i) => [p, pts[(i + 1) % pts.length]]);
-  // Transition (breaker) boards across the decking where a run is longer than one board,
-  // each over a doubled joist ladder. Per deck: auto (over 20′), none, one centered, or two.
-  const BOARD_MAX = 20;
+  // Deck Plus framing standards: joists 12″ o.c.; a joist span over 14′ gets a second beam
+  // with the joists lapped over it; mid-span blocking on spans over 10′; decking comes in
+  // 12′, 16′ and 20′ boards. Rim joist: single, double under a picture-frame border, triple
+  // around a porch floor.
+  const JOIST_OC = 1, MAX_SPAN = 14, BLOCK_OVER = 10, BOARDS = [12, 16, 20], BOARD_MAX = 20;
+  // Transition (breaker) boards across the decking where a run is longer than the longest
+  // board, each over a joist ladder. Auto puts them on joists so every section is cut from
+  // the 12′, 16′ or 20′ board with the least waste; or none, one centered, two.
   function transitionsOf(e) {
-    const xs = e.pts.map(q => q[0]), x0 = Math.min(...xs), run = Math.max(...xs) - x0, mode = e.trans || 'auto', oc = 16 / 12;
+    const xs = e.pts.map(q => q[0]), x0 = Math.min(...xs), run = Math.max(...xs) - x0, mode = e.trans || 'auto', oc = JOIST_OC;
     const n = mode === 'none' ? 0 : mode === 'center' ? 1 : mode === 'two' ? 2 : Math.max(0, Math.ceil(run / BOARD_MAX - 1e-6) - 1);
-    const out = [];
-    for (let k = 1; k <= n; k++) out.push(x0 + Math.max(1, Math.round(run * k / (n + 1) / oc)) * oc);
-    return out;
+    if (!n) return [];
+    const even = Array.from({ length: n }, (_, k) => x0 + Math.max(1, Math.round(run * (k + 1) / (n + 1) / oc)) * oc);
+    if (mode !== 'auto' || n > 2) return even;
+    const stock = (L) => BOARDS.find(b => b >= L - 1e-6) ?? Infinity;
+    const joists = []; for (let x = x0 + oc; x < x0 + run - 0.5; x += oc) joists.push(x);
+    let best = null;
+    const tryCuts = (cuts) => {
+      const at = [x0, ...cuts, x0 + run]; let waste = 0;
+      for (let i = 0; i + 1 < at.length; i++) { const L = at[i + 1] - at[i], b = stock(L); if (!isFinite(b)) return; waste += b - L; }
+      const off = cuts.reduce((a, c, i) => a + Math.abs(c - (x0 + run * (i + 1) / (n + 1))), 0);
+      if (!best || waste < best.waste - 1e-6 || (Math.abs(waste - best.waste) < 1e-6 && off < best.off)) best = { waste, off, cuts };
+    };
+    if (n === 1) joists.forEach(a => tryCuts([a]));
+    else joists.forEach((a, i) => joists.slice(i + 1).forEach(b => tryCuts([a, b])));
+    return best ? best.cuts : even;
+  }
+  // The outline moved d feet inward on every side (each corner where the moved sides meet).
+  function insetPoly(pts, d) {
+    const n = pts.length, lines = pts.map((a, i) => {
+      const b = pts[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+      let nx = -uz, nz = ux; const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      if (!inPoly(mx + nx * 0.05, mz + nz * 0.05, pts)) { nx = -nx; nz = -nz; }
+      return { p: [a[0] + nx * d, a[1] + nz * d], u: [ux, uz] };
+    });
+    return lines.map((l2, i) => {
+      const l1 = lines[(i - 1 + n) % n], den = l1.u[0] * l2.u[1] - l1.u[1] * l2.u[0];
+      if (Math.abs(den) < 1e-6) return l2.p;
+      const t = ((l2.p[0] - l1.p[0]) * l2.u[1] - (l2.p[1] - l1.p[1]) * l2.u[0]) / den;
+      return [l1.p[0] + l1.u[0] * t, l1.p[1] + l1.u[1] * t];
+    });
   }
   function projSeg(px, pz, a, b) {
     const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1;
@@ -652,40 +684,26 @@
       el('rect', { x: x - w / 2, y: z - hh / 2, width: w, height: hh, fill: '#ffffff', stroke: color, 'stroke-width': P * 0.9, rx: P * 1.5 }, g2);
       const t = el('text', { x, y: z + fs * 0.36, 'font-size': fs, 'text-anchor': 'middle', fill: color, 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 500 }, g2); t.textContent = text;
     };
-    function drawFraming(e, pts, grp) {
+    function drawFraming(e, pts, grp, rims = 1) {
       const xs = pts.map(p => p[0]), zs = pts.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs);
       const isHouse = ([a, b]) => Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05;
       const house = edges(pts).filter(isHouse), back = house.length ? z0 : null;
       const JL = '#8fb2e8', BM = '#2f6fd1', fg = el('g', { 'pointer-events': 'none' }, grp);
       // joists 16″ o.c., out from the house
-      for (let x = x0 + 16 / 12; x < x1 - 0.2; x += 16 / 12) clipLine(pts, 'x', x).forEach(([a, b]) => [-0.06, 0.06].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: JL, 'stroke-width': P * 0.9 }, fg)));
+      for (let x = x0 + JOIST_OC; x < x1 - 0.2; x += JOIST_OC) clipLine(pts, 'x', x).forEach(([a, b]) => [-0.06, 0.06].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: JL, 'stroke-width': P * 0.9 }, fg)));
       const th = Math.max(0.125, P * 4.5);
       const block = (x, z, w) => el('rect', { x, y: z - th / 2, width: Math.max(0.05, w), height: th, fill: '#dbe7fb', stroke: '#2f6fd1', 'stroke-width': P * 0.9 }, fg);
       // a row of blocks between each pair of joists from lo to hi at z, staggered so each can be end-nailed
       const blockRow = (z, lo, hi, stagger = true) => {
-        const stops = [lo]; for (let x = x0 + 16 / 12; x < hi - 0.1; x += 16 / 12) if (x > lo + 0.1) stops.push(x); stops.push(hi);
+        const stops = [lo]; for (let x = x0 + JOIST_OC; x < hi - 0.1; x += JOIST_OC) if (x > lo + 0.1) stops.push(x); stops.push(hi);
         const st = stagger ? Math.max(0.1, P * 3.5) : 0;
         for (let i = 0; i + 1 < stops.length; i++) block(stops[i] + 0.08, z + (i % 2 ? st : -st), stops[i + 1] - stops[i] - 0.16);
       };
-      // double rim joist on every side but the house (the ledger is there)
-      const insetPts = (d) => {
-        const n = pts.length, lines = edges(pts).map(([a, b]) => {
-          const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
-          let nx = -uz, nz = ux; const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
-          if (!inPoly(mx + nx * 0.05, mz + nz * 0.05, pts)) { nx = -nx; nz = -nz; }
-          return { p: [a[0] + nx * d, a[1] + nz * d], u: [ux, uz] };
-        });
-        return lines.map((l2, i) => {
-          const l1 = lines[(i - 1 + n) % n], den = l1.u[0] * l2.u[1] - l1.u[1] * l2.u[0];
-          if (Math.abs(den) < 1e-6) return l2.p;
-          const t = ((l2.p[0] - l1.p[0]) * l2.u[1] - (l2.p[1] - l1.p[1]) * l2.u[0]) / den;
-          return [l1.p[0] + l1.u[0] * t, l1.p[1] + l1.u[1] * t];
-        });
-      };
-      [Math.max(0.125, P * 3.5), Math.max(0.25, P * 7)].forEach(d => { const r = insetPts(d);
+      // rim joist on every side but the house (the ledger is there): single, double, or triple
+      Array.from({ length: rims }, (_, k) => Math.max(0.125 * (k + 1), P * 3.5 * (k + 1))).forEach(d => { const r = insetPoly(pts, d);
         edges(pts).forEach((ed, i) => { if (isHouse(ed)) return; const q1 = r[i], q2 = r[(i + 1) % r.length]; el('line', { x1: q1[0], y1: q1[1], x2: q2[0], y2: q2[1], stroke: '#2f6fd1', 'stroke-width': P * 1.4 }, fg); }); });
       // a ladder under each transition board: two joists with a block every 12″
-      transitionsOf(e).forEach(x => clipLine(pts, 'x', x).forEach(([a, b]) => {
+      (e.type === 'deck' ? transitionsOf(e) : []).forEach(x => clipLine(pts, 'x', x).forEach(([a, b]) => {
         const w = 0.9;
         [-w / 2, w / 2].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: '#2f6fd1', 'stroke-width': P * 1.5 }, fg));
         for (let z = a + 1; z < b - 0.4; z += 1) block(x - w / 2 + 0.06, z, w - 0.12);
@@ -708,7 +726,7 @@
         const A = [a[0] - nx * cant, a[1] - nz * cant], B = [b[0] - nx * cant, b[1] - nz * cant];
         beamRuns.push({ A, B, L, ux, uz, flat: Math.abs(uz) < 0.05, cant });
         // a joist span over 14′ gets a second beam halfway back
-        if (house.length && Math.abs(uz) < 0.05 && A[1] - back > 14) beamRuns.push({ A: [A[0], back + (A[1] - back) / 2], B: [B[0], back + (A[1] - back) / 2], L, ux, uz, flat: true, cant: 0, mid: true });
+        if (house.length && Math.abs(uz) < 0.05 && A[1] - back > MAX_SPAN) beamRuns.push({ A: [A[0], back + (A[1] - back) / 2], B: [B[0], back + (A[1] - back) / 2], L, ux, uz, flat: true, cant: 0, mid: true });
       });
       beamRuns.forEach(r => {
         const { A, B, ux, uz } = r, len = Math.hypot(B[0] - A[0], B[1] - A[1]); if (len < 2) return;
@@ -725,17 +743,19 @@
         });
         const ang = Math.atan2(uz, ux) * 180 / Math.PI, up = ang > 90 || ang < -90 ? ang + 180 : ang;
         for (let i = 0; i < m; i++) { const [qx, qz] = at((posts[i] + posts[i + 1]) / 2); tag(qx - px * (0.45 + P * 8), qz - pz * (0.45 + P * 8), `${fmt(posts[i + 1] - posts[i])} Beam Span`, '#b42318', up); }
-        // joists splice (lap) over an inner beam: a ladder of blocks each side of it
+        // joists lap over an inner beam (each overlaps the next by 1′6″ beside it), with a
+        // ladder of blocks on each side
         if (r.mid) {
           const lo = Math.min(A[0], B[0]), hi = Math.max(A[0], B[0]);
+          for (let x = x0 + JOIST_OC; x < hi - 0.2; x += JOIST_OC) if (x > lo + 0.2) el('line', { x1: x + 0.19, y1: A[1] - 0.75, x2: x + 0.19, y2: A[1] + 0.75, stroke: '#2f6fd1', 'stroke-width': P * 1.4 }, fg);
           [-0.5, 0.5].forEach(o => clipLine(pts, 'z', A[1] + o).forEach(([c, d]) => { const l2 = Math.max(c, lo), h2 = Math.min(d, hi); if (h2 - l2 > 1) blockRow(A[1] + o, l2, h2, false); }));
-          tag(lo + (hi - lo) * 0.62, A[1] - 0.5 - P * 9, 'Joist splice', '#0f766e');
+          tag(lo + (hi - lo) * 0.62, A[1] - 0.5 - P * 9, 'Joists lapped over beam', '#0f766e');
         }
         // blocking halfway between this beam and the one behind it
         if (r.flat && back != null) {
           const from = r.mid ? back : (beamRuns.find(o => o.mid && Math.abs(o.A[0] - A[0]) < 0.01)?.A[1] ?? back), bz = (from + A[1]) / 2;
           // a row of blocks between each pair of joists, staggered so each can be end-nailed
-          if (A[1] - from > 8) clipLine(pts, 'z', bz).forEach(([c, d]) => {
+          if (A[1] - from > BLOCK_OVER) clipLine(pts, 'z', bz).forEach(([c, d]) => {
             const lo = Math.max(c, Math.min(A[0], B[0])), hi = Math.min(d, Math.max(A[0], B[0])); if (hi - lo > 1) blockRow(bz, lo, hi);
           });
           if (!r.mid && A[1] - from > 2.5) tag(Math.min(A[0], B[0]) + Math.abs(B[0] - A[0]) * 0.22, (from + A[1]) / 2, `${fmt(A[1] - from)} Joist Span`, '#1d4ed8', -90);
@@ -776,6 +796,7 @@
           if (e.roof !== 'shed') el('line', { x1: e.x, y1: z0, x2: e.x, y2: e.z + e.d + ov, stroke: '#7a7a7a', 'stroke-width': P, 'stroke-dasharray': `${P * 3} ${P * 3}` }, grp);
         }
         el('polygon', { points: ptsAttr(pts), fill: e.type === 'porch' ? '#f1f5f9' : (e.mat === 'concrete' ? '#eceae6' : '#e9e7e1'), stroke: '#1a1c38', 'stroke-width': P * (e.type === 'patio' && Number(e.wallH) > 0 ? 4 : 2) }, grp);
+        if (e.type === 'porch' && FRAME && e.floor === 'deck') drawFraming(e, pts, grp, 3);
         if (e.type === 'patio' && e.mat !== 'concrete') {
           const clip = `clip${e.id}`; const cp = el('clipPath', { id: clip }, grp); el('polygon', { points: ptsAttr(pts) }, cp);
           const bl = el('g', { 'clip-path': `url(#${clip})` }, grp);
@@ -790,13 +811,19 @@
         const pts = polyOf(e);
         const framed = FRAME && e.type === 'deck';
         el('polygon', { points: ptsAttr(pts), fill: framed ? '#f4f5f7' : e.type === 'deck' ? '#f6efe2' : '#efe6d4', stroke: '#111827', 'stroke-width': P * (framed ? 2.8 : 2), 'stroke-linejoin': 'round' }, grp);
-        if (framed) drawFraming(e, pts, grp);
+        if (framed) drawFraming(e, pts, grp, e.border === '1' || e.border === '2' ? 2 : 1);
         else {
           // board lines parallel to the house
           const zs = pts.map(p => p[1]), xs = pts.map(p => p[0]);
           const clip = `clip${e.id}`; const cp = el('clipPath', { id: clip }, grp); el('polygon', { points: ptsAttr(pts) }, cp);
           const bl = el('g', { 'clip-path': `url(#${clip})` }, grp);
           for (let z = Math.min(...zs) + 5.75 / 12; z < Math.max(...zs); z += 5.75 / 12) el('line', { x1: Math.min(...xs), y1: z, x2: Math.max(...xs), y2: z, stroke: '#d9cbb3', 'stroke-width': P * 0.8 }, bl);
+          // picture-frame border: 1 or 2 boards around every side but the house
+          if (e.type === 'deck' && (e.border === '1' || e.border === '2')) {
+            const isH = ([a, b]) => Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05;
+            for (let k = 1; k <= Number(e.border); k++) { const r = insetPoly(pts, 0.46 * k);
+              edges(pts).forEach((ed, i) => { if (isH(ed)) return; const q1 = r[i], q2 = r[(i + 1) % r.length]; el('line', { x1: q1[0], y1: q1[1], x2: q2[0], y2: q2[1], stroke: '#9c7f52', 'stroke-width': P * 1.4 }, grp); }); }
+          }
           if (e.type === 'deck') transitionsOf(e).forEach(x => clipLine(pts, 'x', x).forEach(([a, b]) => el('rect', { x: x - 0.23, y: a, width: 0.46, height: b - a, fill: '#eadbbf', stroke: '#b49a6c', 'stroke-width': P * 0.8 }, bl)));
         }
         const [cx, cz] = centroid(pts);
@@ -1348,8 +1375,9 @@
       const pts = e.pts, area = Math.abs(pts.reduce((a, q, i) => { const r = pts[(i + 1) % pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2);
       const xs = pts.map(q => q[0]), zs = pts.map(q => q[1]);
       h = `<b class="ptitle">Deck</b>` + grp('Size', `${num('h', 'Height (ft)', e.h, 0.25)}${num('dw', 'Width', Math.max(...xs) - Math.min(...xs), 0.5, 3)}${num('dd', 'Depth', Math.max(...zs) - Math.min(...zs), 0.5, 3)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`, 'drag a side or corner on the plan to reshape')
-        + grp('Decking', pick('trans', 'Transition boards', [['auto', `Auto (runs over ${BOARD_MAX}′)`], ['none', 'None'], ['center', 'One, centered'], ['two', 'Two']], e.trans || 'auto')
-          + `<label>On this deck<span class="ro">${transitionsOf(e).length || 'None'}</span></label>`, 'each sits on a doubled joist')
+        + grp('Decking', pick('border', 'Picture-frame border', [['none', 'None'], ['1', '1 board'], ['2', '2 boards']], e.border || 'none')
+          + pick('trans', 'Transition boards', [['auto', `Auto (runs over ${BOARD_MAX}′)`], ['none', 'None'], ['center', 'One, centered'], ['two', 'Two']], e.trans || 'auto')
+          + `<label>On this deck<span class="ro">${transitionsOf(e).length || 'None'}</span></label>`, '12′, 16′ and 20′ boards; a border doubles the rim joist')
         + grp('Skirting', pick('skirt', 'Skirting', [['', 'Same as all decks'], ...[['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']]], e.skirt || ''));
     } else if (e.type === 'landing') {
       h = `<b class="ptitle">Landing</b>${pick('skirt', 'Skirting', [['', 'Same as all decks'], ...[['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']]], e.skirt || '')}${num('h', 'Height (ft)', e.h, 0.25)}${num('w', 'Width', e.w, 0.5, 3)}${num('d', 'Depth', e.d, 0.5, 3)}${num('rot', 'Angle°', e.rot, 1, -180)}`;
@@ -1474,7 +1502,7 @@
       const rect = pts.length === 4 && edges(pts).every(([a, b]) => Math.abs(a[0] - b[0]) < 0.01 || Math.abs(a[1] - b[1]) < 0.01);
       const area = Math.abs(pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
       return { id: e.id, h: r1(Number(e.h) || 0), rect, width: r1(Math.max(...xs) - Math.min(...xs)), depth: r1(Math.max(...zs) - Math.min(...zs)),
-        area: Math.round(area), railLF: Math.round(M.rail), openLF: Math.round(M.open), house: M.house, transitions: transitionsOf(e).length };
+        area: Math.round(area), railLF: Math.round(M.rail), openLF: Math.round(M.open), house: M.house, transitions: transitionsOf(e).length, border: e.border === '1' || e.border === '2' ? e.border : 'none' };
     });
     const stairs = S.els.filter(e => e.type === 'stairs' && e.of == null).map(e => { const i = stairInfo(e);
       return { id: e.id, from: i.host?.el.id ?? null, to: i.foot ? i.foot.id : 'grade', across: r1(Number(e.w) || 4), steps: i.n, boxed: !!e.boxed }; });

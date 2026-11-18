@@ -28,7 +28,7 @@ export function deckStateFromDrawing(g, build, prev) {
   return {
     ...base,
     sizeMode: g.sizeMode, width: g.width, depth: g.depth, areaSF: g.areaSF, openEdgeLF: g.openEdgeLF, height: g.height,
-    sections: [], freestanding: g.freestanding, landings: g.landings, stairs: autoStairSteps(g.stairs, g.height, g.landings), qtyOv: {},
+    sections: [], freestanding: g.freestanding, border: g.border || base.border, landings: g.landings, stairs: autoStairSteps(g.stairs, g.height, g.landings), qtyOv: {},
   }
 }
 

@@ -103,6 +103,8 @@ function groupTakeoff(d, { H, pieces: main, area: areaAll, lead }) {
     freestanding: !main.some(x => x.house),
     stairs, landings,
     railLF: main.reduce((a, x) => a + x.railLF, 0),
+    // picture-frame border, as the Deck Builder names it
+    border: lead.border === '2' ? '2-board' : lead.border === '1' ? '1-board' : 'None',
   }
 }
 
