@@ -22,6 +22,8 @@ export function designParts(lines = []) {
         doorWall: pb.doorWall || '', stairWidthFt: n(pb.steps?.stairWidthFt) || 0, landings: n(pb.landings?.count) || 0,
         // Steps are on the quote only when a stair product is picked; otherwise the porch walks out level onto the deck.
         stepsQuoted: !!String(pb.steps?.product || '').trim(),
+        // The drawing made from this builder line ("Draw it"), kept on this device (lib/drawingLink.js).
+        link: l.builder?.state?.drawLink || '',
       })
       continue
     }
@@ -43,6 +45,7 @@ export function designParts(lines = []) {
         // Stair runs and landings as the deck builder links them (from 'deck' / a landing → to a landing / 'grade'), for the design editor
         stairs: (st.stairs || []).filter(s => s.auto || n(s.steps) > 0).map(s => ({ id: s.id, across: n(s.across) || 4, steps: n(s.steps), from: s.from || 'deck', to: s.to || 'grade', boxed: /box/i.test(s.style || '') })),
         landings: (st.landings || []).map(x => ({ id: x.id, width: n(x.width), depth: n(x.depth), height: n(x.height) })),
+        link: st.drawLink || '',
       })
       continue
     }

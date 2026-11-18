@@ -240,6 +240,17 @@
   let SENT = null; try { const m = location.hash.match(/[#&]d=([^&]+)/); SENT = m ? JSON.parse(decodeURIComponent(m[1])) : null; } catch { SENT = null; }
   if (CUSTOMER) document.body.classList.add('customer');
   let DESIGN = null; try { DESIGN = QS.get('design') ? JSON.parse(QS.get('design')) : null; } catch { DESIGN = null; }
+  // ?link=<key>: opened from the Deck Builder or Porch Builder ("Draw it"). Every change
+  // here writes the drawing's measurements to this browser's storage under that key, and
+  // the builder in the other tab fills its fields from them (src/lib/drawingLink.js).
+  const LINK = CUSTOMER ? '' : (QS.get('link') || '').replace(/[^\w-]/g, '').slice(0, 40);
+  // The last drawing made from this builder (or from any builder line on the proposal), on this device.
+  const LINKED = (() => {
+    const keys = [LINK, ...[...(DESIGN?.decks || []), ...(DESIGN?.porches || [])].map(x => String(x.link || '').replace(/[^\w-]/g, ''))].filter(Boolean);
+    let best = null;
+    keys.forEach(k => { try { const o = JSON.parse(localStorage.getItem('qx-drawing-snap:' + k) || 'null'); if (o && Array.isArray(o.els) && o.els.length && (!best || (o.at || 0) > (best.at || 0))) best = o; } catch { /* none */ } });
+    return best;
+  })();
   function layoutFrom(d) {
     const els = []; let id = 1;
     const plats = [...(d.decks || [])];
@@ -453,10 +464,22 @@
   const snap = () => JSON.stringify({ v: 2, els: S.els, color: S.color, build: S.build, nextId, house: S.house || null, share: S.share === true });
   let lastSaved = snap();
   let onChange = () => {};        // set once the saved design has loaded (see Save to the proposal)
-  function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); onChange(); }
+  function commit() { const now = snap(); if (now === lastSaved) return; hist.push(lastSaved); if (hist.length > 100) hist.shift(); fut.length = 0; lastSaved = now; refreshButtons(); onChange(); publish(); }
   function restore(json) { const o = JSON.parse(json); S.els = o.els; S.color = o.color; S.house = o.house || null; S.share = o.share === true; if ($('b-share')) $('b-share').checked = S.share; if (typeof shareNote === 'function') shareNote(); S.build = { ...BUILD_DEF, ...(o.build || legacyBuild(o.color)) }; nextId = o.nextId; lastSaved = json; if (!byId(sel)) sel = null; changed(); }
-  function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); refreshButtons(); onChange(); }
-  function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); refreshButtons(); onChange(); }
+  function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); refreshButtons(); onChange(); publish(); }
+  function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); refreshButtons(); onChange(); publish(); }
+  // To the builder that opened this drawing: its measurements, a moment after each change.
+  let pubT = null;
+  function publish() {
+    if (!LINK) return;
+    clearTimeout(pubT);
+    pubT = setTimeout(() => {
+      try {
+        localStorage.setItem('qx-drawing:' + LINK, JSON.stringify({ ...takeoff(), at: Date.now() }));
+        localStorage.setItem('qx-drawing-snap:' + LINK, JSON.stringify({ ...JSON.parse(snap()), at: Date.now() }));
+      } catch { /* storage full or blocked: the builder keeps its own numbers */ }
+    }, 150);
+  }
 
   // ═══ 2D plan ═════════════════════════════════════════════════════════════
   const svg = $('plan'), NS = 'http://www.w3.org/2000/svg';
@@ -1194,6 +1217,33 @@
     const meta = DESIGN ? { client: DESIGN.client || '', address: DESIGN.address || '', phone: DESIGN.phone || '', email: DESIGN.email || '', contract: DESIGN.contractNum || '' } : null;
     return { type: 'qx-design-3d', sections, free: { plats, stairs }, H, build: S.build, meta, house: S.house || null };
   }
+  // ═══ What the builders price from ════════════════════════════════════════
+  // Decks: size (W × D when a plain rectangle, else area), height, railing and open edge
+  // (the same edges the 3D draws railing and skirting on), stair runs with where they land,
+  // and landings. Porches: everything the Porch Builder prices (size, type, roof, tie,
+  // floor and height, walls, door wall, steps and landing).
+  function takeoff() {
+    const m = renderModel(), r1 = (v) => Math.round(v * 10) / 10;
+    const flat = S.els.filter(e => e.type === 'deck' || e.type === 'landing');
+    const segL = (r) => Math.hypot(r[2] - r[0], r[3] - r[1]);
+    const meas = new Map(flat.map((e, i) => { const q = m.free.plats[i];
+      return [e.id, { rail: q.edges.reduce((a, ed) => a + ed.rails.reduce((b, r) => b + segL(r), 0), 0),
+        open: q.edges.reduce((a, ed) => a + ed.skirt.reduce((b, [p, t]) => b + (t - p), 0), 0), house: !!q.houseSpan }]; }));
+    const decks = S.els.filter(e => e.type === 'deck').map(e => {
+      const pts = e.pts, xs = pts.map(p => p[0]), zs = pts.map(p => p[1]), M = meas.get(e.id);
+      const rect = pts.length === 4 && edges(pts).every(([a, b]) => Math.abs(a[0] - b[0]) < 0.01 || Math.abs(a[1] - b[1]) < 0.01);
+      const area = Math.abs(pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+      return { id: e.id, h: r1(Number(e.h) || 0), rect, width: r1(Math.max(...xs) - Math.min(...xs)), depth: r1(Math.max(...zs) - Math.min(...zs)),
+        area: Math.round(area), railLF: Math.round(M.rail), openLF: Math.round(M.open), house: M.house };
+    });
+    const stairs = S.els.filter(e => e.type === 'stairs' && e.of == null).map(e => { const i = stairInfo(e);
+      return { id: e.id, from: i.host?.el.id ?? null, to: i.foot ? i.foot.id : 'grade', across: r1(Number(e.w) || 4), steps: i.n, boxed: !!e.boxed }; });
+    const landings = S.els.filter(e => e.type === 'landing').map(e => ({ id: e.id, width: r1(e.w), depth: r1(e.d), h: r1(Number(e.h) || 0) }));
+    const porches = S.els.filter(e => e.type === 'porch').map(e => ({ id: e.id, w: e.w, d: e.d, ptype: e.ptype, tie: e.tie, roof: e.roof,
+      pitch: Number(e.pitch) > 0 ? Number(e.pitch) : null, floor: e.floor, h: e.h, wallH: e.wallH, enclose: e.enclose, doorWall: e.doorWall || 'front',
+      gableEnd: e.gableEnd || null, steps: e.floor === 'deck' && e.steps !== false, stairW: e.stairW || 4, landing: e.landing || 'none' }));
+    return { decks, stairs, landings, porches };
+  }
   function send3D(force) {
     clearTimeout(sendT);
     sendT = setTimeout(() => { if (!frame?.contentWindow || !OPTS) return; const m = renderModel(); if (firstSend || force) m.frame = true; firstSend = false; frame.contentWindow.postMessage(m, '*'); }, force ? 0 : 120);
@@ -1261,6 +1311,7 @@
     const w = Math.max(x1 - x0, (z1 - z0) / asp, 20); vb = { x: (x0 + x1) / 2 - w / 2, z: z0 - ((w * asp) - (z1 - z0)) / 2 * 0.3, w }; drawPlan();
   }
   $('b-fit').addEventListener('click', fitPlan);
+  if (!CUSTOMER && LINKED) { S.els = LINKED.els; if (LINKED.color) S.color = LINKED.color; S.build = { ...BUILD_DEF, ...(LINKED.build || {}) }; S.house = LINKED.house || null; nextId = LINKED.nextId || S.els.length + 1; lastSaved = snap(); }
   if (CUSTOMER && SENT && Array.isArray(SENT.els) && SENT.els.length) { S.els = SENT.els; if (SENT.color) S.color = SENT.color; S.build = { ...BUILD_DEF, ...(SENT.build || {}) }; S.house = SENT.house || null; if (!SENT.build && SENT.color) S.pendingLegacy = SENT.color; nextId = SENT.nextId || SENT.els.length + 1; lastSaved = snap(); }
   init3D(); frame3D(); sel = DESIGN || CUSTOMER ? null : 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
   if (EMPTY_NOTE && !CUSTOMER) $('tip').textContent = EMPTY_NOTE;
@@ -1286,7 +1337,7 @@
   document.addEventListener('keydown', (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); saveNow(); } });
   window.addEventListener('beforeunload', (ev) => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
   if (CUSTOMER) setStatus('');
-  else if (!PID) setStatus('Open from Sales → Designs to save');
+  else if (!PID) setStatus(LINK ? 'Linked to the builder: changes update its price' : 'Open from Sales → Designs to save');
   else if (!store) setStatus('Saving is unavailable here');
   else {
     setStatus('Loading…');
@@ -1303,7 +1354,7 @@
       onChange = () => { dirty = true; setStatus('Unsaved changes'); clearTimeout(saveT); saveT = setTimeout(saveNow, 1500); };
     });
   }
-  window.__ed = { S, stairInfo, get hwin() { return HWIN; }, load(els) { S.els = els; nextId = Math.max(...els.map(e => e.id)) + 1; sel = null; commit(); changed(); frame3D(); fitPlan(); } };
+  window.__ed = { S, stairInfo, takeoff, get hwin() { return HWIN; }, load(els) { S.els = els; nextId = Math.max(...els.map(e => e.id)) + 1; sel = null; commit(); changed(); frame3D(); fitPlan(); } };
 })();
 </script>
 </body>
