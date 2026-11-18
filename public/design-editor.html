@@ -20,159 +20,226 @@
 <title>Deck Plus Design Editor</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
-  /* Layout: toolbar across the top, 2D plan (left) and live 3D (right); stacked on phones. */
+  /* Deck Plus look: the app's own brand color and type. Header, a labeled toolbar, a hint line,
+     then the plan, the live 3D and the settings panel side by side (stacked on phones). */
   :root {
-    --bg: #eef2ef; --panel: #ffffff; --fg: #1b2520; --muted: #5a675f; --line: #d5ddd7;
-    --accent: #2c6a4d; --accent-fg: #ffffff; --accent-soft: #e3efe8; --danger: #a23b2a;
-    --plan-bg: #f7f8f6; --grid: #e2e6e2; --grid2: #c9d0ca;
-    --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
-    --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
-    --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --bg: #f5f7f9; --panel: #ffffff; --fg: #0f172a; --muted: #64748b; --line: #e2e8f0; --line2: #cbd5e1;
+    --accent: #1d758b; --accent-fg: #ffffff; --accent-soft: #e8f3f6; --accent-ink: #145667; --danger: #b42318;
+    --plan-bg: #ffffff; --grid: #e3eaf2; --grid2: #c7d3e0;
+    --font-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "Inter", system-ui, sans-serif;
+    --shadow: 0 1px 2px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.06);
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --bg: #111714; --panel: #18201c; --fg: #e4ebe6; --muted: #98a69e; --line: #2a3530;
-    --accent: #72c196; --accent-fg: #0c140f; --accent-soft: #1f3128; --danger: #e48b78;
-    --plan-bg: #f7f8f6; --grid: #e2e6e2; --grid2: #c9d0ca; color-scheme: dark; } }
+    --bg: #0e1418; --panel: #151d22; --fg: #e6edf1; --muted: #94a3b0; --line: #26323a; --line2: #33424c;
+    --accent: #4fb3c9; --accent-fg: #071318; --accent-soft: #15313a; --accent-ink: #8fd3e2; --danger: #f08b7c; color-scheme: dark; } }
   :root[data-theme="dark"] {
-    --bg: #111714; --panel: #18201c; --fg: #e4ebe6; --muted: #98a69e; --line: #2a3530;
-    --accent: #72c196; --accent-fg: #0c140f; --accent-soft: #1f3128; --danger: #e48b78;
-    --plan-bg: #f7f8f6; --grid: #e2e6e2; --grid2: #c9d0ca; color-scheme: dark; }
+    --bg: #0e1418; --panel: #151d22; --fg: #e6edf1; --muted: #94a3b0; --line: #26323a; --line2: #33424c;
+    --accent: #4fb3c9; --accent-fg: #071318; --accent-soft: #15313a; --accent-ink: #8fd3e2; --danger: #f08b7c; color-scheme: dark; }
   html, body { height: 100%; }
-  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; }
-  .app { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
-  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--panel); border-bottom: 1px solid var(--line);
-    padding-block: 8px; padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
-  .bar h1 { font: 700 19px/1 var(--font-display); margin: 0 10px 0 0; }
-  .grp { display: flex; gap: 3px; align-items: center; padding: 3px; border: 1px solid var(--line); border-radius: 9px; }
-  .proj { font-size: 13px; color: var(--muted); }
-  .sheetg { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-  .sheetg select { font: 500 13px var(--font-body); padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
-  .ghost-btn { font: 600 13px var(--font-body); padding: 7px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
-  .ghost-btn:hover { border-color: var(--accent); }
-  body.customer .sheetg { display: none !important; }
-  .share-tg { display: flex; align-items: center; gap: 6px; font: 600 13px var(--font-body); color: var(--fg); cursor: pointer; white-space: nowrap; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; -webkit-font-smoothing: antialiased; }
+  .app { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); height: 100%; }
+  button, .btn { font: 500 13px/1 var(--font-body); padding: 8px 10px; border-radius: 8px; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button:disabled { opacity: .38; cursor: default; }
+
+  /* ── Header ── */
+  .app > * { min-width: 0; }
+  .bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--panel); border-bottom: 1px solid var(--line);
+    padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .brandg { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 0; }
+  .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; flex: none; }
+  .logo svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .bar h1 { font: 650 16px/1 var(--font-display); margin: 0; letter-spacing: -.01em; white-space: nowrap; }
+  .crumb-sep { color: var(--line2); }
+  .proj { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .save-status { font: 500 12px/1 var(--font-body); color: var(--muted); white-space: nowrap; }
+  .save-status:not(:empty) { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+  .save-status:not(:empty)::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #16a34a; }
+  .save-status.unsaved::before { background: #d97706; }
+  .barR { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+  .sheetg, .saveg { display: flex; align-items: center; gap: 8px; }
+  .sheetg select { font: 500 13px var(--font-body); height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); }
+  .ghost-btn { font: 500 13px/1 var(--font-body); height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); white-space: nowrap; }
+  .ghost-btn:hover { background: var(--bg); border-color: var(--line2); }
+  .share-tg { display: flex; align-items: center; gap: 7px; font: 500 13px var(--font-body); color: var(--fg); cursor: pointer; white-space: nowrap; padding: 0 6px; }
   .share-tg input { width: 16px; height: 16px; accent-color: var(--accent); }
-  .share-tg.off { color: #b03a2e; }
-  .share-tg.off::after { content: ': not on the proposal, tick to add it'; font-weight: 500; }
-  .saveg { display: flex; align-items: center; gap: 8px; }
-  .save-status { font-size: 12px; color: var(--muted); }
-  .save-btn { font: 600 13px var(--font-body); padding: 6px 12px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); cursor: pointer; }
+  .share-tg.off { color: var(--muted); }
+  .save-btn { font: 600 13px/1 var(--font-body); height: 34px; padding: 0 16px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); cursor: pointer; white-space: nowrap; }
+  .save-btn:hover:not(:disabled) { filter: brightness(.94); }
   .save-btn:disabled { opacity: .45; cursor: default; }
-  .grp span { font: 600 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 6px; }
-  button, .btn { font: 600 13px/1 var(--font-body); padding: 8px 10px; border-radius: 7px; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
-  button:hover { background: var(--accent-soft); }
-  button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
-  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  button:disabled { opacity: .4; cursor: default; background: transparent; }
-  .danger { color: var(--danger); }
-  body.customer .rail, body.customer .saveg, body.customer .props, body.customer .bar .grp { display: none !important; }
-  body.customer .main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  body.customer .view-wrap { order: -1; }            /* the customer sees the 3D first */
-  body.customer .plan-wrap { border-right: 0; }
-  body.customer .view-wrap { border-right: 1px solid var(--line); }
-  body.customer #plan { cursor: grab; }
-  .rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }
-  .rail button { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 8px; }
-  .rail svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .rail hr { width: 28px; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
-  .main { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
-  .plan-wrap { position: relative; min-width: 0; background: var(--plan-bg); border-right: 1px solid var(--line); }
+
+  /* ── Toolbar: labeled tools, then view controls on the right ── */
+  .rail { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+  .tgrp { display: flex; align-items: center; gap: 2px; padding-right: 8px; margin-right: 2px; border-right: 1px solid var(--line); }
+  .tgrp:last-of-type { border-right: 0; }
+  .rail button { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border-radius: 8px; color: var(--fg); font-weight: 500; white-space: nowrap; }
+  .rail button.icon { width: 34px; padding: 0; justify-content: center; }
+  .rail button:hover:not(:disabled) { background: var(--bg); }
+  .rail button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+  .rail svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .rail .danger { color: var(--danger); }
+  .rail .spacer { flex: 1 1 auto; }
+  .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
+  .seg button { height: 28px !important; padding: 0 12px !important; border-radius: 6px !important; color: var(--muted) !important; font-weight: 500; }
+  .seg button[aria-pressed="true"] { background: var(--panel) !important; color: var(--fg) !important; font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,.12); }
+
+  /* ── Hint line ── */
+  .hint { display: flex; align-items: center; gap: 8px; padding: 7px max(16px, env(safe-area-inset-left, 0px)); background: var(--bg); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); min-height: 18px; }
+  .hint::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; opacity: .7; }
+
+  /* ── Work area: the plan fills it; settings open beside it when a piece is picked ── */
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 0; }
+  body.panel-open .main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 360px; }
+  body[data-view="2d"] .main, body[data-view="3d"] .main { grid-template-columns: minmax(0, 1fr); }
+  body.panel-open[data-view="2d"] .main, body.panel-open[data-view="3d"] .main { grid-template-columns: minmax(0, 1fr) 360px; }
+  body[data-view="2d"] .view-wrap { display: none; }
+  body[data-view="3d"] .plan-wrap { display: none; }
+  .side { display: none; border-left: 1px solid var(--line); }
+  body.panel-open .side { display: block; }
+  .count { font-size: 12.5px; color: var(--muted); white-space: nowrap; margin-right: 4px; }
+  .act-btn { height: 34px !important; padding: 0 12px !important; background: var(--accent) !important; color: var(--accent-fg) !important; font-weight: 600 !important; }
+  .act-btn:hover { filter: brightness(.94); }
+  .sheetg select { height: 34px; }
+  .keyc { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); font-size: 12.5px; color: var(--fg); max-width: 300px; }
+  .keyc[hidden] { display: none; }
+  .keyc b { font: 600 11px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .keyc span { display: flex; align-items: center; gap: 8px; }
+  .keyc svg { width: 18px; height: 18px; flex: none; fill: none; }
+  .keyc em { font-style: normal; font-size: 11.5px; color: var(--muted); }
+  .plan-wrap { position: relative; min-width: 0; background: var(--plan-bg); }
+  body[data-view="split"] .plan-wrap { border-right: 1px solid var(--line); }
   #plan { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; }
-  .view-wrap { position: relative; min-width: 0; background: #cddfe8; }
+  .view-wrap { position: relative; min-width: 0; background: #d9e6ec; }
   #view { position: absolute; inset: 0; }
   #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-  .props { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--panel); color: var(--fg);
-    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.12); display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; max-width: calc(100% - 24px); }
+  .zoomc { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 2px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .zoomc button { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; font-size: 16px; color: var(--fg); border-radius: 7px; }
+  .zoomc button:hover { background: var(--bg); }
+  .zoomc span { font: 500 12px var(--font-body); color: var(--muted); min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+
+  /* ── Settings panel ── */
+  .side { min-width: 0; background: var(--panel); overflow-y: auto; }
+  .props { display: flex; flex-wrap: wrap; gap: 12px 12px; align-items: end; padding: 16px 18px 24px; color: var(--fg); }
   .props[hidden] { display: none; }
-  .props b { font: 700 15px/1.1 var(--font-display); align-self: center; }
-  .props label { display: flex; flex-direction: column; gap: 4px; font: 600 11px/1 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-  .props select { font: 500 13.5px/1.2 var(--font-body); padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); max-width: 220px; }
-  .props { max-height: 46%; overflow-y: auto; }
-  .props input { font: 500 14px/1 var(--font-mono); width: 76px; padding: 6px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
-  .props .ptabs { flex-basis: 100%; display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
-  .props .ptabs button { font: 600 13px var(--font-body); padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); cursor: pointer; margin-bottom: -1px; }
-  .props .ptabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
-  .props .phint { flex-basis: 100%; font-size: 12px; }
+  .props b { font: 650 16px/1.2 var(--font-display); align-self: center; letter-spacing: -.01em; }
+  .props label { display: flex; flex-direction: column; gap: 5px; font: 500 12px/1 var(--font-body); color: var(--muted); }
+  .props select { font: 500 13.5px/1.2 var(--font-body); height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); max-width: 320px; }
+  .props input { font: 500 14px/1 var(--font-body); font-variant-numeric: tabular-nums; width: 84px; height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); box-sizing: border-box; }
+  .props input:focus, .props select:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .props .ptabs { flex-basis: 100%; display: flex; gap: 2px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; }
+  .props .ptabs button { flex: 1; font: 500 13px var(--font-body); height: 30px; padding: 0 10px; border-radius: 6px; color: var(--muted); }
+  .props .ptabs button[aria-selected="true"] { background: var(--panel); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(15,23,42,.12); }
+  .props .phint { flex-basis: 100%; font-size: 12.5px; color: var(--muted) !important; }
   .props .ptitle { flex-basis: 100%; }
-  .props .pgrp { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding-top: 8px; border-top: 1px solid var(--line); }
-  .props .pgrp h4 { flex-basis: 100%; margin: 0; font: 700 12px/1.2 var(--font-body); letter-spacing: .06em; text-transform: uppercase; color: var(--fg); }
-  .props .pgrp h4 span { margin-left: 8px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
-  .props .htable { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
-  .props .hgrid { display: grid; grid-template-columns: repeat(4, minmax(64px, 110px)) 36px; gap: 6px; align-items: center; }
-  .props .hgrid.cg { grid-template-columns: repeat(2, minmax(64px, 110px)) 36px; }
-  .props .hgrid.sec { grid-template-columns: repeat(5, minmax(60px, 104px)) 36px; }
-  .props .hgrid > span { font: 600 11px var(--font-body); text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6d6b66); }
+  .props .pgrp { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 12px; align-items: end; padding-top: 14px; border-top: 1px solid var(--line); }
+  .props .pgrp h4 { flex-basis: 100%; margin: 0; font: 600 13px/1.2 var(--font-body); color: var(--fg); }
+  .props .pgrp h4 span { margin-left: 6px; font-weight: 400; color: var(--muted); }
+  .props .htable { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); overflow-x: auto; }
+  .props .hgrid { display: grid; grid-template-columns: repeat(4, minmax(60px, 1fr)) 34px; gap: 6px; align-items: center; }
+  .props .hgrid.cg { grid-template-columns: repeat(2, minmax(60px, 1fr)) 34px; }
+  .props .hgrid.sec { grid-template-columns: repeat(5, minmax(56px, 1fr)) 34px; }
+  .props .hgrid > span { font: 500 11.5px var(--font-body); color: var(--muted); }
   .props .hgrid input, .props .hgrid select { width: 100%; }
   .props .hrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }
-  .props input[type=color] { width: 56px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
-  .props .ro { font: 500 13px/1.3 var(--font-mono); color: var(--fg); text-transform: none; letter-spacing: 0; }
-  kbd { font: 500 10.5px/1 var(--font-mono); padding: 2px 4px; border-radius: 4px; border: 1px solid currentColor; opacity: .7; margin-left: 3px; }
-  .keys { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: 52px; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
-    border-radius: 10px; padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.18); z-index: 5; max-width: calc(100% - 24px); font-size: 13px; }
+  .props input[type=color] { width: 56px; height: 34px; padding: 3px; }
+  .props input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .props .ro { font: 500 13px/1.35 var(--font-body); color: var(--fg); }
+  .props .ghost-btn { height: 32px; }
+  kbd { font: 500 10.5px/1 var(--font-body); padding: 2px 5px; border-radius: 4px; border: 1px solid var(--line2); color: var(--muted); margin-left: 3px; }
+  .keys { position: absolute; right: 12px; top: 12px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); z-index: 5; max-width: calc(100% - 24px); font-size: 13px; }
   .keys[hidden] { display: none; }
   .keys .muted { color: var(--muted); font-size: 12px; }
-  .keys dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 10px 0 0; }
-  .keys dt { font: 500 12px/1.4 var(--font-mono); white-space: nowrap; }
-  .keys dd { margin: 0; line-height: 1.4; }
-  .tip { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: 10px; font-size: 12.5px; color: #3c4740; background: rgba(255,255,255,.9); border-radius: 6px; padding: 6px 9px; max-width: 60%; }
+  .keys dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 10px 0 0; }
+  .keys dt { font: 600 12px/1.4 var(--font-body); white-space: nowrap; }
+  .keys dd { margin: 0; line-height: 1.4; color: var(--muted); }
   .swatches { display: flex; gap: 4px; }
   .swatches button { width: 24px; height: 24px; border-radius: 50%; padding: 0; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
   .swatches button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+
+  /* ── The customer's look-only copy: the 3D and the plan, nothing else ── */
+  body.customer .rail, body.customer .saveg, body.customer .side, body.customer .sheetg, body.customer .share-tg, body.customer .crumb-sep { display: none !important; }
+  body.customer .main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
+  body.customer .plan-wrap, body.customer .view-wrap { display: block !important; }
+  body.customer .view-wrap { order: -1; }
+  body.customer #plan { cursor: grab; }
+
   @media (max-width: 860px) {
     html, body { height: auto; }
     .app { height: auto; }
-    .main { grid-template-columns: 1fr; }
-    body.customer .main { grid-template-columns: 1fr; }
-    .rail { flex-direction: row; flex-wrap: wrap; justify-content: center; border-right: 0; border-bottom: 1px solid var(--line); }
-    .rail hr { width: 1px; height: 28px; border-top: 0; border-left: 1px solid var(--line); margin: 0 4px; }
-    .plan-wrap, .view-wrap { height: 52vh; min-height: 320px; }
-    .plan-wrap { border-right: 0; border-bottom: 1px solid var(--line); }
-    .tip { display: none; }
-    /* customer: 3D on top, floor plan below, each half the frame */
+    .rail { flex-wrap: nowrap; overflow-x: auto; }
+    .rail button span { display: none; }
+    .rail button { width: 36px; padding: 0; justify-content: center; }
+    .seg button { width: auto; }
+    .main, body[data-view] .main { grid-template-columns: 1fr; }
+    body[data-view] .plan-wrap, body[data-view] .view-wrap { display: block; }
+    .plan-wrap, .view-wrap { height: 52vh; min-height: 320px; border-right: 0; border-bottom: 1px solid var(--line); }
+    .seg, .sheetg, .count, .keyc { display: none !important; }
+    body.panel-open .main { grid-template-columns: 1fr; }
+    .brandg { flex: 1 1 100%; overflow: hidden; }
+    .barR { margin-left: 0; }
     html:has(body.customer), body.customer, body.customer .app { height: 100%; }
-    body.customer .main { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+    body.customer .main { grid-template-columns: 1fr !important; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
     body.customer .plan-wrap, body.customer .view-wrap { height: auto; min-height: 0; }
-    body.customer .view-wrap { border-bottom: 1px solid var(--line); }
-    body.customer .plan-wrap { border-bottom: 0; }
   }
 </style>
 
 <div class="app">
   <header class="bar">
-    <h1>Design Editor</h1>
-    <span class="proj" id="proj"></span>
-    <div class="sheetg"><select id="sheet" aria-label="Design sheet"><option value="auto">Sheet: auto</option><option value="s11">11×17</option><option value="s24">18×24</option></select>
-      <button type="button" class="ghost-btn" id="b-reset" hidden title="Rebuild the drawing from the proposal (undo brings it back)">Reset to proposal</button>
-      <button type="button" class="ghost-btn" id="b-print">Print plan</button><button type="button" class="ghost-btn" id="b-svg">Export SVG</button></div>
-    <div class="saveg"><label class="share-tg" title="Off by default: the customer gets just the proposal. Tick to add this design (3D and floor plan) to their proposal link."><input type="checkbox" id="b-share"> Show on proposal</label><span class="save-status" id="save-status" role="status"></span><button type="button" class="save-btn" id="b-save" disabled>Save to proposal</button></div>
+    <div class="brandg">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 10v9h14v-9"/><path d="M5 14h14M5 17h14"/></svg></span>
+      <h1>Design</h1><span class="crumb-sep" aria-hidden="true">/</span>
+      <span class="proj" id="proj">New drawing</span>
+      <span class="save-status" id="save-status" role="status"></span>
+    </div>
+    <div class="barR">
+      <label class="share-tg" title="Off by default: the customer gets just the proposal. Tick to add this design (3D and floor plan) to their proposal link."><input type="checkbox" id="b-share"> Show on proposal</label>
+      <div class="sheetg"><select id="sheet" aria-label="Design sheet"><option value="auto">Sheet</option><option value="s11">11×17</option><option value="s24">18×24</option></select>
+        <button type="button" class="act-btn" id="b-print">Print plan</button><button type="button" class="act-btn" id="b-svg">Export SVG</button></div>
+      <button type="button" class="ghost-btn" id="b-reset" hidden title="Rebuild the drawing from the proposal (undo brings it back)">Reset</button>
+      <div class="saveg"><button type="button" class="save-btn" id="b-save" disabled>Save to proposal</button></div>
+    </div>
   </header>
-  <div class="main">
-  <nav class="rail" role="toolbar" aria-label="Tools" aria-orientation="vertical">
-    <button type="button" data-tool="select" aria-pressed="true" title="Select (V)" aria-label="Select (V)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg></button>
-    <button type="button" data-tool="poly" aria-pressed="false" title="Draw deck (P)" aria-label="Draw deck (P)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l3-1 11-11-2-2L5 17z"/><path d="M14 6l2 2"/><circle cx="4" cy="20" r="0.5"/></svg></button>
-    <hr>
-    <button type="button" data-add="deck" title="Add deck" aria-label="Add deck"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 9h16M4 13h16M4 17h16"/></svg></button>
-    <button type="button" data-add="stairs" title="Add stairs" aria-label="Add stairs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4v-4h4v-4h4V8h4"/><path d="M4 20V4"/></svg></button>
-    <button type="button" data-add="porch" title="Add porch / sunroom" aria-label="Add porch or sunroom"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-6 9 6"/><path d="M5 10v10M19 10v10M9 20v-6h6v6M3 20h18"/></svg></button>
-    <button type="button" data-add="patio" title="Add patio" aria-label="Add patio"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="1"/><path d="M3 11h18M3 15h18M9 7v4M15 11v4M9 15v4"/></svg></button>
-    <button type="button" data-add="landing" title="Add landing" aria-label="Add landing"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M12 18v3M9 21h6"/></svg></button>
-    <hr>
-    <button type="button" id="b-rotl" title="Rotate −15° (Shift+R)" aria-label="Rotate −15° (Shift+R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 3v4h4"/></svg></button>
-    <button type="button" id="b-rotr" title="Rotate +15° (R)" aria-label="Rotate +15° (R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 3v4h-4"/></svg></button>
-    <button type="button" id="b-copy" title="Duplicate (Ctrl/⌘+D)" aria-label="Duplicate (Ctrl/⌘+D)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>
-    <button type="button" id="b-del" class="danger" title="Delete (Del)" aria-label="Delete (Del)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
-    <hr>
-    <button type="button" id="b-undo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo (Ctrl/⌘+Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-5-5 5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
-    <button type="button" id="b-redo" title="Redo (Shift+Ctrl/⌘+Z)" aria-label="Redo (Shift+Ctrl/⌘+Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
-    <button type="button" id="b-fit" title="Fit in window (Ctrl/⌘+0)" aria-label="Fit in window (Ctrl/⌘+0)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
-    <button type="button" id="b-keys" aria-expanded="false" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts (?)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
+  <nav class="rail" role="toolbar" aria-label="Tools">
+    <div class="tgrp">
+      <button type="button" data-tool="select" aria-pressed="true" title="Select (V)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg><span>Select</span></button>
+      <button type="button" data-tool="poly" aria-pressed="false" title="Draw a deck corner by corner (P)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l3-1 11-11-2-2L5 17z"/><path d="M14 6l2 2"/></svg><span>Draw deck</span></button>
+    </div>
+    <div class="tgrp">
+      <button type="button" data-add="deck" title="Add a deck"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 9h16M4 13h16M4 17h16"/></svg><span>Deck</span></button>
+      <button type="button" data-add="stairs" title="Add stairs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4v-4h4v-4h4V8h4"/><path d="M4 20V4"/></svg><span>Stairs</span></button>
+      <button type="button" data-add="landing" title="Add a landing"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M12 18v3M9 21h6"/></svg><span>Landing</span></button>
+      <button type="button" data-add="porch" title="Add a porch or sunroom"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-6 9 6"/><path d="M5 10v10M19 10v10M9 20v-6h6v6M3 20h18"/></svg><span>Porch</span></button>
+      <button type="button" data-add="patio" title="Add a patio"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="1"/><path d="M3 11h18M3 15h18M9 7v4M15 11v4M9 15v4"/></svg><span>Patio</span></button>
+    </div>
+    <div class="tgrp">
+      <button type="button" class="icon" id="b-rotl" title="Rotate −15° (Shift+R)" aria-label="Rotate −15°"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 3v4h4"/></svg></button>
+      <button type="button" class="icon" id="b-rotr" title="Rotate +15° (R)" aria-label="Rotate +15°"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 3v4h-4"/></svg></button>
+      <button type="button" class="icon" id="b-copy" title="Duplicate (Ctrl/⌘+D)" aria-label="Duplicate"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>
+      <button type="button" class="icon danger" id="b-del" title="Delete (Del)" aria-label="Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+    </div>
+    <div class="tgrp">
+      <button type="button" class="icon" id="b-undo" title="Undo (Ctrl/⌘+Z)" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-5-5 5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+      <button type="button" class="icon" id="b-redo" title="Redo (Shift+Ctrl/⌘+Z)" aria-label="Redo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+    </div>
+    <div class="tgrp">
+      <button type="button" id="b-frame" aria-pressed="true" title="Show the framing: joists, beams, posts and footings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 4v16M12 4v16M16 4v16M4 15h16"/></svg><span>Framing</span></button>
+      <button type="button" id="b-finish" aria-pressed="false" title="Decking, railing, skirting, porch trim and the house"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="9" cy="10" r="1.2"/><circle cx="14" cy="9" r="1.2"/><circle cx="15.5" cy="13.5" r="1.2"/><path d="M11 20c-1.5-2 0-4 2-4"/></svg><span>Finishes</span></button>
+    </div>
+    <div class="spacer"></div>
+    <span class="count" id="count"></span>
+    <div class="seg" role="group" aria-label="View"><button type="button" data-view="2d" aria-pressed="false">2D</button><button type="button" data-view="split" aria-pressed="false">2D + 3D</button><button type="button" data-view="3d" aria-pressed="false">3D</button></div>
+    <button type="button" class="icon" id="b-fit" title="Fit in window (Ctrl/⌘+0)" aria-label="Fit in window"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+    <button type="button" class="icon" id="b-keys" aria-expanded="false" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
   </nav>
+  <div class="hint"><span id="tip">Drag to move · Alt-drag copies · round handle rotates (Shift = 45°) · scroll to zoom · Space-drag pans · ? for shortcuts</span></div>
+  <div class="main">
     <div class="plan-wrap">
       <svg id="plan" aria-label="Plan view" role="img"></svg>
-      <div class="tip" id="tip">Drag to move · Alt-drag copies · round handle rotates (Shift = 45°) · scroll to zoom · Space-drag pans · ? for shortcuts</div>
-      <div class="props" id="props" hidden></div>
       <div class="keys" id="keys" hidden role="dialog" aria-label="Keyboard shortcuts">
         <b>Keyboard shortcuts</b> <span class="muted">⌘ on Mac = Ctrl on Windows</span>
         <dl>
@@ -194,8 +261,15 @@
           <dt>?</dt><dd>Show this list</dd>
         </dl>
       </div>
+      <div class="keyc" id="keyc" hidden><b>Key</b>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="#fff" stroke="#111827" stroke-width="2.4"/><rect x="8.5" y="8.5" width="7" height="7" fill="#111827"/></svg>Post on concrete footing</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18M3 12h18M3 15h18" stroke="#2f6fd1" stroke-width="1.6"/></svg>Drop beam</span>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v18M10 3v18M15 3v18M17 3v18" stroke="#8fb2e8" stroke-width="1.4"/></svg>Joists 16″ o.c.</span>
+        <em>Framing preview: sizes follow the state code once it is loaded</em></div>
+      <div class="zoomc" aria-label="Zoom"><button type="button" id="z-out" aria-label="Zoom out">−</button><span id="z-pct">100%</span><button type="button" id="z-in" aria-label="Zoom in">+</button></div>
     </div>
     <div class="view-wrap"><div id="view"></div></div>
+    <aside class="side" aria-label="Settings"><div class="props" id="props" hidden></div></aside>
   </div>
 </div>
 
@@ -493,6 +567,7 @@
 
   function drawPlan() {
     const h = vbH();
+    const zp = $('z-pct'); if (zp) zp.textContent = Math.round(5000 / vb.w) + '%';
     svg.setAttribute('viewBox', `${vb.x} ${vb.z} ${vb.w} ${h}`);
     svg.innerHTML = '';
     const P = px();
@@ -501,8 +576,12 @@
     for (let x = Math.floor(vb.x); x <= vb.x + vb.w; x++) el('line', { x1: x, y1: vb.z, x2: x, y2: vb.z + h, stroke: x % 5 ? 'var(--grid)' : 'var(--grid2)', 'stroke-width': P * (x % 5 ? 1 : 1.4) }, g);
     for (let z = Math.floor(vb.z); z <= vb.z + h; z++) el('line', { x1: vb.x, y1: z, x2: vb.x + vb.w, y2: z, stroke: z % 5 ? 'var(--grid)' : 'var(--grid2)', 'stroke-width': P * (z % 5 ? 1 : 1.4) }, g);
     // house
-    el('rect', { x: vb.x, y: Math.min(vb.z, -40), width: vb.w, height: Math.max(0, -Math.min(vb.z, -40)), fill: '#e4e2dc' });
-    el('line', { x1: vb.x, y1: 0, x2: vb.x + vb.w, y2: 0, stroke: '#1a1c38', 'stroke-width': P * 4 });
+    el('rect', { x: vb.x, y: Math.min(vb.z, -40), width: vb.w, height: Math.max(0, -Math.min(vb.z, -40)), fill: '#ffffff' });
+    { const d0 = el('defs', {}), pat = el('pattern', { id: 'hatch', patternUnits: 'userSpaceOnUse', width: P * 7, height: P * 7, patternTransform: 'rotate(45)' }, d0);
+      el('line', { x1: 0, y1: 0, x2: 0, y2: P * 7, stroke: '#94a3b8', 'stroke-width': P * 1.2 }, pat); }
+    el('rect', { x: vb.x, y: -0.75, width: vb.w, height: 0.75, fill: 'url(#hatch)' });
+    el('line', { x1: vb.x, y1: -0.75, x2: vb.x + vb.w, y2: -0.75, stroke: '#475569', 'stroke-width': P * 1.2 });
+    el('line', { x1: vb.x, y1: 0, x2: vb.x + vb.w, y2: 0, stroke: '#111827', 'stroke-width': P * 3 });
     if (!S.house) [-1, 1].forEach(sd => el('line', { x1: sd * 22, y1: -40, x2: sd * 22, y2: 0, stroke: '#8e8c86', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}` }));   // stock house corners
     if (S.house) {
       const H = S.house, W = H.wallWidthFt || 44;
@@ -513,12 +592,12 @@
         const w = Number(g.widthFt) || 0, out = Number(g.outFt) || 0;
         if (out > 0.5) {
           const o = g.shape === 'bay' ? Math.max(0.5, Math.min(out, w / 2 - 1)) : 0;
-          el('polygon', { points: ptsAttr([[x, 0], [x + o, out], [x + w - o, out], [x + w, 0]]), fill: '#e4e2dc', stroke: '#1a1c38', 'stroke-width': P * 3, ...(grab ? { 'data-hd': `seg:${si}`, style: 'cursor:ew-resize' } : {}) });
+          el('polygon', { points: ptsAttr([[x, 0], [x + o, out], [x + w - o, out], [x + w, 0]]), fill: '#eef1f4', stroke: '#1a1c38', 'stroke-width': P * 3, ...(grab ? { 'data-hd': `seg:${si}`, style: 'cursor:ew-resize' } : {}) });
           if (grab) {   // pull the front edge to set how far it sticks out
             el('line', { x1: x + o, y1: out, x2: x + w - o, y2: out, stroke: 'transparent', 'stroke-width': P * 14, 'data-hd': `segout:${si}`, style: 'cursor:ns-resize' });
-            el('rect', { x: x + w / 2 - P * 9, y: out - P * 3.5, width: P * 18, height: P * 7, rx: P * 3, fill: '#2c6a4d', stroke: '#fff', 'stroke-width': P, 'data-hd': `segout:${si}`, style: 'cursor:ns-resize' });
+            el('rect', { x: x + w / 2 - P * 9, y: out - P * 3.5, width: P * 18, height: P * 7, rx: P * 3, fill: '#1d758b', stroke: '#fff', 'stroke-width': P, 'data-hd': `segout:${si}`, style: 'cursor:ns-resize' });
           }
-          const t = el('text', { x: x + w / 2, y: out / 2 + P * 4, 'font-size': P * 10, 'text-anchor': 'middle', fill: '#6d6b66', 'font-family': 'Barlow, sans-serif', 'font-weight': 700, 'pointer-events': 'none' }); t.textContent = `${g.shape === 'bay' ? 'BAY' : 'BUMP-OUT'} ${fmt(w)} × ${fmt(out)}`;
+          const t = el('text', { x: x + w / 2, y: out / 2 + P * 4, 'font-size': P * 10, 'text-anchor': 'middle', fill: '#6d6b66', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 700, 'pointer-events': 'none' }); t.textContent = `${g.shape === 'bay' ? 'BAY' : 'BUMP-OUT'} ${fmt(w)} × ${fmt(out)}`;
         }
         x += w;
       });
@@ -527,7 +606,7 @@
       (H.crossGables || []).forEach((c, ci) => {
         const cx = (c.center - 0.5) * W, hw = c.widthFt / 2;
         el('polygon', { points: ptsAttr([[cx - hw, -0.15], [cx, -Math.min(4, hw * 0.6)], [cx + hw, -0.15]]), fill: 'rgba(176,58,46,.06)', stroke: '#b03a2e', 'stroke-width': P * 1.5, 'stroke-dasharray': `${P * 4} ${P * 3}`, ...(grab ? { 'data-hd': `cg:${ci}`, style: 'cursor:ew-resize' } : {}) });
-        const t = el('text', { x: cx, y: -P * 18, 'font-size': P * 9, 'text-anchor': 'middle', fill: '#b03a2e', 'font-family': 'Barlow, sans-serif', 'font-weight': 700, 'pointer-events': 'none' }); t.textContent = 'GABLE';
+        const t = el('text', { x: cx, y: -P * 18, 'font-size': P * 9, 'text-anchor': 'middle', fill: '#b03a2e', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 700, 'pointer-events': 'none' }); t.textContent = 'GABLE';
       });
       (H.windows || []).forEach((w, wi) => {
         const cx = (w.center - 0.5) * W, sg = segs.find(g => g.out > 0.5 && cx > g.x0 && cx < g.x1 && w.story <= g.st);
@@ -537,15 +616,100 @@
         if (grab) el('line', { x1: cx - w.widthFt / 2, y1: z - (w.story > 1 ? P * 9 : 0), x2: cx + w.widthFt / 2, y2: z - (w.story > 1 ? P * 9 : 0), stroke: 'transparent', 'stroke-width': P * 12, 'data-hd': `win:${wi}`, style: 'cursor:ew-resize' });
       });
     }
-    const ht = el('text', { x: vb.x + P * 12, y: -P * 10, 'font-size': P * 12, fill: '#8e8c86', 'font-family': 'Barlow, sans-serif', 'font-weight': 700, 'letter-spacing': P * 2 }); ht.textContent = 'EXISTING HOUSE';
+    const ht = el('text', { x: vb.x + P * 12, y: -0.75 - P * 8, 'font-size': P * 12, fill: '#8e8c86', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 700, 'letter-spacing': P * 2 }); ht.textContent = 'EXISTING HOUSE';
     // elements, lowest first
+    // ── Framing on the plan (a preview by Deck Plus's usual practice until the state code
+    // tables are in): joists 16″ o.c. out from the house, the ledger, drop beams with posts
+    // no more than 8′ apart on numbered footings, mid-span blocking, and the spans.
+    const FRAME = !CUSTOMER && FRAMING;
+    const frameLayer = el('g', { 'pointer-events': 'none' });
+    let postNo = 0;
+    const clipLine = (pts, axis, v) => {
+      const hits = [];
+      edges(pts).forEach(([a, b]) => {
+        const [a0, a1, b0, b1] = axis === 'x' ? [a[0], a[1], b[0], b[1]] : [a[1], a[0], b[1], b[0]];
+        if ((a0 <= v && b0 > v) || (b0 <= v && a0 > v)) hits.push(a1 + (v - a0) / (b0 - a0) * (b1 - a1));
+      });
+      hits.sort((p, q) => p - q);
+      const out = []; for (let i = 0; i + 1 < hits.length; i += 2) out.push([hits[i], hits[i + 1]]); return out;
+    };
+    const tag = (x, z, text, color, rot = 0) => {
+      const fs = P * 9.5, w = text.length * fs * 0.58 + P * 8, hh = fs + P * 5;
+      const g2 = el('g', { transform: `rotate(${rot} ${x} ${z})` }, frameLayer);
+      el('rect', { x: x - w / 2, y: z - hh / 2, width: w, height: hh, fill: '#ffffff', stroke: color, 'stroke-width': P * 0.9, rx: P * 1.5 }, g2);
+      const t = el('text', { x, y: z + fs * 0.36, 'font-size': fs, 'text-anchor': 'middle', fill: color, 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 500 }, g2); t.textContent = text;
+    };
+    function drawFraming(e, pts, grp) {
+      const xs = pts.map(p => p[0]), zs = pts.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs);
+      const isHouse = ([a, b]) => Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05;
+      const house = edges(pts).filter(isHouse), back = house.length ? z0 : null;
+      const JL = '#8fb2e8', BM = '#2f6fd1', fg = el('g', { 'pointer-events': 'none' }, grp);
+      // joists 16″ o.c., out from the house
+      for (let x = x0 + 16 / 12; x < x1 - 0.2; x += 16 / 12) clipLine(pts, 'x', x).forEach(([a, b]) => [-0.06, 0.06].forEach(o => el('line', { x1: x + o, y1: a, x2: x + o, y2: b, stroke: JL, 'stroke-width': P * 0.9 }, fg)));
+      // ledger on the house
+      house.forEach(([a, b]) => el('line', { x1: a[0], y1: 0.14, x2: b[0], y2: 0.14, stroke: '#7c3aed', 'stroke-width': P * 2.2, 'stroke-dasharray': `${P * 7} ${P * 3}` }, fg));
+      // a drop beam inside each side that faces the yard (angled sides too), set back by the joist cantilever
+      const [ccx, ccz] = centroid(pts);
+      const beamRuns = [];
+      edges(pts).forEach(([a, b]) => {
+        if (isHouse([a, b])) return;
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 2) return;
+        const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L; let nx = -uz, nz = ux;
+        if (nx * ((a[0] + b[0]) / 2 - ccx) + nz * ((a[1] + b[1]) / 2 - ccz) < 0) { nx = -nx; nz = -nz; }
+        if (nz < 0.3 && house.length) return;                        // a side running out from the house: joists rest on it
+        if (!house.length && Math.abs(nz) < 0.3) return;            // freestanding: beams at front and back only
+        const reach = Math.abs(((a[1] + b[1]) / 2) - (back ?? ((a[1] + b[1]) / 2)));
+        const cant = Math.min(2, Math.max(0.5, Math.round((house.length ? reach : 8) * 0.12 * 2) / 2));
+        const A = [a[0] - nx * cant, a[1] - nz * cant], B = [b[0] - nx * cant, b[1] - nz * cant];
+        beamRuns.push({ A, B, L, ux, uz, flat: Math.abs(uz) < 0.05, cant });
+        // a joist span over 14′ gets a second beam halfway back
+        if (house.length && Math.abs(uz) < 0.05 && A[1] - back > 14) beamRuns.push({ A: [A[0], back + (A[1] - back) / 2], B: [B[0], back + (A[1] - back) / 2], L, ux, uz, flat: true, cant: 0, mid: true });
+      });
+      beamRuns.forEach(r => {
+        const { A, B, ux, uz } = r, len = Math.hypot(B[0] - A[0], B[1] - A[1]); if (len < 2) return;
+        const px = -uz, pz = ux;
+        [-0.17, 0, 0.17].forEach(o => el('line', { x1: A[0] + px * o, y1: A[1] + pz * o, x2: B[0] + px * o, y2: B[1] + pz * o, stroke: BM, 'stroke-width': P * 1.3 }, fg));
+        const inset = Math.min(1, len / 4), m = Math.max(1, Math.ceil((len - 2 * inset) / 8));
+        const posts = Array.from({ length: m + 1 }, (_, i) => inset + (len - 2 * inset) * i / m);
+        const at = (t) => [A[0] + ux * t, A[1] + uz * t];
+        posts.forEach(t => {
+          const [qx, qz] = at(t); postNo++;
+          el('circle', { cx: qx, cy: qz, r: 0.5, fill: '#ffffff', stroke: '#111827', 'stroke-width': P * 1.6 }, frameLayer);
+          el('rect', { x: qx - 0.23, y: qz - 0.23, width: 0.46, height: 0.46, fill: '#111827' }, frameLayer);
+          const tt = el('text', { x: qx + 0.75, y: qz + 0.5 + P * 10, 'font-size': P * 10.5, fill: '#111827', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 700 }, frameLayer); tt.textContent = `F${postNo}`;
+        });
+        const ang = Math.atan2(uz, ux) * 180 / Math.PI, up = ang > 90 || ang < -90 ? ang + 180 : ang;
+        for (let i = 0; i < m; i++) { const [qx, qz] = at((posts[i] + posts[i + 1]) / 2); tag(qx - px * (0.45 + P * 8), qz - pz * (0.45 + P * 8), `${fmt(posts[i + 1] - posts[i])} Beam Span`, '#b42318', up); }
+        // blocking halfway between this beam and the one behind it
+        if (r.flat && back != null) {
+          const from = r.mid ? back : (beamRuns.find(o => o.mid && Math.abs(o.A[0] - A[0]) < 0.01)?.A[1] ?? back), bz = (from + A[1]) / 2;
+          if (A[1] - from > 8) clipLine(pts, 'z', bz).forEach(([c, d]) => { const lo = Math.max(c, Math.min(A[0], B[0])), hi = Math.min(d, Math.max(A[0], B[0])); if (hi - lo > 1) [-0.06, 0.06].forEach(o => el('line', { x1: lo, y1: bz + o, x2: hi, y2: bz + o, stroke: JL, 'stroke-width': P * 0.9 }, fg)); });
+          if (!r.mid && A[1] - from > 2.5) tag(Math.min(A[0], B[0]) + Math.abs(B[0] - A[0]) * 0.22, (from + A[1]) / 2, `${fmt(A[1] - from)} Joist Span`, '#1d4ed8', -90);
+        }
+      });
+      pts.forEach(q => el('rect', { x: q[0] - P * 3, y: q[1] - P * 3, width: P * 6, height: P * 6, fill: '#111827' }, frameLayer));
+    }
     const order = [...S.els].sort((a, b) => (a.type === 'stairs') - (b.type === 'stairs') || (a.h || 0) - (b.h || 0));
-    const edgeLabels = (pts, grp) => edges(pts).forEach(([a, b]) => {
+    // Dimension lines outside each side (not along the house: the opposite side gives that
+    // length): extension lines, a dimension line with 45° ticks, and the length on a halo.
+    const dimLayer = el('g', { 'pointer-events': 'none' });
+    const edgeLabels = (pts, self) => edges(pts).forEach(([a, b]) => {
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1.5) return;
-      const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, ang = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
-      const [ccx, ccz] = centroid(pts); let nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L; if (nx * (mx - ccx) + nz * (mz - ccz) < 0) { nx = -nx; nz = -nz; }
-      const tx = mx + nx * P * 12, tz = mz + nz * P * 12, up = ang > 90 || ang < -90 ? ang + 180 : ang;
-      const t = el('text', { x: tx, y: tz, 'font-size': P * 11, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#b03a2e', 'font-family': 'JetBrains Mono, monospace', transform: `rotate(${up} ${tx} ${tz})` }, grp);
+      if (Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05) return;
+      const [ccx, ccz] = centroid(pts), mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      let nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L; if (nx * (mx - ccx) + nz * (mz - ccz) < 0) { nx = -nx; nz = -nz; }
+      // A side another piece sits right against (a porch beside the deck) is measured on the outside instead.
+      if (S.els.some(o => o !== self && o.type !== 'stairs' && inPoly(mx + nx * 2.6, mz + nz * 2.6, polyOf(o)))) return;
+      const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, off = P * 22;
+      const A = [a[0] + nx * off, a[1] + nz * off], B = [b[0] + nx * off, b[1] + nz * off];
+      const g = el('g', { 'pointer-events': 'none' }, dimLayer);
+      [[a, A], [b, B]].forEach(([q, r]) => el('line', { x1: q[0] + nx * P * 4, y1: q[1] + nz * P * 4, x2: r[0] + nx * P * 5, y2: r[1] + nz * P * 5, stroke: '#94a3b8', 'stroke-width': P }, g));
+      el('line', { x1: A[0], y1: A[1], x2: B[0], y2: B[1], stroke: '#475569', 'stroke-width': P * 1.1 }, g);
+      const tk = P * 3.6;
+      [A, B].forEach(q => el('line', { x1: q[0] - (ux + nx) * tk, y1: q[1] - (uz + nz) * tk, x2: q[0] + (ux + nx) * tk, y2: q[1] + (uz + nz) * tk, stroke: '#1e293b', 'stroke-width': P * 1.5 }, g));
+      const ang = Math.atan2(uz, ux) * 180 / Math.PI, up = ang > 90 || ang < -90 ? ang + 180 : ang, tx = (A[0] + B[0]) / 2, tz = (A[1] + B[1]) / 2;
+      const t = el('text', { x: tx, y: tz, 'font-size': P * 11.5, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#1e293b', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 600,
+        stroke: '#fbfcfd', 'stroke-width': P * 4, 'paint-order': 'stroke', 'stroke-linejoin': 'round', transform: `rotate(${up} ${tx} ${tz})` }, g);
       t.textContent = fmt(L);
     });
     order.forEach(e => {
@@ -557,39 +721,37 @@
           el('rect', { x: e.x - e.w / 2 - ov, y: z0, width: e.w + 2 * ov, height: e.z + e.d + ov - z0, fill: 'none', stroke: '#7a7a7a', 'stroke-width': P * 1.2, 'stroke-dasharray': `${P * 6} ${P * 4}` }, grp);
           if (e.roof !== 'shed') el('line', { x1: e.x, y1: z0, x2: e.x, y2: e.z + e.d + ov, stroke: '#7a7a7a', 'stroke-width': P, 'stroke-dasharray': `${P * 3} ${P * 3}` }, grp);
         }
-        el('polygon', { points: ptsAttr(pts), fill: e.type === 'porch' ? '#e6e1d6' : (e.mat === 'concrete' ? '#eceae6' : '#e9e7e1'), stroke: '#1a1c38', 'stroke-width': P * (e.type === 'patio' && Number(e.wallH) > 0 ? 4 : 2) }, grp);
+        el('polygon', { points: ptsAttr(pts), fill: e.type === 'porch' ? '#f1f5f9' : (e.mat === 'concrete' ? '#eceae6' : '#e9e7e1'), stroke: '#1a1c38', 'stroke-width': P * (e.type === 'patio' && Number(e.wallH) > 0 ? 4 : 2) }, grp);
         if (e.type === 'patio' && e.mat !== 'concrete') {
           const clip = `clip${e.id}`; const cp = el('clipPath', { id: clip }, grp); el('polygon', { points: ptsAttr(pts) }, cp);
           const bl = el('g', { 'clip-path': `url(#${clip})` }, grp);
           for (let z = e.z + 1; z < e.z + e.d; z += 1) el('line', { x1: e.x - e.w / 2, y1: z, x2: e.x + e.w / 2, y2: z, stroke: '#cfccc4', 'stroke-width': P * 0.8 }, bl);
         }
-        const t1 = el('text', { x: cx, y: cz - P * 4, 'font-size': P * 13, 'text-anchor': 'middle', fill: '#1a1c38', 'font-family': 'Barlow, sans-serif', 'font-weight': 700 }, grp);
+        const t1 = el('text', { x: cx, y: cz - P * 4, 'font-size': P * 13, 'text-anchor': 'middle', fill: '#1a1c38', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 700 }, grp);
         t1.textContent = e.type === 'porch' ? PORCH_NAMES[e.ptype].toUpperCase() : (e.mat === 'concrete' ? 'CONCRETE PATIO' : 'PAVER PATIO');
-        const t2 = el('text', { x: cx, y: cz + P * 12, 'font-size': P * 11, 'text-anchor': 'middle', fill: '#4a4c5e', 'font-family': 'Barlow, sans-serif' }, grp);
+        const t2 = el('text', { x: cx, y: cz + P * 12, 'font-size': P * 11, 'text-anchor': 'middle', fill: '#4a4c5e', 'font-family': 'Inter, system-ui, sans-serif' }, grp);
         t2.textContent = e.type === 'porch' ? `${ROOF_NAMES[e.roof]} roof · ${TIE_NAMES[e.tie].toLowerCase()}` : (Number(e.wallH) > 0 ? `Raised ${fmt(e.wallH)} on retaining wall` : 'At grade');
-        edgeLabels(pts, grp);
+        edgeLabels(pts, e);
       } else if (e.type === 'deck' || e.type === 'landing') {
         const pts = polyOf(e);
-        el('polygon', { points: ptsAttr(pts), fill: e.type === 'deck' ? '#f6efe2' : '#efe6d4', stroke: '#1a1c38', 'stroke-width': P * 2, 'stroke-linejoin': 'round' }, grp);
-        // board lines parallel to the house
-        const zs = pts.map(p => p[1]), xs = pts.map(p => p[0]);
-        const clip = `clip${e.id}`; const cp = el('clipPath', { id: clip }, grp); el('polygon', { points: ptsAttr(pts) }, cp);
-        const bl = el('g', { 'clip-path': `url(#${clip})` }, grp);
-        for (let z = Math.min(...zs) + 5.75 / 12; z < Math.max(...zs); z += 5.75 / 12) el('line', { x1: Math.min(...xs), y1: z, x2: Math.max(...xs), y2: z, stroke: '#d9cbb3', 'stroke-width': P * 0.8 }, bl);
+        const framed = FRAME && e.type === 'deck';
+        el('polygon', { points: ptsAttr(pts), fill: framed ? '#f4f5f7' : e.type === 'deck' ? '#f6efe2' : '#efe6d4', stroke: '#111827', 'stroke-width': P * (framed ? 2.8 : 2), 'stroke-linejoin': 'round' }, grp);
+        if (framed) drawFraming(e, pts, grp);
+        else {
+          // board lines parallel to the house
+          const zs = pts.map(p => p[1]), xs = pts.map(p => p[0]);
+          const clip = `clip${e.id}`; const cp = el('clipPath', { id: clip }, grp); el('polygon', { points: ptsAttr(pts) }, cp);
+          const bl = el('g', { 'clip-path': `url(#${clip})` }, grp);
+          for (let z = Math.min(...zs) + 5.75 / 12; z < Math.max(...zs); z += 5.75 / 12) el('line', { x1: Math.min(...xs), y1: z, x2: Math.max(...xs), y2: z, stroke: '#d9cbb3', 'stroke-width': P * 0.8 }, bl);
+        }
         const [cx, cz] = centroid(pts);
-        const t1 = el('text', { x: cx, y: cz - P * 4, 'font-size': P * 13, 'text-anchor': 'middle', fill: '#1a1c38', 'font-family': 'Barlow, sans-serif', 'font-weight': 700 }, grp);
-        t1.textContent = e.type === 'deck' ? 'DECK' : 'LANDING';
-        const t2 = el('text', { x: cx, y: cz + P * 12, 'font-size': P * 11, 'text-anchor': 'middle', fill: '#4a4c5e', 'font-family': 'Barlow, sans-serif' }, grp);
+        const t1 = el('text', { x: cx, y: cz - P * 4, 'font-size': P * 13, 'text-anchor': 'middle', fill: '#1a1c38', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 700 }, grp);
+        t1.textContent = e.type === 'deck' ? 'Deck' : 'Landing';
+        if (framed) { t1.setAttribute('fill', '#4b5563'); t1.setAttribute('font-size', P * 15); }
+        const t2 = el('text', { x: cx, y: cz + P * 12, 'font-size': P * 11, 'text-anchor': 'middle', fill: '#4a4c5e', 'font-family': 'Inter, system-ui, sans-serif' }, grp);
         t2.textContent = `${fmt(e.h)} high${e.type === 'landing' ? ` · ${fmt(e.w)} × ${fmt(e.d)}` : ''}`;
         // edge lengths
-        if (e.id === sel || e.type === 'deck') edges(pts).forEach(([a, b]) => {
-          const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1.5) return;
-          const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, ang = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
-          const [ccx, ccz] = centroid(pts); let nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L; if (nx * (mx - ccx) + nz * (mz - ccz) < 0) { nx = -nx; nz = -nz; }
-          const tx = mx + nx * P * 12, tz = mz + nz * P * 12, up = ang > 90 || ang < -90 ? ang + 180 : ang;
-          const t = el('text', { x: tx, y: tz, 'font-size': P * 11, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#b03a2e', 'font-family': 'JetBrains Mono, monospace', transform: `rotate(${up} ${tx} ${tz})` }, grp);
-          t.textContent = fmt(L);
-        });
+        if (e.id === sel || e.type === 'deck') edgeLabels(pts, e);
       } else {
         const info = stairInfo(e), pts = stairFootprint(e);
         el('polygon', { points: ptsAttr(pts), fill: '#ffffff', stroke: '#1a1c38', 'stroke-width': P * 2 }, grp);
@@ -598,51 +760,54 @@
         const a0 = W(0, 0.3), a1 = W(0, Math.max(0.6, info.len - 0.2));
         el('line', { x1: a0[0], y1: a0[1], x2: a1[0], y2: a1[1], stroke: '#1a1c38', 'stroke-width': P * 1.2, 'marker-end': 'url(#arrow)' }, grp);
         const tp = W(0, info.len + 1.1);
-        const t = el('text', { x: tp[0], y: tp[1], 'font-size': P * 11, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#1a1c38', 'font-family': 'Barlow, sans-serif', 'font-weight': 600 }, grp);
+        const t = el('text', { x: tp[0], y: tp[1], 'font-size': P * 11, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#1a1c38', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 600 }, grp);
         t.textContent = `DN ${info.n - 1} treads${info.foot ? ' to landing' : ''}`;
-        if (!info.host) { const w = W(0, -0.6); const tw = el('text', { x: w[0], y: w[1], 'font-size': P * 11, 'text-anchor': 'middle', fill: '#b03a2e', 'font-family': 'Barlow, sans-serif', 'font-weight': 700 }, grp); tw.textContent = 'not attached'; }
+        if (!info.host) { const w = W(0, -0.6); const tw = el('text', { x: w[0], y: w[1], 'font-size': P * 11, 'text-anchor': 'middle', fill: '#b03a2e', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 700 }, grp); tw.textContent = 'not attached'; }
       }
     });
     S.els.filter(e => e.type === 'porch' && PDOOR[e.id]).forEach(e => { const grp = el('g', { 'pointer-events': 'none' });
       const dr = doorPts(e, PDOOR[e.id]), half = e.ptype === 'open' ? (e.stairW || 4) / 2 : 1.5;
       const [a, b] = [[dr.c[0] - dr.t[0] * half, dr.c[1] - dr.t[1] * half], [dr.c[0] + dr.t[0] * half, dr.c[1] + dr.t[1] * half]];
-      el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: '#e6e1d6', 'stroke-width': P * 5 }, grp);
+      el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: '#f1f5f9', 'stroke-width': P * 5 }, grp);
       if (e.ptype !== 'open') el('path', { d: `M${a[0]} ${a[1]} L${a[0] + dr.n[0] * 3} ${a[1] + dr.n[1] * 3} A3 3 0 0 ${dr.sweep} ${b[0]} ${b[1]}`, fill: 'none', stroke: '#1a1c38', 'stroke-width': P * 1 }, grp);
     });
+    svg.appendChild(frameLayer);
+    svg.appendChild(dimLayer);
+    const kc = $('keyc'); if (kc) kc.hidden = !(FRAME && postNo > 0);
     const defs = el('defs', {}); const m = el('marker', { id: 'arrow', viewBox: '0 0 6 6', refX: 5, refY: 3, markerWidth: 6, markerHeight: 6, orient: 'auto' }, defs); el('path', { d: 'M0 0L6 3L0 6Z', fill: '#1a1c38' }, m);
     // selection handles
     const e = byId(sel);
     if (e) {
       const pts = polyOf(e), hs = P * 9;
-      el('polygon', { points: ptsAttr(pts), fill: 'none', stroke: '#2c6a4d', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}`, 'pointer-events': 'none' });
+      el('polygon', { points: ptsAttr(pts), fill: 'none', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}`, 'pointer-events': 'none' });
       if (e.type === 'deck') {
-        e.pts.forEach((p, i) => el('rect', { x: p[0] - hs / 2, y: p[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2, 'data-h': `v${i}`, style: 'cursor:crosshair' }));
+        e.pts.forEach((p, i) => el('rect', { x: p[0] - hs / 2, y: p[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': `v${i}`, style: 'cursor:crosshair' }));
         edges(e.pts).forEach(([a, b], i) => { const vert = Math.abs(b[0] - a[0]) < Math.abs(b[1] - a[1]);
-          el('rect', { x: (a[0] + b[0]) / 2 - hs * (vert ? 0.35 : 0.9), y: (a[1] + b[1]) / 2 - hs * (vert ? 0.9 : 0.35), width: hs * (vert ? 0.7 : 1.8), height: hs * (vert ? 1.8 : 0.7), rx: hs * 0.3, fill: '#2c6a4d', stroke: '#fff', 'stroke-width': P, 'data-h': `m${i}`, style: `cursor:${vert ? 'ew' : 'ns'}-resize` }); });
+          el('rect', { x: (a[0] + b[0]) / 2 - hs * (vert ? 0.35 : 0.9), y: (a[1] + b[1]) / 2 - hs * (vert ? 0.9 : 0.35), width: hs * (vert ? 0.7 : 1.8), height: hs * (vert ? 1.8 : 0.7), rx: hs * 0.3, fill: '#1d758b', stroke: '#fff', 'stroke-width': P, 'data-h': `m${i}`, style: `cursor:${vert ? 'ew' : 'ns'}-resize` }); });
       }
       if (e.type === 'landing') {
         const [, b, c2] = rectPts(e);
-        el('rect', { x: c2[0] - hs / 2, y: c2[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2, 'data-h': 'size', style: 'cursor:nwse-resize' });
+        el('rect', { x: c2[0] - hs / 2, y: c2[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': 'size', style: 'cursor:nwse-resize' });
       }
       if (e.type === 'porch' && PDOOR[e.id] && !CUSTOMER) {
         const dr = doorPts(e, PDOOR[e.id]);
         el('circle', { cx: dr.c[0], cy: dr.c[1], r: hs * 0.62, fill: '#b03a2e', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'door', style: 'cursor:grab' });
       }
       if (e.type === 'porch' || e.type === 'patio') {
-        el('rect', { x: e.x + e.w / 2 - hs / 2, y: e.z + e.d - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2, 'data-h': 'box', style: 'cursor:nwse-resize' });
+        el('rect', { x: e.x + e.w / 2 - hs / 2, y: e.z + e.d - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': 'box', style: 'cursor:nwse-resize' });
       }
       // rotation handle: beyond the element in its facing direction
       const [cx, cz] = e.type === 'stairs' ? [e.x, e.z] : centroid(pts);
       if (e.type !== 'porch' && e.type !== 'patio' && e.of == null) {
       const ang = e.type === 'deck' ? 180 : (e.rot || 0), reach = e.type === 'stairs' ? -2.2 : Math.max(...pts.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + 1.6;
       const hx = cx + Math.sin(rad(ang)) * reach, hz = cz + Math.cos(rad(ang)) * reach;
-      el('line', { x1: cx, y1: cz, x2: hx, y2: hz, stroke: '#2c6a4d', 'stroke-width': P * 1.2, 'pointer-events': 'none' });
-      el('circle', { cx: hx, cy: hz, r: hs * 0.75, fill: '#2c6a4d', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'rot', style: 'cursor:grab' });
+      el('line', { x1: cx, y1: cz, x2: hx, y2: hz, stroke: '#1d758b', 'stroke-width': P * 1.2, 'pointer-events': 'none' });
+      el('circle', { cx: hx, cy: hz, r: hs * 0.75, fill: '#1d758b', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'rot', style: 'cursor:grab' });
       }
     }
     if (draft) {
-      el('polyline', { points: ptsAttr(draft.pts.concat(draft.hover ? [draft.hover] : [])), fill: 'rgba(44,106,77,.08)', stroke: '#2c6a4d', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}` });
-      draft.pts.forEach((p, i) => el('circle', { cx: p[0], cy: p[1], r: P * (i === 0 ? 7 : 4), fill: i === 0 ? '#2c6a4d' : '#fff', stroke: '#2c6a4d', 'stroke-width': P * 2 }));
+      el('polyline', { points: ptsAttr(draft.pts.concat(draft.hover ? [draft.hover] : [])), fill: 'rgba(29,117,139,.08)', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}` });
+      draft.pts.forEach((p, i) => el('circle', { cx: p[0], cy: p[1], r: P * (i === 0 ? 7 : 4), fill: i === 0 ? '#1d758b' : '#fff', stroke: '#1d758b', 'stroke-width': P * 2 }));
     }
   }
 
@@ -838,6 +1003,24 @@
     if (c.pts) c.pts = c.pts.map(p => [p[0] + 2, p[1] + 2]); else { c.x += 2; c.z += 2; }
     clip = JSON.stringify(c); S.els.push(c); sel = c.id; commit(); changed();
   }
+  // Framing on the plan, and the Finishes panel (both remembered on this device).
+  let FRAMING = true, finishesOpen = false;
+  try { FRAMING = localStorage.getItem('qx-editor-framing') !== 'off'; } catch { FRAMING = true; }
+  $('b-frame').setAttribute('aria-pressed', String(FRAMING));
+  $('b-frame').addEventListener('click', () => { FRAMING = !FRAMING; $('b-frame').setAttribute('aria-pressed', String(FRAMING)); try { localStorage.setItem('qx-editor-framing', FRAMING ? 'on' : 'off'); } catch { /* not kept */ } drawPlan(); });
+  $('b-finish').addEventListener('click', () => { finishesOpen = !finishesOpen; if (finishesOpen) sel = null; $('b-finish').setAttribute('aria-pressed', String(finishesOpen)); changed(false); });
+  // 2D, 2D + 3D or 3D (remembered on this device); the plan and 3D refit to their new size.
+  function setView(v) {
+    document.body.dataset.view = v;
+    document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+    try { localStorage.setItem('qx-editor-view', v); } catch { /* not kept */ }
+    requestAnimationFrame(() => { drawPlan(); if (v !== '2d') send3D(true); });
+  }
+  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+  { let v0 = null; try { v0 = localStorage.getItem('qx-editor-view'); } catch { v0 = null; }
+    setView(['2d', 'split', '3d'].includes(v0) ? v0 : '2d'); }
+  $('z-in').addEventListener('click', () => zoomBy(1 / 1.25));
+  $('z-out').addEventListener('click', () => zoomBy(1.25));
   function zoomBy(f) { const cx = vb.x + vb.w / 2, cz = vb.z + vbH() / 2, w = Math.min(160, Math.max(10, vb.w * f)); vb = { x: cx - w / 2, z: cz - (vbH() * w / vb.w) / 2, w }; drawPlan(); }
   function toggleKeys(show) { const k = $('keys'); k.hidden = show == null ? !k.hidden : !show; $('b-keys').setAttribute('aria-expanded', String(!k.hidden)); }
   $('b-keys').addEventListener('click', () => toggleKeys());
@@ -1301,28 +1484,34 @@
   const frame3D = () => send3D(true);
 
   // ═══ Glue ════════════════════════════════════════════════════════════════
-  function changed(full = true) { syncAttached(); drawPlan(); renderProps(); refreshButtons(); send3D(); }
+  function changed(full = true) {
+    syncAttached(); drawPlan(); renderProps(); refreshButtons(); send3D();
+    // Settings open beside the plan when a piece is picked (or Finishes is on).
+    document.body.classList.toggle('panel-open', !CUSTOMER && (sel != null || finishesOpen));
+    const nd = S.els.filter(e => e.type === 'deck').length, np = S.els.filter(e => e.type === 'porch').length, c = $('count');
+    if (c) c.textContent = [nd && `${nd} deck${nd > 1 ? 's' : ''}`, np && `${np} porch${np > 1 ? 'es' : ''}`].filter(Boolean).join(' · ');
+  }
   new ResizeObserver(() => drawPlan()).observe(svg);
   // Zoom the plan to the whole project (plus a strip of the house)
   function fitPlan() {
     const r = svg.getBoundingClientRect(), all = S.els.flatMap(polyOf); if (!all.length || !r.width) return;
     const xs = all.map(p => p[0]), zs = all.map(p => p[1]);
-    const x0 = Math.min(...xs) - 4, x1 = Math.max(...xs) + 4, z0 = -4, z1 = Math.max(...zs) + 4, asp = r.height / r.width;
-    const w = Math.max(x1 - x0, (z1 - z0) / asp, 20); vb = { x: (x0 + x1) / 2 - w / 2, z: z0 - ((w * asp) - (z1 - z0)) / 2 * 0.3, w }; drawPlan();
+    const x0 = Math.min(...xs) - 7, x1 = Math.max(...xs) + 7, z0 = -5, z1 = Math.max(...zs) + 7, asp = r.height / r.width;
+    const w = Math.max(x1 - x0, (z1 - z0) / asp, 20); vb = { x: (x0 + x1) / 2 - w / 2, z: z0 - ((w * asp) - (z1 - z0)) / 2 * 0.55, w }; drawPlan();
   }
   $('b-fit').addEventListener('click', fitPlan);
   if (!CUSTOMER && LINKED) { S.els = LINKED.els; if (LINKED.color) S.color = LINKED.color; S.build = { ...BUILD_DEF, ...(LINKED.build || {}) }; S.house = LINKED.house || null; nextId = LINKED.nextId || S.els.length + 1; lastSaved = snap(); }
   if (CUSTOMER && SENT && Array.isArray(SENT.els) && SENT.els.length) { S.els = SENT.els; if (SENT.color) S.color = SENT.color; S.build = { ...BUILD_DEF, ...(SENT.build || {}) }; S.house = SENT.house || null; if (!SENT.build && SENT.color) S.pendingLegacy = SENT.color; nextId = SENT.nextId || SENT.els.length + 1; lastSaved = snap(); }
   init3D(); frame3D(); sel = DESIGN || CUSTOMER ? null : 3; changed(); refreshButtons(); requestAnimationFrame(fitPlan);
   if (EMPTY_NOTE && !CUSTOMER) $('tip').textContent = EMPTY_NOTE;
-  if (CUSTOMER) { $('tip').textContent = 'Drag to move around · scroll or pinch to zoom · drag the 3D view to look around'; const h = document.querySelector('.bar h1'); if (h) h.textContent = 'Your Deck Plus Design'; }
+  if (CUSTOMER) { $('tip').textContent = 'Drag to move around · scroll or pinch to zoom · drag the 3D view to look around'; const h = document.querySelector('.bar h1'); if (h) h.textContent = 'Your Deck Plus design'; }
 
   // ═══ Save to the proposal ════════════════════════════════════════════════
   // Saved in proposal_designs with the rep's QuoteX sign-in (qx-design-bridge.js):
   // a moment after each change, and on Save / Ctrl+S. A saved drawing wins over
   // the layout worked out from the quote.
   const store = CUSTOMER ? null : window.qxDesignStore, saveBtn = $('b-save');
-  const setStatus = (t) => { $('save-status').textContent = t; };
+  const setStatus = (t) => { const s = $('save-status'); s.textContent = t; s.classList.toggle('unsaved', /unsaved|saving/i.test(t)); };
   // Say plainly when the design is not going on the customer's proposal (the default).
   function shareNote() { const l = document.querySelector('.share-tg'); if (l) l.classList.toggle('off', S.share !== true); }
   shareNote();
@@ -1337,7 +1526,7 @@
   document.addEventListener('keydown', (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); saveNow(); } });
   window.addEventListener('beforeunload', (ev) => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
   if (CUSTOMER) setStatus('');
-  else if (!PID) setStatus(LINK ? 'Linked to the quote: changes update its price' : 'Open from Sales → Designs to save');
+  else if (!PID) setStatus(LINK ? 'Linked to the quote' : 'Open from Sales → Designs to save');
   else if (!store) setStatus('Saving is unavailable here');
   else {
     setStatus('Loading…');
