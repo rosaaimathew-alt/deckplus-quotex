@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileCheck } from 'lucide-react'
+import { ArrowRight, FileCheck } from 'lucide-react'
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
 import { useScopedProposals } from '../lib/proposalScope'
@@ -60,7 +60,7 @@ function Card({ title, action, children }) {
 
 const LinkBtn = ({ onClick, children }) => (
   <button onClick={onClick} className="flex items-center gap-1 text-xs font-medium text-[var(--brand-700)] hover:underline">
-    {children}
+    {children} <ArrowRight size={12} />
   </button>
 )
 
@@ -197,7 +197,7 @@ export default function Dashboard() {
               <div className="px-5 pb-8 pt-4 text-center text-gray-400">
                 <FileCheck size={26} className="mx-auto mb-2 opacity-30" />
                 <p className="text-sm">No quotes yet.</p>
-                {can('/quote') && <button onClick={() => navigate('/quote')} className="mt-2 text-xs font-medium text-[var(--brand-700)] hover:underline">Build your first quote</button>}
+                {can('/quote') && <button onClick={() => navigate('/quote')} className="mt-2 text-xs font-medium text-[var(--brand-700)] hover:underline">Build your first quote →</button>}
               </div>
             ) : (
               <ul className="border-t border-gray-100 divide-y divide-gray-100">

@@ -1645,7 +1645,7 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
                   }}
                   className="flex-1 py-2 rounded-xl bg-[var(--brand-600)] text-white text-sm font-semibold hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors"
                 >
-                  Build contract
+                  Build Contract →
                 </button>
               </div>
             </div>

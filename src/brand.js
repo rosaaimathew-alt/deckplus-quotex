@@ -107,7 +107,7 @@ export function applyBrandStyles(primaryHex, opts = {}, { remember = true } = {}
   const sidebarBorder = darken(sidebar, 0.08)
   const sidebarHover  = isLight(sidebar) ? darken(sidebar, 0.08) : p[600]
   const navText       = isLight(sidebar) ? '#1f2937' : p[100]
-  const accent        = opts.accent || primaryHex || p[600]
+  const accent        = opts.accent || p[500]
 
   let el = document.getElementById('qx-brand')
   if (!el) { el = document.createElement('style'); el.id = 'qx-brand'; document.head.appendChild(el) }
@@ -144,7 +144,7 @@ export function applyBrandStyles(primaryHex, opts = {}, { remember = true } = {}
     }
     .brand-nav-inactive        { color: ${navText}; }
     .brand-nav-inactive:hover  { background-color: ${sidebarHover}; color: #fff; }
-    .brand-nav-active          { background-color: ${isLight(sidebar) ? p[50] : '#fff'}; color: ${p[700]}; box-shadow: ${isLight(sidebar) ? `inset 3px 0 0 ${p[600]}` : 'none'}; }
+    .brand-nav-active          { background-color: #fff; color: ${p[700]}; }
     .brand-badge               { color: ${p[700]}; }
     .brand-footer              { color: ${navText}; }
     ${opts.sidebarDark ? (() => {

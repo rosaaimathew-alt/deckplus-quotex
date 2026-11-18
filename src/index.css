@@ -1,23 +1,5 @@
 @import "tailwindcss";
 
-/* IBM Plex Sans, self-hosted (SIL Open Font License: src/assets/fonts/IBM-Plex-OFL.txt) */
-@font-face {
-  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 400; font-display: swap;
-  src: url(./assets/fonts/ibm-plex-sans-latin-400-normal.woff2) format('woff2');
-}
-@font-face {
-  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 500; font-display: swap;
-  src: url(./assets/fonts/ibm-plex-sans-latin-500-normal.woff2) format('woff2');
-}
-@font-face {
-  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 600; font-display: swap;
-  src: url(./assets/fonts/ibm-plex-sans-latin-600-normal.woff2) format('woff2');
-}
-@font-face {
-  font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 700; font-display: swap;
-  src: url(./assets/fonts/ibm-plex-sans-latin-700-normal.woff2) format('woff2');
-}
-
 .print-only { display: none; }
 
 @media print {
@@ -147,7 +129,7 @@
 
   /* App ground — a deeper, more neutral warm paper (not bright beige) so white
      cards get real contrast. Replaces the light --brand-50 tint. */
-  .qx-ground            { background-color: #f5f7f8; }
+  .qx-ground            { background-color: #ebe5d8; }
   html.dark .qx-ground  { background-color: #1c1c20; }
 
   /* Page titles (.qx-title: Sales, Projects…) use the same sans as the rest
@@ -168,39 +150,17 @@
      With a page background chosen in Settings › Branding, brand.js sets these
      variables to shades of that color instead, so search bars, chips and
      borders match it. */
-  html:not(.dark) .bg-gray-50   { background-color: var(--qx-soft, #f5f7f8) !important; }
-  html:not(.dark) .bg-gray-100  { background-color: var(--qx-soft-2, #eceff1) !important; }
-  html:not(.dark) .border-gray-200 { border-color: var(--qx-line, #dde2e5) !important; }
-  html:not(.dark) .border-gray-100 { border-color: var(--qx-line-soft, #e8ecee) !important; }
-  html:not(.dark) .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--qx-line-soft, #e8ecee) !important; }
+  html:not(.dark) .bg-gray-50   { background-color: var(--qx-soft, #f1ede4) !important; }
+  html:not(.dark) .bg-gray-100  { background-color: var(--qx-soft-2, #eae4d8) !important; }
+  html:not(.dark) .border-gray-200 { border-color: var(--qx-line, #e7e1d4) !important; }
+  html:not(.dark) .border-gray-100 { border-color: var(--qx-line-soft, #efe9df) !important; }
+  html:not(.dark) .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--qx-line-soft, #efe9df) !important; }
 
-  /* ── The Deck Plus look ────────────────────────────────────────────────
-     One typeface (IBM Plex Sans: drafting-sheet plain, with even-width figures
-     so money lines up), structure from thin rules rather than floating cards,
-     tight corners, words in sentence case, and the brand teal kept for the one
-     thing to press. Screen only: print and PDFs are untouched. */
-  body { font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1d2529; }
-  .contract-doc { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
-  table, .tabular-nums, [class*="text-2xl"], [class*="text-3xl"] { font-variant-numeric: tabular-nums; }
-  h1, h2, h3, .qx-title { letter-spacing: -0.012em; }
-
-  /* Flat surfaces: a hairline, no drop shadow; tight, consistent corners */
-  .shadow-sm { box-shadow: none !important; }
-  .shadow, .shadow-md { box-shadow: 0 1px 2px rgba(17, 24, 28, .06) !important; }
-  .rounded-lg  { border-radius: 6px; }
-  .rounded-xl  { border-radius: 8px; }
-  .rounded-2xl { border-radius: 10px; }
-  /* Labels and buttons with text are squared off; dots, avatars and switches stay round */
-  :where(.rounded-full.px-1, .rounded-full.px-1\.5, .rounded-full.px-2, .rounded-full.px-2\.5, .rounded-full.px-3, .rounded-full.px-3\.5, .rounded-full.px-4, .rounded-full.px-5) { border-radius: 5px; }
-
-  /* Sentence case: no tracked-out capitals above sections and table columns */
-  :where(.uppercase.tracking-wide, .uppercase.tracking-wider, .uppercase.tracking-widest, th.uppercase, thead .uppercase, th .uppercase):not(.contract-doc *, .dp-doc *, .qx-keep-caps) {
-    text-transform: none !important; letter-spacing: 0 !important;
-  }
-  th { font-weight: 500; }
-
-  /* Inputs: a crisp field, the brand ring on focus */
-  input:not([type=checkbox]):not([type=radio]):not([type=range]), select, textarea { border-radius: 6px; }
+  /* Softer, warmer surfaces + slightly more generous corners */
+  .shadow-sm { box-shadow: 0 1px 2px rgba(38,38,43,.05), 0 1px 1px rgba(38,38,43,.04) !important; }
+  .shadow-md { box-shadow: 0 2px 10px rgba(38,38,43,.06) !important; }
+  .rounded-xl  { border-radius: 14px; }
+  .rounded-2xl { border-radius: 18px; }
 }
 
 /* ── Deck Plus contract packet (src/contract/DeckPlusContract.jsx) ─────────
