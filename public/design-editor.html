@@ -427,6 +427,8 @@
   const rad = (d) => d * Math.PI / 180;
   // Stairs turn in 45° steps only (square, or straight off a corner).
   const snap45 = (v) => { const r = Math.round(v / 45) * 45; return ((r % 360) + 540) % 360 - 180; };
+  // Roof-to-roof tie: the porch roof floods a third of the porch depth into the existing roof.
+  const roofFlood = (e) => (e.type === 'porch' && e.tie === 'roof' ? Math.round(e.d / 3 * 12) / 12 : 0);
   const fmt = (ft) => { const t = Math.round(ft * 12), f = Math.floor(t / 12), i = t - f * 12; return `${f}′-${i}″`; };
   const snapV = (v, s = 0.5) => Math.round(v / s) * s;
 
@@ -683,13 +685,16 @@
     document.body.classList.toggle('roof-plan', ROOF);
     // ── Roof plan of a porch: the roof with its overhang, ridge and hips, rafters 16″ o.c.,
     // the pitch, the header on the columns, the columns, and the ledger or roof tie-in.
+    // A roof-to-roof tie floods a third of the porch depth into the existing roof.
     function drawRoofPlan(e, grp) {
-      const ov = 1, free = e.tie === 'free', cx = e.x;
-      const L = e.x - e.w / 2 - ov, R = e.x + e.w / 2 + ov, T = free ? e.z - ov : 0, Bz = e.z + e.d + ov;
+      const ov = 1, free = e.tie === 'free', cx = e.x, flood = roofFlood(e);
+      const L = e.x - e.w / 2 - ov, R = e.x + e.w / 2 + ov, T = free ? e.z - ov : -flood, Bz = e.z + e.d + ov;
       const style = e.roof === 'semivault' ? 'gable' : (free && e.roof === 'hip' ? 'gable' : e.roof);
       const pitch = Number(e.pitch) > 0 ? Number(e.pitch) : (e.roof === 'shed' ? 3 : 6), oc = 16 / 12;
       const outline = [[L, T], [R, T], [R, Bz], [L, Bz]];
       el('polygon', { points: ptsAttr(outline), fill: '#f3f6fa', stroke: '#111827', 'stroke-width': P * 2.6 }, grp);
+      // the part framed over the existing roof
+      if (flood) el('rect', { x: L, y: T, width: R - L, height: flood, fill: '#ede9fe', 'fill-opacity': 0.75 }, grp);
       const fg = el('g', { 'pointer-events': 'none' }, grp);
       const line = (x1, y1, x2, y2, stroke = '#9db9e8', w = 0.9, dash) => el('line', { x1, y1, x2, y2, stroke, 'stroke-width': P * w, ...(dash ? { 'stroke-dasharray': dash } : {}) }, fg);
       const arrow = (x, z, dx, dz) => {
@@ -730,7 +735,18 @@
       cols.forEach(([x, z]) => el('rect', { x: x - 0.28, y: z - 0.28, width: 0.56, height: 0.56, fill: '#111827' }, fg));
       // at the house: a ledger on the wall, or tied into the existing roof
       if (!free) {
-        if (e.tie === 'roof') { line(L, T + 0.1, R, T + 0.1, '#7c3aed', 2.2, `${P * 7} ${P * 3}`); tag(cx + (R - cx) * 0.5, T + 0.5 + P * 7, 'Tied into the existing roof', '#7c3aed'); }
+        if (e.tie === 'roof') {
+          line(L, T + 0.1, R, T + 0.1, '#7c3aed', 2.2, `${P * 7} ${P * 3}`);
+          line(e.x - e.w / 2, 0, e.x + e.w / 2, 0, '#64748b', 1.1, `${P * 6} ${P * 4}`);
+          tag(cx + (R - cx) * 0.5, T + flood / 2, `Over the existing roof: ⅓ of the depth`, '#7c3aed');
+          // dimension of the flood, outside the right side
+          const dx = R + P * 22, g = el('g', { 'pointer-events': 'none' }, dimLayer), tk = P * 3.6;
+          [T, 0].forEach(z => { el('line', { x1: R + P * 4, y1: z, x2: dx + P * 5, y2: z, stroke: '#94a3b8', 'stroke-width': P }, g); el('line', { x1: dx - tk, y1: z + tk, x2: dx + tk, y2: z - tk, stroke: '#1e293b', 'stroke-width': P * 1.5 }, g); });
+          el('line', { x1: dx, y1: T, x2: dx, y2: 0, stroke: '#7c3aed', 'stroke-width': P * 1.1 }, g);
+          const t = el('text', { x: dx, y: T / 2, 'font-size': P * 11.5, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#7c3aed', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 600,
+            stroke: '#fbfcfd', 'stroke-width': P * 4, 'paint-order': 'stroke', transform: `rotate(-90 ${dx} ${T / 2})` }, g);
+          t.textContent = fmt(flood);
+        }
         else { line(e.x - e.w / 2, T + 0.1, e.x + e.w / 2, T + 0.1, '#7c3aed', 2.2, `${P * 7} ${P * 3}`); tag(cx + (R - cx) * 0.5, T + 0.5 + P * 7, 'Ledger on the house wall', '#7c3aed'); }
       }
       const ty = T + (Bz - T) * (style === 'hip' ? 0.3 : 0.4);
@@ -738,7 +754,7 @@
       t1.textContent = `${PORCH_NAMES[e.ptype]} roof`;
       const t2 = el('text', { x: cx, y: ty + P * 15, 'font-size': P * 11, 'text-anchor': 'middle', fill: '#475569', 'font-family': 'Inter, system-ui, sans-serif', stroke: '#f3f6fa', 'stroke-width': P * 4, 'paint-order': 'stroke' }, frameLayer);
       t2.textContent = `${ROOF_NAMES[e.roof]} · ${pitch}/12 · rafters 16″ o.c. · 1′ overhang`;
-      edgeLabels(outline, e);
+      edgeLabels(flood ? [[L, 0], [R, 0], [R, Bz], [L, Bz]] : outline, e);
     }
     const frameLayer = el('g', { 'pointer-events': 'none' });
     let postNo = 0;
@@ -874,7 +890,7 @@
       if (e.type === 'porch' || e.type === 'patio') {
         const pts = polyOf(e), [cx, cz] = centroid(pts);
         if (e.type === 'porch') {
-          const ov = 1, z0 = e.tie === 'free' ? e.z - ov : e.z;
+          const ov = 1, z0 = e.tie === 'free' ? e.z - ov : e.z - roofFlood(e);
           el('rect', { x: e.x - e.w / 2 - ov, y: z0, width: e.w + 2 * ov, height: e.z + e.d + ov - z0, fill: 'none', stroke: '#7a7a7a', 'stroke-width': P * 1.2, 'stroke-dasharray': `${P * 6} ${P * 4}` }, grp);
           if (e.roof !== 'shed') el('line', { x1: e.x, y1: z0, x2: e.x, y2: e.z + e.d + ov, stroke: '#7a7a7a', 'stroke-width': P, 'stroke-dasharray': `${P * 3} ${P * 3}` }, grp);
         }
