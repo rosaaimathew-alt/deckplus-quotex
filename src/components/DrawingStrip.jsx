@@ -4,7 +4,7 @@ import { PenTool } from 'lucide-react'
 export function DrawButton({ onClick, title = 'Draw it: the drawing fills this builder', label = 'Draw it' }) {
   return (
     <button type="button" onClick={onClick} title={title}
-      className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)] rounded-full px-3 py-1.5">
+      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[13px] font-medium text-[var(--brand-700)] bg-white border border-[var(--brand-300)] hover:bg-[var(--brand-50)] rounded-md px-3 py-1.5">
       <PenTool size={13} /> {label}
     </button>
   )

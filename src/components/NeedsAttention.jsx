@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, ArrowRight, ChevronDown } from 'lucide-react'
+import { CheckCircle2, ChevronDown } from 'lucide-react'
 
 // ── "Needs your attention" ───────────────────────────────────────────────────
 // The first thing on Home: a short, ranked list of what to do next, each with
@@ -52,8 +52,8 @@ export default function NeedsAttention({ items, limit = 5, title = 'Needs your a
                   </p>
                 </button>
                 <button onClick={() => navigate(it.to)}
-                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--brand-700)] bg-[var(--brand-50)] hover:bg-[var(--brand-100)] transition-colors">
-                  {it.cta} <ArrowRight size={12} />
+                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--brand-700)] border border-[var(--brand-200)] hover:bg-[var(--brand-50)] transition-colors">
+                  {it.cta}
                 </button>
               </div>
               {expanded && (

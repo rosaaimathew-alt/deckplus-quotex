@@ -87,7 +87,7 @@ function NavItem({ d, badge, onClick }) {
   const Icon = d.icon
   return (
     <NavLink to={d.to} end={d.to === '/'} onClick={onClick} title={d.hint}
-      className={({ isActive }) => `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-colors ${isActive ? 'brand-nav-active shadow-sm' : 'brand-nav-inactive'}`}>
+      className={({ isActive }) => `group flex items-center gap-3 px-3 py-2.5 rounded-md text-[15px] font-medium transition-colors ${isActive ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
       <Icon size={19} className="shrink-0" />
       <span className="flex-1 truncate">{d.label}</span>
       {badge > 0 && (
@@ -195,7 +195,7 @@ export default function AppShell() {
         {canQuote && (
           <div className="px-3 pb-3">
             <button onClick={() => { navigate('/quote'); closeSidebar() }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-transform active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md text-sm font-semibold text-white hover:brightness-110 transition active:scale-[0.98]"
               style={{ background: 'var(--accent)' }}>
               <Plus size={17} /> New quote
             </button>
@@ -217,7 +217,7 @@ export default function AppShell() {
           )}
           {/* Search lives in the top bar (and Ctrl K) — no second copy here */}
           <NavLink to="/settings" onClick={closeSidebar}
-            className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${isActive ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
+            className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
             <SettingsIcon size={17} /> <span>Settings</span>
           </NavLink>
         </div>

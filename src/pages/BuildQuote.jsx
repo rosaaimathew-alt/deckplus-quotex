@@ -291,6 +291,20 @@ function PorchAssemblyPanel({ onClose, onAdd, initial, saved }) {
   )
 }
 
+// Two-way switch shown as two joined buttons (how the price shows on the proposal).
+function Segmented({ value, onChange, options }) {
+  return (
+    <div className="inline-flex rounded-md bg-gray-100 p-0.5 text-[13px]">
+      {options.map(([v, label]) => (
+        <button key={label} type="button" onClick={() => onChange(v)} aria-pressed={value === v}
+          className={`px-3 py-1.5 rounded-[4px] transition-colors ${value === v ? 'bg-white text-gray-900 font-medium ring-1 ring-gray-300' : 'text-gray-500 hover:text-gray-900'}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function BuildQuote() {
   const showMoney = useJobMoney()   // the margin overlay: off for some people (Settings › Team › Access)
   const catalogRaw = useStore(s => s.catalog)
@@ -738,7 +752,7 @@ export default function BuildQuote() {
       {/* Left: Catalog picker (on a phone it comes after the customer and the
           quote, so the form isn't buried under 20 catalog cards) */}
       <div className="order-2 lg:order-1 lg:w-64 shrink-0 flex flex-col gap-3">
-        <h3 className="font-semibold text-gray-800 text-sm">Catalog</h3>
+        <h3 className="font-semibold text-gray-900 text-[15px]">Catalog</h3>
         <div className="relative">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -748,22 +762,22 @@ export default function BuildQuote() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 border-b border-gray-200">
           {cats.map(c => (
             <button key={c} onClick={() => setCatFilter(c)}
-              className={`px-2 py-0.5 rounded text-xs font-medium ${catFilter === c ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              className={`-mb-px pb-1.5 text-[13px] border-b-2 transition-colors ${catFilter === c ? 'border-[var(--brand-600)] text-gray-900 font-medium' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
               {c}
             </button>
           ))}
         </div>
-        <div className="flex-1 overflow-y-auto space-y-1 max-h-[50vh] lg:max-h-[calc(100vh-220px)]">
+        <div className="overflow-y-auto max-h-[50vh] lg:max-h-[calc(100vh-220px)] bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
           {filtered.map(item => (
             <button key={item.id} onClick={() => addItem(item)}
-              className="w-full text-left px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors group">
-              <p className="text-xs font-medium text-gray-800 group-hover:text-blue-700 leading-tight">{item.name}</p>
+              className="w-full text-left px-3 py-2.5 hover:bg-[var(--brand-50)] transition-colors group flex items-baseline gap-2">
+              <span className="flex-1 min-w-0 text-[13px] text-gray-800 group-hover:text-[var(--brand-700)] leading-snug">{item.name}</span>
               {item.assembly
-                ? <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-[var(--brand-700)] bg-[var(--brand-100)] px-1.5 py-0.5 rounded-full"><Calculator size={10} /> Builder</span>
-                : <p className="text-xs text-gray-400 mt-0.5">${item.unitPrice}/{item.unit}</p>}
+                ? <span className="shrink-0 inline-flex items-center gap-1 text-[11px] text-gray-400 group-hover:text-[var(--brand-600)]"><Calculator size={11} /> Builder</span>
+                : <span className="shrink-0 text-[11px] text-gray-400 tabular-nums">${item.unitPrice}/{item.unit}</span>}
             </button>
           ))}
         </div>
@@ -789,7 +803,7 @@ export default function BuildQuote() {
         )}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-gray-900">Build Quote</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">Build quote</h2>
             {(client || lines.length > 0 || draftProposalId || revisingParentId) && (
               <button onClick={() => { if (window.confirm('Start a new quote for a new customer? The quote on screen is cleared (anything already saved stays in the tracker).')) startFresh() }}
                 className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
@@ -799,41 +813,16 @@ export default function BuildQuote() {
             <DrawButton onClick={drawQuote} label="Draw the job" title="Each deck and porch you draw becomes a priced line" />
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap w-full sm:w-auto">
-            {/* Item breakdown toggle */}
-            <button
-              onClick={() => setShowBreakdown(v => !v)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
-                showBreakdown
-                  ? 'bg-green-50 border-green-300 text-green-700'
-                  : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              <span className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${showBreakdown ? 'bg-green-500' : 'bg-gray-300'}`}>
-                <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${showBreakdown ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </span>
-              {showBreakdown ? 'Itemized Pricing' : 'Lump Sum'}
-            </button>
-            {/* Summed / A La Carte toggle */}
-            <button
-              onClick={() => setIsAlaCarte(v => !v)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${
-                isAlaCarte
-                  ? 'bg-purple-50 border-purple-300 text-purple-700'
-                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <span className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${isAlaCarte ? 'bg-purple-500' : 'bg-gray-300'}`}>
-                <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${isAlaCarte ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </span>
-              {isAlaCarte ? 'A La Carte' : 'Summed Total'}
-            </button>
+            {/* How the price shows: one lump sum or itemized; one summed total or à la carte */}
+            <Segmented value={showBreakdown} onChange={setShowBreakdown} options={[[false, 'Lump sum'], [true, 'Itemized']]} />
+            <Segmented value={isAlaCarte} onChange={setIsAlaCarte} options={[[false, 'Summed total'], [true, 'À la carte']]} />
             {/* Template buttons */}
             {templates.length > 0 && (
               <button
                 onClick={() => setShowLoadTemplate(true)}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
               >
-                <BookTemplate size={14} /> Load Template
+                <BookTemplate size={14} /> Load template
               </button>
             )}
             {lines.length > 0 && (
@@ -841,7 +830,7 @@ export default function BuildQuote() {
                 onClick={() => { setTemplateName(''); setTemplateDesc(''); setShowSaveTemplate(true) }}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
               >
-                <Save size={14} /> Save as Template
+                <Save size={14} /> Save as template
               </button>
             )}
             <button
@@ -849,44 +838,45 @@ export default function BuildQuote() {
               disabled={!lines.length}
               className="basis-full sm:basis-auto min-h-[48px] sm:min-h-0 px-4 py-2 bg-blue-600 text-white rounded-lg text-base sm:text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Preview Proposal →
+              Preview proposal
             </button>
           </div>
         </div>
 
         {/* Customer info */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Customer Info</p>
+        <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5">
+          <p className="text-[15px] font-semibold text-gray-900 mb-3">Customer</p>
           <div className="grid grid-cols-2 gap-3 [&>div]:col-span-2 sm:[&>div]:col-span-1 sm:[&>div.col-span-2]:col-span-2">
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Customer Name</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Name</label>
               <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="John Smith" value={client} onChange={e => setClient(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Project Address</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Project address</label>
               <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="123 Main St" value={address} onChange={e => setAddress(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Email Address</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Email</label>
               <input type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="john@example.com" value={email} onChange={e => setEmail(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Phone Number</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Phone</label>
               <input type="tel" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" placeholder="(555) 000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Quote Expiration Date</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Quote expires</label>
               <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" value={expiration} onChange={e => setExpiration(e.target.value)} />
             </div>
             <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Project Type</label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Project type</label>
               <div className="flex flex-wrap gap-1.5">
                 {PROJECT_TYPE_OPTIONS.map(t => (
                   <button key={t} type="button" onClick={() => toggleProjectType(t)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    aria-pressed={projectTypes.includes(t)}
+                    className={`px-2.5 py-1 rounded-md text-[13px] border transition-colors ${
                       projectTypes.includes(t)
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300'
+                        ? 'bg-[var(--brand-50)] text-[var(--brand-800)] border-[var(--brand-500)] font-medium'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
                     }`}>
                     {t}
                   </button>
@@ -894,7 +884,7 @@ export default function BuildQuote() {
               </div>
             </div>
             <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Project Summary <span className="text-gray-400">(optional — appears on scope of work)</span></label>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Project summary <span className="text-gray-400">(shows on the scope of work)</span></label>
               <textarea rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" placeholder="e.g. 16'x16' Gable Roof Eze-Breeze Porch with vaulted ceilings…" value={projectSummary} onChange={e => setProjectSummary(e.target.value)} />
             </div>
           </div>
@@ -904,11 +894,10 @@ export default function BuildQuote() {
           idle="Linked to the drawing. Each deck and porch you draw becomes a priced line." />}
         {/* Quick Build — type or dictate (Wispr Flow) a job; AI fills the matching tool */}
         {!activeAssembly && (
-          <div className="bg-[var(--brand-50)] border-2 border-[var(--brand-200)] rounded-2xl p-4 mb-1">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 mb-1">
+            <div className="flex items-center gap-2 mb-2.5">
               <Sparkles size={15} className="text-[var(--brand-600)]" />
-              <p className="text-sm font-semibold text-gray-800">Quick Build</p>
-              <span className="hidden sm:inline text-xs text-gray-400">— say or type the job; the deck, porch, sunroom, under-deck and hardscape tools fill themselves</span>
+              <p className="text-[15px] font-semibold text-gray-900">Quick build</p>
             </div>
             <div className="flex gap-2">
               <input
