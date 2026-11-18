@@ -296,6 +296,9 @@ function stagesForType(type, proposal) {
 }
 
 // Steps every kind of job has once, whatever each list calls them.
+// Steps that come before building starts, and the approvals a job waits on (Jobs list phases).
+const PRE_BUILD = new Set(['hoa', 'zoning', 'building', 'precon', 'start', 'materials', 'measurements'])
+const APPROVALS = ['hoa', ...PERMIT_KEYS]
 const SHARED_STEPS = new Set(['hoa', 'zoning', 'building', 'precon', 'start', 'materials', 'paint', 'final_insp', 'punch', 'closed'])
 
 // A second job type's steps joined onto the first's. A step both have is kept
@@ -2195,7 +2198,8 @@ export default function Jobs() {
   const moneyIdx  = useMemo(() => (showMoney ? booksIndex({ invoices, purchases, bills }) : null), [showMoney, invoices, purchases, bills])
   const [params] = useSearchParams()
   const focusId = params.get('job')
-  const [filter, setFilter] = useState('active')
+  const [filter, setFilter] = useState('all')
+  const subTasks = useStore(s => s.subTasks)
   const [query,  setQuery]  = useState('')
   const [stageFilter, setStageFilter] = useState(null)   // the Stage dropdown: only jobs on this step now
   const permitAccess = usePermitAccess()
@@ -2212,13 +2216,20 @@ export default function Jobs() {
     } catch (e) { setPulseMsg(e.message) } finally { setPulseBusy(false) }
   }
 
-  // A job's phase: closed, in-progress (≥1 stage done, not closed), or not-started.
+  // Where a sold job is: permitting (an approval — HOA, zoning, building permit — still
+  // open), ready to start (approved or none needed, building not begun), active (building:
+  // the start date has come, a building step is checked off, or a sub has started on it),
+  // or closed.
+  const today = new Date().toISOString().slice(0, 10)
+  const subStarted = useMemo(() => new Set((subTasks || []).filter(t => t && ['started', 'near', 'done'].includes(t.status)).map(t => String(t.proposalId))), [subTasks])
   const phaseOf = (p) => {
     const cs = p.jobData?.completedStages || []
     if (cs.includes('closed')) return 'closed'
     const stages = getStages(p) || []
-    const done = stages.filter(s => cs.includes(s.key)).length
-    return done > 0 ? 'in-progress' : 'not-started'
+    const building = (p.jobData?.startDate && p.jobData.startDate <= today) || subStarted.has(String(p.id))
+      || stages.some(s => cs.includes(s.key) && !PRE_BUILD.has(s.key))
+    if (building) return 'active'
+    return stages.some(s => APPROVALS.includes(s.key) && !cs.includes(s.key)) ? 'permitting' : 'ready'
   }
 
   // Where each open job is right now: its first unfinished stage
@@ -2244,10 +2255,7 @@ export default function Jobs() {
     const phase = phaseOf(p)
     if (stageFilter && (phase === 'closed' || currentStageOf(p) !== stageFilter)) return false
     if (permitAccess && permitsOnly && !permitTracked(p)) return false
-    if (filter === 'active'      && phase === 'closed')        return false
-    if (filter === 'in-progress' && phase !== 'in-progress')   return false
-    if (filter === 'not-started' && phase !== 'not-started')   return false
-    if (filter === 'closed'      && phase !== 'closed')        return false
+    if (filter === 'all' ? phase === 'closed' : filter !== 'canceled' && phase !== filter) return false
     if (filter === 'canceled')   return !query || [p.client, p.address, p.email].some(v => v?.toLowerCase().includes(query.toLowerCase()))
     if (query) {
       const q = query.toLowerCase()
@@ -2261,8 +2269,8 @@ export default function Jobs() {
     return aDate < bDate ? 1 : -1
   })
 
-  const counts = { all: wonJobs.length, active: 0, 'in-progress': 0, 'not-started': 0, closed: 0 }
-  wonJobs.forEach(p => { const ph = phaseOf(p); counts[ph] += 1; if (ph !== 'closed') counts.active += 1 })
+  const counts = { all: 0, permitting: 0, ready: 0, active: 0, closed: 0 }
+  wonJobs.forEach(p => { const ph = phaseOf(p); counts[ph] += 1; if (ph !== 'closed') counts.all += 1 })
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -2277,10 +2285,11 @@ export default function Jobs() {
         <SearchLine value={query} onChange={setQuery} placeholder="Search name or contract #" />
         <div className="min-w-0">
           <QuickPicks value={filter} onChange={setFilter} options={[
-            { value: 'active',      label: 'Active',      count: counts.active },
-            { value: 'not-started', label: 'Not started', count: counts['not-started'] },
-            { value: 'closed',      label: 'Closed',      count: counts.closed },
-            { value: 'all',         label: 'All',         count: counts.all },
+            { value: 'all',        label: 'All',            count: counts.all },
+            { value: 'permitting', label: 'Permitting',     count: counts.permitting },
+            { value: 'ready',      label: 'Ready to start', count: counts.ready },
+            { value: 'active',     label: 'Active',         count: counts.active },
+            { value: 'closed',     label: 'Closed',         count: counts.closed },
             ...(canceledJobs.length ? [{ value: 'canceled', label: 'Canceled', count: canceledJobs.length }] : []),
           ]} />
         </div>
