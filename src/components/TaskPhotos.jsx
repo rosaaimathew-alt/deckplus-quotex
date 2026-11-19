@@ -9,7 +9,7 @@ import { photosByDay, uploadTaskPhoto, usePhotoUrl } from '../lib/taskPhotos'; i
 
 const dayName = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-function Thumb({ photo, size, onOpen }) {
+export function Thumb({ photo, size, onOpen }) {
   const url = usePhotoUrl(photo)
   return (
     <button type="button" onClick={() => url && onOpen(url)} className={`${size} shrink-0 rounded-lg overflow-hidden bg-gray-100 border border-gray-200`} aria-label="Open photo">

@@ -166,6 +166,17 @@ export const ACTIVITY_TYPES = ['Call', 'Follow-up', 'Meeting', 'Email', 'Objecti
 // Copies a job's inspection results onto its subs' bookings, each sub getting
 // only their own trade's (lib/subInspections), and alerts the sub about a new
 // pass / fail from the last three days.
+// A job's inspections as the PM hears about them (api/_notify.js, job_inspection):
+// each one's result, or its scheduled date. A change → the job's PM is told
+// what's new (the server works out what that is, and never repeats itself).
+const inspectionSig = (p) => JSON.stringify([
+  ...(p?.countyPermit?.permits || []).flatMap(x => [...(x.upcoming || []).map(u => `${x.record}:${u.id}:${u.date}`), ...(x.completed || []).map(c => `${x.record}:${c.id}:${c.result}`)]),
+  ...(p?.jobData?.officeInspections || []).map(o => `${o.id}:${o.result}:${o.date}`),
+])
+const findJob = (get, id) => (get().proposals || []).find((x) => String(x.id) === String(id))
+function tellPmIfInspectionsChanged(get, proposalId, before) {
+  if (inspectionSig(findJob(get, proposalId)) !== before) notify('job_inspection', proposalId, 4000)
+}
 function syncSubInspections(get, set, proposalId, alert = true) {
   const s = get()
   const p = (s.proposals || []).find((x) => String(x.id) === String(proposalId))
@@ -954,6 +965,7 @@ export const useStore = create(
 
       // ── Job Management (stages, notes, dates per won proposal) ──────────
       updateJobData: (proposalId, changes) => {
+        const insBefore = changes && 'officeInspections' in changes ? inspectionSig(findJob(get, proposalId)) : null
         set((s) => ({
           proposals: s.proposals.map((p) =>
             p.id === proposalId
@@ -963,6 +975,7 @@ export const useStore = create(
         }))
         // A result the office recorded by hand reaches the sub of that trade
         if (changes && 'officeInspections' in changes) syncSubInspections(get, set, proposalId)
+        if (insBefore != null) tellPmIfInspectionsChanged(get, proposalId, insBefore)   // the job's PM hears
       },
 
       // Schedule (or clear) a single job stage on the PM calendar.
@@ -996,6 +1009,7 @@ export const useStore = create(
       // County permit results from the inspection pulse. Stages the county
       // has passed are checked off; nothing is ever unchecked.
       setCountyPermit: (proposalId, countyPermit, passedStages = []) => {
+        const insBefore = inspectionSig(findJob(get, proposalId))
         set((s) => ({
           proposals: s.proposals.map((p) => {
             if (p.id !== proposalId) return p
@@ -1009,6 +1023,7 @@ export const useStore = create(
           }),
         }))
         syncSubInspections(get, set, proposalId)   // each sub hears about their own trade's results
+        tellPmIfInspectionsChanged(get, proposalId, insBefore)   // and the job's PM about anything new
       },
 
       toggleJobStage: (proposalId, stageKey) =>
@@ -1227,13 +1242,15 @@ export const useStore = create(
 
       // ── Job chat: a sub's manager and the PM, per job (lib/subChat) ──────
       subMessages: [],
-      addSubMessage: ({ proposalId, subId, subUserId, client = '', from, text }) => {
+      // photos: [{ id, path }] already uploaded (lib/taskPhotos uploadChatPhoto), up to 6
+      addSubMessage: ({ proposalId, subId, subUserId, client = '', from, text, photos = [] }) => {
         const t = String(text || '').trim().slice(0, 2000)
-        if (!t || proposalId == null || subId == null) return null
+        const pics = (photos || []).filter(p => p && (p.path || p.dataUrl)).slice(0, 6)
+        if ((!t && !pics.length) || proposalId == null || subId == null) return null
         const id = newMessageId()
         set((s) => ({
           subMessages: [...(s.subMessages || []), {
-            id, proposalId, subId, subUserId: subUserId || null, client, from, text: t,
+            id, proposalId, subId, subUserId: subUserId || null, client, from, text: t, ...(pics.length ? { photos: pics } : {}),
             byId: s.me?.id || null, byName: s.me?.displayName || s.me?.email || '', at: new Date().toISOString(),
           }],
         }))

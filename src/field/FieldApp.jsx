@@ -102,7 +102,8 @@ function TodayScreen() {
       <ScopeToggle scope={scope} setScope={setScope} hasMine={hasMine} />
 
       <InstallCard />
-      <PushCard installHint={false} />
+      {/* Each phone and tablet a PM uses asks once per visit until alerts are on there */}
+      <PushCard installHint={false} prompt reason="Know right away when a sub messages you, adds photos, finishes a job, or an inspection is scheduled or gets a result." />
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">

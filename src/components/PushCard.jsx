@@ -23,7 +23,8 @@ const readAsked = () => { try { return sessionStorage.getItem(ASKED_KEY) === '1'
 // prompt: the sub app. Each time the app is opened with alerts still off, the
 // card comes up over the page and asks, once; a phone only shows its own
 // "Allow notifications?" question after a tap, so this is that tap.
-export default function PushCard({ installHint = true, compact = false, keep = false, prompt = false }) {
+// reason: the line under the title when it asks (prompt); the sub app's by default
+export default function PushCard({ installHint = true, compact = false, keep = false, prompt = false, reason = '' }) {
   const [status, setStatus] = useState(pushStatus)
   const [dismissed, setDismissed] = useState(readDismissed)
   const [asked, setAsked] = useState(readAsked)
@@ -52,7 +53,8 @@ export default function PushCard({ installHint = true, compact = false, keep = f
       <span className="font-bold text-[var(--brand-700)]">{tr('Turn on')}</span>
     </button>
   )
-  const title = tr(isPhone() ? 'Get alerts on this phone' : 'Get alerts on this computer')
+  const tablet = /ipad|tablet/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) || (/android/i.test(navigator.userAgent) && !/mobile/i.test(navigator.userAgent))
+  const title = tr(tablet ? 'Get alerts on this tablet' : isPhone() ? 'Get alerts on this phone' : 'Get alerts on this computer')
   const turnOn = async () => {
     setBusy(true); setError('')
     try {
@@ -66,7 +68,7 @@ export default function PushCard({ installHint = true, compact = false, keep = f
     <section className={`relative bg-white rounded-2xl border-2 border-[var(--brand-300)] shadow-sm p-4 space-y-3 ${compact ? 'max-w-md' : ''} ${asking ? 'w-full max-w-md shadow-2xl' : ''}`} aria-label={title}>
       <button onClick={dismiss} aria-label={tr('Not now')} className="absolute top-2 right-2 h-9 w-9 flex items-center justify-center text-gray-400"><X size={18} /></button>
       <p className="flex items-center gap-2 pr-8 text-base font-bold text-gray-900"><Bell size={20} className="text-[var(--brand-700)] shrink-0" /> {title}</p>
-      {asking && <p className="text-base text-gray-700">{tr('Know right away when your PM books you or sends you a message.')}</p>}
+      {asking && <p className="text-base text-gray-700">{reason || tr('Know right away when your PM books you or sends you a message.')}</p>}
       {status === 'install' ? (
         <ol className="space-y-2 text-base text-gray-800">
           <li className="flex items-center gap-2 flex-wrap">

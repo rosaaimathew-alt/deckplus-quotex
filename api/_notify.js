@@ -22,6 +22,9 @@
  *   message (job chat)             → the other side of that conversation: the sub's manager,
  *                                    or the Deck Plus PM on the job
  *   todo_assigned (To-do › Shared) → the office teammate the task was given to, in the giver's name
+ *   job_inspection (id = the job)   → the Deck Plus PM on the job: an inspection got a result, or was
+ *                                    scheduled or moved (supabase/job_inspection_alerts.sql). Only
+ *                                    what's new since the last alert about that job is told.
  */
 import { verifyToken, asUser, staffMembership } from './_auth.js'
 import { sendMail } from './_mailer.js'
@@ -31,7 +34,7 @@ import { getKV } from './_kv.js'
 
 const TEAL = '#1d758b'
 const ORANGE = '#ea7a24'
-export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message', 'todo_assigned', 'photos']
+export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message', 'todo_assigned', 'photos', 'job_inspection']
 const CHAT_QUIET_SECONDS = 300   // a back-and-forth emails each side at most once every five minutes per job
 const QUIET_SECONDS = 60   // the same alert about the same booking is not repeated inside a minute
 const PHOTO_QUIET_SECONDS = 600   // new photos on a booking: one alert per 10 minutes, however many batches
@@ -184,15 +187,36 @@ export function messageFor(info) {
     case 'message': {
       const m = info.message || {}
       const said = tidy(m.text, 600)
-      if (!said) return null
+      // a photo with no words still tells the other side
+      const pics = Math.max(0, Number(m.photos) || 0) || (said ? 0 : 1)
+      const photoEn = pics ? (pics === 1 ? 'a photo' : `${pics} photos`) : '', photoEs = pics ? (pics === 1 ? 'una foto' : `${pics} fotos`) : ''
       const toSub = m.from === 'pm'
       return {
-        subject: `Message from ${by}: ${tidy(m.client, 60) || 'your job'}`,
-        en: `${by} wrote about ${tidy(m.client, 80) || 'the job'}: "${said}"`,
-        es: toSub ? `${by} escribió sobre ${tidy(m.client, 80) || 'el trabajo'}: "${said}"` : null,
-        sms: `Deck Plus: ${by} (${tidy(m.client, 40) || 'job'}): ${tidy(m.text, 200)}`,
+        subject: `${said ? 'Message' : 'Photo'} from ${by}: ${tidy(m.client, 60) || 'your job'}`,
+        en: said ? `${by} wrote about ${tidy(m.client, 80) || 'the job'}: "${said}"${pics ? ` (with ${photoEn})` : ''}` : `${by} sent ${photoEn} about ${tidy(m.client, 80) || 'the job'}.`,
+        es: toSub ? (said ? `${by} escribió sobre ${tidy(m.client, 80) || 'el trabajo'}: "${said}"${pics ? ` (con ${photoEs})` : ''}` : `${by} envió ${photoEs} sobre ${tidy(m.client, 80) || 'el trabajo'}.`) : null,
+        sms: `Deck Plus: ${by} (${tidy(m.client, 40) || 'job'}): ${said ? tidy(m.text, 200) : `sent ${photoEn}`}`,
         path: toSub ? (m.taskId ? `/task/${encodeURIComponent(m.taskId)}` : '/') : (m.proposalId ? `/field/job/${encodeURIComponent(m.proposalId)}` : '/field'),
         cta: toSub ? 'Reply / Responder' : 'Reply',
+      }
+    }
+    // An inspection on one of the PM's jobs (only what's new: info.news, see sendNotification)
+    case 'job_inspection': {
+      const j = info.job || {}, news = info.news || { results: [], scheduled: [] }
+      if (!news.results.length && !news.scheduled.length) return null
+      const client = tidy(j.client, 60) || 'your job'
+      const where = [tidy(j.client), tidy(j.address)].filter(Boolean).join(', ')
+      const lines = [
+        ...news.results.map(r => `${r.name}: ${r.pass ? 'passed' : `did not pass (${tidy(r.result, 40) || 'failed'})`}${r.date ? ` ${dayText(r.date)}` : ''}`),
+        ...news.scheduled.map(u => `${u.name}: scheduled ${dayText(u.date) || u.date}`),
+      ]
+      const lead = news.results[0] || null
+      return {
+        subject: lead ? `${lead.pass ? 'Passed' : 'Did not pass'}: ${lead.name} inspection · ${client}` : `Inspection ${dayText(news.scheduled[0].date)}: ${client}`,
+        en: `Inspections at ${where}: ${lines.join('; ')}.`,
+        es: null,
+        sms: `Deck Plus: ${client}: ${lines.join('; ')}`,
+        path: `/field/job/${encodeURIComponent(j.id || '')}`, cta: 'Open the job',
       }
     }
     // A task one person in the office gave another (To-do › Shared)
@@ -254,6 +278,42 @@ export function mailSenderFor(kind, info, people, orgId = null, popupOnly = new 
   return toPm?.email && !kept(toPm.email) ? { orgId, email: toPm.email } : { orgId }
 }
 
+// ── Inspections on a job: what's new since the last alert about it ──────────
+// Each inspection is remembered by its permit, id and result (or scheduled
+// date) for 120 days, so the county check running again, or two people's
+// screens running it, never tells the PM the same thing twice. Old results
+// arriving late (more than 3 days old) and past dates are never news.
+const insItems = (job) => {
+  const out = []
+  for (const p of [...(job?.permits || []), { record: 'office', completed: job?.office || [], upcoming: [] }]) {
+    for (const c of p.completed || []) if (c && String(c.result || '').trim()) out.push({ key: `${p.record}:${c.id || c.code}:r:${String(c.result).trim().toLowerCase()}`, type: 'result', c })
+    for (const u of p.upcoming || []) if (u && u.date) out.push({ key: `${p.record}:${u.id || u.code}:d:${u.date}`, type: 'scheduled', c: u })
+  }
+  return out
+}
+const insName = (c) => tidy(c.name, 60) || ({ FT: 'Footing', FR: 'Framing', FF: 'Floor framing', FI: 'Final', ER: 'Electrical rough', EF: 'Electrical final', SL: 'Slab' })[c.code] || 'Inspection'
+function newsOf(items, seen, today = new Date().toISOString().slice(0, 10)) {
+  const since = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)
+  const news = { results: [], scheduled: [] }
+  for (const it of items) {
+    if (seen.has(it.key)) continue
+    const c = it.c
+    if (it.type === 'result') {
+      if (c.date && c.date < since) continue
+      news.results.push({ name: insName(c), result: c.result, date: c.date || '', pass: /^pass/i.test(String(c.result || '')) })
+    } else if (c.date >= today) news.scheduled.push({ name: insName(c), date: c.date })
+  }
+  return news
+}
+export async function inspectionNews(kv, jobId, job) {
+  const items = insItems(job), key = `notify:jobinsp:seen:${jobId}`
+  const seen = new Set((await kv.get(key)) || [])
+  const news = newsOf(items, seen)
+  await kv.set(key, items.map(i => i.key).slice(-300), { ex: 120 * 86400 })
+  return news
+}
+inspectionNews.fresh = (job) => newsOf(insItems(job), new Set())
+
 export async function sendNotification(req, res, body) {
   const header = req.headers?.authorization || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : (req.headers?.['x-qx-token'] || null)
@@ -265,18 +325,25 @@ export async function sendNotification(req, res, body) {
   if (!KINDS.includes(kind) || !id) return res.status(400).json({ error: 'Unknown alert.' })
 
   // Who is told, and about what: the database decides, as the signed-in person.
-  const { data: info, error } = await asUser(token).rpc('notify_targets', { p_kind: kind, p_id: id })
+  const { data: info, error } = kind === 'job_inspection'
+    ? await asUser(token).rpc('job_inspection_targets', { p_id: id })
+    : await asUser(token).rpc('notify_targets', { p_kind: kind, p_id: id })
   if (error) return res.status(500).json({ sent: false, error: 'Could not look up who to tell.' })
   if (!info) return res.status(404).json({ sent: false, reason: 'Nothing to tell anyone about.' })
   const people = (info.recipients || []).filter(p => p && p.email)
   if (!people.length) return res.status(200).json({ sent: false, reason: 'Nobody to tell yet.' })
+  // Inspections: only what the PM hasn't been told about this job yet
+  if (kind === 'job_inspection') {
+    try { info.news = await inspectionNews(await getKV(), id, info.job) } catch { info.news = inspectionNews.fresh(info.job) }
+  }
   const msg = messageFor(info)
   if (!msg) return res.status(200).json({ sent: false, reason: 'Nothing to say.' })
 
   // Not twice in a minute (a date typed digit by digit, a double tap).
   // Chat: per conversation and direction, not per message
   const quietKey = kind === 'message' ? `notify:message:${info.message?.proposalId}:${info.message?.subId}:${info.message?.from}` : `notify:${kind}:${id}`
-  try {
+  // (inspections need none: they only ever tell what's new, see inspectionNews)
+  if (kind !== 'job_inspection') try {
     const kv = await getKV()
     if (await kv.get(quietKey)) return res.status(200).json({ sent: false, reason: 'Already sent a moment ago.' })
     await kv.set(quietKey, { at: Date.now() }, { ex: kind === 'message' ? CHAT_QUIET_SECONDS : kind === 'photos' ? PHOTO_QUIET_SECONDS : QUIET_SECONDS })

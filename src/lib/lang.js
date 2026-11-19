@@ -53,7 +53,7 @@ const ES = {
   'Put one of your technicians on this job. They send the daily photos and move it along.': 'Ponga a uno de sus técnicos en este trabajo. Ellos envían las fotos diarias y lo avanzan.',
   // one job
   "That task isn't here anymore.": 'Ese trabajo ya no está aquí.', 'Directions': 'Cómo llegar',
-  'Messages': 'Mensajes', 'with': 'con', 'your PM': 'su PM', 'Message': 'Mensaje para', 'Write a message…': 'Escriba un mensaje…', 'Send': 'Enviar',
+  'Messages': 'Mensajes', 'with': 'con', 'your PM': 'su PM', 'Message': 'Mensaje para', 'Write a message…': 'Escriba un mensaje…', 'Send': 'Enviar', 'Add a photo': 'Agregar una foto', 'The photo did not upload.': 'La foto no se subió.',
   "Today's photos": 'Fotos de hoy', 'Required': 'Obligatorio', 'sent': 'enviadas',
   "Send photos of the work every day. The buttons below unlock once today's are in.": 'Envíe fotos del trabajo todos los días. Los botones de abajo se activan cuando envíe las de hoy.',
   'Add more photos': 'Agregar más fotos', 'Take photos': 'Tomar fotos', 'Sending': 'Enviando',
@@ -66,7 +66,7 @@ const ES = {
   'Paint': 'Pintura', 'Paint date': 'Fecha de pintura', 'Color not set': 'Color sin definir', 'Notes for the painter': 'Notas para el pintor', 'Touch-ups': 'Retoques',
   'Inspection results': 'Resultados de inspección', 'Passed': 'Aprobada', 'Did not pass': 'No aprobada', 'Recorded': 'Registrada',
   'Electrical items': 'Artículos eléctricos', 'Job checklist': 'Lista del trabajo',
-  'Get alerts on this phone': 'Reciba avisos en este teléfono', 'Get alerts on this computer': 'Reciba avisos en esta computadora', 'Turn on alerts': 'Activar avisos', 'Not now': 'Ahora no',
+  'Get alerts on this phone': 'Reciba avisos en este teléfono', 'Get alerts on this tablet': 'Reciba avisos en esta tableta', 'Get alerts on this computer': 'Reciba avisos en esta computadora', 'Turn on alerts': 'Activar avisos', 'Not now': 'Ahora no',
   'Alerts are off on this phone': 'Los avisos están apagados en este teléfono', 'Turn on': 'Activar',
   'Know right away when your PM books you or sends you a message.': 'Entérese al momento cuando su PM le asigne un trabajo o le envíe un mensaje.',
   'Tap': 'Toque', 'Share': 'Compartir', 'at the bottom of Safari': 'en la parte de abajo de Safari', 'Add to Home Screen': 'Agregar a inicio',
