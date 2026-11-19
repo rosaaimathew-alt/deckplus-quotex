@@ -134,8 +134,8 @@ export function StatusCell({ status }) {
 // Row action icon (record payment, print, email, void…).
 export function RowIcon({ icon, title, onClick, tone = 'brand' }) {
   const Icon = icon
-  const cls = tone === 'muted' ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-[var(--brand-600)] hover:bg-[var(--brand-50)]'
-  return <button type="button" onClick={onClick} title={title} aria-label={title} className={`p-0.5 rounded-lg ${cls}`}><Icon size={24} strokeWidth={1.9} /></button>
+  const cls = tone === 'muted' ? 'text-gray-300 hover:text-red-600 hover:bg-red-50' : 'text-[var(--brand-400)] hover:text-[var(--brand-700)] hover:bg-[var(--brand-50)]'
+  return <button type="button" onClick={onClick} title={title} aria-label={title} className={`p-1 rounded-lg ${cls}`}><Icon size={19} strokeWidth={1.5} /></button>
 }
 
 // "View report": the rows on screen as a printable report (same columns as
