@@ -27,8 +27,10 @@ const daysSince = (iso) => (iso ? Math.floor((Date.now() - new Date(iso).getTime
 export const contractStatusOf = (p) => (!p.contractDraft ? 'not-started' : p.contractDraft.signed ? 'signed' : 'in-progress')
 export const isJobClosed = (p) => (p.jobData?.completedStages || []).includes('closed')
 // A job on the Jobs page: a won deal, or an ongoing job brought in from the
-// office's project sheet (status 'Imported' — never counted as a sale).
-export const isJob = (p) => p.status === 'Won' || p.status === 'Imported'
+// office's project sheet (status 'Imported' — never counted as a sale). Not a
+// record kept only for its invoices (jobData.invoicesOnly: an old Knowify
+// invoice or a collection, no job behind it): that one stays in Money only.
+export const isJob = (p) => (p.status === 'Won' || p.status === 'Imported') && !p.jobData?.invoicesOnly
 
 // Each item: { key, tone, title, detail, count, people: [{ id, name, note }], to, cta }
 // costOf: lib/jobCost.js's useJobCostOf(), so a job with POs / bills in Money counts as costed.
