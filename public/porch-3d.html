@@ -293,6 +293,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="/paver-patterns.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/SSAOShader.js"></script>
@@ -1486,6 +1487,24 @@
     ridge: () => mat('ridge', () => std({ color: '#3e3f43', roughness: 0.95 })),
     concrete: () => mat('concrete', () => std({ color: '#ffffff', map: T.concrete, roughness: 0.95 })),
     pavers: () => mat('pavers', () => std({ color: '#ffffff', map: T.pavers, bumpMap: T.pavers, bumpScale: 0.03, roughness: 0.9 })),
+    // the patio's own pavers: its collection's stones in the chosen pattern and color
+    paversFor: (p) => {
+      const P = window.QX_PAVERS; if (!P) return M.pavers();
+      const sp = P.spec(p), key = `pav-${sp.paver}-${sp.pattern}-${sp.color}`;
+      return mat(key, () => {
+        const pat = P.layout(sp.paver, sp.pattern, 11), [px, py] = pat.period, k = Math.min(10, 1400 / Math.max(px, py));
+        const [c, x] = cnv(Math.round(px * k), Math.round(py * k));
+        x.fillStyle = shade(sp.hex, -0.45); x.fillRect(0, 0, c.width, c.height);         // the joints show between the stones
+        P.tile(pat, 0, 0, px, py).forEach(st => {
+          x.beginPath(); st.pts.forEach(([u, v], i) => (i ? x.lineTo : x.moveTo).call(x, u * k, v * k)); x.closePath();
+          x.fillStyle = shade(sp.hex, (st.s - 0.5) * 0.18); x.fill();
+          x.lineWidth = Math.max(1, sp.joint * k); x.strokeStyle = shade(sp.hex, -0.45); x.stroke();
+        });
+        for (let i = 0; i < c.width * c.height / 60; i++) { x.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},0.06)`; x.fillRect(Math.random() * c.width, Math.random() * c.height, 2, 2); }
+        const t = tex(c, px / 12, py / 12);
+        return std({ color: '#ffffff', map: t, bumpMap: t, bumpScale: 0.025, roughness: 0.88 });
+      });
+    },
     block: () => mat('block', () => std({ color: '#9b958b', map: T.wallBlock, bumpMap: T.wallBlock, bumpScale: 0.05, roughness: 0.95 })),
     border: () => mat('border', () => std({ color: '#5d5a55', map: T.concrete, roughness: 0.9 })),
     mulch: () => mat('mulch', () => std({ color: '#ffffff', map: T.mulch, roughness: 1 })),
@@ -2011,7 +2030,7 @@
         for (let k = 0; k < n; k++) { const top = h - (k + 1) * rise + rise; B(STAIR_W + 1, top, pw.run, M.block(), cx, top / 2, fz + k * pw.run + pw.run / 2); B(STAIR_W + 1.2, 0.15, pw.run + 0.1, M.border(), cx, top + 0.075, fz + k * pw.run + pw.run / 2); } }
     }
     if (s.mat === 'concrete') { slab(pts, h, 0.33, M.concrete()); return; }
-    slab(pts, h, 0.25, M.pavers());
+    slab(pts, h, 0.25, M.paversFor(s));
     sides.forEach(sd => along(sd, 0.25, 0.5, 0.25, h + 0.13, M.border()));     // a soldier border all round
   }
   function buildPatio(s) {
@@ -2036,7 +2055,7 @@
       }
     }
     if (s.mat === 'concrete') { B(s.w, 0.33, s.d, M.concrete(), cx, h + 0.165, cz); return; }
-    B(s.w - 1, 0.25, s.d - 1, M.pavers(), cx, h + 0.125, cz);
+    B(s.w - 1, 0.25, s.d - 1, M.paversFor(s), cx, h + 0.125, cz);
     B(s.w, 0.24, 0.5, M.border(), cx, h + 0.12, r.z0 + 0.25); B(s.w, 0.24, 0.5, M.border(), cx, h + 0.12, r.z1 - 0.25);
     [r.x0 + 0.25, r.x1 - 0.25].forEach(x => B(0.5, 0.24, s.d - 1, M.border(), x, h + 0.12, cz));
   }
