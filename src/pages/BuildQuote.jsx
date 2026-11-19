@@ -757,13 +757,29 @@ export default function BuildQuote() {
             <button onClick={() => setRestoredFrom(null)} aria-label="Dismiss" className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
           </div>
         )}
+        {/* The four steps of a quote; each one jumps to its part of the page */}
+        <ol className="no-print flex gap-2 text-sm" aria-label="Steps">
+          {[
+            ['bq-customer', 'Customer', !!client],
+            ['bq-design', 'Design it', lines.length > 0],
+            ['bq-price', 'Price it', lines.length > 0 && !!client],
+            ['bq-send', 'Send it', false],
+          ].map(([id, label, done], i) => (
+            <li key={id} className="flex-1 min-w-0">
+              <button type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                className={`w-full text-left px-3 py-2 rounded-lg border truncate ${done ? 'bg-[var(--brand-50)] border-[var(--brand-200)] text-[var(--brand-800)]' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                <span className="font-semibold">{i + 1}</span> · {label}
+              </button>
+            </li>
+          ))}
+        </ol>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-gray-900">Build Quote</h2>
+            <h2 className="text-2xl font-bold text-gray-900">New quote</h2>
             {(client || lines.length > 0 || draftProposalId || revisingParentId) && (
               <button onClick={() => { if (window.confirm('Start a new quote for a new customer? The quote on screen is cleared (anything already saved stays in the tracker).')) startFresh() }}
                 className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
-                <Plus size={12} /> New quote
+                <Plus size={12} /> Start over
               </button>
             )}
           </div>
@@ -813,10 +829,10 @@ export default function BuildQuote() {
                 <Save size={14} /> Save as Template
               </button>
             )}
-            <button
+            <button id="bq-send"
               onClick={goToProposal}
               disabled={!lines.length}
-              className="basis-full sm:basis-auto min-h-[48px] sm:min-h-0 px-4 py-2 bg-blue-600 text-white rounded-lg text-base sm:text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="basis-full sm:basis-auto min-h-[48px] sm:min-h-0 px-4 py-2 bg-[var(--brand-600)] text-white rounded-lg text-base sm:text-sm font-medium hover:bg-[var(--brand-700)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Preview Proposal →
             </button>
@@ -824,7 +840,7 @@ export default function BuildQuote() {
         </div>
 
         {/* Customer info */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div id="bq-customer" className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Customer Info</p>
           <div className="grid grid-cols-2 gap-3 [&>div]:col-span-2 sm:[&>div]:col-span-1 sm:[&>div.col-span-2]:col-span-2">
             <div>
@@ -871,7 +887,7 @@ export default function BuildQuote() {
 
         {/* Quick Build — type or dictate (Wispr Flow) a job; AI fills the matching tool */}
         {!activeAssembly && (
-          <div className="bg-[var(--brand-50)] border-2 border-[var(--brand-200)] rounded-2xl p-4 mb-1">
+          <div id="bq-design" className="bg-[var(--brand-50)] border-2 border-[var(--brand-200)] rounded-2xl p-4 mb-1">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles size={15} className="text-[var(--brand-600)]" />
               <p className="text-sm font-semibold text-gray-800">Quick Build</p>
@@ -950,7 +966,7 @@ export default function BuildQuote() {
         )}
 
         {/* Lines */}
-        <div className="bg-white rounded-xl border border-gray-200 flex-1">
+        <div id="bq-price" className="bg-white rounded-xl border border-gray-200 flex-1">
           <div className="qx-stack-box">
             <table className="w-full text-sm qx-stack">
               <thead className="bg-gray-50 border-b border-gray-100">
