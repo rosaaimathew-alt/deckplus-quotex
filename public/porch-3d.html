@@ -1987,7 +1987,35 @@
       subtract(r.z0, r.z1, [...covered(s, e), ...gapAt(e)]).forEach(([a, b]) => { const [p, q] = ends(a, b, r.z0, r.z1); railRun(x, Math.max(p, 0.25), x, q, fy, fy); }));
   }
 
+  // Where a patio's front edge is at its middle: its block steps go down from there.
+  function patioFrontZ(s) {
+    if (!Array.isArray(s.pts) || s.pts.length < 3) return rect(s).z1;
+    let z = -Infinity; const x = s.x;
+    s.pts.forEach((a, i) => { const b = s.pts[(i + 1) % s.pts.length]; if ((a[0] <= x && b[0] >= x) || (b[0] <= x && a[0] >= x)) z = Math.max(z, a[0] === b[0] ? Math.max(a[1], b[1]) : a[1] + (x - a[0]) / (b[0] - a[0]) * (b[1] - a[1])); });
+    return isFinite(z) ? z : rect(s).z1;
+  }
+  // A patio drawn with its own corners: the same build, along its outline.
+  function buildPatioShape(s) {
+    const pts = s.pts, pw = patioWall(s), h = pw ? pw.H : 0, cx = s.x;
+    const slab = (q, y0, t, m) => { const sh = new THREE.Shape(); sh.moveTo(q[0][0], -q[0][1]); q.slice(1).forEach(p => sh.lineTo(p[0], -p[1])); sh.closePath();
+      const me = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: t, bevelEnabled: false }), m); me.rotation.x = -Math.PI / 2; me.position.y = y0; me.castShadow = me.receiveShadow = true; G.add(me); };
+    const [ccx, ccz] = [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length];
+    // each side: its length, direction and the way in (toward the middle)
+    const sides = pts.map((a, i) => { const b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+      let nx = -uz, nz = ux; if (nx * (ccx - (a[0] + b[0]) / 2) + nz * (ccz - (a[1] + b[1]) / 2) < 0) { nx = -nx; nz = -nz; } return { a, b, L, nx, nz, ang: Math.atan2(-(b[1] - a[1]), b[0] - a[0]) }; });
+    const along = (sd, inset, w, hgt, y, m) => { const mx = (sd.a[0] + sd.b[0]) / 2 + sd.nx * inset, mz = (sd.a[1] + sd.b[1]) / 2 + sd.nz * inset, bx = B(sd.L, hgt, w, m, mx, y, mz); bx.rotation.y = sd.ang; };
+    if (h > 0) {
+      slab(pts, 0, h, M.footing());
+      sides.forEach(sd => { along(sd, WALL_T / 2, WALL_T, h, h / 2, M.block()); along(sd, WALL_T / 2, WALL_T + 0.2, 0.18, h + 0.09, M.border()); });
+      if (pw.steps) { const n = pw.steps, rise = h / n, fz = patioFrontZ(s);
+        for (let k = 0; k < n; k++) { const top = h - (k + 1) * rise + rise; B(STAIR_W + 1, top, pw.run, M.block(), cx, top / 2, fz + k * pw.run + pw.run / 2); B(STAIR_W + 1.2, 0.15, pw.run + 0.1, M.border(), cx, top + 0.075, fz + k * pw.run + pw.run / 2); } }
+    }
+    if (s.mat === 'concrete') { slab(pts, h, 0.33, M.concrete()); return; }
+    slab(pts, h, 0.25, M.pavers());
+    sides.forEach(sd => along(sd, 0.25, 0.5, 0.25, h + 0.13, M.border()));     // a soldier border all round
+  }
   function buildPatio(s) {
+    if (Array.isArray(s.pts) && s.pts.length >= 3) return buildPatioShape(s);
     const r = rect(s), cx = s.x, cz = (r.z0 + r.z1) / 2, pw = patioWall(s), h = pw ? pw.H : 0;
     if (h > 0) {
       // fill under the raised patio, then the block wall and its cap along the wall runs
@@ -3132,7 +3160,7 @@ ${CHECK} No split screen and no text.`;
           if (wall) doors.push({ id: x.id, wall, pos });
         }
         if (x.kind === 'porch') { const sp = stairPlacement(x); if (sp) att.push({ id: x.id, x: sp.x, z: sp.z, rot: sp.ry * 180 / Math.PI, w: sw(x), n: stairGeom(x)?.n || risers(S.H), run: RUN, landing: x.landing || 'none' }); }
-        if (x.kind === 'patio') { const pw = patioWall(x); if (pw?.steps) att.push({ id: x.id, x: x.x, z: rect(x).z1, rot: 0, w: STAIR_W + 1, n: pw.steps + 1, run: pw.run }); }
+        if (x.kind === 'patio') { const pw = patioWall(x); if (pw?.steps) att.push({ id: x.id, x: x.x, z: patioFrontZ(x), rot: 0, w: STAIR_W + 1, n: pw.steps + 1, run: pw.run }); }
       });
       window.parent.postMessage({ type: 'qx-attached', list: att, doors, windows: HOUSE_WIN.slice() }, '*');
     });

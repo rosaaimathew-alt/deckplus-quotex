@@ -254,7 +254,7 @@
         <dl>
           <dt>V</dt><dd>Selection tool</dd>
           <dt>P</dt><dd>Draw deck (pen): Enter finishes, Esc cancels</dd>
-          <dt>A</dt><dd>Add point: click a deck's edge where it goes, drag to place it</dd>
+          <dt>A</dt><dd>Add point: click a deck's or patio's edge where it goes, drag to place it</dd>
           <dt>⌘Z / ⇧⌘Z</dt><dd>Undo / Redo (also ⌘Y)</dd>
           <dt>⌘C ⌘X ⌘V</dt><dd>Copy, Cut, Paste (pastes 2′ offset)</dd>
           <dt>⌘D</dt><dd>Duplicate</dd>
@@ -471,7 +471,14 @@
     return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([u, v]) => [e.x + u * c + v * s, e.z - u * s + v * c]);
   }
   const boxPts = (e) => [[e.x - e.w / 2, e.z], [e.x + e.w / 2, e.z], [e.x + e.w / 2, e.z + e.d], [e.x - e.w / 2, e.z + e.d]];
-  const polyOf = (e) => e.type === 'deck' ? e.pts : e.type === 'landing' ? rectPts(e) : (e.type === 'porch' || e.type === 'patio') ? boxPts(e) : stairFootprint(e);
+  const polyOf = (e) => e.type === 'deck' ? e.pts : e.type === 'landing' ? rectPts(e) : e.type === 'patio' ? (e.pts || boxPts(e)) : e.type === 'porch' ? boxPts(e) : stairFootprint(e);
+  // A patio given its own corners (Add point) keeps x, z, w, d as the box round them, for its wall and steps.
+  const shaped = (e) => e.type === 'deck' || (e.type === 'patio' && !!e.pts);
+  function syncBox(e) {
+    if (e.type !== 'patio' || !e.pts) return;
+    const xs = e.pts.map(q => q[0]), zs = e.pts.map(q => q[1]), x0 = Math.min(...xs), z0 = Math.min(...zs);
+    e.x = (x0 + Math.max(...xs)) / 2; e.z = z0; e.w = Math.max(...xs) - x0; e.d = Math.max(...zs) - z0;
+  }
   // Walkable height of a piece (patios on a retaining wall are raised).
   const elH = (e) => e.type === 'patio' ? (Number(e.wallH) > 0 ? Number(e.wallH) + 0.25 : 0.25) : e.type === 'porch' ? (e.floor === 'deck' ? e.h : 0.33) : (e.h || 0);
   const stairHost = (e) => e.type === 'deck' || e.type === 'landing' || (e.type === 'patio' && Number(e.wallH) > 0);
@@ -1188,7 +1195,7 @@
     if (e) {
       const pts = polyOf(e), hs = P * 9;
       el('polygon', { points: ptsAttr(pts), fill: 'none', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}`, 'pointer-events': 'none' });
-      if (e.type === 'deck') {
+      if (shaped(e)) {
         e.pts.forEach((p, i) => el('rect', { x: p[0] - hs / 2, y: p[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': `v${i}`, style: 'cursor:crosshair' }));
         edges(e.pts).forEach(([a, b], i) => { const vert = Math.abs(b[0] - a[0]) < Math.abs(b[1] - a[1]);
           el('rect', { x: (a[0] + b[0]) / 2 - hs * (vert ? 0.35 : 0.9), y: (a[1] + b[1]) / 2 - hs * (vert ? 0.9 : 0.35), width: hs * (vert ? 0.7 : 1.8), height: hs * (vert ? 1.8 : 0.7), rx: hs * 0.3, fill: '#1d758b', stroke: '#fff', 'stroke-width': P, 'data-h': `m${i}`, style: `cursor:${vert ? 'ew' : 'ns'}-resize` }); });
@@ -1203,7 +1210,7 @@
         const dr = doorPts(e, PDOOR[e.id]);
         el('circle', { cx: dr.c[0], cy: dr.c[1], r: hs * 0.62, fill: '#b03a2e', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'door', style: 'cursor:grab' });
       }
-      if (e.type === 'porch' || e.type === 'patio') {
+      if (e.type === 'porch' || (e.type === 'patio' && !e.pts)) {
         el('rect', { x: e.x + e.w / 2 - hs / 2, y: e.z + e.d - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': 'box', style: 'cursor:nwse-resize' });
       }
       // rotation handle: beyond the element in its facing direction
@@ -1261,17 +1268,17 @@
   }
   // The spot on a deck's outline nearest the pointer (Add point, Bump-out), with that side's outward direction.
   function nearEdge(e, x, z) {
-    let best = null;
-    edges(e.pts).forEach(([a, b], i) => { const p = projSeg(x, z, a, b); if (!best || p.d < best.d) best = { ...p, i, a, b }; });
+    let best = null; const pts = polyOf(e);
+    edges(pts).forEach(([a, b], i) => { const p = projSeg(x, z, a, b); if (!best || p.d < best.d) best = { ...p, i, a, b }; });
     if (!best || best.len < 0.01) return null;
     const { a, b, len } = best, ux = (b[0] - a[0]) / len, uz = (b[1] - a[1]) / len, s = Math.max(0, Math.min(len, snapV(best.t * len)));
-    let nx = -uz, nz = ux; if (inPoly((a[0] + b[0]) / 2 + nx * 0.05, (a[1] + b[1]) / 2 + nz * 0.05, e.pts)) { nx = -nx; nz = -nz; }
+    let nx = -uz, nz = ux; if (inPoly((a[0] + b[0]) / 2 + nx * 0.05, (a[1] + b[1]) / 2 + nz * 0.05, pts)) { nx = -nx; nz = -nz; }
     return { i: best.i, a, b, len, ux, uz, nx, nz, s, x: a[0] + ux * s, z: a[1] + uz * s, house: Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05 };
   }
-  // The deck edge under the pointer (any deck, within a few pixels): where Add point would put a point.
+  // The deck or patio edge under the pointer (within a few pixels): where Add point would put a point.
   function deckEdgeAt(x, z) {
     const tol = vb.w / (svg.getBoundingClientRect().width || 1) * 14; let best = null;
-    S.els.filter(o => o.type === 'deck').forEach(o => edges(o.pts).forEach(([a, b]) => { const p = projSeg(x, z, a, b); if (p.d < tol && (!best || p.d < best.d)) best = { d: p.d, e: o }; }));
+    S.els.filter(o => o.type === 'deck' || o.type === 'patio').forEach(o => edges(polyOf(o)).forEach(([a, b]) => { const p = projSeg(x, z, a, b); if (p.d < tol && (!best || p.d < best.d)) best = { d: p.d, e: o }; }));
     return best ? { ...nearEdge(best.e, x, z), e: best.e } : null;
   }
   // A bump-out on one side: four new corners, up to 6′ wide and 2′ out, at least 1′ in from each end.
@@ -1341,6 +1348,7 @@
       // the deck is selected when the point is let go: selecting it now opens the settings panel,
       // which narrows the plan under the pointer mid-drag
       const e = h.e; edgeHover = null;
+      if (!e.pts) e.pts = boxPts(e).map(q => [...q]);      // a plain patio gets its own corners
       const i = h.s < 0.05 ? h.i : h.len - h.s < 0.05 ? (h.i + 1) % e.pts.length : -1;    // on a corner: move that corner
       if (i >= 0) drag = { kind: 'vertex', e, i, selectAfter: true }; else { e.pts.splice(h.i + 1, 0, [h.x, h.z]); drag = { kind: 'vertex', e, i: h.i + 1, selectAfter: true }; }
       svg.setPointerCapture(ev.pointerId); changed(false); return;
@@ -1404,6 +1412,7 @@
       if (e.type === 'deck') { const ddx = snapV(dx), ddz = snapV(dz); e.pts = o.pts.map(p => [p[0] + ddx, Math.max(0, p[1] + ddz) === 0 && p[1] + ddz < 0 ? 0 : p[1] + ddz]); }
       else if (e.type === 'landing') { e.x = snapV(o.x + dx); e.z = snapV(o.z + dz); }
       else if (e.type === 'porch') { e.x = snapV(o.x + dx); e.z = e.tie === 'free' ? Math.max(2, snapV(o.z + dz)) : 0; }
+      else if (e.type === 'patio' && o.pts) { const ddx = snapV(dx), ddz = Math.max(-Math.min(...o.pts.map(p => p[1])), snapV(dz)); e.pts = o.pts.map(p => [p[0] + ddx, p[1] + ddz]); syncBox(e); }
       else if (e.type === 'patio') { e.x = snapV(o.x + dx); e.z = Math.max(0, snapV(o.z + dz)); }
       else if (e.of == null) { e.x = o.x + dx; e.z = o.z + dz; snapStairs(e); }
     }
@@ -1503,7 +1512,7 @@
   }
 
   // ── Toolbar & keys ───────────────────────────────────────────────────────
-  function setTool(t) { tool = t; draft = null; edgeHover = null; document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); svg.style.cursor = t === 'poly' || t === 'addpt' || t === 'bump' ? 'crosshair' : ''; $('tip').textContent = t === 'poly' ? 'Click each corner · click the first corner (or double-click) to finish · Esc cancels' : t === 'addpt' ? 'Click a deck’s edge exactly where the new point goes (drag to pull it out) · click again for more · V or Esc to stop' : t === 'bump' ? 'Click the side of the deck where the bump-out goes · then drag its sides to size it · Esc cancels' : 'Drag to move · drag a side to stretch · Add point (A) puts a corner where you click (double-click removes it) · sides snap square or 45° when close (Alt = free) · round handle turns 45° (Shift = any angle) · scroll to zoom · ? for shortcuts'; drawPlan(); }
+  function setTool(t) { tool = t; draft = null; edgeHover = null; document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); svg.style.cursor = t === 'poly' || t === 'addpt' || t === 'bump' ? 'crosshair' : ''; $('tip').textContent = t === 'poly' ? 'Click each corner · click the first corner (or double-click) to finish · Esc cancels' : t === 'addpt' ? 'Click a deck’s or patio’s edge exactly where the new point goes (drag to pull it out) · click again for more · V or Esc to stop' : t === 'bump' ? 'Click the side of the deck where the bump-out goes · then drag its sides to size it · Esc cancels' : 'Drag to move · drag a side to stretch · Add point (A) puts a corner where you click (double-click removes it) · sides snap square or 45° when close (Alt = free) · round handle turns 45° (Shift = any angle) · scroll to zoom · ? for shortcuts'; drawPlan(); }
   document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
   function viewCentre() { return [snapV(vb.x + vb.w / 2, 1), Math.max(2, snapV(vb.z + vbH() / 2, 1))]; }
   document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
@@ -1825,7 +1834,7 @@
           + (e.steps !== false ? num('stairW', 'Step width', e.stairW || 4, 0.5, 3) + pick('landing', 'Step landing', [['none', 'None'], ['straight', 'Straight'], ['left', 'Turn left'], ['right', 'Turn right']], e.landing || 'none') : '')
           + pick('skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']], e.skirt || 'none'), 'this porch only') : '');
     } else if (e.type === 'patio') {
-      h = `<b>Patio</b>${pick('mat', 'Surface', [['pavers', 'Pavers (Techo Bloc)'], ['concrete', 'Concrete 4″']], e.mat)}${num('w', 'Width', e.w, 1, 4)}${num('d', 'Depth', e.d, 1, 4)}${num('wallH', 'Retaining wall height', e.wallH, 0.5, 0)}${Number(e.wallH) > 0 ? num('wallLen', 'Wall length (0 = all edges)', e.wallLen, 1, 0) + pick('steps', 'Block steps', [['1', 'Yes'], ['', 'None']], e.steps === false ? '' : '1') : ''}`;
+      h = `<b>Patio</b>${pick('mat', 'Surface', [['pavers', 'Pavers (Techo Bloc)'], ['concrete', 'Concrete 4″']], e.mat)}${e.pts ? num('dw', 'Width', e.w, 0.5, 3) + num('dd', 'Depth', e.d, 0.5, 3) + `<label>Size<span class="ro">${Math.round(Math.abs(e.pts.reduce((a, q, i) => { const r = e.pts[(i + 1) % e.pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2))} SF · ${e.pts.length} corners</span></label>` : num('w', 'Width', e.w, 1, 4) + num('d', 'Depth', e.d, 1, 4)}${num('wallH', 'Retaining wall height', e.wallH, 0.5, 0)}${Number(e.wallH) > 0 ? num('wallLen', 'Wall length (0 = all edges)', e.wallLen, 1, 0) + pick('steps', 'Block steps', [['1', 'Yes'], ['', 'None']], e.steps === false ? '' : '1') : ''}`;
     } else if (e.type === 'deck') {
       const pts = e.pts, area = Math.abs(pts.reduce((a, q, i) => { const r = pts[(i + 1) % pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2);
       const xs = pts.map(q => q[0]), zs = pts.map(q => q[1]);
@@ -1950,7 +1959,7 @@
     const sections = [];
     S.els.forEach(e => {
       if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, pitch: Number(e.pitch) > 0 ? Number(e.pitch) : null, skirt: e.skirt || 'none', doorWall: e.doorWall || 'front', doorPos: e.doorPos ?? null, stairW: e.stairW || 4, landing: e.landing || 'none', steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
-      if (e.type === 'patio') sections.push({ id: e.id, kind: 'patio', x: e.x, z: e.z, w: e.w, d: e.d, mat: e.mat, wallH: Number(e.wallH) || 0, wallLen: Number(e.wallLen) || 0, steps: e.steps !== false });
+      if (e.type === 'patio') sections.push({ id: e.id, kind: 'patio', x: e.x, z: e.z, w: e.w, d: e.d, pts: e.pts || null, mat: e.mat, wallH: Number(e.wallH) || 0, wallLen: Number(e.wallLen) || 0, steps: e.steps !== false });
     });
     const porchOnDeck = S.els.find(e => e.type === 'porch' && e.floor === 'deck');
     const H = porchOnDeck ? porchOnDeck.h : Math.max(3, ...plats.filter(q => q.houseSpan).map(q => q.h));
@@ -2045,7 +2054,7 @@
 
   // ═══ Glue ════════════════════════════════════════════════════════════════
   function changed(full = true) {
-    syncAttached(); drawPlan(); renderProps(); refreshButtons(); send3D();
+    S.els.forEach(syncBox); syncAttached(); drawPlan(); renderProps(); refreshButtons(); send3D();
     // Settings open beside the plan when a piece is picked (or Finishes is on). Not while
     // something is being dragged: the plan would narrow under the pointer and the drag jump.
     if (!drag) document.body.classList.toggle('panel-open', !CUSTOMER && (sel != null || finishesOpen));
