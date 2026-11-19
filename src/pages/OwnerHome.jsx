@@ -54,7 +54,6 @@ function yearNumbers(props, sales, jobs, start, end) {
   return {
     wonRevenue: h.wonRevenue, jobsWon: h.won.length, winRate: h.winRate, avgJob: h.avgJob,
     clients: h.clients.length,
-    quotesSent: props.filter(p => p.status !== 'Archived' && inRange(p.sentAt)).length,
     daysToSign: days.length ? days.reduce((s, d) => s + d, 0) / days.length : null,
     collected,
   }
@@ -189,7 +188,6 @@ export default function OwnerHome({ pill = null }) {
     ['Win rate', 'winRate', (v) => (v == null ? '—' : `${Math.round(v)}%`), 'pts'],
     ['Average job', 'avgJob', (v) => (v == null ? '—' : money(v)), 'pct'],
     ['Clients quoted', 'clients', String, 'count'],
-    ['Quotes sent', 'quotesSent', String, 'count'],
     ['Days to sign', 'daysToSign', (v) => (v == null ? '—' : String(Math.round(v))), 'days'],
     ['Collected', 'collected', money, 'pct'],
   ]
