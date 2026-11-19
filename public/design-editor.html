@@ -90,6 +90,7 @@
 
   /* ── Hint line ── */
   .hint { display: flex; align-items: center; gap: 8px; padding: 7px max(16px, env(safe-area-inset-left, 0px)); background: var(--bg); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--muted); min-height: 18px; }
+  .hint #tip { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* one line: a longer hint must not push the drawing down */
   .hint::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; opacity: .7; }
 
   /* ── Work area: the plan fills it; settings open beside it when a piece is picked ── */
@@ -219,13 +220,14 @@
     <div class="tgrp">
       <button type="button" data-add="deck" title="Add a deck"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 9h16M4 13h16M4 17h16"/></svg><span>Deck</span></button>
       <button type="button" data-add="stairs" title="Add stairs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4v-4h4v-4h4V8h4"/><path d="M4 20V4"/></svg><span>Stairs</span></button>
+      <button type="button" data-add="cornersteps" title="Add steps that wrap around a deck corner"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h9v9H4z"/><path d="M13 4h3.5v12.5H4V13"/><path d="M16.5 4H20v16H4v-3.5"/></svg><span>Corner steps</span></button>
       <button type="button" data-add="landing" title="Add a landing"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M12 18v3M9 21h6"/></svg><span>Landing</span></button>
       <button type="button" data-add="porch" title="Add a porch or sunroom"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-6 9 6"/><path d="M5 10v10M19 10v10M9 20v-6h6v6M3 20h18"/></svg><span>Porch</span></button>
       <button type="button" data-add="patio" title="Add a patio"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="1"/><path d="M3 11h18M3 15h18M9 7v4M15 11v4M9 15v4"/></svg><span>Patio</span></button>
     </div>
     <div class="tgrp">
-      <button type="button" class="icon" id="b-rotl" title="Rotate −15° (Shift+R)" aria-label="Rotate −15°"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 3v4h4"/></svg></button>
-      <button type="button" class="icon" id="b-rotr" title="Rotate +15° (R)" aria-label="Rotate +15°"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 3v4h-4"/></svg></button>
+      <button type="button" class="icon" id="b-rotl" title="Turn −45° (Shift+R)" aria-label="Turn −45°"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 3v4h4"/></svg></button>
+      <button type="button" class="icon" id="b-rotr" title="Turn +45° (R)" aria-label="Turn +45°"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 3v4h-4"/></svg></button>
       <button type="button" class="icon" id="b-copy" title="Duplicate (Ctrl/⌘+D)" aria-label="Duplicate"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg></button>
       <button type="button" class="icon danger" id="b-del" title="Delete (Del)" aria-label="Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
     </div>
@@ -243,7 +245,7 @@
     <button type="button" class="icon" id="b-fit" title="Fit in window (Ctrl/⌘+0)" aria-label="Fit in window"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
     <button type="button" class="icon" id="b-keys" aria-expanded="false" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
   </nav>
-  <div class="hint"><span id="tip">Drag to move · Alt-drag copies · round handle rotates (Shift = 45°) · scroll to zoom · Space-drag pans · ? for shortcuts</span></div>
+  <div class="hint"><span id="tip">Drag to move · drag a side to stretch · + adds a point (double-click removes it) · sides snap square or 45° (Alt = free) · round handle turns 45° (Shift = any angle) · scroll to zoom · ? for shortcuts</span></div>
   <div class="main">
     <div class="plan-wrap">
       <svg id="plan" aria-label="Plan view" role="img"></svg>
@@ -258,7 +260,7 @@
           <dt>Alt / ⌥ + drag</dt><dd>Drag a copy</dd>
           <dt>Shift + drag</dt><dd>Move straight across or out only</dd>
           <dt>Rotate handle</dt><dd>Free angle; hold Shift for 45° steps</dd>
-          <dt>R / ⇧R</dt><dd>Rotate +15° / −15°</dd>
+          <dt>R / ⇧R</dt><dd>Turn +45° / −45°</dd>
           <dt>Arrows / ⇧Arrows</dt><dd>Nudge 6″ / 5′</dd>
           <dt>Delete / Backspace</dt><dd>Delete</dd>
           <dt>Esc</dt><dd>Deselect / cancel drawing</dd>
@@ -503,6 +505,66 @@
     const xs = Array.from({ length: m + 1 }, (_, i) => x0 + (x1 - x0) * i / m);
     return [e.z + e.d - 0.25, ...(e.tie === 'free' ? [e.z + 0.25] : [])].flatMap(z => xs.map(x => [x, z]));
   }
+  // Where a floor's drop beams and their posts go. Joists run out from the house, so each
+  // side that faces the yard gets a beam inside it, set back by the joist cantilever (angled
+  // sides too). On a deck on the house, sides in one line share one beam, carried straight
+  // across under a bump-out: the bump-out's joists are the main floor's, run on over that
+  // beam. A bump-out reaching no more than 2′ past the beam hangs on them; a deeper one gets
+  // its own beam and posts at its front. A deck attached to a porch has its beams flush, like
+  // the porch's. → runs: { A, B, ux, uz, len, flat, cant, mid, sup (what carries the joists
+  // behind it), postT (posts, as distances along it), posts } or { hang, A, B, over }.
+  const CANT_MAX = 2;
+  function beamPlan(e, pts, porch = false) {
+    const isHouse = ([a, b]) => Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05;
+    const house = edges(pts).filter(isHouse), back = house.length ? Math.min(...pts.map(q => q[1])) : null;
+    const [ccx, ccz] = centroid(pts);
+    const touches = (A, B) => A.some(q => inPoly(q[0], q[1], B) || edges(B).some(([a, b]) => projSeg(q[0], q[1], a, b).d < 0.6));
+    const flush = porch || S.els.some(o => o.type === 'porch' && o !== e && (touches(pts, polyOf(o)) || touches(polyOf(o), pts)));
+    const cantFor = (reach) => Math.min(CANT_MAX, Math.max(0.5, Math.round(reach * 0.12 * 2) / 2));
+    const runs = [], flats = [];
+    edges(pts).forEach(([a, b]) => {
+      if (isHouse([a, b])) return;
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 2) return;
+      const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L, mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2; let nx = -uz, nz = ux;
+      if (pts.length > 4 ? inPoly(mx + nx * 0.05, mz + nz * 0.05, pts) : nx * (mx - ccx) + nz * (mz - ccz) < 0) { nx = -nx; nz = -nz; }
+      if (nz < 0.3 && house.length) return;                        // a side running out from the house: joists rest on it
+      if (!house.length && Math.abs(nz) < 0.3) return;            // freestanding: beams at front and back only
+      if (house.length && !flush && Math.abs(uz) < 0.05) { flats.push({ lo: Math.min(a[0], b[0]), hi: Math.max(a[0], b[0]), z: a[1] }); return; }
+      // a porch's beam sits flush under its front wall, where the roof columns land
+      const cant = flush ? 0.25 : cantFor(house.length ? Math.abs(mz - back) : 8);
+      const A = [a[0] - nx * cant, a[1] - nz * cant], B = [b[0] - nx * cant, b[1] - nz * cant], flat = Math.abs(uz) < 0.05;
+      // a joist span over 14′ gets a second beam halfway back
+      const midZ = house.length && flat && A[1] - back > MAX_SPAN ? back + (A[1] - back) / 2 : null;
+      runs.push({ A, B, ux, uz, flat, cant, porch, flush, sup: midZ ?? back });
+      if (midZ != null) runs.push({ A: [A[0], midZ], B: [B[0], midZ], ux, uz, flat: true, cant: 0, mid: true, sup: back });
+    });
+    // sides in one line: one beam, also across a gap the floor covers (under a bump-out)
+    flats.sort((p, q) => p.z - q.z || p.lo - q.lo);
+    const lines = [];
+    flats.forEach(f => { const l = lines[lines.length - 1], gx = l ? (l.hi + f.lo) / 2 : 0;
+      if (l && Math.abs(l.z - f.z) < 0.05 && (f.lo - l.hi < 0.05 || (inPoly(gx, f.z + 0.1, pts) && inPoly(gx, f.z - 0.1, pts)))) l.hi = Math.max(l.hi, f.hi); else lines.push({ ...f }); });
+    const beams = [];
+    lines.forEach(l => {
+      if (l.hi - l.lo < 2) return;
+      const cx = (l.lo + l.hi) / 2, behind = beams.filter(o => o.lo - 0.05 <= cx && cx <= o.hi + 0.05 && o.z < l.z - 0.05).sort((p, q) => q.z - p.z)[0];
+      const from = behind ? behind.z : back, over = l.z - from;
+      if (behind && over <= CANT_MAX + 0.01) { runs.push({ hang: true, A: [l.lo, l.z], B: [l.hi, l.z], over }); return; }
+      const cant = cantFor(over), z = l.z - cant, midZ = z - from > MAX_SPAN ? from + (z - from) / 2 : null;
+      runs.push({ A: [l.lo, z], B: [l.hi, z], ux: 1, uz: 0, flat: true, cant, sup: midZ ?? from, thru: behind ? [cx, behind.z] : null });
+      beams.push({ lo: l.lo, hi: l.hi, z });
+      if (midZ != null) runs.push({ A: [l.lo, midZ], B: [l.hi, midZ], ux: 1, uz: 0, flat: true, cant: 0, mid: true, sup: from });
+    });
+    runs.forEach(r => {
+      if (r.hang) return;
+      const len = r.len = Math.hypot(r.B[0] - r.A[0], r.B[1] - r.A[1]), inset = Math.min(1, len / 4);
+      // a porch: a post under each roof column; a deck: posts no more than 8′ apart
+      const under = r.porch && r.flat && !r.mid ? porchColumns(e).filter(c => Math.abs(c[1] - r.A[1]) < 0.6).map(c => (c[0] - r.A[0]) / r.ux).filter(t => t >= -0.01 && t <= len + 0.01).sort((p, q) => p - q) : [];
+      const bays = Math.max(1, Math.ceil((len - 2 * inset) / 8));
+      r.postT = under.length >= 2 ? under : Array.from({ length: bays + 1 }, (_, i) => inset + (len - 2 * inset) * i / bays);
+      r.posts = r.postT.map(t => [r.A[0] + r.ux * t, r.A[1] + r.uz * t]);
+    });
+    return { runs: runs.filter(r => r.hang || r.len >= 2), back };
+  }
   // The outline moved d feet inward on every side (each corner where the moved sides meet).
   function insetPoly(pts, d) {
     const n = pts.length, lines = pts.map((a, i) => {
@@ -548,7 +610,43 @@
     });
     return best;
   }
+  // ── Corner steps: treads that wrap around a deck corner, w along one side and w2 along the other ──
+  // The corner at pts[i], if steps can wrap it: both sides open (not on the house) and the corner pointing out.
+  function cornerAt(pts, i) {
+    const n = pts.length, q = pts[i], a = pts[(i + n - 1) % n], b = pts[(i + 1) % n];
+    const onHouse = (p, r) => Math.abs(p[1]) < 0.05 && Math.abs(r[1]) < 0.05;
+    if (onHouse(a, q) || onHouse(q, b)) return null;
+    const L1 = Math.hypot(a[0] - q[0], a[1] - q[1]), L2 = Math.hypot(b[0] - q[0], b[1] - q[1]); if (L1 < 1 || L2 < 1) return null;
+    const u1 = [(a[0] - q[0]) / L1, (a[1] - q[1]) / L1], u2 = [(b[0] - q[0]) / L2, (b[1] - q[1]) / L2];
+    const out = (u, m) => { let nx = -u[1], nz = u[0]; if (inPoly(m[0] + nx * 0.05, m[1] + nz * 0.05, pts)) { nx = -nx; nz = -nz; } return [nx, nz]; };
+    const n1 = out(u1, [(a[0] + q[0]) / 2, (a[1] + q[1]) / 2]), n2 = out(u2, [(b[0] + q[0]) / 2, (b[1] + q[1]) / 2]);
+    const dot = n1[0] * n2[0] + n1[1] * n2[1];
+    if (dot < -0.75 || u2[0] * n1[0] + u2[1] * n1[1] > -0.05) return null;       // too sharp, or an inside corner
+    const k = 1 / (1 + dot);
+    return { q, a, b, u1, u2, n1, n2, L1, L2, mt: [(n1[0] + n2[0]) * k, (n1[1] + n2[1]) * k] };
+  }
+  function nearestCorner(x, z, maxD = Infinity) {
+    let best = null;
+    S.els.forEach(o => { if (!stairHost(o)) return; const pts = polyOf(o); pts.forEach((q, i) => {
+      const d = Math.hypot(q[0] - x, q[1] - z); if (d > maxD || (best && d >= best.d)) return;
+      const c = cornerAt(pts, i); if (c) best = { d, el: o, ...c };
+    }); });
+    return best;
+  }
+  const cornerInfo = (e) => nearestCorner(e.x, e.z, 0.35);
+  const cornerW = (e, c) => [Math.min(Math.max(1, Number(e.w) || 4), c.L1), Math.min(Math.max(1, Number(e.w2 ?? e.w) || 4), c.L2)];
+  // The steps' outline d feet out from the deck (the tread edge at that distance): out from one
+  // side, around the corner, and back in to the other side.
+  function cornerPoly(c, e, d) {
+    const [w1, w2] = cornerW(e, c), q = c.q;
+    const p0 = [q[0] + c.u1[0] * w1, q[1] + c.u1[1] * w1], p4 = [q[0] + c.u2[0] * w2, q[1] + c.u2[1] * w2];
+    return [p0, [p0[0] + c.n1[0] * d, p0[1] + c.n1[1] * d], [q[0] + c.mt[0] * d, q[1] + c.mt[1] * d], [p4[0] + c.n2[0] * d, p4[1] + c.n2[1] * d], p4, [...q]];
+  }
   function stairInfo(e) {
+    if (e.corner) {                 // corner steps: down to grade, all the way around
+      const c = cornerInfo(e), top = c ? elH(c.el) : 3, n = Math.max(1, Math.ceil(top / RISE_MAX));
+      return { host: c ? { el: c.el } : null, top, bottom: 0, n, rise: top / n, len: (n - 1) * RUN, foot: null, corner: c };
+    }
     if (e.of != null) {             // a porch's steps or a raised patio's block steps (built by the 3D engine)
       const o = byId(e.of), top = o ? elH(o) : 3, n = Math.max(1, e.n || Math.ceil(top / RISE_MAX)), len = (n - 1) * (e.run || RUN);
       return { host: o ? { el: o } : null, top, bottom: 0, n, rise: top / n, len, foot: null };
@@ -577,6 +675,7 @@
     });
   }
   function stairFootprint(e) {
+    if (e.corner) { const i = stairInfo(e); return i.corner ? cornerPoly(i.corner, e, Math.max(i.len, 0.6)) : [[e.x - 1.5, e.z - 1.5], [e.x + 1.5, e.z - 1.5], [e.x + 1.5, e.z + 1.5], [e.x - 1.5, e.z + 1.5]]; }
     const info = stairInfo(e), c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), hw = e.w / 2, L = Math.max(info.len, 0.6);
     return [[-hw, 0], [hw, 0], [hw, L], [-hw, L]].map(([u, v]) => [e.x + u * c + v * s, e.z - u * s + v * c]);
   }
@@ -806,37 +905,16 @@
       }));
       // ledger on the house
       house.forEach(([a, b]) => el('line', { x1: a[0], y1: 0.14, x2: b[0], y2: 0.14, stroke: '#7c3aed', 'stroke-width': P * 2.2, 'stroke-dasharray': `${P * 7} ${P * 3}` }, fg));
-      // a drop beam inside each side that faces the yard (angled sides too), set back by the joist
-      // cantilever; a deck attached to a porch has none: its beams sit flush, like the porch's
-      const [ccx, ccz] = centroid(pts);
-      const touches = (A, B) => A.some(q => inPoly(q[0], q[1], B) || edges(B).some(([a, b]) => projSeg(q[0], q[1], a, b).d < 0.6));
-      const flush = porch || S.els.some(o => o.type === 'porch' && o !== e && (touches(pts, polyOf(o)) || touches(polyOf(o), pts)));
-      const beamRuns = [];
-      edges(pts).forEach(([a, b]) => {
-        if (isHouse([a, b])) return;
-        const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 2) return;
-        const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L; let nx = -uz, nz = ux;
-        if (nx * ((a[0] + b[0]) / 2 - ccx) + nz * ((a[1] + b[1]) / 2 - ccz) < 0) { nx = -nx; nz = -nz; }
-        if (nz < 0.3 && house.length) return;                        // a side running out from the house: joists rest on it
-        if (!house.length && Math.abs(nz) < 0.3) return;            // freestanding: beams at front and back only
-        const reach = Math.abs(((a[1] + b[1]) / 2) - (back ?? ((a[1] + b[1]) / 2)));
-        // a porch's beam sits flush under its front wall, where the roof columns land
-        const cant = flush ? 0.25 : Math.min(2, Math.max(0.5, Math.round((house.length ? reach : 8) * 0.12 * 2) / 2));
-        const A = [a[0] - nx * cant, a[1] - nz * cant], B = [b[0] - nx * cant, b[1] - nz * cant];
-        beamRuns.push({ A, B, L, ux, uz, flat: Math.abs(uz) < 0.05, cant, porch, flush });
-        // a joist span over 14′ gets a second beam halfway back
-        if (house.length && Math.abs(uz) < 0.05 && A[1] - back > MAX_SPAN) beamRuns.push({ A: [A[0], back + (A[1] - back) / 2], B: [B[0], back + (A[1] - back) / 2], L, ux, uz, flat: true, cant: 0, mid: true });
-      });
+      // drop beams and their posts (beamPlan): one beam for each line of yard-facing sides,
+      // carried straight across under a bump-out, whose joists are the main floor's run on over it
+      const beamRuns = beamPlan(e, pts, porch).runs;
       beamRuns.forEach(r => {
-        const { A, B, ux, uz } = r, len = Math.hypot(B[0] - A[0], B[1] - A[1]); if (len < 2) return;
-        const px = -uz, pz = ux;
+        const { A, B, ux, uz } = r;
+        if (r.hang) { tag((A[0] + B[0]) / 2, A[1] - Math.min(0.9, r.over / 2), `${fmt(r.over)} joist cantilever`, '#1d4ed8'); return; }
+        const len = r.len, px = -uz, pz = ux;
         [-0.17, 0, 0.17].forEach(o => el('line', { x1: A[0] + px * o, y1: A[1] + pz * o, x2: B[0] + px * o, y2: B[1] + pz * o, stroke: BM, 'stroke-width': P * 1.3 }, fg));
-        const inset = Math.min(1, len / 4);
-        // a porch: a post under each roof column; a deck: posts no more than 8′ apart
-        const under = r.porch && r.flat && !r.mid ? porchColumns(e).filter(c => Math.abs(c[1] - A[1]) < 0.6).map(c => (c[0] - A[0]) / ux).filter(t => t >= -0.01 && t <= len + 0.01).sort((p, q) => p - q) : []
-        const bays = Math.max(1, Math.ceil((len - 2 * inset) / 8));
-        const posts = under.length >= 2 ? under : Array.from({ length: bays + 1 }, (_, i) => inset + (len - 2 * inset) * i / bays);
-        const m = posts.length - 1;
+        if (r.thru) tag(Math.min(A[0], B[0]) + len * 0.74, (r.thru[1] + A[1]) / 2, 'Joists carry through', '#0f766e', -90);
+        const posts = r.postT, m = posts.length - 1;
         const at = (t) => [A[0] + ux * t, A[1] + uz * t];
         posts.forEach(t => {
           const [qx, qz] = at(t); postNo++;
@@ -856,7 +934,7 @@
         }
         // blocking halfway between this beam and the one behind it
         if (r.flat && back != null) {
-          const from = r.mid ? back : (beamRuns.find(o => o.mid && Math.abs(o.A[0] - A[0]) < 0.01)?.A[1] ?? back), bz = (from + A[1]) / 2;
+          const from = r.sup ?? back, bz = (from + A[1]) / 2;
           // a row of blocks between each pair of joists, staggered so each can be end-nailed
           if (A[1] - from > BLOCK_OVER) clipLine(pts, 'z', bz).forEach(([c, d]) => {
             const lo = Math.max(c, Math.min(A[0], B[0])), hi = Math.min(d, Math.max(A[0], B[0])); if (hi - lo > 1) blockRow(bz, lo, hi);
@@ -939,6 +1017,16 @@
         t2.textContent = `${fmt(e.h)} high${e.type === 'landing' ? ` · ${fmt(e.w)} × ${fmt(e.d)}` : ''}`;
         // edge lengths
         if (e.id === sel || e.type === 'deck') edgeLabels(pts, e);
+      } else if (e.corner) {
+        const info = stairInfo(e), c = info.corner, pts = stairFootprint(e);
+        el('polygon', { points: ptsAttr(pts), fill: '#ffffff', stroke: '#1a1c38', 'stroke-width': P * 2, ...(c ? {} : { 'stroke-dasharray': `${P * 5} ${P * 3}` }) }, grp);
+        const label = (x, z, txt, col = '#1a1c38') => { el('text', { x, y: z, 'font-size': P * 11, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: col, 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 600 }, grp).textContent = txt; };
+        if (c) {
+          for (let k = 1; k < info.n - 1; k++) el('polyline', { points: ptsAttr(cornerPoly(c, e, k * RUN).slice(1, 4)), fill: 'none', stroke: '#1a1c38', 'stroke-width': P * 1 }, grp);
+          const far = pts[2], ml = Math.hypot(c.mt[0], c.mt[1]) || 1;
+          el('line', { x1: c.q[0], y1: c.q[1], x2: far[0], y2: far[1], stroke: '#1a1c38', 'stroke-width': P * 1 }, grp);       // the mitre
+          label(far[0] + c.mt[0] / ml * 1.3, far[1] + c.mt[1] / ml * 1.3, `DN ${info.n - 1} treads`);
+        } else label(e.x, e.z, 'Drag onto a deck corner', '#b03a2e');
       } else {
         const info = stairInfo(e), pts = stairFootprint(e);
         el('polygon', { points: ptsAttr(pts), fill: '#ffffff', stroke: '#1a1c38', 'stroke-width': P * 2 }, grp);
@@ -978,6 +1066,13 @@
         e.pts.forEach((p, i) => el('rect', { x: p[0] - hs / 2, y: p[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': `v${i}`, style: 'cursor:crosshair' }));
         edges(e.pts).forEach(([a, b], i) => { const vert = Math.abs(b[0] - a[0]) < Math.abs(b[1] - a[1]);
           el('rect', { x: (a[0] + b[0]) / 2 - hs * (vert ? 0.35 : 0.9), y: (a[1] + b[1]) / 2 - hs * (vert ? 0.9 : 0.35), width: hs * (vert ? 0.7 : 1.8), height: hs * (vert ? 1.8 : 0.7), rx: hs * 0.3, fill: '#1d758b', stroke: '#fff', 'stroke-width': P, 'data-h': `m${i}`, style: `cursor:${vert ? 'ew' : 'ns'}-resize` }); });
+        // a "+" a quarter of the way along each side: press it to add a corner there, and drag it
+        edges(e.pts).forEach(([a, b], i) => { if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 3) return;
+          const px = a[0] + (b[0] - a[0]) * 0.25, pz = a[1] + (b[1] - a[1]) * 0.25, r = hs * 0.62, g = el('g', { 'data-h': `a${i}`, style: 'cursor:copy' });
+          el('circle', { cx: px, cy: pz, r, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 1.6 }, g);
+          el('path', { d: `M${px - r * 0.5} ${pz}H${px + r * 0.5}M${px} ${pz - r * 0.5}V${pz + r * 0.5}`, stroke: '#1d758b', 'stroke-width': P * 1.8, fill: 'none' }, g);
+          el('title', {}, g).textContent = 'Add a point here, then drag it';
+        });
       }
       if (e.type === 'landing') {
         const [, b, c2] = rectPts(e);
@@ -992,13 +1087,15 @@
       }
       // rotation handle: beyond the element in its facing direction
       const [cx, cz] = e.type === 'stairs' ? [e.x, e.z] : centroid(pts);
-      if (e.type !== 'porch' && e.type !== 'patio' && e.of == null) {
+      if (e.type !== 'porch' && e.type !== 'patio' && e.of == null && !e.corner) {
       const ang = e.type === 'deck' ? 180 : (e.rot || 0), reach = e.type === 'stairs' ? -2.2 : Math.max(...pts.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + 1.6;
       const hx = cx + Math.sin(rad(ang)) * reach, hz = cz + Math.cos(rad(ang)) * reach;
       el('line', { x1: cx, y1: cz, x2: hx, y2: hz, stroke: '#1d758b', 'stroke-width': P * 1.2, 'pointer-events': 'none' });
       el('circle', { cx: hx, cy: hz, r: hs * 0.75, fill: '#1d758b', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'rot', style: 'cursor:grab' });
       }
     }
+    if (edgeHover && tool === 'bump') { const bp = bumpPts(edgeHover); if (bp) el('polyline', { points: ptsAttr(bp), fill: 'rgba(29,117,139,.14)', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}`, 'pointer-events': 'none' }); }
+    if (edgeHover && tool === 'addpt') el('circle', { cx: edgeHover.x, cy: edgeHover.z, r: P * 6, fill: '#1d758b', stroke: '#fff', 'stroke-width': P * 2, 'pointer-events': 'none' });
     if (draft) {
       el('polyline', { points: ptsAttr(draft.pts.concat(draft.hover ? [draft.hover] : [])), fill: 'rgba(29,117,139,.08)', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}` });
       draft.pts.forEach((p, i) => el('circle', { cx: p[0], cy: p[1], r: P * (i === 0 ? 7 : 4), fill: i === 0 ? '#1d758b' : '#fff', stroke: '#1d758b', 'stroke-width': P * 2 }));
@@ -1006,7 +1103,47 @@
   }
 
   // ── Pointer interaction ──────────────────────────────────────────────────
-  let drag = null;
+  let drag = null, edgeHover = null, lastV = null;
+  // Sides snap square or at 45°: from a fixed corner `a` the pointer is pulled onto the nearest
+  // of the eight directions (and the ½′ grid along it). With a second fixed corner `b` on the
+  // other side, it lands where the two snapped sides meet when that is close by. Alt = free.
+  function snapRay(a, x, z) {
+    const dx = x - a[0], dz = z - a[1], k = ((Math.round(Math.atan2(dz, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+    const [ux, uz] = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]][k];
+    const m = ux && uz ? snapV((Math.abs(dx) + Math.abs(dz)) / 2) : snapV(Math.abs(ux ? dx : dz));
+    return { p: [a[0] + ux * m, a[1] + uz * m], u: [ux, uz] };
+  }
+  function snapCorner(x, z, a, b, free = false) {
+    if (free || !a) return [snapV(x), snapV(z)];
+    const A = snapRay(a, x, z), far = (q) => Math.hypot(q[0] - x, q[1] - z);
+    if (!b) return A.p;
+    const Bq = snapRay(b, x, z), den = A.u[0] * Bq.u[1] - A.u[1] * Bq.u[0];
+    if (Math.abs(den) > 1e-6) { const t = ((b[0] - a[0]) * Bq.u[1] - (b[1] - a[1]) * Bq.u[0]) / den, meet = [a[0] + A.u[0] * t, a[1] + A.u[1] * t]; if (far(meet) < 1.25) return meet; }
+    return far(A.p) <= far(Bq.p) ? A.p : Bq.p;
+  }
+  // The spot on a deck's outline nearest the pointer (Add point, Bump-out), with that side's outward direction.
+  function nearEdge(e, x, z) {
+    let best = null;
+    edges(e.pts).forEach(([a, b], i) => { const p = projSeg(x, z, a, b); if (!best || p.d < best.d) best = { ...p, i, a, b }; });
+    if (!best || best.len < 0.01) return null;
+    const { a, b, len } = best, ux = (b[0] - a[0]) / len, uz = (b[1] - a[1]) / len, s = Math.max(0, Math.min(len, snapV(best.t * len)));
+    let nx = -uz, nz = ux; if (inPoly((a[0] + b[0]) / 2 + nx * 0.05, (a[1] + b[1]) / 2 + nz * 0.05, e.pts)) { nx = -nx; nz = -nz; }
+    return { i: best.i, a, b, len, ux, uz, nx, nz, s, x: a[0] + ux * s, z: a[1] + uz * s, house: Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05 };
+  }
+  // A bump-out on one side: four new corners, up to 6′ wide and 2′ out, at least 1′ in from each end.
+  // Its sides are then dragged like any other. Not on the house side, or a side under 4′.
+  function bumpPts(h) {
+    if (!h || h.house || h.len < 4) return null;
+    const w = Math.min(6, snapV(h.len - 2)), s0 = Math.max(1, Math.min(h.len - 1 - w, snapV(h.s - w / 2))), d = 2;
+    const p0 = [h.a[0] + h.ux * s0, h.a[1] + h.uz * s0], p3 = [h.a[0] + h.ux * (s0 + w), h.a[1] + h.uz * (s0 + w)];
+    return [p0, [p0[0] + h.nx * d, Math.max(0, p0[1] + h.nz * d)], [p3[0] + h.nx * d, Math.max(0, p3[1] + h.nz * d)], p3];
+  }
+  // Corners left on top of each other after a drag become one.
+  function tidyPts(e) {
+    if (!e?.pts) return;
+    const out = e.pts.filter((q, i, a) => { const r = a[(i + 1) % a.length]; return Math.hypot(q[0] - r[0], q[1] - r[1]) > 0.05; });
+    if (out.length >= 3) e.pts = out;
+  }
   function hitElement(x, z) {
     const st = S.els.filter(e => e.type === 'stairs' && inPoly(x, z, stairFootprint(e)));
     if (st.length) return st[st.length - 1];
@@ -1016,6 +1153,7 @@
   }
   // Snap a stair's top onto the nearest deck/landing edge; unless rotated by hand, face it straight out.
   function snapStairs(e) {
+    if (e.corner) { const c = nearestCorner(e.x, e.z, 5); if (c) { e.x = c.q[0]; e.z = c.q[1]; } return; }
     let best = null;
     S.els.forEach(o => { if (!stairHost(o)) return; const pts = polyOf(o); edges(pts).forEach(([a, b]) => { const p = projSeg(e.x, e.z, a, b); if (p.d < 1.6 && p.z > -0.01 && !(Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05) && (!best || p.d < best.d)) best = { ...p, a, b, pts }; }); });
     if (!best) return;
@@ -1027,12 +1165,20 @@
     if (ev.button > 0) return;
     const [x, z] = toFt(ev), hEl = ev.target.closest('[data-h]');
     if (tool === 'poly') {
-      const p = [snapV(x), snapV(z)];
+      const dp = draft?.pts, p = snapCorner(x, z, dp?.[dp.length - 1], dp?.length >= 2 ? dp[0] : null, ev.altKey); p[1] = Math.max(0, p[1]);
       if (!draft) draft = { pts: [p] };
       else if (draft.pts.length >= 3 && Math.hypot(p[0] - draft.pts[0][0], p[1] - draft.pts[0][1]) < 0.75) {
         const e = { id: nextId++, type: 'deck', h: 3, pts: draft.pts }; S.els.push(e); sel = e.id; draft = null; setTool('select'); commit(); changed(); return;
       } else draft.pts.push(p);
       drawPlan(); return;
+    }
+    if (tool === 'addpt' || tool === 'bump') {
+      const e = byId(sel), h = e?.type === 'deck' ? nearEdge(e, x, z) : null, was = tool;
+      setTool('select');
+      if (!h) return;
+      if (was === 'addpt') { e.pts.splice(h.i + 1, 0, [h.x, h.z]); drag = { kind: 'vertex', e, i: h.i + 1 }; svg.setPointerCapture(ev.pointerId); changed(false); }
+      else { const bp = bumpPts(h); if (bp) { e.pts.splice(h.i + 1, 0, ...bp); commit(); changed(); } }
+      return;
     }
     const hd = !CUSTOMER && !spaceDown && S.house && ev.target.closest('[data-hd]');
     if (hd) { startHouseDrag(hd.dataset.hd, x, z); svg.setPointerCapture(ev.pointerId); return; }
@@ -1044,7 +1190,14 @@
       else if (h === 'size') drag = { kind: 'size', e };
       else if (h === 'door') drag = { kind: 'door', e };
       else if (h === 'box') drag = { kind: 'box', e, x0: e.x - e.w / 2 };
-      else if (h[0] === 'v') drag = { kind: 'vertex', e, i: +h.slice(1) };
+      else if (h[0] === 'v') {
+        // two quick presses on the same point take it out (the browser's own double-click is
+        // lost here: the plan is redrawn between the two)
+        const i = +h.slice(1), now = performance.now();
+        if (lastV && lastV.id === e.id && lastV.i === i && now - lastV.t < 450 && e.pts.length > 3) { e.pts.splice(i, 1); lastV = null; commit(); changed(); return; }
+        lastV = { id: e.id, i, t: now }; drag = { kind: 'vertex', e, i };
+      }
+      else if (h[0] === 'a') { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, snapRay(a, a[0] + (b[0] - a[0]) * 0.25, a[1] + (b[1] - a[1]) * 0.25).p); drag = { kind: 'vertex', e, i: i + 1 }; }
       else if (h[0] === 'm' && ev.altKey) { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, [snapV((a[0] + b[0]) / 2), snapV((a[1] + b[1]) / 2)]); drag = { kind: 'vertex', e, i: i + 1 }; }
       else if (h[0] === 'm') {
         const i = +h.slice(1), j = (i + 1) % e.pts.length, a = e.pts[i], b = e.pts[j], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
@@ -1061,7 +1214,8 @@
     svg.setPointerCapture(ev.pointerId); changed(false);
   });
   svg.addEventListener('pointermove', (ev) => {
-    if (tool === 'poly' && draft) { const [x, z] = toFt(ev); draft.hover = [snapV(x), snapV(z)]; drawPlan(); return; }
+    if (tool === 'poly' && draft) { const [x, z] = toFt(ev), dp = draft.pts; draft.hover = snapCorner(x, z, dp[dp.length - 1], dp.length >= 2 ? dp[0] : null, ev.altKey); draft.hover[1] = Math.max(0, draft.hover[1]); drawPlan(); return; }
+    if ((tool === 'addpt' || tool === 'bump') && !drag) { const d = byId(sel); if (d?.type === 'deck') { const [x, z] = toFt(ev); edgeHover = nearEdge(d, x, z); drawPlan(); } return; }
     if (!drag) return;
     const [x, z] = toFt(ev), e = drag.e;
     if (drag.kind === 'pan') { const r = svg.getBoundingClientRect(), k = vb.w / r.width; vb.x = drag.vb0.x - (ev.clientX - drag.s0[0]) * k; vb.z = drag.vb0.z - (ev.clientY - drag.s0[1]) * k; drawPlan(); return; }
@@ -1097,7 +1251,7 @@
       e.pts[drag.j] = [drag.b0[0] + drag.n[0] * d, Math.max(0, drag.b0[1] + drag.n[1] * d)];
       drag.riders.forEach(r => { r.o.x = r.x + drag.n[0] * d; r.o.z = r.z + drag.n[1] * d; });
     }
-    if (drag.kind === 'vertex') { e.pts[drag.i] = [snapV(x), Math.max(0, snapV(z))]; }
+    if (drag.kind === 'vertex') { const n = e.pts.length, q = snapCorner(x, z, e.pts[(drag.i + n - 1) % n], e.pts[(drag.i + 1) % n], ev.altKey); e.pts[drag.i] = [q[0], Math.max(0, q[1])]; }
     if (drag.kind === 'box') { e.w = Math.max(6, Math.round(x - drag.x0)); e.x = drag.x0 + e.w / 2; e.d = Math.max(4, Math.round(z - e.z)); }
     if (drag.kind === 'size') {
       const c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), [cx, cz] = [e.x, e.z];
@@ -1110,7 +1264,7 @@
     if (drag.kind === 'rot') {
       const a = Math.atan2(x - drag.c[0], z - drag.c[1]) * 180 / Math.PI;
       if (drag.a0 == null) drag.a0 = a;
-      let d = a - drag.a0; d = ev.shiftKey ? Math.round(d / 45) * 45 : Math.round(d);   // free (1°); Shift = 45° steps
+      let d = a - drag.a0; d = ev.shiftKey ? Math.round(d) : Math.round(d / 45) * 45;   // 45° steps; Shift = any angle (1°)
       rotateBy(e, d, drag);
     }
     changed(false);
@@ -1148,7 +1302,7 @@
       H.segments[i - 1].widthFt = a + d; H.segments[i + 1].widthFt = b - d;
     }
   }
-  const endDrag = () => { if (!drag) return; if (drag.kind === 'house' && S.house?.segments) S.house.segments = S.house.segments.filter(g => (Number(g.widthFt) || 0) > 0.05); if (['move', 'box'].includes(drag.kind)) { snapToBump(drag.e); fitPorch(drag.e); } drag = null; commit(); changed(); };
+  const endDrag = () => { if (!drag) return; if (drag.kind === 'house' && S.house?.segments) S.house.segments = S.house.segments.filter(g => (Number(g.widthFt) || 0) > 0.05); if (['move', 'box'].includes(drag.kind)) { snapToBump(drag.e); fitPorch(drag.e); } if (['vertex', 'edge'].includes(drag.kind)) tidyPts(drag.e); S.els.forEach(o => { if (o.corner && !cornerInfo(o)) snapStairs(o); }); drag = null; commit(); changed(); };
   svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag);
   svg.addEventListener('dblclick', (ev) => {
     if (tool === 'poly' && draft && draft.pts.length >= 3) { const e = { id: nextId++, type: 'deck', h: 3, pts: draft.pts }; S.els.push(e); sel = e.id; draft = null; setTool('select'); commit(); changed(); }
@@ -1169,7 +1323,7 @@
   }
 
   // ── Toolbar & keys ───────────────────────────────────────────────────────
-  function setTool(t) { tool = t; draft = null; document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); svg.style.cursor = t === 'poly' ? 'crosshair' : ''; $('tip').textContent = t === 'poly' ? 'Click each corner · click the first corner (or double-click) to finish · Esc cancels' : 'Drag to move · Alt-drag copies · round handle rotates (Shift = 45°) · drag a deck side to stretch it (Alt-click adds a corner) · drag house windows, bump-outs and gables · ? for shortcuts'; drawPlan(); }
+  function setTool(t) { tool = t; draft = null; edgeHover = null; document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); svg.style.cursor = t === 'poly' || t === 'addpt' || t === 'bump' ? 'crosshair' : ''; $('tip').textContent = t === 'poly' ? 'Click each corner · click the first corner (or double-click) to finish · Esc cancels' : t === 'addpt' ? 'Click the deck’s outline where the new point goes, and drag it · Esc cancels' : t === 'bump' ? 'Click the side of the deck where the bump-out goes · then drag its sides to size it · Esc cancels' : 'Drag to move · drag a side to stretch · + adds a point (double-click removes it) · sides snap square or 45° (Alt = free) · round handle turns 45° (Shift = any angle) · scroll to zoom · ? for shortcuts'; drawPlan(); }
   document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
   function viewCentre() { return [snapV(vb.x + vb.w / 2, 1), Math.max(2, snapV(vb.z + vbH() / 2, 1))]; }
   document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
@@ -1177,6 +1331,12 @@
     if (t === 'deck') e = { id: nextId++, type: 'deck', h: 3, pts: [[cx - 6, cz - 5], [cx + 6, cz - 5], [cx + 6, cz + 5], [cx - 6, cz + 5]] };
     if (t === 'landing') e = { id: nextId++, type: 'landing', h: 1.5, x: cx, z: cz, w: LANDING_DEF, d: LANDING_DEF, rot: 0 };
     if (t === 'stairs') { e = { id: nextId++, type: 'stairs', x: cx, z: cz, rot: 0, w: 4 }; snapStairs(e); }
+    if (t === 'cornersteps') {       // on the nearest free corner of the selected deck, else of any deck
+      const d = byId(sel), taken = (q) => S.els.some(o => o.corner && Math.hypot(o.x - q[0], o.z - q[1]) < 0.35);
+      const own = d && stairHost(d) ? polyOf(d).map((q, i) => cornerAt(polyOf(d), i)).filter(c => c && !taken(c.q)).sort((p, q) => q.q[1] - p.q[1])[0] : null;
+      const c = own || nearestCorner(cx, cz);
+      e = { id: nextId++, type: 'stairs', corner: true, x: c ? c.q[0] : cx, z: c ? c.q[1] : cz, rot: 0, w: 4, w2: 4 };
+    }
     if (t === 'porch') e = { id: nextId++, type: 'porch', x: cx, z: 0, w: 14, d: 12, ...PORCH_DEF };
     if (t === 'patio') e = { id: nextId++, type: 'patio', x: cx, z: Math.max(2, cz - 6), w: 16, d: 12, mat: 'pavers', wallH: 0, wallLen: 0 };
     S.els.push(e); sel = e.id; setTool('select'); commit(); changed();
@@ -1189,7 +1349,7 @@
   }
   function rotSel(d) { const e = byId(sel); if (!e) return; rotateBy(e, d, { c: e.type === 'stairs' ? [e.x, e.z] : centroid(polyOf(e)), pts0: e.pts, rot0: e.rot || 0 }); commit(); changed(); }
   $('b-copy').addEventListener('click', copySel); $('b-del').addEventListener('click', delSel);
-  $('b-rotl').addEventListener('click', () => rotSel(-15)); $('b-rotr').addEventListener('click', () => rotSel(15));
+  $('b-rotl').addEventListener('click', () => rotSel(-45)); $('b-rotr').addEventListener('click', () => rotSel(45));
   $('b-undo').addEventListener('click', undo); $('b-redo').addEventListener('click', redo);
   let clip = null, spaceDown = false;
   function pasteClip() {
@@ -1243,12 +1403,12 @@
       else if (k === '-') { ev.preventDefault(); zoomBy(1.25); }
       return;
     }
-    if (k === 'escape') { if (!$('keys').hidden) toggleKeys(false); else if (draft) { draft = null; drawPlan(); } else { sel = null; changed(false); } return; }
+    if (k === 'escape') { if (!$('keys').hidden) toggleKeys(false); else if (draft) { draft = null; drawPlan(); } else if (tool === 'addpt' || tool === 'bump') setTool('select'); else { sel = null; changed(false); } return; }
     if (k === 'enter' && draft && draft.pts.length >= 3) { const d = { id: nextId++, type: 'deck', h: 3, pts: draft.pts }; S.els.push(d); sel = d.id; draft = null; setTool('select'); commit(); changed(); return; }
     if (k === 'delete' || k === 'backspace') { ev.preventDefault(); delSel(); return; }
     if (k === '?' || (k === '/' && ev.shiftKey)) { toggleKeys(); return; }
     if (k === 'tab' && S.els.length) { ev.preventDefault(); const i2 = S.els.findIndex(o => o.id === sel); sel = S.els[(i2 + (ev.shiftKey ? -1 : 1) + S.els.length) % S.els.length].id; changed(false); return; }
-    if (k === 'r') { rotSel(ev.shiftKey ? -15 : 15); return; }
+    if (k === 'r') { rotSel(ev.shiftKey ? -45 : 45); return; }
     if (k === 'v') { setTool('select'); return; }
     if (k === 'p') { setTool('poly'); return; }
     if (k === 'f') { fitPlan(); return; }
@@ -1413,6 +1573,8 @@
   const normRot = (v) => ((v % 360) + 540) % 360 - 180;
   function stairTool(e, act) {
     if (act.startsWith('rot:')) { e.rot = normRot(e.rot + Number(act.slice(4))); e.manual = true; }
+    else if (act === 'wrap') { const c = nearestCorner(e.x, e.z); if (!c) { alert('There is no open deck corner for the steps to wrap.'); return; } e.corner = true; e.w2 = e.w; e.x = c.q[0]; e.z = c.q[1]; }
+    else if (act === 'unwrap') { const c = cornerInfo(e); delete e.corner; delete e.w2; e.manual = false; if (c) { e.x = c.q[0] + c.u2[0] * Math.min(c.L2 / 2, e.w / 2 + 0.5); e.z = c.q[1] + c.u2[1] * Math.min(c.L2 / 2, e.w / 2 + 0.5); } snapStairs(e); }
     else if (act === 'corner') {
       // Nearest corner of a deck/landing; the run heads out between its two edges.
       let best = null;
@@ -1494,6 +1656,7 @@
       const pts = e.pts, area = Math.abs(pts.reduce((a, q, i) => { const r = pts[(i + 1) % pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2);
       const xs = pts.map(q => q[0]), zs = pts.map(q => q[1]);
       h = `<b class="ptitle">Deck</b>` + grp('Size', `${num('h', 'Height (ft)', e.h, 0.25)}${num('dw', 'Width', Math.max(...xs) - Math.min(...xs), 0.5, 3)}${num('dd', 'Depth', Math.max(...zs) - Math.min(...zs), 0.5, 3)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`, 'drag a side or corner on the plan to reshape')
+        + grp('Shape', `<button type="button" class="ghost-btn" data-shape="addpt">+ Add point</button><button type="button" class="ghost-btn" data-shape="bump">+ Add bump-out</button>`, 'double-click a point to remove it')
         + grp('Decking', pick('border', 'Picture-frame border', [['none', 'None'], ['1', '1 board'], ['2', '2 boards']], e.border || 'none')
           + pick('trans', 'Transition boards', [['auto', `Auto (runs over ${BOARD_MAX}′)`], ['none', 'None'], ['center', 'One, centered'], ['two', 'Two']], e.trans || 'auto')
           + `<label>On this deck<span class="ro">${transitionsOf(e).length || 'None'}</span></label>`, '12′, 16′ and 20′ boards; a border doubles the rim joist')
@@ -1503,10 +1666,14 @@
     } else if (e.of != null) {
       const i = stairInfo(e), o = byId(e.of);
       h = `<b>${o?.type === 'patio' ? 'Patio block steps' : 'Porch steps'}</b>${o?.type === 'porch' ? pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '') : ''}<label>Steps<span class="ro">${i.n - 1} treads · from ${fmt(i.top)}</span></label><span class="ro" style="align-self:center">Sits at the ${o?.type === 'patio' ? 'patio front' : 'porch door'} · Delete removes it</span>`;
+    } else if (e.corner) {
+      const i = stairInfo(e);
+      h = `<b>Corner steps</b>${num('w', 'Along one side', e.w, 0.5, 1)}${num('w2', 'Along the other', e.w2 ?? e.w, 0.5, 1)}<label>From → to<span class="ro">${fmt(i.top)} → grade</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label><span class="ro" style="align-self:center">${i.corner ? 'Drag to move to another corner' : 'Drag onto a deck corner'}</span>`
+        + `<span class="hrow"><button type="button" class="ghost-btn" data-st="unwrap">Make straight stairs</button></span>`;
     } else {
       const i = stairInfo(e);
       h = `<b>Stairs</b>${num('rot', 'Angle°', e.rot, 45, -180)}${num('w', 'Width', e.w, 0.5, 3)}${pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '')}<label>From → to<span class="ro">${fmt(i.top)} → ${i.foot ? 'landing ' + fmt(i.bottom) : 'grade'}</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label>${e.manual ? '<button type="button" id="b-square">Square to edge</button>' : ''}`
-        + `<span class="hrow"><span class="ro">Turn</span><button type="button" class="ghost-btn" data-st="rot:90" title="Turn 90° counter-clockwise">↺ 90°</button><button type="button" class="ghost-btn" data-st="rot:45">↺ 45°</button><button type="button" class="ghost-btn" data-st="rot:-45">↻ 45°</button><button type="button" class="ghost-btn" data-st="rot:-90" title="Turn 90° clockwise">↻ 90°</button><button type="button" class="ghost-btn" data-st="corner">Off nearest corner</button></span>`
+        + `<span class="hrow"><span class="ro">Turn</span><button type="button" class="ghost-btn" data-st="rot:90" title="Turn 90° counter-clockwise">↺ 90°</button><button type="button" class="ghost-btn" data-st="rot:45">↺ 45°</button><button type="button" class="ghost-btn" data-st="rot:-45">↻ 45°</button><button type="button" class="ghost-btn" data-st="rot:-90" title="Turn 90° clockwise">↻ 90°</button><button type="button" class="ghost-btn" data-st="corner">Off nearest corner</button><button type="button" class="ghost-btn" data-st="wrap">Wrap the corner</button></span>`
         + `<span class="hrow"><span class="ro">Landing partway down, then</span><button type="button" class="ghost-btn" data-st="land:straight">Straight</button><button type="button" class="ghost-btn" data-st="land:left">Turn left</button><button type="button" class="ghost-btn" data-st="land:right">Turn right</button></span>`;
     }
     p.innerHTML = h; p.hidden = false; bindHouse(p);
@@ -1544,6 +1711,7 @@
     }));
     $('b-square')?.addEventListener('click', () => { e.manual = false; snapStairs(e); commit(); changed(); });
     p.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => stairTool(e, b.dataset.st)));
+    p.querySelectorAll('[data-shape]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.shape)));
   }
 
   // ═══ 3D: the 3D builder's engine (porch-3d.html?embed=1) in a frame ══════
@@ -1559,10 +1727,16 @@
   }
   const subtract = (a, b, cuts) => { let parts = [[a, b]]; cuts.forEach(([c, d]) => { parts = parts.flatMap(([p, q]) => (d <= p || c >= q) ? [[p, q]] : [[p, Math.max(p, c)], [Math.min(q, d), q]]); }); return parts.filter(([p, q]) => q - p > .3); };
   function renderModel() {
-    const plats = [], stairs = [];
+    const plats = [], stairs = [], wraps = [];
     const stairCuts = (a, b) => {
       const cuts = [];
       S.els.filter(x => x.type === 'stairs' && x.of == null).forEach(st => {
+        if (st.corner) {              // corner steps: no railing along the part of each side they cover
+          const c = stairInfo(st).corner; if (!c) return;
+          const L = Math.hypot(b[0] - a[0], b[1] - a[1]), same = (p, r) => Math.hypot(p[0] - r[0], p[1] - r[1]) < 0.1, [w1, w2] = cornerW(st, c);
+          if (same(b, c.q) && same(a, c.a)) cuts.push([L - w1 + .1, L + 1]); else if (same(a, c.q) && same(b, c.b)) cuts.push([-1, w2 - .1]);
+          return;
+        }
         const p = projSeg(st.x, st.z, a, b); if (p.d < .35) cuts.push([p.t * p.len - st.w / 2 + .1, p.t * p.len + st.w / 2 - .1]);
         const i = stairInfo(st); if (i.foot) { const fx = st.x + Math.sin(rad(st.rot)) * i.len, fz = st.z + Math.cos(rad(st.rot)) * i.len, q = projSeg(fx, fz, a, b); if (q.d < 1.6) cuts.push([q.t * q.len - st.w / 2 - .4, q.t * q.len + st.w / 2 + .4]); }
       });
@@ -1590,9 +1764,13 @@
         // Skirting runs along the open part of the edge (not where another piece at this height joins it).
         eds.push({ a, b, house, rails, skirt: house ? [] : subtract(0, L, sharedCuts(a, b, e)) });
       });
-      plats.push({ pts, h, edges: eds, posts, houseSpan, skirt: e.skirt || null });
+      // a deck stands on its drop beams' posts, as drawn in the framing; a landing on posts around its edge
+      const fr = e.type === 'deck' ? beamPlan(e, pts).runs.filter(r => !r.hang) : [], beams = fr.map(r => [...r.A, ...r.B]);
+      plats.push({ pts, h, edges: eds, posts: fr.length ? fr.flatMap(r => r.posts) : posts, beams, houseSpan, skirt: e.skirt || null });
     });
-    S.els.filter(e => e.type === 'stairs' && e.of == null).forEach(e => { const i = stairInfo(e); stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
+    S.els.filter(e => e.type === 'stairs' && e.of == null).forEach(e => { const i = stairInfo(e);
+      if (e.corner) { if (i.corner && i.n > 1) wraps.push({ top: i.top, bottom: 0, n: i.n, rise: i.rise, w: cornerW(e, i.corner), levels: Array.from({ length: i.n - 1 }, (_, k) => cornerPoly(i.corner, e, (k + 1) * RUN)) }); return; }
+      stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
     const sections = [];
     S.els.forEach(e => {
       if (e.type === 'porch') sections.push({ id: e.id, kind: 'porch', x: e.x, z: e.tie === 'free' ? e.z : 0, w: e.w, d: e.d, type: e.ptype, tie: e.tie, roof: e.roof, floor: e.floor, wallH: e.wallH, enclose: e.enclose, cornerSide: e.cornerSide, sideGable: e.sideGable, gableEnd: e.gableEnd, pitch: Number(e.pitch) > 0 ? Number(e.pitch) : null, skirt: e.skirt || 'none', doorWall: e.doorWall || 'front', doorPos: e.doorPos ?? null, stairW: e.stairW || 4, landing: e.landing || 'none', steps: e.steps !== false, stairBox: S.els.find(x => x.of === e.id)?.boxed ? 'boxed' : 'open' });
@@ -1602,7 +1780,7 @@
     const H = porchOnDeck ? porchOnDeck.h : Math.max(3, ...plats.filter(q => q.houseSpan).map(q => q.h));
     plats.forEach((q, i) => { q.kind = S.els.filter(e => e.type === 'deck' || e.type === 'landing')[i].type; });
     const meta = DESIGN ? { client: DESIGN.client || '', address: DESIGN.address || '', phone: DESIGN.phone || '', email: DESIGN.email || '', contract: DESIGN.contractNum || '' } : null;
-    return { type: 'qx-design-3d', sections, free: { plats, stairs }, H, build: S.build, meta, house: S.house || null };
+    return { type: 'qx-design-3d', sections, free: { plats, stairs, wraps }, H, build: S.build, meta, house: S.house || null };
   }
   // ═══ What the builders price from ════════════════════════════════════════
   // Decks: size (W × D when a plain rectangle, else area), height, railing and open edge
@@ -1623,7 +1801,8 @@
       return { id: e.id, h: r1(Number(e.h) || 0), rect, width: r1(Math.max(...xs) - Math.min(...xs)), depth: r1(Math.max(...zs) - Math.min(...zs)),
         area: Math.round(area), railLF: Math.round(M.rail), openLF: Math.round(M.open), house: M.house, transitions: transitionsOf(e).length, border: e.border === '1' || e.border === '2' ? e.border : 'none' };
     });
-    const stairs = S.els.filter(e => e.type === 'stairs' && e.of == null).map(e => { const i = stairInfo(e);
+    const stairs = S.els.filter(e => e.type === 'stairs' && e.of == null && !(e.corner && !stairInfo(e).corner)).map(e => { const i = stairInfo(e);
+      if (e.corner) { const [w1, w2] = cornerW(e, i.corner); return { id: e.id, from: i.host?.el.id ?? null, to: 'grade', across: r1(w1 + w2), steps: i.n, boxed: true, corner: true }; }
       return { id: e.id, from: i.host?.el.id ?? null, to: i.foot ? i.foot.id : 'grade', across: r1(Number(e.w) || 4), steps: i.n, boxed: !!e.boxed }; });
     const landings = S.els.filter(e => e.type === 'landing').map(e => ({ id: e.id, width: r1(e.w), depth: r1(e.d), h: r1(Number(e.h) || 0) }));
     const porches = S.els.filter(e => e.type === 'porch').map(e => ({ id: e.id, w: e.w, d: e.d, ptype: e.ptype, tie: e.tie, roof: e.roof,
