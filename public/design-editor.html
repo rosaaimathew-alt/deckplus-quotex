@@ -216,6 +216,7 @@
     <div class="tgrp">
       <button type="button" data-tool="select" aria-pressed="true" title="Select (V)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg><span>Select</span></button>
       <button type="button" data-tool="poly" aria-pressed="false" title="Draw a deck corner by corner (P)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l3-1 11-11-2-2L5 17z"/><path d="M14 6l2 2"/></svg><span>Draw deck</span></button>
+      <button type="button" data-tool="addpt" aria-pressed="false" title="Add a point: click a deck's edge where it goes, then drag it (A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 19L10 5l11 14z"/><circle cx="15.5" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg><span>Add point</span></button>
     </div>
     <div class="tgrp">
       <button type="button" data-add="deck" title="Add a deck"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 9h16M4 13h16M4 17h16"/></svg><span>Deck</span></button>
@@ -244,7 +245,7 @@
     <button type="button" class="icon" id="b-fit" title="Fit in window (Ctrl/⌘+0)" aria-label="Fit in window"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
     <button type="button" class="icon" id="b-keys" aria-expanded="false" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
   </nav>
-  <div class="hint"><span id="tip">Drag to move · drag a side to stretch · + adds a point (double-click removes it) · sides snap square or 45° (Alt = free) · round handle turns 45° (Shift = any angle) · scroll to zoom · ? for shortcuts</span></div>
+  <div class="hint"><span id="tip">Drag to move · drag a side to stretch · Add point (A) puts a corner where you click (double-click removes it) · sides snap square or 45° when close (Alt = free) · round handle turns 45° (Shift = any angle) · scroll to zoom · ? for shortcuts</span></div>
   <div class="main">
     <div class="plan-wrap">
       <svg id="plan" aria-label="Plan view" role="img"></svg>
@@ -253,6 +254,7 @@
         <dl>
           <dt>V</dt><dd>Selection tool</dd>
           <dt>P</dt><dd>Draw deck (pen): Enter finishes, Esc cancels</dd>
+          <dt>A</dt><dd>Add point: click a deck's edge where it goes, drag to place it</dd>
           <dt>⌘Z / ⇧⌘Z</dt><dd>Undo / Redo (also ⌘Y)</dd>
           <dt>⌘C ⌘X ⌘V</dt><dd>Copy, Cut, Paste (pastes 2′ offset)</dd>
           <dt>⌘D</dt><dd>Duplicate</dd>
@@ -1154,13 +1156,6 @@
         e.pts.forEach((p, i) => el('rect', { x: p[0] - hs / 2, y: p[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': `v${i}`, style: 'cursor:crosshair' }));
         edges(e.pts).forEach(([a, b], i) => { const vert = Math.abs(b[0] - a[0]) < Math.abs(b[1] - a[1]);
           el('rect', { x: (a[0] + b[0]) / 2 - hs * (vert ? 0.35 : 0.9), y: (a[1] + b[1]) / 2 - hs * (vert ? 0.9 : 0.35), width: hs * (vert ? 0.7 : 1.8), height: hs * (vert ? 1.8 : 0.7), rx: hs * 0.3, fill: '#1d758b', stroke: '#fff', 'stroke-width': P, 'data-h': `m${i}`, style: `cursor:${vert ? 'ew' : 'ns'}-resize` }); });
-        // a "+" a quarter of the way along each side: press it to add a corner there, and drag it
-        edges(e.pts).forEach(([a, b], i) => { if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 3) return;
-          const px = a[0] + (b[0] - a[0]) * 0.25, pz = a[1] + (b[1] - a[1]) * 0.25, r = hs * 0.62, g = el('g', { 'data-h': `a${i}`, style: 'cursor:copy' });
-          el('circle', { cx: px, cy: pz, r, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 1.6 }, g);
-          el('path', { d: `M${px - r * 0.5} ${pz}H${px + r * 0.5}M${px} ${pz - r * 0.5}V${pz + r * 0.5}`, stroke: '#1d758b', 'stroke-width': P * 1.8, fill: 'none' }, g);
-          el('title', {}, g).textContent = 'Add a point here, then drag it';
-        });
       }
       if (e.type === 'landing') {
         const [, b, c2] = rectPts(e);
@@ -1185,7 +1180,14 @@
       }
     }
     if (edgeHover && tool === 'bump') { const bp = bumpPts(edgeHover); if (bp) el('polyline', { points: ptsAttr(bp), fill: 'rgba(29,117,139,.14)', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}`, 'pointer-events': 'none' }); }
-    if (edgeHover && tool === 'addpt') el('circle', { cx: edgeHover.x, cy: edgeHover.z, r: P * 6, fill: '#1d758b', stroke: '#fff', 'stroke-width': P * 2, 'pointer-events': 'none' });
+    if (edgeHover && tool === 'addpt' && !drag) {
+      const h = edgeHover, g = el('g', { 'pointer-events': 'none' }), lab = (x, z, t) => { const w = t.length * P * 6.6 + P * 8;
+        el('rect', { x: x - w / 2, y: z - P * 9, width: w, height: P * 18, rx: P * 4, fill: '#1d758b' }, g);
+        el('text', { x, y: z + P * 4, 'font-size': P * 11, 'text-anchor': 'middle', fill: '#fff', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 600 }, g).textContent = t; };
+      el('circle', { cx: h.x, cy: h.z, r: P * 6, fill: '#1d758b', stroke: '#fff', 'stroke-width': P * 2 }, g);
+      if (h.s > 0.4) lab(h.a[0] + h.ux * h.s / 2 + h.nx * 1.1, h.a[1] + h.uz * h.s / 2 + h.nz * 1.1, fmt(h.s));
+      if (h.len - h.s > 0.4) lab(h.a[0] + h.ux * (h.s + h.len) / 2 + h.nx * 1.1, h.a[1] + h.uz * (h.s + h.len) / 2 + h.nz * 1.1, fmt(h.len - h.s));
+    }
     if (draft) {
       el('polyline', { points: ptsAttr(draft.pts.concat(draft.hover ? [draft.hover] : [])), fill: 'rgba(29,117,139,.08)', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}` });
       draft.pts.forEach((p, i) => el('circle', { cx: p[0], cy: p[1], r: P * (i === 0 ? 7 : 4), fill: i === 0 ? '#1d758b' : '#fff', stroke: '#1d758b', 'stroke-width': P * 2 }));
@@ -1203,6 +1205,16 @@
     const m = ux && uz ? snapV((Math.abs(dx) + Math.abs(dz)) / 2) : snapV(Math.abs(ux ? dx : dz));
     return { p: [a[0] + ux * m, a[1] + uz * m], u: [ux, uz] };
   }
+  // A corner being dragged: on the ½′ grid wherever it is put, and pulled onto a square or 45°
+  // line from either neighbour (or where two such lines meet) only when it is close to one.
+  function snapCornerNear(x, z, a, b, free = false) {
+    const base = [snapV(x), snapV(z)]; if (free) return base;
+    const tol = 0.9, far = (q) => Math.hypot(q[0] - x, q[1] - z), A = snapRay(a, x, z), B = snapRay(b, x, z);
+    const den = A.u[0] * B.u[1] - A.u[1] * B.u[0];
+    if (Math.abs(den) > 1e-6) { const t = ((b[0] - a[0]) * B.u[1] - (b[1] - a[1]) * B.u[0]) / den, m = [a[0] + A.u[0] * t, a[1] + A.u[1] * t]; if (far(m) < tol) return m; }
+    const best = far(A.p) <= far(B.p) ? A.p : B.p;
+    return far(best) < tol ? best : base;
+  }
   function snapCorner(x, z, a, b, free = false) {
     if (free || !a) return [snapV(x), snapV(z)];
     const A = snapRay(a, x, z), far = (q) => Math.hypot(q[0] - x, q[1] - z);
@@ -1219,6 +1231,12 @@
     const { a, b, len } = best, ux = (b[0] - a[0]) / len, uz = (b[1] - a[1]) / len, s = Math.max(0, Math.min(len, snapV(best.t * len)));
     let nx = -uz, nz = ux; if (inPoly((a[0] + b[0]) / 2 + nx * 0.05, (a[1] + b[1]) / 2 + nz * 0.05, e.pts)) { nx = -nx; nz = -nz; }
     return { i: best.i, a, b, len, ux, uz, nx, nz, s, x: a[0] + ux * s, z: a[1] + uz * s, house: Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05 };
+  }
+  // The deck edge under the pointer (any deck, within a few pixels): where Add point would put a point.
+  function deckEdgeAt(x, z) {
+    const tol = vb.w / (svg.getBoundingClientRect().width || 1) * 14; let best = null;
+    S.els.filter(o => o.type === 'deck').forEach(o => edges(o.pts).forEach(([a, b]) => { const p = projSeg(x, z, a, b); if (p.d < tol && (!best || p.d < best.d)) best = { d: p.d, e: o }; }));
+    return best ? { ...nearEdge(best.e, x, z), e: best.e } : null;
   }
   // A bump-out on one side: four new corners, up to 6′ wide and 2′ out, at least 1′ in from each end.
   // Its sides are then dragged like any other. Not on the house side, or a side under 4′.
@@ -1282,12 +1300,19 @@
       } else draft.pts.push(p);
       drawPlan(); return;
     }
-    if (tool === 'addpt' || tool === 'bump') {
-      const e = byId(sel), h = e?.type === 'deck' ? nearEdge(e, x, z) : null, was = tool;
+    if (tool === 'addpt') {                     // stays on: click each place a point goes, drag it if you like
+      const h = deckEdgeAt(x, z); if (!h) return;
+      // the deck is selected when the point is let go: selecting it now opens the settings panel,
+      // which narrows the plan under the pointer mid-drag
+      const e = h.e; edgeHover = null;
+      const i = h.s < 0.05 ? h.i : h.len - h.s < 0.05 ? (h.i + 1) % e.pts.length : -1;    // on a corner: move that corner
+      if (i >= 0) drag = { kind: 'vertex', e, i, selectAfter: true }; else { e.pts.splice(h.i + 1, 0, [h.x, h.z]); drag = { kind: 'vertex', e, i: h.i + 1, selectAfter: true }; }
+      svg.setPointerCapture(ev.pointerId); changed(false); return;
+    }
+    if (tool === 'bump') {
+      const e = byId(sel), h = e?.type === 'deck' ? nearEdge(e, x, z) : null;
       setTool('select');
-      if (!h) return;
-      if (was === 'addpt') { e.pts.splice(h.i + 1, 0, [h.x, h.z]); drag = { kind: 'vertex', e, i: h.i + 1 }; svg.setPointerCapture(ev.pointerId); changed(false); }
-      else { const bp = bumpPts(h); if (bp) { e.pts.splice(h.i + 1, 0, ...bp); commit(); changed(); } }
+      if (h) { const bp = bumpPts(h); if (bp) { e.pts.splice(h.i + 1, 0, ...bp); commit(); changed(); } }
       return;
     }
     const hd = !CUSTOMER && !spaceDown && S.house && ev.target.closest('[data-hd]');
@@ -1315,7 +1340,6 @@
         if (lastV && lastV.id === e.id && lastV.i === i && now - lastV.t < 450 && e.pts.length > 3) { e.pts.splice(i, 1); lastV = null; commit(); changed(); return; }
         lastV = { id: e.id, i, t: now }; drag = { kind: 'vertex', e, i };
       }
-      else if (h[0] === 'a') { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, snapRay(a, a[0] + (b[0] - a[0]) * 0.25, a[1] + (b[1] - a[1]) * 0.25).p); drag = { kind: 'vertex', e, i: i + 1 }; }
       else if (h[0] === 'm' && ev.altKey) { const i = +h.slice(1), a = e.pts[i], b = e.pts[(i + 1) % e.pts.length]; e.pts.splice(i + 1, 0, [snapV((a[0] + b[0]) / 2), snapV((a[1] + b[1]) / 2)]); drag = { kind: 'vertex', e, i: i + 1 }; }
       else if (h[0] === 'm') {
         const i = +h.slice(1), j = (i + 1) % e.pts.length, a = e.pts[i], b = e.pts[j], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
@@ -1333,7 +1357,8 @@
   });
   svg.addEventListener('pointermove', (ev) => {
     if (tool === 'poly' && draft) { const [x, z] = toFt(ev), dp = draft.pts; draft.hover = snapCorner(x, z, dp[dp.length - 1], dp.length >= 2 ? dp[0] : null, ev.altKey); draft.hover[1] = Math.max(0, draft.hover[1]); drawPlan(); return; }
-    if ((tool === 'addpt' || tool === 'bump') && !drag) { const d = byId(sel); if (d?.type === 'deck') { const [x, z] = toFt(ev); edgeHover = nearEdge(d, x, z); drawPlan(); } return; }
+    if (tool === 'addpt' && !drag) { const [x, z] = toFt(ev); edgeHover = deckEdgeAt(x, z); drawPlan(); return; }
+    if (tool === 'bump' && !drag) { const d = byId(sel); if (d?.type === 'deck') { const [x, z] = toFt(ev); edgeHover = nearEdge(d, x, z); drawPlan(); } return; }
     if (!drag) return;
     const [x, z] = toFt(ev), e = drag.e;
     if (drag.kind === 'pan') { const r = svg.getBoundingClientRect(), k = vb.w / r.width; vb.x = drag.vb0.x - (ev.clientX - drag.s0[0]) * k; vb.z = drag.vb0.z - (ev.clientY - drag.s0[1]) * k; drawPlan(); return; }
@@ -1370,7 +1395,7 @@
       drag.riders.forEach(r => { r.o.x = r.x + drag.n[0] * d; r.o.z = r.z + drag.n[1] * d; });
     }
     if (drag.kind === 'stairEnd') stretchStair(drag, x, z);
-    if (drag.kind === 'vertex') { const n = e.pts.length, q = snapCorner(x, z, e.pts[(drag.i + n - 1) % n], e.pts[(drag.i + 1) % n], ev.altKey); e.pts[drag.i] = [q[0], Math.max(0, q[1])]; }
+    if (drag.kind === 'vertex') { const n = e.pts.length, q = snapCornerNear(x, z, e.pts[(drag.i + n - 1) % n], e.pts[(drag.i + 1) % n], ev.altKey); e.pts[drag.i] = [q[0], Math.max(0, q[1])]; }
     if (drag.kind === 'box') { e.w = Math.max(6, Math.round(x - drag.x0)); e.x = drag.x0 + e.w / 2; e.d = Math.max(4, Math.round(z - e.z)); }
     if (drag.kind === 'size') {
       const c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), [cx, cz] = [e.x, e.z];
@@ -1421,7 +1446,7 @@
       H.segments[i - 1].widthFt = a + d; H.segments[i + 1].widthFt = b - d;
     }
   }
-  const endDrag = () => { if (!drag) return; if (drag.kind === 'house' && S.house?.segments) S.house.segments = S.house.segments.filter(g => (Number(g.widthFt) || 0) > 0.05); if (['move', 'box'].includes(drag.kind)) { snapToBump(drag.e); fitPorch(drag.e); } if (['vertex', 'edge'].includes(drag.kind)) tidyPts(drag.e); if (drag.kind === 'stairEnd') { const r = stairRun(drag.e); if (r) { const q = pointOn(r.o, (r.lo + r.hi) / 2); Object.assign(drag.e, { w: snapV(r.len), x: q[0], z: q[1] }); } } drag = null; commit(); changed(); };
+  const endDrag = () => { if (!drag) return; if (drag.kind === 'house' && S.house?.segments) S.house.segments = S.house.segments.filter(g => (Number(g.widthFt) || 0) > 0.05); if (['move', 'box'].includes(drag.kind)) { snapToBump(drag.e); fitPorch(drag.e); } if (['vertex', 'edge'].includes(drag.kind)) tidyPts(drag.e); if (drag.selectAfter) sel = drag.e.id; if (drag.kind === 'stairEnd') { const r = stairRun(drag.e); if (r) { const q = pointOn(r.o, (r.lo + r.hi) / 2); Object.assign(drag.e, { w: snapV(r.len), x: q[0], z: q[1] }); } } drag = null; commit(); changed(); };
   svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag);
   svg.addEventListener('dblclick', (ev) => {
     if (tool === 'poly' && draft && draft.pts.length >= 3) { const e = { id: nextId++, type: 'deck', h: 3, pts: draft.pts }; S.els.push(e); sel = e.id; draft = null; setTool('select'); commit(); changed(); }
@@ -1442,7 +1467,7 @@
   }
 
   // ── Toolbar & keys ───────────────────────────────────────────────────────
-  function setTool(t) { tool = t; draft = null; edgeHover = null; document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); svg.style.cursor = t === 'poly' || t === 'addpt' || t === 'bump' ? 'crosshair' : ''; $('tip').textContent = t === 'poly' ? 'Click each corner · click the first corner (or double-click) to finish · Esc cancels' : t === 'addpt' ? 'Click the deck’s outline where the new point goes, and drag it · Esc cancels' : t === 'bump' ? 'Click the side of the deck where the bump-out goes · then drag its sides to size it · Esc cancels' : 'Drag to move · drag a side to stretch · + adds a point (double-click removes it) · sides snap square or 45° (Alt = free) · round handle turns 45° (Shift = any angle) · scroll to zoom · ? for shortcuts'; drawPlan(); }
+  function setTool(t) { tool = t; draft = null; edgeHover = null; document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t))); svg.style.cursor = t === 'poly' || t === 'addpt' || t === 'bump' ? 'crosshair' : ''; $('tip').textContent = t === 'poly' ? 'Click each corner · click the first corner (or double-click) to finish · Esc cancels' : t === 'addpt' ? 'Click a deck’s edge exactly where the new point goes (drag to pull it out) · click again for more · V or Esc to stop' : t === 'bump' ? 'Click the side of the deck where the bump-out goes · then drag its sides to size it · Esc cancels' : 'Drag to move · drag a side to stretch · Add point (A) puts a corner where you click (double-click removes it) · sides snap square or 45° when close (Alt = free) · round handle turns 45° (Shift = any angle) · scroll to zoom · ? for shortcuts'; drawPlan(); }
   document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
   function viewCentre() { return [snapV(vb.x + vb.w / 2, 1), Math.max(2, snapV(vb.z + vbH() / 2, 1))]; }
   document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => {
@@ -1524,6 +1549,7 @@
     if (k === 'r') { rotSel(ev.shiftKey ? -45 : 45); return; }
     if (k === 'v') { setTool('select'); return; }
     if (k === 'p') { setTool('poly'); return; }
+    if (k === 'a' && !ev.metaKey && !ev.ctrlKey) { setTool('addpt'); return; }
     if (k === 'f') { fitPlan(); return; }
     const st = ev.shiftKey ? 5 : 0.5, mv = { arrowleft: [-st, 0], arrowright: [st, 0], arrowup: [0, -st], arrowdown: [0, st] }[k];
     if (mv && e) { ev.preventDefault(); if (e.pts) e.pts = e.pts.map(p => [p[0] + mv[0], Math.max(0, p[1] + mv[1])]); else { e.x += mv[0]; e.z += mv[1]; if (e.type === 'stairs') snapStairs(e); if (e.type === 'porch' && e.tie !== 'free') e.z = 0; if (e.z < 0) e.z = 0; } if (e.type === 'porch' && mv[0]) fitPorch(e, Math.sign(mv[0])); /* arrow keys jump past a window */ commit(); changed(); }
@@ -1768,7 +1794,7 @@
       const pts = e.pts, area = Math.abs(pts.reduce((a, q, i) => { const r = pts[(i + 1) % pts.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0) / 2);
       const xs = pts.map(q => q[0]), zs = pts.map(q => q[1]);
       h = `<b class="ptitle">Deck</b>` + grp('Size', `${num('h', 'Height (ft)', e.h, 0.25)}${num('dw', 'Width', Math.max(...xs) - Math.min(...xs), 0.5, 3)}${num('dd', 'Depth', Math.max(...zs) - Math.min(...zs), 0.5, 3)}<label>Size<span class="ro">${Math.round(area)} SF · ${pts.length} corners</span></label>`, 'drag a side or corner on the plan to reshape')
-        + grp('Shape', `<button type="button" class="ghost-btn" data-shape="addpt">+ Add point</button><button type="button" class="ghost-btn" data-shape="bump">+ Add bump-out</button>`, 'double-click a point to remove it')
+        + grp('Shape', `<button type="button" class="ghost-btn" data-shape="bump">+ Add bump-out</button>`, 'Add point (A) in the toolbar · double-click a point to remove it')
         + grp('Decking', pick('border', 'Picture-frame border', [['none', 'None'], ['1', '1 board'], ['2', '2 boards']], e.border || 'none')
           + pick('trans', 'Transition boards', [['auto', `Auto (runs over ${BOARD_MAX}′)`], ['none', 'None'], ['center', 'One, centered'], ['two', 'Two']], e.trans || 'auto')
           + `<label>On this deck<span class="ro">${transitionsOf(e).length || 'None'}</span></label>`, '12′, 16′ and 20′ boards; a border doubles the rim joist')
@@ -1984,8 +2010,9 @@
   // ═══ Glue ════════════════════════════════════════════════════════════════
   function changed(full = true) {
     syncAttached(); drawPlan(); renderProps(); refreshButtons(); send3D();
-    // Settings open beside the plan when a piece is picked (or Finishes is on).
-    document.body.classList.toggle('panel-open', !CUSTOMER && (sel != null || finishesOpen));
+    // Settings open beside the plan when a piece is picked (or Finishes is on). Not while
+    // something is being dragged: the plan would narrow under the pointer and the drag jump.
+    if (!drag) document.body.classList.toggle('panel-open', !CUSTOMER && (sel != null || finishesOpen));
     const nd = S.els.filter(e => e.type === 'deck').length, np = S.els.filter(e => e.type === 'porch').length, c = $('count');
     if (c) c.textContent = [nd && `${nd} deck${nd > 1 ? 's' : ''}`, np && `${np} porch${np > 1 ? 'es' : ''}`].filter(Boolean).join(' · ');
   }
