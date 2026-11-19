@@ -791,7 +791,7 @@
     const c = Math.cos(st.rot * Math.PI / 180), sn = Math.sin(st.rot * Math.PI / 180), hw = st.w / 2, L = Math.max(0.6, (st.n - 1) * RUN);
     return [[-hw, 0], [hw, 0], [hw, L], [-hw, L]].map(([u, v]) => [st.x + u * c + v * sn, st.z - u * sn + v * c]);
   }
-  const freeStairPts = () => (S.free?.stairs || []).flatMap(freeStairCorners);
+  const freeStairPts = () => [...(S.free?.stairs || []).flatMap(freeStairCorners), ...(S.free?.wraps || []).flatMap(w => w.levels[w.levels.length - 1] || [])];
   // Smallest sheet that holds the project at 1/4″; if even 18×24 is too small, 1/8″ on 18×24.
   function pickSheet() {
     const e = planExtents(), w = e.x1 - e.x0, h = e.z1 - e.z0;
@@ -827,6 +827,7 @@
     });
     (S.free?.plats || []).forEach(p => { const xs = p.pts.map(q => q[0]), zs = p.pts.map(q => q[1]); notes.push(`${p.kind === 'landing' ? 'Landing' : 'Deck'} ${Math.round(Math.max(...xs) - Math.min(...xs))}′×${Math.round(Math.max(...zs) - Math.min(...zs))}′, ${fmtFt(p.h)} high`); });
     (S.free?.stairs || []).forEach(st => { if (st.top - st.bottom > 0.3) notes.push(`  Stairs ${st.n - 1} treads, ${fmtFt(st.top)} to ${st.foot ? fmtFt(st.bottom) + ' landing' : 'grade'}${st.boxed ? ', boxed' : ''}`); });
+    (S.free?.wraps || []).forEach(w => notes.push(`  Corner steps ${w.n - 1} treads, ${fmtFt(w.top)} to grade, ${w.w[0]}′ + ${w.w[1]}′ around the corner`));
     notes.push(`Decking: ${dk}. Floor ${fmtFt(S.H)} above grade.`);
     notes.push(`Railing: ${S.rail === 'aluminum' ? 'black aluminum' : 'hybrid, composite cap, black balusters'}; equal sections, 8′ max.`);
     return notes;
@@ -1060,6 +1061,12 @@
       text(cx, cz - ft(2), p.kind === 'landing' ? 'LANDING' : 'NEW DECK', 'room'); text(cx, cz + ft(7), `${fmtFt(p.h)} high`, 'note');
     });
     { const moved = out.splice(freeLen); out.splice(freeAt, 0, ...moved); }
+    (S.free?.wraps || []).forEach(w => {
+      const outer = w.levels[w.levels.length - 1]; if (!outer) return;
+      poly(outer, 'stairs-box');
+      w.levels.slice(0, -1).forEach(lv => { line(lv[1][0], lv[1][1], lv[2][0], lv[2][1], 'tread'); line(lv[2][0], lv[2][1], lv[3][0], lv[3][1], 'tread'); });
+      line(outer[5][0], outer[5][1], outer[2][0], outer[2][1], 'tread');
+    });
     (S.free?.stairs || []).forEach(st => {
       if (st.top - st.bottom < 0.3) return;
       const pts = freeStairCorners(st), c = Math.cos(st.rot * Math.PI / 180), sn = Math.sin(st.rot * Math.PI / 180), W2 = (u, v) => [st.x + u * c + v * sn, st.z - u * sn + v * c];
@@ -2641,10 +2648,22 @@
         if (!ed.house) { const f = B(L + 0.08, 0.95, 0.08, M.fascia(), (a[0] + b[0]) / 2, h - 0.5, (a[1] + b[1]) / 2); f.rotation.y = Math.atan2(-(b[1] - a[1]), b[0] - a[0]); }
         (ed.rails || []).forEach(([ax, az, bx, bz]) => railRun(ax, az, bx, bz, h, h));
       });
+      // drop beams under the joists (the editor's framing), with the posts under them
+      const bh = (p.beams || []).length && h - 1.65 > 0.25 ? 0.75 : 0;
+      if (bh) p.beams.forEach(([ax, az, bx, bz]) => { const bm = B(Math.hypot(bx - ax, bz - az), bh, 0.38, M.pt(), (ax + bx) / 2, h - 0.9 - bh / 2, (az + bz) / 2); bm.rotation.y = Math.atan2(-(bz - az), bx - ax); });
       (p.posts || []).forEach(([x, z]) => {
-        if (h - 0.9 > 0.2) B(0.46, h - 0.9, 0.46, M.pt(), x, (h - 0.9) / 2, z);
+        if (h - 0.9 - bh > 0.2) B(0.46, h - 0.9 - bh, 0.46, M.pt(), x, (h - 0.9 - bh) / 2, z);
         const f = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 14), M.footing()); f.position.set(x, 0.08, z); f.receiveShadow = true; G.add(f);
       });
+    });
+    (fr.wraps || []).forEach(wr => {
+      if (wr.top - wr.bottom < 0.3) return;
+      const solid = (pts, y0, y1, mats) => {
+        const sh = new THREE.Shape(); sh.moveTo(pts[0][0], -pts[0][1]); pts.slice(1).forEach(q => sh.lineTo(q[0], -q[1])); sh.closePath();
+        const m = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: y1 - y0, bevelEnabled: false }), mats);
+        m.rotation.x = -Math.PI / 2; m.position.y = y0; m.castShadow = m.receiveShadow = true; G.add(m);
+      };
+      wr.levels.forEach((lv, k) => solid(lv, wr.bottom, wr.top - (k + 1) * wr.rise, [top, M.fascia()]));
     });
     (fr.stairs || []).forEach(st => {
       if (st.top - st.bottom < 0.3) return;
@@ -2823,6 +2842,7 @@
       ...plats.map(p => { const xs = p.pts.map(q => q[0]), zs = p.pts.map(q => q[1]), w = Math.round(Math.max(...xs) - Math.min(...xs)), d = Math.round(Math.max(...zs) - Math.min(...zs)), sk = p.skirt || S.skirt;
         return `${w}×${d} ft ${p.kind === 'landing' ? 'stair landing' : 'deck'} ${ftIn(p.h)} above grade${sk && sk !== 'none' ? ` with ${SK[sk]}` : ''}`; }),
       ...(free.stairs || []).filter(st => st.top - st.bottom > 0.3).map(st => `${st.w} ft wide stairs with ${st.n - 1} treads${st.boxed ? ', boxed sides' : ''}`),
+      ...(free.wraps || []).map(w => `box steps with ${w.n - 1} treads wrapping around a corner of the deck`),
     ];
     const hs = HS(), house = hs ? [
       `${hs.stories}-story house${hs.walkout ? ' over a walkout basement' : ''}, ${hs.wallWidthFt} ft wide`,
@@ -2913,6 +2933,7 @@
       L.push(`NEW ${q.kind === 'landing' ? 'STAIR LANDING' : 'DECK'}: ${w} ft × ${d} ft, ${ftIn(q.h)} above grade, on square wood posts with concrete footings${sk && sk !== 'none' ? `, ${sk === 'lattice' ? 'stained square-grid lattice' : sk === 'pt' ? 'stained wood board' : 'horizontal composite board'} skirting` : ''}.`);
     });
     (S.free?.stairs || []).filter(st => st.top - st.bottom > 0.3).forEach(st => L.push(`NEW STAIRS: ${nWord(st.n - 1, 'tread', 'treads')}, ${st.w} ft wide${st.boxed ? ', boxed sides' : ', open stringers'}${st.n >= 4 ? ', railing on both sides' : ''}, landing on ${st.foot ? 'a landing' : 'a small concrete pad'}.`));
+    (S.free?.wraps || []).forEach(w => L.push(`NEW CORNER STEPS: ${nWord(w.n - 1, 'tread', 'treads')} of box steps wrapping around a corner of the deck, ${w.w[0]} ft along one side and ${w.w[1]} ft along the other, down to grade.`));
     S.sections.filter(x => x.kind === 'patio').forEach(x => { const pw = patioWall(x); L.push(`NEW PATIO: ${x.w} × ${x.d} ft ${x.mat === 'concrete' ? 'concrete' : 'paver'} patio${pw ? `, raised ${ftIn(pw.H)} on a block retaining wall${pw.steps ? ` with ${pw.steps} block steps down` : ''}` : ''}.`); });
     // finishes
     const deck = S.decking === 'pt' ? 'pressure-treated wood (natural tan)' : `${DECKING[S.decking].label} composite in ${COLORS.find(c => c.key === S.color).name} (${colorWord(COLORS.find(c => c.key === S.color).hex)})`;
