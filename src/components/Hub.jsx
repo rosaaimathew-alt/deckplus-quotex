@@ -61,6 +61,35 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
       </div>
     </div>
   )
+  // layout="views": the title with the views as one switch beside it and the
+  // main button on the right (Sales, Catalog, Insights), as in the rebuild.
+  if (layout === 'views') return (
+    <div className="min-h-full flex flex-col">
+      <div className="no-print max-w-7xl w-full mx-auto px-4 sm:px-6 pt-5 sm:pt-6 flex items-center gap-x-4 gap-y-3 flex-wrap">
+        <h1 className="qx-title text-2xl font-bold text-gray-900 leading-tight">{title}</h1>
+        {visible.length > 1 && (
+          <nav className="inline-flex max-w-full overflow-x-auto rounded-lg border border-gray-300 bg-white divide-x divide-gray-200" aria-label={`${title} views`}>
+            {visible.map(t => {
+              const on = t.key === current.key
+              return (
+                <button key={t.key} onClick={() => setActive(t.key)} aria-current={on ? 'page' : undefined} title={t.hint || undefined}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
+                    on ? 'bg-[var(--brand-50)] text-[var(--brand-800)] font-semibold' : 'text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-900'
+                  }`}>
+                  {t.label}
+                  {t.count ? <span className={`text-[11px] font-semibold rounded-full px-1.5 min-w-[18px] text-center ${t.countTone === 'alert' ? 'qx-badge' : 'bg-gray-100 text-gray-500'}`}>{t.count}</span> : null}
+                </button>
+              )
+            })}
+          </nav>
+        )}
+        {actions && <div className="ml-auto flex items-center gap-2 flex-wrap">{actions}</div>}
+      </div>
+      <div className="flex-1 qx-embedded" key={current.key}>
+        {current.render()}
+      </div>
+    </div>
+  )
   return (
     <div className="min-h-full flex flex-col">
       <div className="no-print bg-white/80 border-b border-gray-200 backdrop-blur-sm">
