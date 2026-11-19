@@ -147,7 +147,7 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
         : withNotes(r, prev)
       const stageKeys = (getStages(p) || []).map(s => s.key)
       setCountyPermit(p.id, next, r.permits ? countyPassedStages({ countyPermit: next }, stageKeys) : [])
-      // Every final passed: off the board and into Closed jobs
+      // Every final passed: off the board, ready for the office's close-out
       if (r.permits?.length && !r.error) closeIfFinaled(p.id, useStore.getState)
       done++
     }

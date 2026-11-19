@@ -1597,6 +1597,8 @@ export const useStore = create(
       homePages: {},
       // The company owner's login: the only one with the owner's Today page (App.jsx)
       ownerUserId: null,
+      // The one person who closes jobs (with the owner): after every payment is in (Jobs › Close out)
+      closeOutUserId: null,
       setHomePage: (userId, kind) => set((s) => {
         const next = { ...(s.homePages || {}) }
         if (kind) next[userId] = kind; else delete next[userId]
@@ -1676,7 +1678,7 @@ const SETTINGS_DEFAULTS = () => ({
   paymentScheduleLearning: {}, scopeExamples: [], historyImported: false, calendarHiddenJobs: [],
   contractPrefix: 'DP', companySignature: null, welcomeEmail: null, permitPulse: null,
   porchBuildRates: {}, porchBuildLocked: false, porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
-  subscriptions: [], homePages: {}, ownerUserId: null,
+  subscriptions: [], homePages: {}, ownerUserId: null, closeOutUserId: null,
 })
 const ID_COUNTERS = ['nextProposalId', 'nextCatalogId', 'nextTemplateId', 'nextScopeTemplateId', 'nextPaymentScheduleId', 'nextSubId']
 

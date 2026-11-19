@@ -50,7 +50,8 @@ export const countyConnected = (p) => CONNECTED_COUNTIES.includes(jobJurisdictio
 export const noPermit = (proposal) => proposal?.jobData?.noPermit === true
 
 export function permitTracked(proposal) {
-  if ((proposal.jobData?.completedStages || []).includes('closed') || noPermit(proposal)) return false
+  // a job whose finals have all passed is done with inspections (ready for close-out)
+  if ((proposal.jobData?.completedStages || []).includes('closed') || proposal.jobData?.finalsPassed || noPermit(proposal)) return false
   return !!jobCounty(proposal)
 }
 
@@ -310,19 +311,19 @@ export function allFinalsPassed(proposal) {
   return last || today()
 }
 
-// Close a job whose finals have all passed — the same "Job Closed" stage the
-// PM's close-out sets, without the customer email or the profit entry.
+// A job whose finals have all passed leaves the inspections board and is marked
+// ready for close-out. It is NOT closed: only the office's close-out does that,
+// by the person who closes jobs, once every payment is collected (Jobs ›
+// CloseOutModal, canCloseJobs).
 export function closeIfFinaled(proposalId, getState) {
-  const { proposals, updateJobData, toggleJobStage } = getState()
+  const { proposals, updateJobData } = getState()
   const p = proposals.find(x => x.id === proposalId)
-  if (!p || (p.jobData?.completedStages || []).includes('closed')) return false
+  if (!p || p.jobData?.finalsPassed || (p.jobData?.completedStages || []).includes('closed')) return false
   const finalDate = allFinalsPassed(p)
   if (!finalDate) return false
   updateJobData(p.id, {
     completionDate: p.jobData?.completionDate || finalDate,
-    closedAt: new Date().toISOString(),
-    autoClosed: { at: new Date().toISOString(), reason: 'All final inspections passed' },
+    finalsPassed: { at: new Date().toISOString(), date: finalDate },
   })
-  toggleJobStage(p.id, 'closed')
   return true
 }

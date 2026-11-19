@@ -148,6 +148,10 @@ export function useNav() {
 export function useJobMoney() {
   return useStore(s => !isOff(s.me?.permissions, JOB_MONEY))
 }
+// Who closes jobs: the person set to close them out (closeOutUserId) and the owner.
+export function useCanCloseJobs() {
+  return useStore(s => !!s.me?.id && [s.closeOutUserId, s.ownerUserId].filter(Boolean).map(String).includes(String(s.me.id)))
+}
 // The itemized price list on a job and a quote: its own switch, apart from job money.
 export function usePriceList() {
   return useStore(s => !isOff(s.me?.permissions, PRICE_LIST))
