@@ -421,7 +421,10 @@
       const fl = String(d.porches?.[0]?.flooring || '').replace(/^deckfloor_/, '');
       const ck = Object.keys(COLL_LINE).find(k => coll.startsWith(k)), fk = Object.keys(FLOOR_LINE).find(k => fl.startsWith(k));
       S.decking = ck ? COLL_LINE[ck] : fk ? FLOOR_LINE[fk] : 'pt';
-      if (/alum/i.test(`${d.decks?.[0]?.rail || ''} ${d.porches?.[0]?.railing?.product || ''}`)) S.rail = 'aluminum';
+      { const n = String(d.decks?.[0]?.rail || '').toLowerCase(), bp = /between/.test(n);        // the quote's railing, by its price-list name
+        const rk = /cable/.test(n) ? 'cable' : /iron rod/.test(n) ? 'ironrod' : /2x2|picket/.test(n) ? 'wood' : /wood cap/.test(n) ? 'hybridwood' : /transcend/.test(n) ? 'transcend' : /white only/.test(n) ? 'selectwhite'
+          : /signature/.test(n) ? (bp ? 'sigalum-bp' : 'sigalum') : /timbertech/.test(n) ? (bp ? 'tt-bp' : 'ttalum') : /alum/.test(n) ? (bp ? 'selectalum-bp' : 'aluminum') : /alum/i.test(d.porches?.[0]?.railing?.product || '') ? 'aluminum' : null;
+        if (rk) S.rail = rk; }
       const range = d.priceRange && Number(d.priceRange.high) > 0 ? { low: Number(d.priceRange.low) || 0, high: Number(d.priceRange.high) } : null;
       S.meta = { client: String(d.client || ''), address: String(d.address || ''), phone: String(d.phone || ''), email: String(d.email || ''), contract: String(d.contractNum || ''), priceRange: range, total: range ? 0 : Number(d.total) || 0 };
       fromEstimate = true;
@@ -829,7 +832,7 @@
     (S.free?.stairs || []).forEach(st => { if (st.top - st.bottom > 0.3) notes.push(`  Stairs ${st.n - 1} treads, ${fmtFt(st.top)} to ${st.foot ? fmtFt(st.bottom) + ' landing' : 'grade'}${st.boxed ? ', boxed' : ''}`); });
     (S.free?.wraps || []).forEach(w => notes.push(`  Corner steps ${w.n - 1} treads, ${fmtFt(w.top)} to grade, ${w.w[0]}′ + ${w.w[1]}′ around the corner`));
     notes.push(`Decking: ${dk}. Floor ${fmtFt(S.H)} above grade.`);
-    notes.push(`Railing: ${S.rail === 'aluminum' ? 'black aluminum' : 'hybrid, composite cap, black balusters'}; equal sections, 8′ max.`);
+    notes.push(`Railing: ${railSpec().desc}; equal sections, 8′ max.`);
     return notes;
   }
   let PLAN = null, planSel = true;                       // last plan's transform; show selection?
@@ -1490,6 +1493,8 @@
     tg: () => mat('tg', () => std({ color: '#ffffff', map: T.tg, roughness: 0.55 })),
     railWhite: () => mat('railWhite', () => std({ color: '#f3f3ef', roughness: 0.45 })),
     railBlack: () => mat('railBlack', () => std({ color: '#1d1e20', roughness: 0.35, metalness: 0.4 })),
+    railBronze: () => mat('railBronze', () => std({ color: '#6b4a2b', roughness: 0.4, metalness: 0.5 })),
+    railCable: () => mat('railCable', () => std({ color: '#c9ccd1', roughness: 0.3, metalness: 0.8 })),
     cap: () => mat(`cap-${S.decking}-${S.color}`, () => std({ color: '#ffffff', map: deckTex(), roughness: 0.6 })),
     pt: () => mat('pt', () => std({ color: '#ffffff', map: T.pt, bumpMap: T.pt, bumpScale: 0.01, roughness: 0.9 })),
     glass: () => mat('glass', () => std({ color: '#1d2a33', roughness: 0.04, metalness: 0.95, envMapIntensity: 1.2 })),
@@ -1599,7 +1604,34 @@
   function withG(g, fn) { const prev = G; G = g; const r = fn(); G = prev; return r; }
 
   // Balusters as one instanced mesh per run: round 3/4″ (hybrid) or square aluminum.
-  const balGeo = new THREE.CylinderGeometry(0.032, 0.032, 1, 10), balGeoSq = new THREE.BoxGeometry(0.06, 1, 0.06);
+  const balGeo = new THREE.CylinderGeometry(0.032, 0.032, 1, 10), balGeoSq = new THREE.BoxGeometry(0.06, 1, 0.06), balGeoPk = new THREE.BoxGeometry(0.125, 1, 0.125);
+  // The railings on the Deck Plus price list (Catalog › Railing), by the key the design tool
+  // sends. post / rail: white composite sleeve, black aluminum, or wood; cap: a board on top
+  // (decking, wood or white); fill: balusters (round, square or 2×2 pickets), cable or iron rod.
+  // "Between posts only" railings are aluminum sections set between the deck's own wood posts.
+  const RAILS = {
+    wood:            { post: 'wood',  rail: 'wood',  cap: 'wood',  fill: 'bal', shape: 'picket', color: 'wood',  desc: 'pressure-treated wood railing with 2×2 wood pickets' },
+    hybridwood:      { post: 'white', rail: 'white', cap: 'wood',  fill: 'bal', shape: 'round',  color: 'black', desc: 'white railing with a wood top cap and black round balusters' },
+    hybrid:          { post: 'white', rail: 'white', cap: 'deck',  fill: 'bal', shape: 'round',  color: 'black', desc: 'white railing with a composite cap and black round balusters' },
+    transcend:       { post: 'white', rail: 'white', cap: 'white', fill: 'bal', shape: 'round',  color: 'black', desc: 'Trex Transcend white composite railing with black round balusters' },
+    selectwhite:     { post: 'white', rail: 'white', cap: null,    fill: 'bal', shape: 'square', color: 'white', desc: 'Trex Select white railing with white square balusters' },
+    aluminum:        { post: 'black', rail: 'black', cap: null,    fill: 'bal', shape: 'square', color: 'black', desc: 'black aluminum railing with black square balusters' },
+    'selectalum-bp': { post: 'wood',  rail: 'black', cap: null,    fill: 'bal', shape: 'square', color: 'black', desc: 'Trex Select black aluminum railing set between wood posts' },
+    sigalum:         { post: 'black', rail: 'black', cap: null,    fill: 'bal', shape: 'square', color: 'black', desc: 'Trex Signature black aluminum railing with black square balusters' },
+    'sigalum-bp':    { post: 'wood',  rail: 'black', cap: null,    fill: 'bal', shape: 'square', color: 'black', desc: 'Trex Signature black aluminum railing set between wood posts' },
+    ttalum:          { post: 'black', rail: 'black', cap: null,    fill: 'bal', shape: 'square', color: 'black', desc: 'TimberTech black aluminum railing with black square balusters' },
+    'tt-bp':         { post: 'wood',  rail: 'black', cap: null,    fill: 'bal', shape: 'square', color: 'black', desc: 'TimberTech railing set between wood posts' },
+    cable:           { post: 'black', rail: 'black', cap: null,    fill: 'cable', desc: 'TimberTech IRX black aluminum railing with stainless cable' },
+    ironrod:         { post: 'white', rail: 'white', cap: 'deck',  fill: 'rod', desc: 'white railing with a composite cap and horizontal iron rods' },
+  };
+  // The railing in use, with the infill picked in the design tool (S.infill) put in place of its own.
+  function railSpec(style = S.rail) {
+    const r = RAILS[style] || RAILS.hybrid, f = S.infill, base = r.desc.replace(/ (with|and) (black|white|2×2|stainless|horizontal)[^,;]*$/, '');
+    if (f === 'cable') return { ...r, fill: 'cable', desc: `${base} with stainless cable infill` };
+    if (f === 'rod') return { ...r, fill: 'rod', desc: `${base} with horizontal iron rods` };
+    if (f === 'black' || f === 'bronze') { const shape = r.fill === 'bal' && r.shape !== 'picket' ? r.shape : (r.rail === 'black' ? 'square' : 'round'); return { ...r, fill: 'bal', shape, color: f, desc: `${base} with ${f} ${shape} balusters` }; }
+    return r;
+  }
   function balusters(list, m, geo = balGeo) {
     if (!list.length) return;
     const im = new THREE.InstancedMesh(geo, m, list.length), mx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
@@ -1611,14 +1643,16 @@
   // Aluminum: slim black posts, rails and square balusters.
   function railRun(ax, az, bx, bz, ya, yb, { postA = true, postB = true, style = S.rail, H = 3 } = {}) {
     const len = Math.hypot(bx - ax, bz - az); if (len < 0.4) return;
-    const hyb = style === 'hybrid', white = M.railWhite(), blk = M.railBlack();
+    const sp = railSpec(style), white = M.railWhite(), blk = M.railBlack(), matOf = (k) => k === 'black' ? blk : k === 'wood' ? M.pt() : k === 'bronze' ? M.railBronze() : white;
+    const hyb = sp.post !== 'black', wide = sp.rail !== 'black', pm = matOf(sp.post), rm = matOf(sp.rail);
+    const capM = sp.cap === 'deck' ? M.cap() : sp.cap === 'wood' ? M.pt() : sp.cap === 'white' ? white : null;
     const ux = (bx - ax) / len, uz = (bz - az) / len;
     const posts = [];
     if (postA) posts.push(0); if (postB) posts.push(len);
     if (postA && postB && Math.abs(ya - yb) < 0.01) spread(0, len, RAIL_SECTION).slice(1, -1).forEach(t => posts.push(t));
     posts.forEach(t => {
       const x = ax + ux * t, z = az + uz * t, y = ya + (yb - ya) * t / len;
-      if (hyb) { B(0.42, H, 0.42, white, x, y + H / 2, z); B(0.52, 0.08, 0.52, M.cap(), x, y + H + 0.04, z); }
+      if (hyb) { B(0.42, H, 0.42, pm, x, y + H / 2, z); B(0.52, 0.08, 0.52, capM || pm, x, y + H + 0.04, z); }
       else { B(0.21, H + 0.05, 0.21, blk, x, y + (H + 0.05) / 2, z); B(0.27, 0.05, 0.27, blk, x, y + H + 0.07, z); B(0.32, 0.04, 0.32, blk, x, y + 0.02, z); }
     });
     const p1 = new THREE.Vector3(ax, ya, az), p2 = new THREE.Vector3(bx, yb, bz);
@@ -1628,14 +1662,19 @@
       mesh.rotation.order = 'YXZ'; mesh.rotation.y = Math.atan2(dx, dz); mesh.rotation.x = -Math.atan2(b.y - a.y, horiz);
     };
     let b0, b1, gap;
-    if (hyb) { bar(H - 0.17, 0.29, 0.26, white); bar(H + 0.04, 0.46, 0.08, M.cap()); bar(0.36, 0.29, 0.2, white); b0 = 0.46; b1 = H - 0.3; gap = 0.375; }
+    if (wide) { bar(H - 0.17, 0.29, 0.26, rm); if (capM) bar(H + 0.04, 0.46, 0.08, capM); bar(0.36, 0.29, 0.2, rm); b0 = 0.46; b1 = H - 0.3; gap = sp.shape === 'picket' ? 0.44 : 0.375; }
     else { bar(H - 0.08, 0.13, 0.16, blk); bar(0.3, 0.11, 0.12, blk); b0 = 0.36; b1 = H - 0.16; gap = 0.33; }
+    if (sp.fill === 'cable' || sp.fill === 'rod') {                 // horizontal: ten cables, or six iron rods
+      const k = sp.fill === 'cable' ? 10 : 6, th = sp.fill === 'cable' ? 0.022 : 0.05, m = sp.fill === 'cable' ? M.railCable() : blk;
+      for (let i = 1; i <= k; i++) bar(b0 + (b1 - b0) * i / (k + 1), th, th, m);
+      return;
+    }
     const list = [], n = Math.floor(len / gap);
     for (let i = 1; i < n; i++) {
       const t = i / n * len; if (posts.some(p => Math.abs(p - t) < (hyb ? 0.3 : 0.2))) continue;
       const y = ya + (yb - ya) * t / len; list.push([ax + ux * t, y + b0, y + b1, az + uz * t]);
     }
-    balusters(list, blk, hyb ? balGeo : balGeoSq);
+    balusters(list, matOf(sp.color), sp.shape === 'picket' ? balGeoPk : sp.shape === 'square' ? balGeoSq : balGeo);
   }
 
   // Horizontal composite skirting on the exposed edges of a raised floor.
@@ -2861,7 +2900,7 @@
       return `${s.w}×${s.d} ft ${s.mat === 'concrete' ? 'concrete' : 'paver'} patio`;
     });
     const deck = S.decking === 'pt' ? 'pressure-treated wood decking' : `${DECKING[S.decking].label} composite decking in ${COLORS.find(c => c.key === S.color).name}`;
-    const rail = S.rail === 'aluminum' ? 'black aluminum railing' : 'white railing with a composite cap and black round balusters';
+    const rail = railSpec().desc;
     return `${[...parts, ...extra].join(', ')}; ${deck}; ${rail}; ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()} trim and columns; ${house}; floor ${ftIn(S.H)} above grade`;
   }
   // ── The ChatGPT prompt: an exact, countable inventory of what is built ──────────────
@@ -2937,7 +2976,7 @@
     S.sections.filter(x => x.kind === 'patio').forEach(x => { const pw = patioWall(x); L.push(`NEW PATIO: ${x.w} × ${x.d} ft ${x.mat === 'concrete' ? 'concrete' : 'paver'} patio${pw ? `, raised ${ftIn(pw.H)} on a block retaining wall${pw.steps ? ` with ${pw.steps} block steps down` : ''}` : ''}.`); });
     // finishes
     const deck = S.decking === 'pt' ? 'pressure-treated wood (natural tan)' : `${DECKING[S.decking].label} composite in ${COLORS.find(c => c.key === S.color).name} (${colorWord(COLORS.find(c => c.key === S.color).hex)})`;
-    L.push(`FINISHES: decking and stair treads ${deck}; railing ${S.rail === 'aluminum' ? 'black aluminum with black square balusters' : 'white posts and rails with a composite top cap and black round balusters'}; porch trim, columns and frames ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()}; deck framing and posts natural pressure-treated wood.`);
+    L.push(`FINISHES: decking and stair treads ${deck}; railing ${railSpec().desc}; porch trim, columns and frames ${TRIMS.find(t => t.key === S.trim).name.toLowerCase()}; deck framing and posts natural pressure-treated wood.`);
     return L;
   }
   const RULES = `HARD RULES
