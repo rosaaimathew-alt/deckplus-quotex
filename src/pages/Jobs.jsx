@@ -15,7 +15,7 @@ import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel, noPermit
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
 import { jobPhaseOf, subStartedIds } from '../lib/jobPhase'
-import { useNav, useJobMoney, usePriceList } from '../nav'
+import { useNav, useJobMoney, usePriceList, useCanCloseJobs } from '../nav'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
 import { useJobCostOf } from '../lib/jobCost'
 import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'
@@ -1627,6 +1627,8 @@ function CloseOutModal({ proposal, onClose }) {
   // an older hand-entered total, which this close-out replaces.
   const costOf = useJobCostOf()
   const fin = costOf(proposal)
+  // A job is closed only once every payment is collected and entered (Money › Invoices / the job's payments)
+  const owed = Math.round((Number(fin.balanceDue) || 0) * 100) / 100
   const legacy = useStore(s => s.jobCosts?.[proposal.id])
   const legacyCost = ['materials', 'labor', 'subcontractors', 'other'].reduce((t, k) => t + (Number(legacy?.[k]) || 0), 0)
   const recordedCost = Math.max(0, fin.actualCost - legacyCost)
@@ -1642,6 +1644,7 @@ function CloseOutModal({ proposal, onClose }) {
   const onMargin = (v) => setProfit(revenue > 0 && v !== '' ? String(Math.round(revenue * (Number(v) || 0) / 100)) : '')
 
   const closeOut = async () => {
+    if (owed > 0) return
     setClosing(true); setError('')
     try {
       updateJobData(proposal.id, { completionDate, closedAt: new Date().toISOString() })
@@ -1735,9 +1738,14 @@ function CloseOutModal({ proposal, onClose }) {
 
           {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
+          {owed > 0 && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              Balance due <strong>${fmtDol(owed)}</strong> of ${fmtDol(fin.revenue)}. Collect it and enter the payment before closing the job.
+            </p>
+          )}
           <div className="flex gap-2 pt-1">
-            <button onClick={closeOut} disabled={closing}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors">
+            <button onClick={closeOut} disabled={closing || owed > 0}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[var(--brand-600)] text-white text-sm font-medium rounded-lg hover:bg-[var(--brand-700)] disabled:opacity-40 transition-colors">
               {closing ? 'Closing…' : <><CheckCheck size={15} /> Close Job</>}
             </button>
             <button onClick={() => onClose(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
@@ -1837,6 +1845,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const [noteText, setNoteText] = useState(proposal.jobData?.notes || '')
   const [showReminder, setShowReminder] = useState(false)
   const [showCloseOut, setShowCloseOut] = useState(false)
+  const canClose = useCanCloseJobs()   // only the person who closes jobs (and the owner)
   const [menuOpen, setMenuOpen] = useState(false)
   const permitAccess = usePermitAccess()
 
@@ -1987,10 +1996,10 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                     <Mail size={14} className="text-gray-400 shrink-0" /> Send payment reminder
                   </button>
-                  <button onClick={() => { setMenuOpen(false); setShowCloseOut(true) }}
+                  {canClose && <button onClick={() => { setMenuOpen(false); setShowCloseOut(true) }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                     <CheckCheck size={14} className="text-gray-400 shrink-0" /> Close out job
-                  </button>
+                  </button>}
                   {permitAccess === 'edit' && (
                     <button onClick={() => { setMenuOpen(false); updateJobData(proposal.id, { noPermit: !noPermit(proposal) }) }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
@@ -2140,7 +2149,12 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                               className="h-7 w-7 rounded-md border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:border-gray-300 disabled:opacity-30"><ChevronDown size={15} /></button>
                           </div>
                         ) : (
-                          <button onClick={() => toggleJobStage(proposal.id, stage.key)} className={`${row} ${done ? '' : 'hover:border-blue-200 hover:bg-blue-50'}`}>{inner}</button>
+                          stage.key === 'closed'
+                            // Closing goes through the close-out (every payment in), and only for the person who closes jobs
+                            ? <button onClick={() => { if (!canClose) return; if (done) toggleJobStage(proposal.id, 'closed'); else setShowCloseOut(true) }} disabled={!canClose}
+                                title={canClose ? (done ? 'Reopen the job' : 'Close out the job') : 'Closed by the office at close-out, once every payment is in'}
+                                className={`${row} ${done || !canClose ? '' : 'hover:border-blue-200 hover:bg-blue-50'} disabled:cursor-default`}>{inner}{!done && !canClose && <span className="text-xs font-semibold text-gray-400 shrink-0">Office</span>}</button>
+                            : <button onClick={() => toggleJobStage(proposal.id, stage.key)} className={`${row} ${done ? '' : 'hover:border-blue-200 hover:bg-blue-50'}`}>{inner}</button>
                         )}
                       </li>
                     )

@@ -205,7 +205,7 @@ function OfficeResultForm({ proposal, connected }) {
   const save = () => {
     updateJobData(proposal.id, { officeInspections: [...list, { ...f, id: `o${Date.now()}`, by: me?.displayName || me?.email || '' }] })
     setF(blank); setOpen(false)
-    // A passed final that finishes the job moves it to Closed jobs
+    // A passed final that finishes the job takes it off the board, ready for close-out
     if (f.code === 'FI') closeIfFinaled(proposal.id, useStore.getState)
   }
   const remove = (id) => updateJobData(proposal.id, { officeInspections: list.filter(o => o.id !== id) })
