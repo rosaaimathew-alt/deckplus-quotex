@@ -17,6 +17,7 @@ import { attentionItems, isJob, isJobClosed, contractStatusOf } from '../lib/att
 import { useJobCostOf } from '../lib/jobCost'
 import { booksIndex, jobMoneyFromIndex, jobIndex, invoiceStatus, invoiceBalance } from '../lib/books'
 import { jobPhaseOf, subStartedIds } from '../lib/jobPhase'
+import { getStages } from './Jobs'
 
 const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-US')
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
@@ -33,7 +34,10 @@ const PERIODS = [
 const SALES_STAGES = [
   ['Draft', 'Draft'], ['Sent', 'Sent'], ['Followed Up', 'Followed up'], ['Negotiating', 'Negotiating'],
 ]
-const JOB_PHASES = [['permitting', 'Permitting'], ['ready', 'Ready to start'], ['active', 'Active']]
+// 'setup': a job with no job type picked has no steps, so the app can't tell where
+// it stands (most jobs brought over from Knowify). Shown on its own line instead
+// of being counted as ready to start.
+const JOB_PHASES = [['permitting', 'Permitting'], ['ready', 'Ready to start'], ['active', 'Active'], ['setup', 'Needs a job type']]
 
 const minusYear = (d) => { const x = new Date(d); x.setFullYear(x.getFullYear() - 1); return x }
 
@@ -141,13 +145,19 @@ export default function OwnerHome({ pill = null }) {
   const idx = useMemo(() => booksIndex({ invoices, purchases, bills }), [invoices, purchases, bills])
   const started = useMemo(() => subStartedIds(subTasks), [subTasks])
   const openJobs = jobs.filter(p => !isJobClosed(p))
-  const phases = Object.fromEntries(JOB_PHASES.map(([k]) => [k, { n: 0, revenue: 0, unbilled: 0 }]))
-  let openRevenue = 0, toBill = 0
+  // Left to collect: the contract (with signed change orders) minus the payments
+  // received on the job. Not "contract minus invoices": Knowify invoiced whole
+  // contracts up front, so its jobs would all read as nothing left.
+  const phases = Object.fromEntries(JOB_PHASES.map(([k]) => [k, { n: 0, revenue: 0, left: 0 }]))
+  let openRevenue = 0, toCollect = 0
   for (const j of openJobs) {
     const m = jobMoneyFromIndex(j, idx)
-    openRevenue += m.revenue; toBill += m.unbilled
-    const ph = phases[jobPhaseOf(j, started)]
-    if (ph) { ph.n++; ph.revenue += m.revenue; ph.unbilled += m.unbilled }
+    const paid = (j.jobData?.paymentsReceived || []).reduce((t, pay) => t + (Number(pay.amount) || 0), 0)
+    const left = Math.max(0, m.revenue - paid)
+    openRevenue += m.revenue; toCollect += left
+    const phase = jobPhaseOf(j, started)
+    const ph = phases[phase !== 'active' && !(getStages(j) || []).length ? 'setup' : phase]
+    if (ph) { ph.n++; ph.revenue += m.revenue; ph.left += left }
   }
   const byId = useMemo(() => jobIndex(all), [all])
   let owed = 0, overdue = 0
@@ -198,7 +208,7 @@ export default function OwnerHome({ pill = null }) {
     ['Open pipeline', money(h.pipeline), plural(h.open.length, 'open quote'), '/sales?tab=pipeline'],
     ['Win rate', winRate, `${h.wonClients.length} of ${h.clients.length} clients`, '/insights?tab=winloss'],
     ['Average job', h.avgJob != null ? money(h.avgJob) : '—', 'per won job', '/insights?tab=overview'],
-    ['Open jobs', money(openRevenue), `${plural(openJobs.length, 'job')} · ${money(toBill)} to bill`, '/projects?tab=jobs'],
+    ['Open jobs', money(openRevenue), `${plural(openJobs.length, 'job')} · ${money(toCollect)} left to collect`, '/projects?tab=jobs'],
     ['Owed to us', money(owed), overdue ? `${money(overdue)} overdue` : 'nothing overdue', '/money?tab=invoices'],
   ]
 
@@ -258,9 +268,9 @@ export default function OwnerHome({ pill = null }) {
             foot={['Open', stageRows.reduce((s, r) => s + r.n, 0), money(stageRows.reduce((s, r) => s + r.value, 0))]} />
         </Panel>
         <Panel title="Open jobs" link="Open projects" onLink={() => navigate('/projects?tab=jobs')}>
-          <Table cols={[['Stage'], ['Jobs', 1], ['Contract', 1], ['To bill', 1]]}
-            rows={JOB_PHASES.map(([k, label]) => ({ cells: [label, phases[k].n, money(phases[k].revenue), money(phases[k].unbilled)], onClick: () => navigate('/projects?tab=jobs') }))}
-            foot={['Open', openJobs.length, money(openRevenue), money(toBill)]} />
+          <Table cols={[['Stage'], ['Jobs', 1], ['Contract', 1], ['Left to collect', 1]]}
+            rows={JOB_PHASES.filter(([k]) => k !== 'setup' || phases.setup.n > 0).map(([k, label]) => ({ cells: [label, phases[k].n, money(phases[k].revenue), money(phases[k].left)], onClick: () => navigate('/projects?tab=jobs') }))}
+            foot={['Open', openJobs.length, money(openRevenue), money(toCollect)]} />
           {jobAlerts.length > 0 && (
             <ul className="mt-3 bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
               {jobAlerts.map(a => (
