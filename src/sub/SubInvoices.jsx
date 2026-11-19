@@ -12,7 +12,7 @@ import { tr, getLang } from '../lib/lang'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Send, Paperclip, X, Check } from 'lucide-react'
 import { useStore } from '../store'
-import { submitSubDraw } from '../supabase'
+import { submitSubDraw, supabase } from '../supabase'
 import { DEMO } from '../demo'
 import { Card, BackButton, todayStr } from '../field/shared'
 import { DRAW_STATUS, money, round2, weekOf, remainingOn, agreedOf, newDrawId, WORK_TYPES, MAX_FILES, invoiceWindowOpen, nextInvoiceMonday, tradeOf, tradeEs, capped, canInvoice, invoiceFree, waitingOnAmount } from '../lib/subDraws'
@@ -58,6 +58,21 @@ function StatusPill({ d }) {
   return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${st.cls}`}>{st.label}</span>
 }
 
+// Monday–Wednesday, or later when the office opened it for this sub until a set time
+// (my_invoice_open_until; the database checks the same, supabase/sub_draws.sql).
+let openUntilAsk = null
+function useWindowOpen() {
+  const [until, setUntil] = useState(null)
+  useEffect(() => {
+    if (DEMO || !supabase) return
+    if (!openUntilAsk) openUntilAsk = supabase.rpc('my_invoice_open_until').then(({ data }) => data || null, () => null)
+    let live = true
+    openUntilAsk.then(u => { if (live) setUntil(u) })
+    return () => { live = false }
+  }, [])
+  return invoiceWindowOpen() || (!!until && new Date(until) > new Date())
+}
+
 // Outside Monday–Wednesday: when they can send next, instead of the button.
 function WindowClosed() {
   const next = new Date(`${nextInvoiceMonday()}T12:00:00`)
@@ -72,7 +87,8 @@ function WindowClosed() {
 
 function SendButton() {
   const navigate = useNavigate()
-  if (!invoiceWindowOpen()) return <WindowClosed />
+  const windowOpen = useWindowOpen()
+  if (!windowOpen) return <WindowClosed />
   return (
     <div className="space-y-1.5">
       <button onClick={() => navigate('/invoices/new')}
@@ -176,6 +192,7 @@ export function NewInvoiceScreen() {
   const orgId = useStore(s => s.orgId)
   const addSubDraw = useStore(s => s.addSubDraw)
   const jobs = useMemo(() => invoiceable(tasks, terms, draws, free), [tasks, terms, draws, free])
+  const windowOpen = useWindowOpen()
   const company = tasks.find(t => t.subName)?.subName || ''
   const [taskId, setTaskId] = useState(() => (jobs.length === 1 ? jobs[0].id : ''))
   const [date, setDate] = useState(todayStr())
@@ -230,7 +247,7 @@ export function NewInvoiceScreen() {
 
   const need = (k) => tried && missing[k] && <p className="text-sm text-red-600">This is a required question (Esta pregunta es obligatoria)</p>
 
-  if (!invoiceWindowOpen()) {
+  if (!windowOpen) {
     return (
       <div className="space-y-4">
         <BackButton />
