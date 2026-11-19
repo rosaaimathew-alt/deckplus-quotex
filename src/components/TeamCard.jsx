@@ -279,11 +279,21 @@ export function TeamCard() {
 // One person's switches. Ticked = they have it. Sections their department
 // doesn't include are greyed out (change their role for those). Saved as the
 // switched-off keys; the database enforces the money ones (permissions.sql).
+// The page each person opens to. '' = their department's usual page.
+const HOME_PAGES = [
+  ['', 'Their department’s usual page'],
+  ['owner', 'Owner: organization numbers, each sales rep, last year'],
+  ['office', 'Office: jump-in tiles and what’s overdue'],
+  ['permits', 'Permitting: permits, inspections and what’s due'],
+]
 function AccessPanel({ member, onClose }) {
   const plan = useStore(s => s.branding?.plan || 'enterprise')
   const allows = departmentAllows(plan, member.role)
   const groups = permissionGroups()
   const [off, setOff] = useState(() => ({ ...(member.permissions || {}) }))
+  const homePages = useStore(s => s.homePages) || {}
+  const setHomePage = useStore(s => s.setHomePage)
+  const [home, setHome] = useState(() => homePages[member.id] || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const name = member.displayName || member.email
@@ -294,6 +304,7 @@ function AccessPanel({ member, onClose }) {
     try {
       const r = await setMemberPermissions(member.id, off)
       const saved = r?.permissions || off
+      if ((homePages[member.id] || '') !== home) setHomePage(member.id, home)
       useStore.setState(s => ({ members: (s.members || []).map(x => x.id === member.id ? { ...x, permissions: saved } : x) }))
       onClose()
     } catch (e) { setError(e.message) }
@@ -306,6 +317,13 @@ function AccessPanel({ member, onClose }) {
         Untick what <b className="text-gray-700">{name}</b> shouldn't see. It disappears from their menu; money is also locked in the database.
         They'll see the change the next time they open the app.
       </p>
+      <label className="flex flex-wrap items-center gap-2 mb-3 text-gray-700">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Today page</span>
+        <select value={home} onChange={e => setHome(e.target.value)} aria-label={`Today page for ${name}`}
+          className="h-8 px-2 rounded-lg border border-gray-300 bg-white text-sm">
+          {HOME_PAGES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+        </select>
+      </label>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {groups.map(g => (
           <div key={g.label}>

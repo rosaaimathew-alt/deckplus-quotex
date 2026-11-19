@@ -45,13 +45,11 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
         className="no-print shrink-0 bg-white border-b sm:border-b-0 sm:border-r border-gray-200 flex sm:flex-col gap-1 p-2 sm:w-[96px] sm:sticky sm:top-0 sm:self-start sm:h-[calc(100dvh-3.5rem)]">
         {visible.map(t => {
           const on = t.key === current.key
-          const Icon = t.icon
           return (
             <button key={t.key} onClick={() => setActive(t.key)} aria-current={on ? 'page' : undefined} title={t.hint || t.label}
-              className={`relative flex-1 min-w-0 sm:flex-none sm:w-[80px] flex flex-col items-center gap-1 px-1 py-2.5 rounded-xl text-xs font-medium transition-colors ${
+              className={`relative flex-1 min-w-0 sm:flex-none sm:w-[80px] flex flex-col items-center gap-1 px-1 py-3 rounded-xl text-sm font-medium transition-colors ${
                 on ? 'bg-[var(--brand-50)] text-[var(--brand-700)]' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`}>
-              {Icon && <Icon size={24} strokeWidth={on ? 2.1 : 1.8} />}
               {t.label}
               {t.count ? <span className={`absolute top-1 right-2 text-[10px] font-bold rounded-full px-1.5 min-w-[18px] text-center ${t.countTone === 'alert' ? 'qx-badge' : 'bg-gray-100 text-gray-500'}`}>{t.count}</span> : null}
             </button>
@@ -78,13 +76,11 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
           <nav className="flex flex-wrap gap-x-1 mt-4 -mb-px" aria-label={`${title} views`}>
             {visible.map(t => {
               const on = t.key === current.key
-              const Icon = t.icon
               return (
                 <button key={t.key} onClick={() => setActive(t.key)} aria-current={on ? 'page' : undefined}
                   className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                     on ? 'border-[var(--brand-600)] text-[var(--brand-700)]' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
                   }`}>
-                  {Icon && <Icon size={15} className={`hidden sm:block ${on ? '' : 'opacity-70'}`} />}
                   {t.label}
                   {t.count ? (
                     <span className={`ml-0.5 text-[11px] font-semibold rounded-full px-1.5 min-w-[18px] text-center ${t.countTone === 'alert' ? 'qx-badge' : on ? 'bg-[var(--brand-100)] text-[var(--brand-700)]' : 'bg-gray-100 text-gray-500'}`}>{t.count}</span>
