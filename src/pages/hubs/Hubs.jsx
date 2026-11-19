@@ -3,7 +3,7 @@
 // themselves are unchanged; the destination decides which one is on screen,
 // counts what needs attention in each tab, and offers the one primary action.
 import { useMemo } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import Hub from '../../components/Hub'
 import { useNav } from '../../nav'
 import { useStore } from '../../store'
@@ -38,7 +38,8 @@ const withRender = (tabs, renderers, counts = {}) =>
 
 // ── Sales ────────────────────────────────────────────────────────────────────
 export function SalesHub() {
-  const { tabsOf } = useNav()
+  const { tabsOf, can } = useNav()
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const proposals = useStore(s => s.proposals)
   const status = params.get('status') || undefined
@@ -59,7 +60,9 @@ export function SalesHub() {
   const old = params.get('tab')
   if (old === 'clients') return <Navigate to={`/sales?tab=proposals${q ? `&q=${encodeURIComponent(q)}` : ''}`} replace />
   if (old === 'opens') return <Navigate to="/sales?tab=proposals&opens=1" replace />
-  return <Hub title="Sales" tabs={tabs} rememberKey="sales" />
+  return <Hub layout="views" title="Sales" tabs={tabs} rememberKey="sales" actions={can('/quote') && (
+    <button onClick={() => navigate('/quote')} className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)]">+ New quote</button>
+  )} />
 }
 
 // ── Projects ─────────────────────────────────────────────────────────────────
@@ -110,7 +113,7 @@ export function InsightsHub() {
     expenses: () => <Finance />,
   }, { profit: { count: pendingCosts } })
 
-  return <Hub title="Insights" tabs={tabs} rememberKey="insights" />
+  return <Hub layout="views" title="Insights" tabs={tabs} rememberKey="insights" />
 }
 
 // ── Money ────────────────────────────────────────────────────────────────────
@@ -161,5 +164,5 @@ export function CatalogHub() {
   })
   // AI edit used to be its own tab
   if (params.get('tab') === 'assistant') return <Navigate to="/catalog?tab=import&mode=ai" replace />
-  return <Hub title="Catalog" tabs={tabs} rememberKey="catalog" />
+  return <Hub layout="views" title="Catalog" tabs={tabs} rememberKey="catalog" />
 }

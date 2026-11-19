@@ -24,11 +24,12 @@ export const DESTINATIONS = [
   { key: 'sales', to: '/sales', label: 'Sales', icon: Handshake,
     hint: 'Proposals, pipeline and designs', keywords: 'proposal tracker crm quotes leads clients customers',
     tabs: [
-      { key: 'proposals', label: 'Proposals', icon: List, access: '/tracker', hint: 'Every client and quote, newest first, and who opened them', keywords: 'tracker quotes follow up reminder status revise contract clients customers contacts opens opened views' },
-      { key: 'pipeline',  label: 'Pipeline',  icon: Columns3, access: '/tracker', hint: 'Board by status', keywords: 'kanban board stages' },
-      { key: 'designs',   label: 'Designs',   icon: Ruler, access: '/tracker', hint: '3D renderings and floor plans', keywords: 'drawings floor plan rendering 3d 2d cad illustrator design' },
+      // Board first (the rebuild); keys stay, so saved switches and links still work
+      { key: 'pipeline',  label: 'Board',     icon: Columns3, access: '/tracker', hint: 'Every open quote by stage', keywords: 'kanban board stages pipeline' },
+      { key: 'proposals', label: 'List',      icon: List, access: '/tracker', hint: 'Every client and quote, newest first, and who opened them', keywords: 'proposals tracker quotes follow up reminder status revise contract clients customers contacts opens opened views list' },
       // Office / admin only: website bookings can't be read by anyone else
       { key: 'leads',     label: 'Leads',     icon: Users, access: '/leads', hint: 'Everyone who booked online, got a quote or had a job, to check before booking', keywords: 'master lead list double booked duplicate website calendar booking caller phone' },
+      { key: 'designs',   label: 'Designs',   icon: Ruler, access: '/tracker', hint: '3D renderings and floor plans', keywords: 'drawings floor plan rendering 3d 2d cad illustrator design' },
       // Contracts: sales prepares and sends them, managers and project managers
       // track signatures. Project managers see Sales with this tab only.
       { key: 'contracts', label: 'Contracts', icon: FileSignature, access: '/contracts', hint: 'Prepare, send and track signatures', keywords: 'sign signature agreement contract' },
