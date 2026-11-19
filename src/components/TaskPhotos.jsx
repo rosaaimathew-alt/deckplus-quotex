@@ -5,7 +5,7 @@ import { useRef, useState } from 'react'
 import { tr } from '../lib/lang'
 import { Camera, X, Loader2 } from 'lucide-react'
 import { useStore } from '../store'
-import { photosByDay, uploadTaskPhoto, usePhotoUrl } from '../lib/taskPhotos'
+import { photosByDay, uploadTaskPhoto, usePhotoUrl } from '../lib/taskPhotos'; import { notify } from '../lib/notify'
 
 const dayName = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
@@ -65,6 +65,8 @@ export function AddPhotosButton({ task, className = '', label = 'Take photos', o
     }
     setBusy(0)
     if (done) onAdded?.(done)
+    // the PM on the job hears about a sub's or technician's new photos (one alert per batch)
+    if (done && me?.role === 'sub') notify('photos', task.id, 4000)
   }
   return (
     <div className="space-y-1.5">
