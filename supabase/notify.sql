@@ -12,6 +12,7 @@
 --                        (the booking carries only its own trade's results: src/lib/subInspections.js)
 --   assigned             the sub company's PM, or staff     the technician / painter put on the job
 --   done                 the sub or the technician          the Deck Plus PM on the job
+--   photos               the sub or the technician          the Deck Plus PM on the job (new job photos)
 --   invoice_submitted    the sub                            office and admin (those who get alert emails)
 --   invoice_decision     office / admin                     the sub
 --   message              whoever wrote it (job chat)        the other side: the sub's manager, or the PM on the job
@@ -131,7 +132,7 @@ begin
   end if;
 
   -- ── Bookings ───────────────────────────────────────────────────────────────
-  if p_kind not in ('booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done') then return null; end if;
+  if p_kind not in ('booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'photos') then return null; end if;
   select * into t from public.sub_tasks where org_id = my_org and id = p_id and deleted_at is null;
   if not found then return null; end if;
   is_paint := coalesce((t.data->>'paint')::boolean, false);
@@ -140,7 +141,7 @@ begin
   if p_kind in ('booked', 'changed', 'inspection', 'inspection_result') and not staff then return null; end if;
   -- ("is not distinct from": a booking with nobody on it has no crew_id, and a plain = would be unknown, not false)
   if p_kind = 'assigned' and not (staff or t.owner_id is not distinct from uid) then return null; end if;
-  if p_kind = 'done' and not (t.owner_id is not distinct from uid or t.crew_id is not distinct from uid) then return null; end if;
+  if p_kind in ('done', 'photos') and not (t.owner_id is not distinct from uid or t.crew_id is not distinct from uid) then return null; end if;
 
   select * into s from public.subcontractors where org_id = my_org and id = (t.data->>'subId') and deleted_at is null;
   select * into pm from public.org_members where org_id = my_org and user_id = t.pm_id;
@@ -150,7 +151,7 @@ begin
   select x into crew from jsonb_array_elements(case when jsonb_typeof(s.data->'crew') = 'array' then s.data->'crew' else '[]'::jsonb end) x
     where x->>'userId' = t.crew_id::text limit 1;
 
-  if p_kind = 'done' then
+  if p_kind in ('done', 'photos') then
     if pm.user_id is not null and coalesce(pm.email, '') <> '' and pm.user_id <> uid then
       who := jsonb_build_array(jsonb_build_object('name', pm.display_name, 'email', pm.email, 'phone', pm.phone));
     end if;
@@ -175,6 +176,10 @@ begin
     'by', jsonb_build_object('id', me.user_id, 'name', me.display_name, 'email', me.email),
     'sender', sender,
     'senderIsStaff', (p_kind in ('booked', 'changed', 'inspection', 'inspection_result') and pm.user_id is not null) or staff,
+    -- photos added to this booking in the last quarter hour (the alert counts them)
+    -- (only for that alert, and only stamps that read as a date, so the other alerts can never trip on one)
+    'newPhotos', case when p_kind <> 'photos' then 0 else (select count(*) from jsonb_array_elements(case when jsonb_typeof(t.data->'photos') = 'array' then t.data->'photos' else '[]'::jsonb end) x
+                  where x->>'at' ~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}' and (x->>'at')::timestamptz > now() - interval '15 minutes') end,
     'task', jsonb_build_object(
       'id', t.id, 'proposalId', t.data->>'proposalId', 'title', t.data->>'title', 'client', t.data->>'client', 'address', t.data->>'address',
       'startDate', t.data->>'startDate', 'endDate', t.data->>'endDate', 'inspectionDate', t.data->>'inspectionDate',

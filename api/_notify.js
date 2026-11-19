@@ -17,6 +17,7 @@
  *                                    result never goes to the carpenters), in the PM's name
  *   assigned                       → the technician put on the job
  *   done                           → the Deck Plus PM on the job
+ *   photos                         → the Deck Plus PM on the job (a sub or technician added job photos)
  *   invoice_submitted              → the office      invoice_decision → the sub
  *   message (job chat)             → the other side of that conversation: the sub's manager,
  *                                    or the Deck Plus PM on the job
@@ -30,9 +31,10 @@ import { getKV } from './_kv.js'
 
 const TEAL = '#1d758b'
 const ORANGE = '#ea7a24'
-export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message', 'todo_assigned']
+export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message', 'todo_assigned', 'photos']
 const CHAT_QUIET_SECONDS = 300   // a back-and-forth emails each side at most once every five minutes per job
 const QUIET_SECONDS = 60   // the same alert about the same booking is not repeated inside a minute
+const PHOTO_QUIET_SECONDS = 600   // new photos on a booking: one alert per 10 minutes, however many batches
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const tidy = (s, max = 120) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -150,6 +152,16 @@ export function messageFor(info) {
       sms: `Deck Plus: ${by} completed ${tidy(t.title, 40)}, ${tidy(t.client, 40)}.`,
       path: t.proposalId ? `/field/job/${encodeURIComponent(t.proposalId)}` : '/field', cta: 'Open the job',
     }
+    case 'photos': {
+      const k = Math.max(1, Number(info.newPhotos) || 1), what = k === 1 ? 'a photo' : `${k} photos`
+      return {
+        subject: `New photos: ${job}`,
+        en: `${by}${t.subName && t.subName !== by ? ` (${tidy(t.subName, 60)})` : ''} added ${what} to ${tidy(t.title)} at ${at}.`,
+        es: null,
+        sms: `Deck Plus: ${by} added ${what} to ${tidy(t.title, 40)}, ${tidy(t.client, 40)}.`,
+        path: t.proposalId ? `/field/job/${encodeURIComponent(t.proposalId)}` : '/field', cta: 'See the photos',
+      }
+    }
     case 'invoice_submitted': return {
       subject: `Sub invoice: ${tidy(d.subName, 60) || by} · ${money(d.total)}`,
       en: `${tidy(d.subName, 60) || by} sent an invoice for ${money(d.total)}${d.weekOf ? ` (week of ${dayText(d.weekOf)})` : ''}. It is waiting for you under Money › Bills.`,
@@ -238,7 +250,7 @@ export function mailSenderFor(kind, info, people, orgId = null, popupOnly = new 
   const sender = info?.sender || {}
   const kept = (email) => popupOnly.has(String(email || '').toLowerCase())
   if (info?.senderIsStaff && sender.id) return kept(sender.email) ? { orgId } : { orgId, userId: sender.id, email: sender.email }
-  const toPm = ['done', 'message'].includes(kind) ? (people || [])[0] : null
+  const toPm = ['done', 'message', 'photos'].includes(kind) ? (people || [])[0] : null
   return toPm?.email && !kept(toPm.email) ? { orgId, email: toPm.email } : { orgId }
 }
 
@@ -267,7 +279,7 @@ export async function sendNotification(req, res, body) {
   try {
     const kv = await getKV()
     if (await kv.get(quietKey)) return res.status(200).json({ sent: false, reason: 'Already sent a moment ago.' })
-    await kv.set(quietKey, { at: Date.now() }, { ex: kind === 'message' ? CHAT_QUIET_SECONDS : QUIET_SECONDS })
+    await kv.set(quietKey, { at: Date.now() }, { ex: kind === 'message' ? CHAT_QUIET_SECONDS : kind === 'photos' ? PHOTO_QUIET_SECONDS : QUIET_SECONDS })
   } catch { /* storage hiccup: better a repeat than no alert */ }
 
   const host = req.headers?.host || 'www.deckplus.app'
