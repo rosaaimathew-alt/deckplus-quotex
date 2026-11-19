@@ -281,12 +281,16 @@ export const countyFinaled = (proposal) =>
   (proposal.countyPermit?.permits || []).some(p => p.role === 'building' && /closed|final/i.test(p.recordStatus || p.status || ''))
 
 // ── Finished jobs ────────────────────────────────────────────────────────────
-// A job is done with inspections when the building final has passed and every
-// county permit on it is finished too: its own final passed, or the county
-// shows it finaled / complete. Such a job leaves the board and moves to
-// Closed in Job Management (see closeIfFinaled).
+// A job is done with inspections when the COUNTY shows every permit on it
+// finished: the building permit's own final passed (or the county shows it
+// finaled / complete), every trade permit finished too, and nothing still
+// scheduled on any of them. Such a job leaves the board and moves to Closed in
+// Job Management (see closeIfFinaled). A result the office typed in never
+// closes a job by itself (it may say "passed" with work still owed): the PM
+// closes those.
 const PERMIT_DONE = /closed|complete|finaled|^final|c\.?c\.? issued/i
 function permitFinished(permit) {
+  if ((permit.upcoming || []).length) return false
   if (PERMIT_DONE.test(permit.recordStatus || permit.status || '')) return true
   return (permit.completed || []).some(i => i.code === 'FI' && isPassResult(i.result))
 }
@@ -296,7 +300,9 @@ export function allFinalsPassed(proposal) {
   const fi = boardCells(proposal).FI
   if (fi?.state !== 'pass') return ''
   const county = (proposal.countyPermit?.permits || []).filter(p => !p.manual)
-  if (!county.every(permitFinished)) return ''
+  // the county's own building permit has to be there and finished (an
+  // electrical final alone, or an office entry, is not the building final)
+  if (!county.some(p => p.role !== 'trade') || !county.every(permitFinished)) return ''
   let last = fi.date || ''
   for (const p of allPermits(proposal)) {
     for (const i of p.completed || []) if (i.code === 'FI' && isPassResult(i.result) && (i.date || '') > last) last = i.date
