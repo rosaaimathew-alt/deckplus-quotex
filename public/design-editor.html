@@ -843,11 +843,13 @@
   const svg = $('plan'), NS = 'http://www.w3.org/2000/svg';
   let vb = { x: -22, z: -6, w: 50 };     // view box in feet (height follows the aspect)
   let tool = 'select', draft = null;     // draft: points while drawing a deck
-  function vbH() { const r = svg.getBoundingClientRect(); return vb.w * (r.height / Math.max(1, r.width)); }
+  // EXPORT: the plan being drawn for the design sheet (its own scale and size, no grid or handles)
+  let EXPORT = null;
+  function vbH() { if (EXPORT) return EXPORT.h; const r = svg.getBoundingClientRect(); return vb.w * (r.height / Math.max(1, r.width)); }
   function toFt(ev) { const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; const p = pt.matrixTransform(svg.getScreenCTM().inverse()); return [p.x, p.y]; }
   const el = (tag, attrs, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); (parent || svg).appendChild(n); return n; };
   const ptsAttr = (pts) => pts.map(p => p.map(v => v.toFixed(3)).join(',')).join(' ');
-  const px = () => vb.w / Math.max(1, svg.getBoundingClientRect().width);   // feet per screen pixel
+  const px = () => EXPORT ? EXPORT.P : vb.w / Math.max(1, svg.getBoundingClientRect().width);   // feet per screen pixel (per point on the sheet)
 
   function drawPlan() {
     migrateStairs();
@@ -858,8 +860,8 @@
     const P = px();
     // grid: 1′ fine, 5′ bold
     const g = el('g', {});
-    for (let x = Math.floor(vb.x); x <= vb.x + vb.w; x++) el('line', { x1: x, y1: vb.z, x2: x, y2: vb.z + h, stroke: x % 5 ? 'var(--grid)' : 'var(--grid2)', 'stroke-width': P * (x % 5 ? 1 : 1.4) }, g);
-    for (let z = Math.floor(vb.z); z <= vb.z + h; z++) el('line', { x1: vb.x, y1: z, x2: vb.x + vb.w, y2: z, stroke: z % 5 ? 'var(--grid)' : 'var(--grid2)', 'stroke-width': P * (z % 5 ? 1 : 1.4) }, g);
+    if (!EXPORT) for (let x = Math.floor(vb.x); x <= vb.x + vb.w; x++) el('line', { x1: x, y1: vb.z, x2: x, y2: vb.z + h, stroke: x % 5 ? 'var(--grid)' : 'var(--grid2)', 'stroke-width': P * (x % 5 ? 1 : 1.4) }, g);
+    if (!EXPORT) for (let z = Math.floor(vb.z); z <= vb.z + h; z++) el('line', { x1: vb.x, y1: z, x2: vb.x + vb.w, y2: z, stroke: z % 5 ? 'var(--grid)' : 'var(--grid2)', 'stroke-width': P * (z % 5 ? 1 : 1.4) }, g);
     // house
     el('rect', { x: vb.x, y: Math.min(vb.z, -40), width: vb.w, height: Math.max(0, -Math.min(vb.z, -40)), fill: '#ffffff' });
     { const d0 = el('defs', {}), pat = el('pattern', { id: 'hatch', patternUnits: 'userSpaceOnUse', width: P * 7, height: P * 7, patternTransform: 'rotate(45)' }, d0);
@@ -872,7 +874,7 @@
       const H = S.house, W = H.wallWidthFt || 44;
       [-1, 1].forEach(sd => el('line', { x1: sd * W / 2, y1: -40, x2: sd * W / 2, y2: 0, stroke: '#8e8c86', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}` }));
       let x = -W / 2;
-      const grab = !CUSTOMER;
+      const grab = !CUSTOMER && !EXPORT;
       (H.segments || []).forEach((g, si) => {
         const w = Number(g.widthFt) || 0, out = Number(g.outFt) || 0;
         if (out > 0.5) {
@@ -1196,7 +1198,7 @@
     }
     const defs = el('defs', {}); const m = el('marker', { id: 'arrow', viewBox: '0 0 6 6', refX: 5, refY: 3, markerWidth: 6, markerHeight: 6, orient: 'auto' }, defs); el('path', { d: 'M0 0L6 3L0 6Z', fill: '#1a1c38' }, m);
     // selection handles
-    const e = byId(sel);
+    const e = EXPORT ? null : byId(sel);
     if (e) {
       const pts = polyOf(e), hs = P * 9;
       el('polygon', { points: ptsAttr(pts), fill: 'none', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 6} ${P * 4}`, 'pointer-events': 'none' });
@@ -1227,8 +1229,8 @@
       el('circle', { cx: hx, cy: hz, r: hs * 0.75, fill: '#1d758b', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'rot', style: 'cursor:grab' });
       }
     }
-    if (edgeHover && tool === 'bump') { const bp = bumpPts(edgeHover); if (bp) el('polyline', { points: ptsAttr(bp), fill: 'rgba(29,117,139,.14)', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}`, 'pointer-events': 'none' }); }
-    if (edgeHover && tool === 'addpt' && !drag) {
+    if (edgeHover && tool === 'bump' && !EXPORT) { const bp = bumpPts(edgeHover); if (bp) el('polyline', { points: ptsAttr(bp), fill: 'rgba(29,117,139,.14)', stroke: '#1d758b', 'stroke-width': P * 2, 'stroke-dasharray': `${P * 5} ${P * 3}`, 'pointer-events': 'none' }); }
+    if (edgeHover && tool === 'addpt' && !drag && !EXPORT) {
       const h = edgeHover, g = el('g', { 'pointer-events': 'none' }), lab = (x, z, t) => { const w = t.length * P * 6.6 + P * 8;
         el('rect', { x: x - w / 2, y: z - P * 9, width: w, height: P * 18, rx: P * 4, fill: '#1d758b' }, g);
         el('text', { x, y: z + P * 4, 'font-size': P * 11, 'text-anchor': 'middle', fill: '#fff', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 600 }, g).textContent = t; };
@@ -2034,7 +2036,7 @@
     // Floor plan on the design sheet, drawn from this same design
     window.addEventListener('message', (ev) => {
       if (ev.source !== frame.contentWindow || ev.data?.type !== 'qx-plan') return;
-      const { svg: sv, w, h, label, action } = ev.data, fname = `deckplus-plan-${new Date().toISOString().slice(0, 10)}.svg`;
+      const { w, h, label, action, place } = ev.data, sv = place ? ev.data.svg.replace(/<g id="drawing">[\s\S]*?<\/g><g id="project-info">/, () => `<g id="drawing">${planForSheet(place)}</g><g id="project-info">`) : ev.data.svg, fname = `deckplus-plan-${new Date().toISOString().slice(0, 10)}.svg`;
       if (action === 'svg') {
         const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + sv], { type: 'image/svg+xml' })); a.download = fname; document.body.appendChild(a); a.click(); a.remove();
         return;
@@ -2043,6 +2045,21 @@
       const win = window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
       if (!win) alert(`Allow pop-ups to print. Print at 100% (Actual size) on ${label} to keep the scale.`);
     });
+    // The plan exactly as drawn here (framing too when Framing is on), at the sheet's scale, for
+    // the design sheet: no grid (the sheet has its dots), no handles or selection.
+    function planForSheet(pl) {
+      const keep = { vb: { ...vb }, sel, edgeHover, draft };
+      sel = null; edgeHover = null; draft = null;
+      Object.assign(vb, { x: pl.xo, z: pl.zo, w: pl.GW });
+      EXPORT = { P: 0.55 / pl.PX, h: pl.GH };
+      let inner = '';
+      try { drawPlan(); inner = svg.innerHTML; }
+      finally { EXPORT = null; Object.assign(vb, keep.vb); sel = keep.sel; edgeHover = keep.edgeHover; draft = keep.draft; drawPlan(); }
+      inner = inner.replace(/ (data-h|data-hd|data-id)="[^"]*"/g, '').replace(/ style="cursor:[^"]*"/g, '').replace(/var\(--[a-z0-9-]+\)/g, '#d9dde3');
+      const W = pl.GW * pl.PX, H = pl.GH * pl.PX;
+      return `<clipPath id="qx-plan-area"><rect x="${pl.x0}" y="${pl.y0}" width="${W}" height="${H}"/></clipPath>`
+        + `<g clip-path="url(#qx-plan-area)" font-family="Helvetica, Arial, sans-serif"><g transform="translate(${(pl.x0 - pl.xo * pl.PX).toFixed(3)} ${(pl.y0 - pl.zo * pl.PX).toFixed(3)}) scale(${pl.PX})">${inner}</g></g>`;
+    }
     const askPlan = (action) => { clearTimeout(sendT); if (!frame?.contentWindow || !OPTS) return; frame.contentWindow.postMessage(renderModel(), '*'); frame.contentWindow.postMessage({ type: 'qx-plan-request', sheet: $('sheet').value, action }, '*'); };
     $('b-print').addEventListener('click', () => askPlan('print'));
     // Whether the design goes on the customer's proposal link (saved with the design).
