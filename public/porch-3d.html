@@ -830,7 +830,7 @@
     });
     (S.free?.plats || []).forEach(p => { const xs = p.pts.map(q => q[0]), zs = p.pts.map(q => q[1]); notes.push(`${p.kind === 'landing' ? 'Landing' : 'Deck'} ${Math.round(Math.max(...xs) - Math.min(...xs))}′×${Math.round(Math.max(...zs) - Math.min(...zs))}′, ${fmtFt(p.h)} high`); });
     (S.free?.stairs || []).forEach(st => { if (st.top - st.bottom > 0.3) notes.push(`  Stairs ${st.n - 1} treads, ${fmtFt(st.top)} to ${st.foot ? fmtFt(st.bottom) + ' landing' : 'grade'}${st.boxed ? ', boxed' : ''}`); });
-    (S.free?.wraps || []).forEach(w => notes.push(`  Corner steps ${w.n - 1} treads, ${fmtFt(w.top)} to grade, ${w.w[0]}′ + ${w.w[1]}′ around the corner`));
+    (S.free?.wraps || []).forEach(w => notes.push(`  Steps ${w.n - 1} treads, ${fmtFt(w.top)} to grade, ${w.len}′ along the deck, around ${w.corners === 1 ? 'the corner' : w.corners + ' corners'}`));
     notes.push(`Decking: ${dk}. Floor ${fmtFt(S.H)} above grade.`);
     notes.push(`Railing: ${railSpec().desc}; equal sections, 8′ max.`);
     return notes;
@@ -1067,8 +1067,8 @@
     (S.free?.wraps || []).forEach(w => {
       const outer = w.levels[w.levels.length - 1]; if (!outer) return;
       poly(outer, 'stairs-box');
-      w.levels.slice(0, -1).forEach(lv => { line(lv[1][0], lv[1][1], lv[2][0], lv[2][1], 'tread'); line(lv[2][0], lv[2][1], lv[3][0], lv[3][1], 'tread'); });
-      line(outer[5][0], outer[5][1], outer[2][0], outer[2][1], 'tread');
+      (w.treads || []).forEach(tl => tl.forEach((q, i) => { if (i) line(tl[i - 1][0], tl[i - 1][1], q[0], q[1], 'tread'); }));
+      (w.mitres || []).forEach(([a, b]) => line(a[0], a[1], b[0], b[1], 'tread'));
     });
     (S.free?.stairs || []).forEach(st => {
       if (st.top - st.bottom < 0.3) return;
@@ -2881,7 +2881,7 @@
       ...plats.map(p => { const xs = p.pts.map(q => q[0]), zs = p.pts.map(q => q[1]), w = Math.round(Math.max(...xs) - Math.min(...xs)), d = Math.round(Math.max(...zs) - Math.min(...zs)), sk = p.skirt || S.skirt;
         return `${w}×${d} ft ${p.kind === 'landing' ? 'stair landing' : 'deck'} ${ftIn(p.h)} above grade${sk && sk !== 'none' ? ` with ${SK[sk]}` : ''}`; }),
       ...(free.stairs || []).filter(st => st.top - st.bottom > 0.3).map(st => `${st.w} ft wide stairs with ${st.n - 1} treads${st.boxed ? ', boxed sides' : ''}`),
-      ...(free.wraps || []).map(w => `box steps with ${w.n - 1} treads wrapping around a corner of the deck`),
+      ...(free.wraps || []).map(w => `box steps with ${w.n - 1} treads wrapping around ${w.corners === 1 ? 'a corner' : w.corners + ' corners'} of the deck`),
     ];
     const hs = HS(), house = hs ? [
       `${hs.stories}-story house${hs.walkout ? ' over a walkout basement' : ''}, ${hs.wallWidthFt} ft wide`,
@@ -2972,7 +2972,7 @@
       L.push(`NEW ${q.kind === 'landing' ? 'STAIR LANDING' : 'DECK'}: ${w} ft × ${d} ft, ${ftIn(q.h)} above grade, on square wood posts with concrete footings${sk && sk !== 'none' ? `, ${sk === 'lattice' ? 'stained square-grid lattice' : sk === 'pt' ? 'stained wood board' : 'horizontal composite board'} skirting` : ''}.`);
     });
     (S.free?.stairs || []).filter(st => st.top - st.bottom > 0.3).forEach(st => L.push(`NEW STAIRS: ${nWord(st.n - 1, 'tread', 'treads')}, ${st.w} ft wide${st.boxed ? ', boxed sides' : ', open stringers'}${st.n >= 4 ? ', railing on both sides' : ''}, landing on ${st.foot ? 'a landing' : 'a small concrete pad'}.`));
-    (S.free?.wraps || []).forEach(w => L.push(`NEW CORNER STEPS: ${nWord(w.n - 1, 'tread', 'treads')} of box steps wrapping around a corner of the deck, ${w.w[0]} ft along one side and ${w.w[1]} ft along the other, down to grade.`));
+    (S.free?.wraps || []).forEach(w => L.push(`NEW STEPS: ${nWord(w.n - 1, 'tread', 'treads')} of box steps, ${w.len} ft along the deck, wrapping around ${w.corners === 1 ? 'a corner' : w.corners + ' corners'} of the deck, down to grade.`));
     S.sections.filter(x => x.kind === 'patio').forEach(x => { const pw = patioWall(x); L.push(`NEW PATIO: ${x.w} × ${x.d} ft ${x.mat === 'concrete' ? 'concrete' : 'paver'} patio${pw ? `, raised ${ftIn(pw.H)} on a block retaining wall${pw.steps ? ` with ${pw.steps} block steps down` : ''}` : ''}.`); });
     // finishes
     const deck = S.decking === 'pt' ? 'pressure-treated wood (natural tan)' : `${DECKING[S.decking].label} composite in ${COLORS.find(c => c.key === S.color).name} (${colorWord(COLORS.find(c => c.key === S.color).hex)})`;

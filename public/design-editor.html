@@ -220,7 +220,6 @@
     <div class="tgrp">
       <button type="button" data-add="deck" title="Add a deck"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 9h16M4 13h16M4 17h16"/></svg><span>Deck</span></button>
       <button type="button" data-add="stairs" title="Add stairs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4v-4h4v-4h4V8h4"/><path d="M4 20V4"/></svg><span>Stairs</span></button>
-      <button type="button" data-add="cornersteps" title="Add steps that wrap around a deck corner"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h9v9H4z"/><path d="M13 4h3.5v12.5H4V13"/><path d="M16.5 4H20v16H4v-3.5"/></svg><span>Corner steps</span></button>
       <button type="button" data-add="landing" title="Add a landing"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M12 18v3M9 21h6"/></svg><span>Landing</span></button>
       <button type="button" data-add="porch" title="Add a porch or sunroom"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-6 9 6"/><path d="M5 10v10M19 10v10M9 20v-6h6v6M3 20h18"/></svg><span>Porch</span></button>
       <button type="button" data-add="patio" title="Add a patio"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="1"/><path d="M3 11h18M3 15h18M9 7v4M15 11v4M9 15v4"/></svg><span>Patio</span></button>
@@ -650,19 +649,75 @@
     }); });
     return best;
   }
-  const cornerInfo = (e) => nearestCorner(e.x, e.z, 0.35);
-  const cornerW = (e, c) => [Math.min(Math.max(1, Number(e.w) || 4), c.L1), Math.min(Math.max(1, Number(e.w2 ?? e.w) || 4), c.L2)];
-  // The steps' outline d feet out from the deck (the tread edge at that distance): out from one
-  // side, around the corner, and back in to the other side.
-  function cornerPoly(c, e, d) {
-    const [w1, w2] = cornerW(e, c), q = c.q;
-    const p0 = [q[0] + c.u1[0] * w1, q[1] + c.u1[1] * w1], p4 = [q[0] + c.u2[0] * w2, q[1] + c.u2[1] * w2];
-    return [p0, [p0[0] + c.n1[0] * d, p0[1] + c.n1[1] * d], [q[0] + c.mt[0] * d, q[1] + c.mt[1] * d], [p4[0] + c.n2[0] * d, p4[1] + c.n2[1] * d], p4, [...q]];
+  // ── Stairs that wrap a corner ────────────────────────────────────────────────
+  // A stair is a stretch of a deck's edge (its width) with steps going out from it. Stretch it
+  // past a corner that can take steps (cornerAt: both sides open, pointing out) and it carries
+  // on along the next side, the treads mitred around the corner, like a deck wrapping it. At
+  // the house, or an inside corner, it stops at the corner. A stair turned by hand stays straight.
+  // Distances along the outline are measured from pts[0], all the way round (P).
+  function outlineOf(pts) {
+    const n = pts.length, L = edges(pts).map(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1])), cum = [0];
+    L.forEach(l => cum.push(cum[cum.length - 1] + l));
+    const P = cum[n], k = (j) => ((j % n) + n) % n, start = (j) => cum[k(j)] + Math.floor(j / n) * P;
+    return { pts, n, L, P, k, start, end: (j) => start(j) + L[k(j)] };
+  }
+  function alongOutline(o, x, z) {           // → { j (side), s (distance round the outline) }
+    let best = null;
+    edges(o.pts).forEach(([a, b], j) => { const p = projSeg(x, z, a, b); if (!best || p.d < best.d) best = { j, s: o.start(j) + p.t * p.len, d: p.d }; });
+    return best;
+  }
+  function pointOn(o, s) { const t = ((s % o.P) + o.P) % o.P; let j = 0; while (j < o.n - 1 && t > o.start(j + 1)) j++;
+    const a = o.pts[j], b = o.pts[(j + 1) % o.n], f = o.L[j] ? (t - o.start(j)) / o.L[j] : 0; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; }
+  // How far the stair whose middle is at s on side j can reach before a corner it cannot wrap.
+  function wrapLimits(o, j) {
+    let f = j, g = j;
+    while (f - j < o.n - 1 && cornerAt(o.pts, o.k(f + 1))) f++;
+    while (j - g < o.n - 1 - (f - j) && cornerAt(o.pts, o.k(g))) g--;
+    return { lo: o.start(g), hi: o.end(f) };
+  }
+  // The stair laid along its deck: its sides (segs) and the corners between them. Only when it
+  // wraps at least one corner; otherwise null and it is an ordinary straight stair.
+  function stairRun(e) {
+    if (e.type !== 'stairs' || e.of != null || e.manual) return null;
+    const h = edgeHost(e); if (!h) return null;
+    const pts = polyOf(h.el), o = outlineOf(pts), m = alongOutline(o, e.x, e.z), lim = wrapLimits(o, m.j);
+    const w = Math.max(1, Number(e.w) || 4), lo = Math.max(lim.lo, m.s - w / 2), hi = Math.min(lim.hi, m.s + w / 2);
+    if (lo >= o.start(m.j) - 0.01 && hi <= o.end(m.j) + 0.01) return null;          // within one side
+    const segs = [], corners = [];
+    let j0 = m.j; while (o.start(j0) > lo + 0.01) j0--;
+    for (let j = j0; o.start(j) < hi - 0.01; j++) {
+      const from = Math.max(lo, o.start(j)), to = Math.min(hi, o.end(j)); if (to - from < 0.01) continue;
+      const a = pts[o.k(j)], b = pts[o.k(j + 1)], L = o.L[o.k(j)], u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+      let nx = -u[1], nz = u[0]; if (inPoly((a[0] + b[0]) / 2 + nx * 0.05, (a[1] + b[1]) / 2 + nz * 0.05, pts)) { nx = -nx; nz = -nz; }
+      if (segs.length) corners.push(cornerAt(pts, o.k(j)));
+      segs.push({ i: o.k(j), a: pointOn(o, from), b: pointOn(o, to), n: [nx, nz], u, len: to - from });
+    }
+    if (segs.length < 2) return null;
+    return { host: h.el, pts, o, segs, corners, lo, hi, len: hi - lo };
+  }
+  // The stair's outline d feet out from the deck: along each side, mitred at each corner.
+  function runOut(r, d) {
+    const f = r.segs[0], l = r.segs[r.segs.length - 1];
+    return [[f.a[0] + f.n[0] * d, f.a[1] + f.n[1] * d], ...r.corners.map(c => [c.q[0] + c.mt[0] * d, c.q[1] + c.mt[1] * d]), [l.b[0] + l.n[0] * d, l.b[1] + l.n[1] * d]];
+  }
+  const runDeck = (r) => [r.segs[0].a, ...r.corners.map(c => c.q), r.segs[r.segs.length - 1].b];
+  const runPoly = (r, d) => [...runOut(r, d), ...runDeck(r).reverse()];
+  // Steps made with the "Corner steps" tool (one release, removed): the same stair, stretched round the corner.
+  function migrateStairs() {
+    S.els.forEach(e => {
+      if (!e.corner) return;
+      const c = nearestCorner(e.x, e.z, 0.35), w1 = Number(e.w) || 4, w2 = Number(e.w2 ?? e.w) || 4;
+      delete e.corner; delete e.w2; e.manual = false; e.boxed = true;
+      if (!c) return;
+      const o = outlineOf(polyOf(c.el)), i = o.pts.findIndex(q => q === c.q || (q[0] === c.q[0] && q[1] === c.q[1]));
+      const mid = pointOn(o, o.start(i) + (w2 - w1) / 2); e.x = mid[0]; e.z = mid[1]; e.w = w1 + w2;
+    });
   }
   function stairInfo(e) {
-    if (e.corner) {                 // corner steps: down to grade, all the way around
-      const c = cornerInfo(e), top = c ? elH(c.el) : 3, n = Math.max(1, Math.ceil(top / RISE_MAX));
-      return { host: c ? { el: c.el } : null, top, bottom: 0, n, rise: top / n, len: (n - 1) * RUN, foot: null, corner: c };
+    const run = stairRun(e);
+    if (run) {                      // wrapping a corner: steps down to grade all the way along
+      const top = elH(run.host), n = Math.max(1, Math.ceil(top / RISE_MAX));
+      return { host: { el: run.host }, top, bottom: 0, n, rise: top / n, len: (n - 1) * RUN, foot: null, run };
     }
     if (e.of != null) {             // a porch's steps or a raised patio's block steps (built by the 3D engine)
       const o = byId(e.of), top = o ? elH(o) : 3, n = Math.max(1, e.n || Math.ceil(top / RISE_MAX)), len = (n - 1) * (e.run || RUN);
@@ -692,7 +747,7 @@
     });
   }
   function stairFootprint(e) {
-    if (e.corner) { const i = stairInfo(e); return i.corner ? cornerPoly(i.corner, e, Math.max(i.len, 0.6)) : [[e.x - 1.5, e.z - 1.5], [e.x + 1.5, e.z - 1.5], [e.x + 1.5, e.z + 1.5], [e.x - 1.5, e.z + 1.5]]; }
+    { const i = stairInfo(e); if (i.run) return runPoly(i.run, Math.max(i.len, 0.6)); }
     const info = stairInfo(e), c = Math.cos(rad(e.rot)), s = Math.sin(rad(e.rot)), hw = e.w / 2, L = Math.max(info.len, 0.6);
     return [[-hw, 0], [hw, 0], [hw, L], [-hw, L]].map(([u, v]) => [e.x + u * c + v * s, e.z - u * s + v * c]);
   }
@@ -749,6 +804,7 @@
   const px = () => vb.w / Math.max(1, svg.getBoundingClientRect().width);   // feet per screen pixel
 
   function drawPlan() {
+    migrateStairs();
     const h = vbH();
     const zp = $('z-pct'); if (zp) zp.textContent = Math.round(5000 / vb.w) + '%';
     svg.setAttribute('viewBox', `${vb.x} ${vb.z} ${vb.w} ${h}`);
@@ -1036,16 +1092,29 @@
         t2.textContent = `${fmt(e.h)} high${e.type === 'landing' ? ` · ${fmt(e.w)} × ${fmt(e.d)}` : ''}`;
         // edge lengths
         if (e.id === sel || e.type === 'deck') edgeLabels(pts, e);
-      } else if (e.corner) {
-        const info = stairInfo(e), c = info.corner, pts = stairFootprint(e);
-        el('polygon', { points: ptsAttr(pts), fill: '#ffffff', stroke: '#1a1c38', 'stroke-width': P * 2, ...(c ? {} : { 'stroke-dasharray': `${P * 5} ${P * 3}` }) }, grp);
-        const label = (x, z, txt, col = '#1a1c38') => { el('text', { x, y: z, 'font-size': P * 11, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: col, 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 600 }, grp).textContent = txt; };
-        if (c) {
-          for (let k = 1; k < info.n - 1; k++) el('polyline', { points: ptsAttr(cornerPoly(c, e, k * RUN).slice(1, 4)), fill: 'none', stroke: '#1a1c38', 'stroke-width': P * 1 }, grp);
-          const far = pts[2], ml = Math.hypot(c.mt[0], c.mt[1]) || 1;
-          el('line', { x1: c.q[0], y1: c.q[1], x2: far[0], y2: far[1], stroke: '#1a1c38', 'stroke-width': P * 1 }, grp);       // the mitre
-          label(far[0] + c.mt[0] / ml * 1.3, far[1] + c.mt[1] / ml * 1.3, `DN ${info.n - 1} treads`);
-        } else label(e.x, e.z, 'Drag onto a deck corner', '#b03a2e');
+      } else if (stairInfo(e).run) {
+        // a stair stretched round a corner: treads mitred at each corner; in Framing, its framing
+        const info = stairInfo(e), r = info.run, D = Math.max(info.len, 0.6), pts = runPoly(r, D);
+        el('polygon', { points: ptsAttr(pts), fill: '#ffffff', stroke: '#1a1c38', 'stroke-width': P * 2 }, grp);
+        for (let k = 1; k < info.n - 1; k++) el('polyline', { points: ptsAttr(runOut(r, k * RUN)), fill: 'none', stroke: '#1a1c38', 'stroke-width': P * 1 }, grp);
+        const outer = runOut(r, D);
+        r.corners.forEach((c, k) => el('line', { x1: c.q[0], y1: c.q[1], x2: outer[k + 1][0], y2: outer[k + 1][1], stroke: '#1a1c38', 'stroke-width': P * 1 }, grp));
+        if (FRAME) {
+          const fg = el('g', { 'pointer-events': 'none' }, grp), JL = '#2f6fd1';
+          // a hip at each corner, a rim along the outside, and step joists 16″ o.c. out from the deck, cut to the hip
+          r.corners.forEach((c, k) => [-0.06, 0.06].forEach(o2 => el('line', { x1: c.q[0] + c.mt[1] * o2, y1: c.q[1] - c.mt[0] * o2, x2: outer[k + 1][0] + c.mt[1] * o2, y2: outer[k + 1][1] - c.mt[0] * o2, stroke: JL, 'stroke-width': P * 1.3 }, fg)));
+          el('polyline', { points: ptsAttr(runOut(r, D - 0.12)), fill: 'none', stroke: JL, 'stroke-width': P * 1.4 }, fg);
+          const hits = (p0, n, c) => { if (!c) return Infinity; const den = n[0] * c.mt[1] - n[1] * c.mt[0]; if (Math.abs(den) < 1e-6) return Infinity;
+            const t = ((c.q[0] - p0[0]) * c.mt[1] - (c.q[1] - p0[1]) * c.mt[0]) / den; return t > 0.01 ? t : Infinity; };
+          r.segs.forEach((g, k) => { for (let t = 16 / 12; t < g.len - 0.1; t += 16 / 12) {
+            const p0 = [g.a[0] + g.u[0] * t, g.a[1] + g.u[1] * t], L = Math.min(D - 0.12, hits(p0, g.n, r.corners[k - 1]), hits(p0, g.n, r.corners[k]));
+            el('line', { x1: p0[0], y1: p0[1], x2: p0[0] + g.n[0] * L, y2: p0[1] + g.n[1] * L, stroke: '#8fb2e8', 'stroke-width': P * 0.9 }, fg); } });
+          const c0 = r.corners[0], o0 = outer[1];
+          tag((c0.q[0] + o0[0]) / 2 + c0.mt[1] * 0.9, (c0.q[1] + o0[1]) / 2 - c0.mt[0] * 0.9, 'Step hip', '#0f766e');
+        }
+        const far = outer[1], c0 = r.corners[0], ml = Math.hypot(c0.mt[0], c0.mt[1]) || 1;
+        const t = el('text', { x: far[0] + c0.mt[0] / ml * 1.3, y: far[1] + c0.mt[1] / ml * 1.3, 'font-size': P * 11, 'text-anchor': 'middle', 'dominant-baseline': 'middle', fill: '#1a1c38', 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': 600 }, grp);
+        t.textContent = `DN ${info.n - 1} treads`;
       } else {
         const info = stairInfo(e), pts = stairFootprint(e);
         el('polygon', { points: ptsAttr(pts), fill: '#ffffff', stroke: '#1a1c38', 'stroke-width': P * 2 }, grp);
@@ -1097,6 +1166,8 @@
         const [, b, c2] = rectPts(e);
         el('rect', { x: c2[0] - hs / 2, y: c2[1] - hs / 2, width: hs, height: hs, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': 'size', style: 'cursor:nwse-resize' });
       }
+      if (e.type === 'stairs' && e.of == null) stairEnds(e).forEach((q, k) =>
+        el('rect', { x: q[0] - hs * 0.4, y: q[1] - hs * 0.4, width: hs * 0.8, height: hs * 0.8, fill: '#fff', stroke: '#1d758b', 'stroke-width': P * 2, 'data-h': `se${k}`, style: 'cursor:ew-resize' }));
       if (e.type === 'porch' && PDOOR[e.id] && !CUSTOMER) {
         const dr = doorPts(e, PDOOR[e.id]);
         el('circle', { cx: dr.c[0], cy: dr.c[1], r: hs * 0.62, fill: '#b03a2e', stroke: '#fff', 'stroke-width': P * 2, 'data-h': 'door', style: 'cursor:grab' });
@@ -1106,7 +1177,7 @@
       }
       // rotation handle: beyond the element in its facing direction
       const [cx, cz] = e.type === 'stairs' ? [e.x, e.z] : centroid(pts);
-      if (e.type !== 'porch' && e.type !== 'patio' && e.of == null && !e.corner) {
+      if (e.type !== 'porch' && e.type !== 'patio' && e.of == null && !stairRun(e)) {
       const ang = e.type === 'deck' ? 180 : (e.rot || 0), reach = e.type === 'stairs' ? -2.2 : Math.max(...pts.map(p => Math.hypot(p[0] - cx, p[1] - cz))) + 1.6;
       const hx = cx + Math.sin(rad(ang)) * reach, hz = cz + Math.cos(rad(ang)) * reach;
       el('line', { x1: cx, y1: cz, x2: hx, y2: hz, stroke: '#1d758b', 'stroke-width': P * 1.2, 'pointer-events': 'none' });
@@ -1163,6 +1234,27 @@
     const out = e.pts.filter((q, i, a) => { const r = a[(i + 1) % a.length]; return Math.hypot(q[0] - r[0], q[1] - r[1]) > 0.05; });
     if (out.length >= 3) e.pts = out;
   }
+  // The two ends of a stair's top (on the deck edge).
+  function stairEnds(e) {
+    const r = stairRun(e); if (r) return [r.segs[0].a, r.segs[r.segs.length - 1].b];
+    const c = Math.cos(rad(e.rot)), s2 = Math.sin(rad(e.rot)), hw = (Number(e.w) || 4) / 2;
+    return [[e.x - hw * c, e.z + hw * s2], [e.x + hw * c, e.z - hw * s2]];
+  }
+  // Drag one end: the other stays put. On a deck edge it follows the outline, round any corner
+  // the steps can wrap; a stair turned by hand stretches along its own top.
+  function stretchStair(d, x, z) {
+    const e = d.e;
+    if (d.o) {
+      const o = d.o, g = alongOutline(o, x, z).s, room = d.lim.hi - d.lim.lo;
+      const reach = (from, dir) => { const t = (((dir > 0 ? g - from : from - g) % o.P) + o.P) % o.P; return t > room ? (t - room < o.P - t ? room : 3) : t; };
+      const w = Math.max(3, snapV(d.k ? Math.min(reach(d.lo, 1), d.lim.hi - d.lo) : Math.min(reach(d.hi, -1), d.hi - d.lim.lo)));
+      const mid = d.k ? d.lo + w / 2 : d.hi - w / 2, q = pointOn(o, mid);
+      e.w = w; e.x = q[0]; e.z = q[1]; if (!e.manual) snapStairs(e);
+    } else {
+      const F = d.fixed, dx = x - F[0], dz = z - F[1], ux = d.dir[0], uz = d.dir[1], w = Math.max(3, snapV(dx * ux + dz * uz));
+      e.w = w; e.x = F[0] + ux * w / 2; e.z = F[1] + uz * w / 2;
+    }
+  }
   function hitElement(x, z) {
     const st = S.els.filter(e => e.type === 'stairs' && inPoly(x, z, stairFootprint(e)));
     if (st.length) return st[st.length - 1];
@@ -1172,7 +1264,6 @@
   }
   // Snap a stair's top onto the nearest deck/landing edge; unless rotated by hand, face it straight out.
   function snapStairs(e) {
-    if (e.corner) { const c = nearestCorner(e.x, e.z, 5); if (c) { e.x = c.q[0]; e.z = c.q[1]; } return; }
     let best = null;
     S.els.forEach(o => { if (!stairHost(o)) return; const pts = polyOf(o); edges(pts).forEach(([a, b]) => { const p = projSeg(e.x, e.z, a, b); if (p.d < 1.6 && p.z > -0.01 && !(Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05) && (!best || p.d < best.d)) best = { ...p, a, b, pts }; }); });
     if (!best) return;
@@ -1209,6 +1300,14 @@
       else if (h === 'size') drag = { kind: 'size', e };
       else if (h === 'door') drag = { kind: 'door', e };
       else if (h === 'box') drag = { kind: 'box', e, x0: e.x - e.w / 2 };
+      else if (h === 'se0' || h === 'se1') {
+        const k = +h[2], host = !e.manual && edgeHost(e), ends = stairEnds(e);
+        if (host) { const o = outlineOf(polyOf(host.el)), m = alongOutline(o, e.x, e.z), w = Number(e.w) || 4;
+          const lo = m.s - w / 2, hi = m.s + w / 2, M = ends[k], dist = (q) => Math.hypot(q[0] - M[0], q[1] - M[1]);
+          // which end of the stretch round the outline this handle is (the outline may run either way)
+          drag = { kind: 'stairEnd', e, k: dist(pointOn(o, hi)) <= dist(pointOn(o, lo)) ? 1 : 0, o, lim: wrapLimits(o, m.j), lo, hi }; }
+        else { const F = ends[1 - k], M = ends[k], L = Math.hypot(M[0] - F[0], M[1] - F[1]) || 1; drag = { kind: 'stairEnd', e, k, fixed: F, dir: [(M[0] - F[0]) / L, (M[1] - F[1]) / L] }; }
+      }
       else if (h[0] === 'v') {
         // two quick presses on the same point take it out (the browser's own double-click is
         // lost here: the plan is redrawn between the two)
@@ -1270,6 +1369,7 @@
       e.pts[drag.j] = [drag.b0[0] + drag.n[0] * d, Math.max(0, drag.b0[1] + drag.n[1] * d)];
       drag.riders.forEach(r => { r.o.x = r.x + drag.n[0] * d; r.o.z = r.z + drag.n[1] * d; });
     }
+    if (drag.kind === 'stairEnd') stretchStair(drag, x, z);
     if (drag.kind === 'vertex') { const n = e.pts.length, q = snapCorner(x, z, e.pts[(drag.i + n - 1) % n], e.pts[(drag.i + 1) % n], ev.altKey); e.pts[drag.i] = [q[0], Math.max(0, q[1])]; }
     if (drag.kind === 'box') { e.w = Math.max(6, Math.round(x - drag.x0)); e.x = drag.x0 + e.w / 2; e.d = Math.max(4, Math.round(z - e.z)); }
     if (drag.kind === 'size') {
@@ -1321,7 +1421,7 @@
       H.segments[i - 1].widthFt = a + d; H.segments[i + 1].widthFt = b - d;
     }
   }
-  const endDrag = () => { if (!drag) return; if (drag.kind === 'house' && S.house?.segments) S.house.segments = S.house.segments.filter(g => (Number(g.widthFt) || 0) > 0.05); if (['move', 'box'].includes(drag.kind)) { snapToBump(drag.e); fitPorch(drag.e); } if (['vertex', 'edge'].includes(drag.kind)) tidyPts(drag.e); S.els.forEach(o => { if (o.corner && !cornerInfo(o)) snapStairs(o); }); drag = null; commit(); changed(); };
+  const endDrag = () => { if (!drag) return; if (drag.kind === 'house' && S.house?.segments) S.house.segments = S.house.segments.filter(g => (Number(g.widthFt) || 0) > 0.05); if (['move', 'box'].includes(drag.kind)) { snapToBump(drag.e); fitPorch(drag.e); } if (['vertex', 'edge'].includes(drag.kind)) tidyPts(drag.e); if (drag.kind === 'stairEnd') { const r = stairRun(drag.e); if (r) { const q = pointOn(r.o, (r.lo + r.hi) / 2); Object.assign(drag.e, { w: snapV(r.len), x: q[0], z: q[1] }); } } drag = null; commit(); changed(); };
   svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag);
   svg.addEventListener('dblclick', (ev) => {
     if (tool === 'poly' && draft && draft.pts.length >= 3) { const e = { id: nextId++, type: 'deck', h: 3, pts: draft.pts }; S.els.push(e); sel = e.id; draft = null; setTool('select'); commit(); changed(); }
@@ -1350,12 +1450,6 @@
     if (t === 'deck') e = { id: nextId++, type: 'deck', h: 3, pts: [[cx - 6, cz - 5], [cx + 6, cz - 5], [cx + 6, cz + 5], [cx - 6, cz + 5]] };
     if (t === 'landing') e = { id: nextId++, type: 'landing', h: 1.5, x: cx, z: cz, w: LANDING_DEF, d: LANDING_DEF, rot: 0 };
     if (t === 'stairs') { e = { id: nextId++, type: 'stairs', x: cx, z: cz, rot: 0, w: 4 }; snapStairs(e); }
-    if (t === 'cornersteps') {       // on the nearest free corner of the selected deck, else of any deck
-      const d = byId(sel), taken = (q) => S.els.some(o => o.corner && Math.hypot(o.x - q[0], o.z - q[1]) < 0.35);
-      const own = d && stairHost(d) ? polyOf(d).map((q, i) => cornerAt(polyOf(d), i)).filter(c => c && !taken(c.q)).sort((p, q) => q.q[1] - p.q[1])[0] : null;
-      const c = own || nearestCorner(cx, cz);
-      e = { id: nextId++, type: 'stairs', corner: true, x: c ? c.q[0] : cx, z: c ? c.q[1] : cz, rot: 0, w: 4, w2: 4 };
-    }
     if (t === 'porch') e = { id: nextId++, type: 'porch', x: cx, z: 0, w: 14, d: 12, ...PORCH_DEF };
     if (t === 'patio') e = { id: nextId++, type: 'patio', x: cx, z: Math.max(2, cz - 6), w: 16, d: 12, mat: 'pavers', wallH: 0, wallLen: 0 };
     S.els.push(e); sel = e.id; setTool('select'); commit(); changed();
@@ -1592,8 +1686,6 @@
   const normRot = (v) => ((v % 360) + 540) % 360 - 180;
   function stairTool(e, act) {
     if (act.startsWith('rot:')) { e.rot = normRot(e.rot + Number(act.slice(4))); e.manual = true; }
-    else if (act === 'wrap') { const c = nearestCorner(e.x, e.z); if (!c) { alert('There is no open deck corner for the steps to wrap.'); return; } e.corner = true; e.w2 = e.w; e.x = c.q[0]; e.z = c.q[1]; }
-    else if (act === 'unwrap') { const c = cornerInfo(e); delete e.corner; delete e.w2; e.manual = false; if (c) { e.x = c.q[0] + c.u2[0] * Math.min(c.L2 / 2, e.w / 2 + 0.5); e.z = c.q[1] + c.u2[1] * Math.min(c.L2 / 2, e.w / 2 + 0.5); } snapStairs(e); }
     else if (act === 'corner') {
       // Nearest corner of a deck/landing; the run heads out between its two edges.
       let best = null;
@@ -1686,14 +1778,13 @@
     } else if (e.of != null) {
       const i = stairInfo(e), o = byId(e.of);
       h = `<b>${o?.type === 'patio' ? 'Patio block steps' : 'Porch steps'}</b>${o?.type === 'porch' ? pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '') : ''}<label>Steps<span class="ro">${i.n - 1} treads · from ${fmt(i.top)}</span></label><span class="ro" style="align-self:center">Sits at the ${o?.type === 'patio' ? 'patio front' : 'porch door'} · Delete removes it</span>`;
-    } else if (e.corner) {
-      const i = stairInfo(e);
-      h = `<b>Corner steps</b>${num('w', 'Along one side', e.w, 0.5, 1)}${num('w2', 'Along the other', e.w2 ?? e.w, 0.5, 1)}<label>From → to<span class="ro">${fmt(i.top)} → grade</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label><span class="ro" style="align-self:center">${i.corner ? 'Drag to move to another corner' : 'Drag onto a deck corner'}</span>`
-        + `<span class="hrow"><button type="button" class="ghost-btn" data-st="unwrap">Make straight stairs</button></span>`;
+    } else if (stairInfo(e).run) {
+      const i = stairInfo(e), k = i.run.corners.length;
+      h = `<b>Stairs</b>${num('w', 'Width along the deck', e.w, 0.5, 3)}<label>From → to<span class="ro">${fmt(i.top)} → grade</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label><span class="ro" style="align-self:center">Box steps around ${k === 1 ? 'the corner' : k + ' corners'} · drag an end to stretch or shorten</span>`;
     } else {
       const i = stairInfo(e);
       h = `<b>Stairs</b>${num('rot', 'Angle°', e.rot, 45, -180)}${num('w', 'Width', e.w, 0.5, 3)}${pick('boxed', 'Sides', [['', 'Open stringers'], ['1', 'Boxed']], e.boxed ? '1' : '')}<label>From → to<span class="ro">${fmt(i.top)} → ${i.foot ? 'landing ' + fmt(i.bottom) : 'grade'}</span></label><label>Steps<span class="ro">${i.n} risers · ${(i.rise * 12).toFixed(1)}″ rise · ${i.n - 1} treads</span></label>${e.manual ? '<button type="button" id="b-square">Square to edge</button>' : ''}`
-        + `<span class="hrow"><span class="ro">Turn</span><button type="button" class="ghost-btn" data-st="rot:90" title="Turn 90° counter-clockwise">↺ 90°</button><button type="button" class="ghost-btn" data-st="rot:45">↺ 45°</button><button type="button" class="ghost-btn" data-st="rot:-45">↻ 45°</button><button type="button" class="ghost-btn" data-st="rot:-90" title="Turn 90° clockwise">↻ 90°</button><button type="button" class="ghost-btn" data-st="corner">Off nearest corner</button><button type="button" class="ghost-btn" data-st="wrap">Wrap the corner</button></span>`
+        + `<span class="hrow"><span class="ro">Turn</span><button type="button" class="ghost-btn" data-st="rot:90" title="Turn 90° counter-clockwise">↺ 90°</button><button type="button" class="ghost-btn" data-st="rot:45">↺ 45°</button><button type="button" class="ghost-btn" data-st="rot:-45">↻ 45°</button><button type="button" class="ghost-btn" data-st="rot:-90" title="Turn 90° clockwise">↻ 90°</button><button type="button" class="ghost-btn" data-st="corner">Off nearest corner</button></span>`
         + `<span class="hrow"><span class="ro">Landing partway down, then</span><button type="button" class="ghost-btn" data-st="land:straight">Straight</button><button type="button" class="ghost-btn" data-st="land:left">Turn left</button><button type="button" class="ghost-btn" data-st="land:right">Turn right</button></span>`;
     }
     p.innerHTML = h; p.hidden = false; bindHouse(p);
@@ -1747,14 +1838,15 @@
   }
   const subtract = (a, b, cuts) => { let parts = [[a, b]]; cuts.forEach(([c, d]) => { parts = parts.flatMap(([p, q]) => (d <= p || c >= q) ? [[p, q]] : [[p, Math.max(p, c)], [Math.min(q, d), q]]); }); return parts.filter(([p, q]) => q - p > .3); };
   function renderModel() {
+    migrateStairs();
     const plats = [], stairs = [], wraps = [];
     const stairCuts = (a, b) => {
       const cuts = [];
       S.els.filter(x => x.type === 'stairs' && x.of == null).forEach(st => {
-        if (st.corner) {              // corner steps: no railing along the part of each side they cover
-          const c = stairInfo(st).corner; if (!c) return;
-          const L = Math.hypot(b[0] - a[0], b[1] - a[1]), same = (p, r) => Math.hypot(p[0] - r[0], p[1] - r[1]) < 0.1, [w1, w2] = cornerW(st, c);
-          if (same(b, c.q) && same(a, c.a)) cuts.push([L - w1 + .1, L + 1]); else if (same(a, c.q) && same(b, c.b)) cuts.push([-1, w2 - .1]);
+        const r = stairRun(st);
+        if (r) {                       // round a corner: no railing along any part of a side it covers
+          const same = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.05;
+          r.segs.forEach(g => { if (same(a, r.pts[g.i]) && same(b, r.pts[(g.i + 1) % r.pts.length])) { const d0 = Math.hypot(g.a[0] - a[0], g.a[1] - a[1]), d1 = Math.hypot(g.b[0] - a[0], g.b[1] - a[1]); cuts.push([Math.min(d0, d1) - .1, Math.max(d0, d1) + .1]); } });
           return;
         }
         const p = projSeg(st.x, st.z, a, b); if (p.d < .35) cuts.push([p.t * p.len - st.w / 2 + .1, p.t * p.len + st.w / 2 - .1]);
@@ -1789,7 +1881,9 @@
       plats.push({ pts, h, edges: eds, posts: fr.length ? fr.flatMap(r => r.posts) : posts, beams, houseSpan, skirt: e.skirt || null });
     });
     S.els.filter(e => e.type === 'stairs' && e.of == null).forEach(e => { const i = stairInfo(e);
-      if (e.corner) { if (i.corner && i.n > 1) wraps.push({ top: i.top, bottom: 0, n: i.n, rise: i.rise, w: cornerW(e, i.corner), levels: Array.from({ length: i.n - 1 }, (_, k) => cornerPoly(i.corner, e, (k + 1) * RUN)) }); return; }
+      if (i.run) { const r = i.run; if (i.n > 1) wraps.push({ top: i.top, bottom: 0, n: i.n, rise: i.rise, len: Math.round(r.len * 2) / 2, corners: r.corners.length,
+        levels: Array.from({ length: i.n - 1 }, (_, k) => runPoly(r, (k + 1) * RUN)), treads: Array.from({ length: Math.max(0, i.n - 2) }, (_, k) => runOut(r, (k + 1) * RUN)),
+        mitres: r.corners.map((c, k) => [c.q, runOut(r, i.len)[k + 1]]) }); return; }
       stairs.push({ x: e.x, z: e.z, rot: e.rot, w: e.w, top: i.top, bottom: i.bottom, n: i.n, rise: i.rise, foot: !!i.foot, boxed: !!e.boxed }); });
     const sections = [];
     S.els.forEach(e => {
@@ -1808,6 +1902,7 @@
   // and landings. Porches: everything the Porch Builder prices (size, type, roof, tie,
   // floor and height, walls, door wall, steps and landing).
   function takeoff() {
+    migrateStairs();
     const m = renderModel(), r1 = (v) => Math.round(v * 10) / 10;
     const flat = S.els.filter(e => e.type === 'deck' || e.type === 'landing');
     const segL = (r) => Math.hypot(r[2] - r[0], r[3] - r[1]);
@@ -1821,8 +1916,8 @@
       return { id: e.id, h: r1(Number(e.h) || 0), rect, width: r1(Math.max(...xs) - Math.min(...xs)), depth: r1(Math.max(...zs) - Math.min(...zs)),
         area: Math.round(area), railLF: Math.round(M.rail), openLF: Math.round(M.open), house: M.house, transitions: transitionsOf(e).length, border: e.border === '1' || e.border === '2' ? e.border : 'none' };
     });
-    const stairs = S.els.filter(e => e.type === 'stairs' && e.of == null && !(e.corner && !stairInfo(e).corner)).map(e => { const i = stairInfo(e);
-      if (e.corner) { const [w1, w2] = cornerW(e, i.corner); return { id: e.id, from: i.host?.el.id ?? null, to: 'grade', across: r1(w1 + w2), steps: i.n, boxed: true, corner: true }; }
+    const stairs = S.els.filter(e => e.type === 'stairs' && e.of == null).map(e => { const i = stairInfo(e);
+      if (i.run) return { id: e.id, from: i.host.el.id, to: 'grade', across: r1(i.run.len), steps: i.n, boxed: true, wraps: i.run.corners.length };
       return { id: e.id, from: i.host?.el.id ?? null, to: i.foot ? i.foot.id : 'grade', across: r1(Number(e.w) || 4), steps: i.n, boxed: !!e.boxed }; });
     const landings = S.els.filter(e => e.type === 'landing').map(e => ({ id: e.id, width: r1(e.w), depth: r1(e.d), h: r1(Number(e.h) || 0) }));
     const porches = S.els.filter(e => e.type === 'porch').map(e => ({ id: e.id, w: e.w, d: e.d, ptype: e.ptype, tie: e.tie, roof: e.roof,
