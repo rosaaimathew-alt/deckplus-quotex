@@ -42,9 +42,17 @@ begin
   new.owner_id    = case when new.data->>'subUserId' ~ '^[0-9a-f-]{36}$' then (new.data->>'subUserId')::uuid end;
   new.proposal_id = new.data->>'proposalId';
   new.sub_id      = new.data->>'subId';
-  -- a message is short text; nothing else rides along
-  if length(coalesce(new.data->>'text', '')) = 0 or length(new.data->>'text') > 2000 then
-    raise exception 'A message needs some text (up to 2000 characters)' using errcode = '22023';
+  -- a message is short text, photos, or both. Photos (up to 6) are stored with
+  -- that sub's booking photos at <org>/<booking>/chat/<id>.jpg (sub_photos.sql
+  -- decides who can open them); nothing else rides along.
+  if new.data ? 'photos' and (jsonb_typeof(new.data->'photos') <> 'array' or jsonb_array_length(new.data->'photos') > 6
+     or exists (select 1 from jsonb_array_elements(new.data->'photos') ph
+                where coalesce(ph->>'path', '') !~ ('^' || new.org_id::text || '/[^/]+/chat/[a-z0-9]+\.jpg$'))) then
+    raise exception 'Up to 6 photos, stored with the job' using errcode = '22023';
+  end if;
+  if (length(coalesce(new.data->>'text', '')) = 0 and coalesce(jsonb_array_length(case when jsonb_typeof(new.data->'photos') = 'array' then new.data->'photos' end), 0) = 0)
+     or length(coalesce(new.data->>'text', '')) > 2000 then
+    raise exception 'A message needs some text (up to 2000 characters) or a photo' using errcode = '22023';
   end if;
   return new;
 end $$;

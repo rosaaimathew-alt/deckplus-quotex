@@ -61,6 +61,20 @@ export async function uploadTaskPhoto({ orgId, task, file, by }) {
   return { ...entry, path }
 }
 
+// A photo sent in the job chat (components/JobChat), either way between the
+// Deck Plus PM and the sub. Kept with that sub's booking photos, at
+// <org>/<booking>/chat/<id>.jpg, so the same people can open it.
+export async function uploadChatPhoto({ orgId, taskId, file }) {
+  const blob = await shrink(file)
+  const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  if (DEMO || !supabase) return { id, dataUrl: await blobToDataUrl(blob) }
+  if (!orgId || !taskId) throw new Error('Not signed in to a company yet. Reload and try again.')
+  const path = `${orgId}/${taskId}/chat/${id}.jpg`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false })
+  if (error) throw new Error(/fetch|network/i.test(error.message) ? 'No signal: the photo did not upload. Try again when you have service.' : error.message)
+  return { id, path }
+}
+
 // A sub's invoice file (lib/subDraws): a photo of the paper invoice, or the
 // PDF itself. Stored next to that job's photos (same bucket, same access) at
 // <org>/<task>/invoices/<id>.<jpg|pdf>. Photos are shrunk but kept large
