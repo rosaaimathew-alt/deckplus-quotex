@@ -157,3 +157,15 @@ export function usePhotoUrl(photo) {
   if (!path) return null
   return _urls.get(path) || (got?.path === path ? got.url : null)
 }
+
+// The same viewable link, outside React (printing): the data URL, a link already
+// fetched this visit, or a fresh 12-hour signed link. null when there is none.
+export async function photoUrl(photo) {
+  if (photo?.dataUrl) return photo.dataUrl
+  const path = photo?.path
+  if (!path || !supabase) return null
+  if (_urls.has(path)) return _urls.get(path)
+  const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 12 * 3600)
+  if (data?.signedUrl) _urls.set(path, data.signedUrl)
+  return data?.signedUrl || null
+}
