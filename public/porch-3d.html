@@ -2665,6 +2665,8 @@
     const [c, x] = cnv(1024, 256), wood = woodCanvas(hex, S.decking === 'pt' ? 'pt' : 'composite', 5);
     x.fillStyle = '#231b14'; x.fillRect(0, 0, 1024, 256);
     x.drawImage(wood, 0, 3, 1024, 122); x.drawImage(wood, 0, 131, 1024, 122);
+    freeTexCache[key + ':rot'] = (() => {                  // the same boards turned 90°: border sides and breakers
+      const [r, y] = cnv(256, 1024); y.translate(256, 0); y.rotate(Math.PI / 2); y.drawImage(c, 0, 0); return tex(r, 11.5 / 12, 8); })();
     return (freeTexCache[key] = tex(c, 8, 11.5 / 12));
   }
   function buildFree(fr) {
@@ -2675,6 +2677,14 @@
       const t = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.09, bevelEnabled: false }), top);
       t.rotation.x = -Math.PI / 2; t.position.y = h - 0.09; t.castShadow = t.receiveShadow = true; G.add(t);
       if (h > 1) { const fm = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.75, bevelEnabled: false }), M.pt()); fm.rotation.x = -Math.PI / 2; fm.position.y = h - 0.9; fm.castShadow = true; G.add(fm); }
+      // picture-frame border and transition (breaker) boards: laid on top, their grain turned to run with them
+      const k = S.decking === 'pt' ? 'pt' : S.color;
+      const along = mat('freeTrim-' + k, () => std({ color: '#e3dbd0', map: freeDeckTex(), roughness: 0.75 }));
+      const across = mat('freeTrimRot-' + k, () => { freeDeckTex(); return std({ color: '#e3dbd0', map: freeTexCache[k + ':rot'], roughness: 0.75 }); });
+      const lay = (q, m) => { const s2 = new THREE.Shape(); s2.moveTo(q[0][0], -q[0][1]); q.slice(1).forEach(r => s2.lineTo(r[0], -r[1])); s2.closePath();
+        const b = new THREE.Mesh(new THREE.ExtrudeGeometry(s2, { depth: 0.1, bevelEnabled: false }), m); b.rotation.x = -Math.PI / 2; b.position.y = h - 0.085; b.castShadow = b.receiveShadow = true; G.add(b); };
+      (p.trims || []).forEach(t => lay(t.pts, t.along ? along : across));
+      (p.breakers || []).forEach(([x0, z0, x1, z1]) => lay([[x0, z0], [x1, z0], [x1, z1], [x0, z1]], across));
       const ccx = p.pts.reduce((u, q) => u + q[0], 0) / p.pts.length, ccz = p.pts.reduce((u, q) => u + q[1], 0) / p.pts.length;
       (p.edges || []).forEach(ed => {
         const [a, b] = [ed.a, ed.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]);

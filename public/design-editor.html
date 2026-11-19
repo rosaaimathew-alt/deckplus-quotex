@@ -583,6 +583,42 @@
     });
     return { runs: runs.filter(r => r.hang || r.len >= 2), back };
   }
+  // The outline moved inward by d(i) feet on side i (each corner where the moved sides meet).
+  function insetPolyBy(pts, d) {
+    const n = pts.length, lines = pts.map((a, i) => {
+      const b = pts[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
+      let nx = -uz, nz = ux; const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+      if (!inPoly(mx + nx * 0.05, mz + nz * 0.05, pts)) { nx = -nx; nz = -nz; }
+      return { p: [a[0] + nx * d(i), a[1] + nz * d(i)], u: [ux, uz] };
+    });
+    return lines.map((l2, i) => {
+      const l1 = lines[(i - 1 + n) % n], den = l1.u[0] * l2.u[1] - l1.u[1] * l2.u[0];
+      if (Math.abs(den) < 1e-6) return l2.p;
+      const t = ((l2.p[0] - l1.p[0]) * l2.u[1] - (l2.p[1] - l1.p[1]) * l2.u[0]) / den;
+      return [l1.p[0] + l1.u[0] * t, l1.p[1] + l1.u[1] * t];
+    });
+  }
+  // A deck's top boards for the 3D: the picture-frame border (1 or 2 boards on every side but
+  // the house, mitred at the corners) and the transition (breaker) boards between the border.
+  // → { trims: [{ pts, along }] (along: the board runs along x), breakers: [[x0, z0, x1, z1]] }
+  const BOARD_W = 5.5 / 12;
+  function topBoards(e) {
+    if (e.type !== 'deck') return { trims: [], breakers: [] };
+    const pts = e.pts, isH = (i) => { const a = pts[i], b = pts[(i + 1) % pts.length]; return Math.abs(a[1]) < 0.05 && Math.abs(b[1]) < 0.05; };
+    const rings = e.border === '1' || e.border === '2' ? Number(e.border) : 0, trims = [];
+    let outer = pts;
+    for (let k = 1; k <= rings; k++) {
+      const inner = insetPolyBy(pts, (i) => isH(i) ? 0 : (BOARD_W + 1 / 96) * k);
+      pts.forEach((a, i) => { if (isH(i)) return; const j = (i + 1) % pts.length, b = pts[j];
+        trims.push({ pts: [outer[i], outer[j], inner[j], inner[i]], along: Math.abs(b[0] - a[0]) >= Math.abs(b[1] - a[1]) }); });
+      outer = inner;
+    }
+    // the breakers run across the field, from the house (or border) to the border, at each transition
+    const clip = (poly, x) => { const hits = []; edges(poly).forEach(([a, b]) => { if ((a[0] <= x && b[0] > x) || (b[0] <= x && a[0] > x)) hits.push(a[1] + (x - a[0]) / (b[0] - a[0]) * (b[1] - a[1])); });
+      hits.sort((p, q) => p - q); const out = []; for (let i = 0; i + 1 < hits.length; i += 2) out.push([hits[i], hits[i + 1]]); return out; };
+    const breakers = transitionsOf(e).flatMap(x => clip(outer, x).map(([z0, z1]) => [x - BOARD_W / 2, z0, x + BOARD_W / 2, z1]));
+    return { trims, breakers };
+  }
   // The outline moved d feet inward on every side (each corner where the moved sides meet).
   function insetPoly(pts, d) {
     const n = pts.length, lines = pts.map((a, i) => {
@@ -1904,7 +1940,7 @@
       });
       // a deck stands on its drop beams' posts, as drawn in the framing; a landing on posts around its edge
       const fr = e.type === 'deck' ? beamPlan(e, pts).runs.filter(r => !r.hang) : [], beams = fr.map(r => [...r.A, ...r.B]);
-      plats.push({ pts, h, edges: eds, posts: fr.length ? fr.flatMap(r => r.posts) : posts, beams, houseSpan, skirt: e.skirt || null });
+      plats.push({ pts, h, edges: eds, posts: fr.length ? fr.flatMap(r => r.posts) : posts, beams, houseSpan, skirt: e.skirt || null, ...topBoards(e) });
     });
     S.els.filter(e => e.type === 'stairs' && e.of == null).forEach(e => { const i = stairInfo(e);
       if (i.run) { const r = i.run; if (i.n > 1) wraps.push({ top: i.top, bottom: 0, n: i.n, rise: i.rise, len: Math.round(r.len * 2) / 2, corners: r.corners.length,
