@@ -206,7 +206,7 @@ export const SETTINGS_KEYS = [
   'paymentScheduleLearning', 'scopeExamples', 'historyImported', 'calendarHiddenJobs',
   'contractPrefix', 'companySignature', 'welcomeEmail',
   'porchBuildRates', 'porchBuildLocked', 'porchBuildScopes',
-  'subscriptions', 'permitPulse', 'homePages',
+  'subscriptions', 'permitPulse', 'homePages', 'ownerUserId',
 ]
 const TABLE_TO_KEY = Object.fromEntries(
   [...Object.entries(RECORD_TABLES), ...Object.entries(MAP_TABLES)].map(([k, t]) => [t, k])

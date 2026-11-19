@@ -1578,6 +1578,8 @@ export const useStore = create(
       // { [userId]: 'owner' | 'office' | 'permits' }. Anyone not listed gets
       // their department's page (App.jsx RoleHome).
       homePages: {},
+      // The company owner's login: the only one with the owner's Today page (App.jsx)
+      ownerUserId: null,
       setHomePage: (userId, kind) => set((s) => {
         const next = { ...(s.homePages || {}) }
         if (kind) next[userId] = kind; else delete next[userId]
@@ -1657,7 +1659,7 @@ const SETTINGS_DEFAULTS = () => ({
   paymentScheduleLearning: {}, scopeExamples: [], historyImported: false, calendarHiddenJobs: [],
   contractPrefix: 'DP', companySignature: null, welcomeEmail: null, permitPulse: null,
   porchBuildRates: {}, porchBuildLocked: false, porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
-  subscriptions: [], homePages: {},
+  subscriptions: [], homePages: {}, ownerUserId: null,
 })
 const ID_COUNTERS = ['nextProposalId', 'nextCatalogId', 'nextTemplateId', 'nextScopeTemplateId', 'nextPaymentScheduleId', 'nextSubId']
 
