@@ -15,6 +15,8 @@
 --   invoice_submitted    the sub                            office and admin (those who get alert emails)
 --   invoice_decision     office / admin                     the sub
 --   message              whoever wrote it (job chat)        the other side: the sub's manager, or the PM on the job
+--   todo_assigned        whoever wrote the to-do (office)   the teammate it was given to, never a sub or painter
+--                        (To-do › Shared: supabase/todos_shared.sql)
 --
 -- Run once in the Supabase SQL editor. Safe to re-run.
 
@@ -43,10 +45,32 @@ declare
   my_org uuid := public.auth_org(); r text := public.auth_role(); uid uuid := auth.uid();
   t public.sub_tasks; d public.sub_draws; s public.subcontractors; msg public.sub_messages;
   me public.org_members; pm public.org_members; owner public.org_members; tech public.org_members;
+  td public.todos; asg public.org_members;
   staff boolean; is_paint boolean; crew jsonb; who jsonb := '[]'::jsonb; sender jsonb;
 begin
   if my_org is null or r is null or uid is null then return null; end if;
   select * into me from public.org_members where org_id = my_org and user_id = uid;
+
+  -- ── To-do › Shared: a task one person in the office gave another ───────────
+  -- Only the person who wrote the to-do can send this, and only to the
+  -- teammate named on it. Subs and painters neither send nor receive it.
+  if p_kind = 'todo_assigned' then
+    if r in ('sub', 'paint') then return null; end if;
+    select * into td from public.todos where org_id = my_org and id = p_id and deleted_at is null;
+    if not found or td.owner_id is distinct from uid or coalesce(td.data->>'assignedTo', '') = '' then return null; end if;
+    select * into asg from public.org_members
+      where org_id = my_org and user_id::text = td.data->>'assignedTo' and role not in ('sub', 'paint');
+    if asg.user_id is not null and asg.user_id <> uid and coalesce(asg.email, '') <> '' then
+      who := jsonb_build_array(jsonb_build_object('name', asg.display_name, 'email', asg.email, 'phone', asg.phone));
+    end if;
+    return jsonb_build_object(
+      'kind', p_kind,
+      'by', jsonb_build_object('id', me.user_id, 'name', me.display_name, 'email', me.email),
+      'sender', jsonb_build_object('id', me.user_id, 'name', me.display_name, 'email', me.email, 'phone', me.phone),
+      'senderIsStaff', true,
+      'todo', jsonb_build_object('id', td.id, 'text', td.data->>'text'),
+      'recipients', who);
+  end if;
 
   -- ── Weekly invoices ────────────────────────────────────────────────────────
   if p_kind in ('invoice_submitted', 'invoice_decision') then

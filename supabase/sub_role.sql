@@ -44,13 +44,14 @@ begin
   end loop;
 end $$;
 
--- A to-do's owner always reaches it; a sub never owns one.
+-- A to-do reaches its owner and, when it was given to someone, that person
+-- (supabase/todos_shared.sql: keep the two in step); a sub never reaches one.
 do $$
 begin
   if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'todos' and policyname = 'todos_owner_only') then
     alter policy todos_owner_only on public.todos
-      using (owner_id = auth.uid() and auth_role() is distinct from 'sub')
-      with check (owner_id = auth.uid() and auth_role() is distinct from 'sub');
+      using ((owner_id = (select auth.uid()) or data->>'assignedTo' = (select auth.uid())::text) and (select auth_role()) is distinct from 'sub')
+      with check ((owner_id = (select auth.uid()) or data->>'assignedTo' = (select auth.uid())::text) and (select auth_role()) is distinct from 'sub');
   end if;
 end $$;
 

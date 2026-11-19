@@ -21,6 +21,7 @@ import { canRoleAccess, roleLanding } from './roles'
 import { useNav, LEGACY_REDIRECTS } from './nav'
 import { nextReminderDate, contractStatusOf, isJobClosed } from './lib/attention'
 import { TodoDock } from './components/TodoPanel'
+import { openTodoCount } from './lib/todos'
 import { DEMO, resetDemo } from './demo'
 import PushCard from './components/PushCard'
 import { useIsPhone, canUseField, setViewPref } from './field/fieldMode'
@@ -128,13 +129,24 @@ export default function AppShell() {
   const me             = useStore(s => s.me)
   const todoPin        = useStore(s => s.todoPin)
   const setTodoPin     = useStore(s => s.setTodoPin)
-  const openTodos      = useStore(s => (s.todos || []).filter(t => !t.done).length)
+  const openTodos      = useStore(s => openTodoCount(s.todos, s.me))   // waiting on me: my own and those given to me
+  const setTodoTab     = useStore(s => s.setTodoTab)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   // Desktop: the menu can be tucked away for a full-width screen (remembered on this device)
   const [menuHidden, setMenuHidden] = useState(() => { try { return localStorage.getItem('qx_menu_hidden') === '1' } catch { return false } })
   const hideMenu = (on) => { setMenuHidden(on); try { localStorage.setItem('qx_menu_hidden', on ? '1' : '0') } catch { /* private mode */ } }
   const [paletteOpen, setPaletteOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // The link in a "New task from …" alert (?todo=1) opens the list on Shared
+  useEffect(() => {
+    const q = new URLSearchParams(location.search)
+    if (q.get('todo') !== '1') return
+    setTodoTab('shared'); setTodoPin('right')
+    q.delete('todo')
+    navigate({ pathname: location.pathname, search: q.toString() ? `?${q}` : '' }, { replace: true })
+  }, [location.pathname, location.search, navigate, setTodoPin, setTodoTab])
 
   const { destinations, can, role } = useNav()
   const badges = useBadges()
