@@ -317,6 +317,7 @@ export default function BuildQuote() {
 
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('All')
+  const [showCats, setShowCats] = useState(false)
   const [lines, setLines] = useState([])
   const [client, setClient] = useState('')
   const [email, setEmail] = useState('')
@@ -749,14 +750,29 @@ export default function BuildQuote() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex flex-wrap gap-1">
-          {cats.map(c => (
-            <button key={c} onClick={() => setCatFilter(c)}
-              className={`px-2 py-0.5 rounded text-xs font-medium ${catFilter === c ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-              {c}
+        {/* Categories stay out of the way until asked for */}
+        <div className="flex items-center gap-2 text-xs -my-1">
+          <button type="button" onClick={() => setShowCats(v => !v)} aria-expanded={showCats}
+            className="font-medium text-[var(--brand-700)] hover:underline">
+            {showCats ? 'Hide categories' : 'Show categories'}
+          </button>
+          {!showCats && catFilter !== 'All' && (
+            <button type="button" onClick={() => setCatFilter('All')} title="Show every category"
+              className="ml-auto flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900">
+              {catFilter} <X size={11} />
             </button>
-          ))}
+          )}
         </div>
+        {showCats && (
+          <div className="flex flex-wrap gap-1">
+            {cats.map(c => (
+              <button key={c} onClick={() => setCatFilter(c)}
+                className={`px-2 py-0.5 rounded text-xs font-medium ${catFilter === c ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto space-y-1 max-h-[50vh] lg:max-h-[calc(100vh-220px)]">
           {filtered.map(item => (
             <button key={item.id} onClick={() => addItem(item)}
