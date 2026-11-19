@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { uploadToDrive } from '../_google-drive.js'
-import { verifyToken, verifyStaff, canSeeRecord, staffMembership, asUser } from '../_auth.js'
+import { verifyToken, verifyStaff, canSeeRecord, staffMembership, asUser, staffRole } from '../_auth.js'
 import { alertMakerOfOpen, looksLikeBot } from '../_push.js'
 import { getKV } from '../_kv.js'
 import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, buildCompanySignature, verifyRecord } from '../_esign.js'
@@ -278,6 +278,34 @@ export default async function handler(req, res) {
     // ── ADMIN: open history + customer contact for the activity log / sender agent.
     // Auth-gated (isAdminAction), so contact PII is only ever returned to a
     // signed-in operator/agent — never in the URL or the public page.
+    // ── ADMIN: the opens of many proposal links in ONE request (Sales › Opens,
+    // a customer's history). One login check, the links read side by side;
+    // only the open times come back (no contact details). A rep gets only the
+    // links on proposals they can see.
+    if (token === 'pdata-batch') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+      const tokens = [...new Set((req.body?.tokens || []).map(String).filter(t => /^[\w-]{8,80}$/.test(t)))].slice(0, 500)
+      const recs = await Promise.all(tokens.map(t => kv.get(`pview:${t}`).catch(() => null)))
+      const role = await staffRole(bearer, staff)
+      let allowed = null   // null = every one (office, admin, PM)
+      if (role !== 'office' && role !== 'admin' && role !== 'pm') {
+        allowed = new Set()
+        const ids = [...new Set(recs.map(r => r?.proposalId).filter(id => id != null).map(String))]
+        const sb = role === 'rep' ? asUser(bearer) : null
+        if (sb && ids.length) {
+          const { data } = await sb.from('proposals').select('id').in('id', ids)
+          for (const row of data || []) allowed.add(String(row.id))
+        }
+      }
+      const opens = {}
+      tokens.forEach((t, i) => {
+        const rec = recs[i]
+        if (!rec || (allowed && !allowed.has(String(rec.proposalId)))) return
+        opens[t] = (rec.opens || []).map(o => ({ at: o.at }))
+      })
+      return res.json({ opens })
+    }
+
     if (token.startsWith('pdata-')) {
       if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
       const viewToken = token.slice('pdata-'.length)
