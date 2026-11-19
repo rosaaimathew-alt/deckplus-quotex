@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { rangeText, DEPOSIT_PCT } from '../lib/priceRange'
+import PackageChoices from '../components/PackageChoices'
 
 // Public, read-only proposal a customer opens from the email link. Fetching it
 // records the open server-side (that's the tracking) and returns a display-only
@@ -12,6 +13,10 @@ const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits:
 export default function PublicProposal() {
   const { token } = useParams()
   const [state, setState] = useState({ loading: true, error: '', snapshot: null })
+  // Good / Better / Best: the package the customer picked (our quote until they pick)
+  const [chosen, setChosen] = useState('better')
+  const [saving, setSaving] = useState('')
+  const [chooseError, setChooseError] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -21,12 +26,22 @@ export default function PublicProposal() {
         if (!r.ok) throw new Error(d.error || 'This proposal link is no longer available.')
         return d
       })
-      .then(d => { if (alive) setState({ loading: false, error: '', snapshot: d.snapshot || null }) })
+      .then(d => { if (alive) { setState({ loading: false, error: '', snapshot: d.snapshot || null }); if (d.choice) setChosen(d.choice) } })
       .catch(err => { if (alive) setState({ loading: false, error: err.message, snapshot: null }) })
     return () => { alive = false }
   }, [token])
 
   const { loading, error, snapshot } = state
+  const choose = async (key) => {
+    if (key === chosen || saving) return
+    const was = chosen
+    setChosen(key); setSaving(key); setChooseError('')
+    try {
+      const r = await fetch(`/api/sign/pchoose-${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) })
+      if (!r.ok) throw new Error('not saved')
+    } catch { setChosen(was); setChooseError('That didn’t save. Please try again, or call us.') }
+    setSaving('')
+  }
 
   if (loading) {
     return <div style={wrap}><p style={{ color: '#64748b', fontSize: 14 }}>Loading your proposal…</p></div>
@@ -180,6 +195,10 @@ export default function PublicProposal() {
             </div>
           )}
           </>)}
+
+          {/* Good / Better / Best — the customer picks one */}
+          <PackageChoices packages={s.packages || []} chosen={chosen} onChoose={choose} saving={saving} accent={accent} />
+          {chooseError && <p style={{ margin: '8px 0 0', fontSize: 13, color: '#b91c1c' }}>{chooseError}</p>}
 
           {/* Optional upgrades — priced, not part of the total */}
           {(s.upgrades || []).length > 0 && (

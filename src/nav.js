@@ -15,7 +15,7 @@ import {
 import { useStore } from './store'
 import { canAccessRoute } from './plans'
 import { canRoleAccess } from './roles'
-import { isOff, PATH_KEYS, JOB_MONEY } from './permissions'
+import { isOff, PATH_KEYS, JOB_MONEY, PRICE_LIST } from './permissions'
 
 export const DESTINATIONS = [
   { key: 'home', to: '/', label: 'Today', icon: House, access: ['/'],
@@ -147,4 +147,8 @@ export function useNav() {
 // The money inside a job (Budget, Costs, Receipts, payments, profit, quote margin).
 export function useJobMoney() {
   return useStore(s => !isOff(s.me?.permissions, JOB_MONEY))
+}
+// The itemized price list on a job and a quote: its own switch, apart from job money.
+export function usePriceList() {
+  return useStore(s => !isOff(s.me?.permissions, PRICE_LIST))
 }

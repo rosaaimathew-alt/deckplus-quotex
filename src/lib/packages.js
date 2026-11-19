@@ -1,101 +1,139 @@
-// ── Good / Better / Best: suggested upgrade packages ─────────────────────────
-// The quote as built is "Good". For every deck on it (a Deck Builder line), the
-// Better and Best packages step the decking and the railing up the ladders
-// below, re-price the deck with the same price list (deckLine), and offer the
-// difference as an optional upgrade under the total. They follow the quote:
-// change the deck and they re-price; a rep can edit one (it then stays as
-// typed) or delete it (it stays gone on this quote).
+// ── Good / Better / Best packages ────────────────────────────────────────────
+// Three complete versions of the same project, side by side on the proposal,
+// each with its own total; the customer picks one. Our quote is always the
+// middle one (Better). Good steps every deck's decking (and railing) one rung
+// down the ladders below, Best one rung up, and each is re-priced with the same
+// price list (deckLine). The rep can change any pick. Separate from Optional
+// upgrades, which are single add-ons under the total.
 import { deckLine } from './builderLines'
+import { DECK_COLLECTIONS, DECK_RAILS } from './deckPricing'
 
-// Decking: [Better, Best] for each collection, within its brand.
-export const DECKING_TIERS = {
-  'PT': ['Trex ENHANCE', 'Trex TRANSCEND'],
-  'Trex ENHANCE': ['Trex TRANSCEND', 'Trex SIGNATURE'],
-  'Trex SELECT': ['Trex TRANSCEND', 'Trex SIGNATURE'],
-  'Trex TRANSCEND': ['Trex SIGNATURE', null],
-  'Trex LINEAGE': ['Trex SIGNATURE', null],
-  'TimberTech PRIME/+': ['TimberTech RESERVE', 'TimberTech VINTAGE PVC'],
-  'TimberTech TERRAIN/+': ['TimberTech RESERVE', 'TimberTech VINTAGE PVC'],
-  'TimberTech RESERVE': ['TimberTech LANDMARK PVC', 'TimberTech VINTAGE PVC'],
-  'TimberTech HARVEST PVC': ['TimberTech VINTAGE PVC', null],
-  'TimberTech LANDMARK PVC': ['TimberTech VINTAGE PVC', null],
+// Decking ladders, cheapest first. A collection between rungs has its own [down, up].
+const DECK_LADDERS = [
+  ['PT', 'Trex ENHANCE', 'Trex TRANSCEND', 'Trex SIGNATURE'],
+  ['PT', 'TimberTech PRIME/+', 'TimberTech RESERVE', 'TimberTech LANDMARK PVC', 'TimberTech VINTAGE PVC'],
+]
+const DECK_BETWEEN = {
+  'Trex SELECT': ['Trex ENHANCE', 'Trex TRANSCEND'],
+  'Trex LINEAGE': ['Trex ENHANCE', 'Trex SIGNATURE'],
+  'TimberTech TERRAIN/+': ['TimberTech PRIME/+', 'TimberTech RESERVE'],
+  'TimberTech HARVEST PVC': ['TimberTech RESERVE', 'TimberTech VINTAGE PVC'],
+  'TimberTech PVC MULTI WIDTH 7.25"/3.5"': ['TimberTech VINTAGE PVC', null],
+  'TimberTech PVC 2" MAX': ['TimberTech VINTAGE PVC', null],
+  'TimberTech PVC 3.5" (NARROW)': ['TimberTech VINTAGE PVC', null],
+  'TimberTech PVC 7.25" (WIDE)': ['TimberTech VINTAGE PVC', null],
+  'TimberTech VINTAGE T&G': ['TimberTech VINTAGE PVC', null],
 }
-// Railing: [Better, Best]. No railing stays no railing.
-export const RAIL_TIERS = {
-  '2x2 pickets wood rail': ['Hybrid Railing / trex cap', 'Trex Select Alum. Railing'],
-  'Hybrid Railing / wood cap': ['Hybrid Railing / trex cap', 'Trex Select Alum. Railing'],
-  'Hybrid Railing / trex cap': ['Trex Select Alum. Railing', 'Trex SIGNATURE Alum. Railing'],
-  'Trex Select Railing WHITE ONLY': ['Trex Transcend Railing', null],
-  'Trex Select Alum. Railing': ['Trex SIGNATURE Alum. Railing', null],
-  'Trex Select Alum. Railing BETWEEN POSTS ONLY': ['Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY', null],
-  'TimberTech Railing BETWEEN POSTS ONLY': ['TimberTech Alum. Railing', null],
+// Railing: [down, up]. No railing stays no railing; a rail with no rung keeps itself.
+const RAIL_STEPS = {
+  '2x2 pickets wood rail': [null, 'Hybrid Railing / trex cap'],
+  'Hybrid Railing / wood cap': ['2x2 pickets wood rail', 'Hybrid Railing / trex cap'],
+  'Hybrid Railing / trex cap': ['Hybrid Railing / wood cap', 'Trex Select Alum. Railing'],
+  'Trex Select Alum. Railing': ['Hybrid Railing / trex cap', 'Trex SIGNATURE Alum. Railing'],
+  'Trex SIGNATURE Alum. Railing': ['Trex Select Alum. Railing', null],
+  'Trex Select Alum. Railing BETWEEN POSTS ONLY': [null, 'Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY'],
+  'Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY': ['Trex Select Alum. Railing BETWEEN POSTS ONLY', null],
+  'Trex Select Railing WHITE ONLY': [null, 'Trex Transcend Railing'],
+  'Trex Transcend Railing': ['Trex Select Railing WHITE ONLY', null],
+  'TimberTech Railing BETWEEN POSTS ONLY': [null, 'TimberTech Alum. Railing'],
+  'TimberTech Alum. Railing': ['TimberTech Railing BETWEEN POSTS ONLY', null],
 }
+export const DECKING_CHOICES = DECK_COLLECTIONS.map(c => c.key)
+export const RAIL_CHOICES = DECK_RAILS.filter(r => r.key !== 'None' && !r.custom).map(r => r.key)
+
 const RAIL_NAMES = {
-  '2x2 pickets wood rail': 'wood railing with 2×2 pickets', 'Hybrid Railing / wood cap': 'hybrid railing with a wood cap',
-  'Hybrid Railing / trex cap': 'hybrid railing with a Trex cap', 'Trex Transcend Railing': 'Trex Transcend railing',
-  'Trex Select Railing WHITE ONLY': 'Trex Select white railing', 'Trex Select Alum. Railing': 'Trex Select aluminum railing',
+  '2x2 pickets wood rail': 'Wood railing, 2×2 pickets', 'Hybrid Railing / wood cap': 'Hybrid railing, wood cap',
+  'Hybrid Railing / trex cap': 'Hybrid railing, Trex cap', 'Trex Transcend Railing': 'Trex Transcend railing',
+  'Trex Select Railing WHITE ONLY': 'Trex Select railing (white)', 'Trex Select Alum. Railing': 'Trex Select aluminum railing',
   'Trex Select Alum. Railing BETWEEN POSTS ONLY': 'Trex Select aluminum railing (between posts)', 'Trex SIGNATURE Alum. Railing': 'Trex Signature aluminum railing',
   'Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY': 'Trex Signature aluminum railing (between posts)', 'TimberTech Alum. Railing': 'TimberTech aluminum railing',
-  'TimberTech Railing BETWEEN POSTS ONLY': 'TimberTech railing (between posts)', 'TimberTech IRX Cable Rail': 'TimberTech IRX cable railing', 'Iron Rod Railing LF': 'iron rod railing',
+  'TimberTech Railing BETWEEN POSTS ONLY': 'TimberTech railing (between posts)', 'TimberTech IRX Cable Rail': 'TimberTech IRX cable railing', 'Iron Rod Railing LF': 'Iron rod railing',
 }
-const DECK_NAMES = { 'PT': 'pressure-treated' }
-const deckName = (k) => DECK_NAMES[k] || k.replace(/\b([A-Z]{2,})\b/g, (w) => w[0] + w.slice(1).toLowerCase()).replace(/\/\+$/, '').replace(/ Pvc$/, ' PVC')
-const railName = (k) => RAIL_NAMES[k] || k
+export const deckName = (k) => k === 'PT' ? 'Pressure-treated wood'
+  : String(k || '').replace(/\b([A-Z]{2,})\b/g, (w) => w[0] + w.slice(1).toLowerCase()).replace(/\/\+$/, '').replace(/ Pvc\b/, ' PVC').replace(/ T&g$/, ' T&G')
+export const railName = (k) => !k || k === 'None' ? 'No railing' : RAIL_NAMES[k] || k
 
-export const PACKAGES = [['better', 'Better', 0], ['best', 'Best', 1]]
-// A deck's settings stepped up to a package ('better' | 'best'); null when nothing steps up.
-// Best falls back to Better's step when a ladder has no third rung.
-export function packageState(st = {}, key) {
-  const tier = key === 'best' ? 1 : 0
-  const dk = DECKING_TIERS[st.collKey]?.[tier] || DECKING_TIERS[st.collKey]?.[0] || null
-  const rl = st.rail && st.rail !== 'None' ? (RAIL_TIERS[st.rail]?.[tier] || RAIL_TIERS[st.rail]?.[0] || null) : null
-  return dk || rl ? { ...st, ...(dk ? { collKey: dk } : {}), ...(rl ? { rail: rl } : {}) } : null
-}
-// The quote lines with a package taken: each deck re-priced with its stepped-up decking and railing.
-export function applyPackage(lines = [], key, ctx = {}) {
-  return lines.map(l => {
-    if (l?.builder?.tool !== 'deck' || !l.builder.state) return l
-    const st = packageState(l.builder.state, key)
-    return st ? { ...deckLine(st, ctx, l.id), qty: l.qty || 1, section: l.section, mergeInto: l.mergeInto ?? null, hidden: l.hidden } : l
-  })
-}
-const list = (xs) => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0]
+export const PACKAGES = [
+  { key: 'good', label: 'Good', tag: 'Lowest price' },
+  { key: 'better', label: 'Better', tag: 'Your quote' },
+  { key: 'best', label: 'Best', tag: 'Top of the line' },
+]
+const STEP = { good: 0, best: 1 }
 
-// The suggested packages for these quote lines → [{ auto: 'better'|'best', name, description, qty, unit, unitPrice }]
-export function suggestPackages(lines = [], ctx = {}) {
-  const decks = (lines || []).filter(l => l?.builder?.tool === 'deck' && l.builder.state)
-  if (!decks.length) return []
-  const out = []
-  PACKAGES.forEach(([key, label]) => {
-    let add = 0; const gets = [], was = []
-    decks.forEach(l => {
-      const st = l.builder.state, qty = Number(l.qty) || 1, nx = packageState(st, key)
-      if (!nx) return
-      const dk = nx.collKey !== st.collKey ? nx.collKey : null, rl = nx.rail !== st.rail ? nx.rail : null
-      const base = deckLine(st, ctx).unitPrice, up = deckLine(nx, ctx).unitPrice
-      if (!(up > base)) return
-      add += (up - base) * qty
-      if (dk) { gets.push(`${deckName(dk)} decking`); was.push(`${deckName(st.collKey)} decking`) }
-      if (rl) { gets.push(railName(rl)); was.push(railName(st.rail)) }
-    })
-    if (add <= 0 || !gets.length) return
-    const uniq = (xs) => [...new Set(xs)]
-    out.push({ auto: key, name: `${label}: ${list(uniq(gets))}`, description: `Instead of ${list(uniq(was))}. Added to the price above.`, qty: 1, unit: 'EA', unitPrice: Math.round(add) })
-  })
-  // Best only when it differs from Better
-  if (out.length === 2 && out[0].name.slice(out[0].name.indexOf(':')) === out[1].name.slice(out[1].name.indexOf(':'))) out.pop()
-  return out
+function deckStep(collKey, i) {
+  if (DECK_BETWEEN[collKey]) return DECK_BETWEEN[collKey][i]
+  for (const lad of DECK_LADDERS) {
+    const at = lad.indexOf(collKey)
+    if (at > 0 || (at === 0 && i === 1)) return lad[at + (i ? 1 : -1)] || null
+  }
+  return null
+}
+// What a package suggests for a deck: { collKey, rail } (null collKey = no rung that way)
+export function suggestedPick(st = {}, key) {
+  const i = STEP[key]
+  if (i == null) return { collKey: st.collKey, rail: st.rail }
+  const rail = st.rail && st.rail !== 'None' ? (RAIL_STEPS[st.rail]?.[i] || st.rail) : st.rail
+  return { collKey: deckStep(st.collKey, i), rail }
+}
+// The deck's settings in a package: the rep's picks over the suggestion. null = not offered.
+export function packageState(st = {}, key, pick = {}) {
+  if (key === 'better') return st
+  const sug = suggestedPick(st, key)
+  const collKey = pick.collKey !== undefined ? pick.collKey : sug.collKey
+  if (!collKey) return null
+  const rail = st.rail && st.rail !== 'None' ? (pick.rail || sug.rail) : st.rail
+  return { ...st, collKey, rail }
 }
 
-// The upgrades list with the suggested packages brought up to date: hand-made upgrades
-// stay as they are; a package the rep turned off is left out. Same array when nothing changed.
-export function withPackages(upgrades = [], suggested = [], off = []) {
-  const keep = upgrades.filter(u => !u.auto)
-  const next = [...keep]
-  suggested.filter(p => !off.includes(p.auto)).forEach(p => {
-    const had = upgrades.find(u => u.auto === p.auto)
-    next.push(had ? { ...had, name: p.name, description: p.description, qty: 1, unit: 'EA', unitPrice: p.unitPrice } : { id: `pkg-${p.auto}-${Date.now()}`, ...p })
+const isDeck = (l) => l?.builder?.tool === 'deck' && l.builder.state
+const sumOf = (ls) => Math.round(ls.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0) * 100) / 100
+
+// The quote lines in a package (null when a deck has no rung that way). A deck line
+// keeps the rep's own price plus the price-list difference between the two decks,
+// so a hand-adjusted price stays adjusted.
+export function applyPackage(lines = [], key, ctx = {}, pick = {}) {
+  let ok = true
+  const out = lines.map(l => {
+    if (!isDeck(l)) return l
+    const st = l.builder.state, nx = packageState(st, key, pick)
+    if (!nx) { ok = false; return l }
+    if (nx === st) return l
+    const up = deckLine(nx, ctx, l.id), add = up.unitPrice - deckLine(st, ctx, l.id).unitPrice
+    return { ...l, ...up, qty: l.qty || 1, section: l.section, mergeInto: l.mergeInto ?? null, hidden: l.hidden,
+      unitPrice: Math.round(((Number(l.unitPrice) || 0) + add) * 100) / 100 }
   })
-  const same = next.length === upgrades.length && next.every((u, i) => upgrades[i] && ['id', 'auto', 'name', 'description', 'unitPrice'].every(k => u[k] === upgrades[i][k]))
-  return same ? upgrades : next
+  return ok ? out : null
 }
+// Each deck in a package, in the customer's words → [{ name, decking, railing }]
+export function packageDecks(lines = []) {
+  const decks = lines.filter(isDeck)
+  return decks.map((l, i) => ({
+    name: decks.length > 1 ? `Deck ${i + 1}` : 'Deck',
+    decking: deckName(l.builder.state.collKey),
+    railing: railName(l.builder.state.rail),
+  }))
+}
+
+// Good / Better / Best for a quote with a deck on it →
+//   [{ key, label, tag, total, decks, lines? }]   (Good and Best carry their own full
+//   quote lines, for the contract; Better is the quote itself)
+// `finish` adds what sits on top of the lines (permit fees, the discount). `picks` are
+// the rep's changes ({ good: { collKey, rail }, best: {…} }). Good is offered only when
+// it costs less than the quote and Best only when it costs more; empty when neither is.
+export function packageOptions(lines = [], ctx = {}, finish = (ls) => ls, picks = {}) {
+  if (!lines.some(isDeck)) return []
+  const better = { ...PACKAGES[1], total: sumOf(finish(lines)), decks: packageDecks(lines) }
+  const make = (p) => {
+    const ls = applyPackage(lines, p.key, ctx, picks[p.key] || {})
+    if (!ls) return null
+    const full = finish(ls)
+    return { ...p, total: sumOf(full), decks: packageDecks(ls), lines: full }
+  }
+  const good = make(PACKAGES[0]), best = make(PACKAGES[2])
+  const out = [good && good.total < better.total ? good : null, better, best && best.total > better.total ? best : null].filter(Boolean)
+  return out.length > 1 ? out : []
+}
+
+// What the customer's copy carries: no quote lines, only names and totals.
+export const customerPackages = (pkgs) => (pkgs || []).filter(p => p && p.key && Number(p.total) > 0)
+  .map(p => ({ key: p.key, label: p.label, tag: p.tag || '', total: Number(p.total), decks: p.decks || [] }))

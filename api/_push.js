@@ -145,14 +145,15 @@ const BOTS = /bot|crawler|spider|preview|scanner|facebookexternalhit|slackbot|wh
 export const looksLikeBot = (ua) => BOTS.test(String(ua || ''))
 
 // What the pop-up says. kind: 'proposal' | 'contract'
-export function openAlert(kind, { client, contractNum, origin }) {
+export function openAlert(kind, { client, contractNum, origin, pkg }) {
   const who = String(client || '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Your customer'
+  if (kind === 'choice') return { title: 'Package chosen', body: `${who} chose the ${String(pkg || '').slice(0, 20)} package.`, url: `${origin}/sales?tab=proposals` }
   return kind === 'contract'
     ? { title: 'Contract opened', body: `${who} just opened contract ${String(contractNum || '').slice(0, 30)}`.trim() + '.', url: `${origin}/contracts` }
     : { title: 'Proposal opened', body: `${who} just opened their proposal.`, url: `${origin}/sales?tab=proposals` }
 }
 
-export async function alertMakerOfOpen({ kind, email = null, proposalId = null, client, contractNum, origin, quietKey, kv, send = pushToEmails, ownerOf = (id) => rpc('proposal_owner_email_s', { p_proposal_id: String(id) }) }) {
+export async function alertMakerOfOpen({ kind, email = null, proposalId = null, client, contractNum, pkg, origin, quietKey, kv, send = pushToEmails, ownerOf = (id) => rpc('proposal_owner_email_s', { p_proposal_id: String(id) }) }) {
   const work = (async () => {
     // The same page loading twice in a minute is one open
     if (kv && quietKey) {
@@ -161,7 +162,7 @@ export async function alertMakerOfOpen({ kind, email = null, proposalId = null, 
     }
     const to = email || (proposalId != null && proposalId !== '' ? await ownerOf(proposalId) : null)
     if (!to) return { pushed: 0 }
-    return send([to], openAlert(kind, { client, contractNum, origin }))
+    return send([to], openAlert(kind, { client, contractNum, origin, pkg }))
   })()
   try { return await Promise.race([work, new Promise(resolve => setTimeout(() => resolve({ pushed: 0, slow: true }), 3000))]) } catch { return { pushed: 0 } }
 }

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { openProposal } from '../lib/openProposal'
 import { MenuChip, QuickPicks, SwitchChip, RepToggle, SearchLine } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
-import { useIsPhone } from '../field/fieldMode'
+import { useIsPhone } from '../field/fieldMode'; import { usePriceList } from '../nav'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
 import { headlineNumbers, wonDateOf } from '../lib/headline'
 import { contractStatusOf } from '../lib/attention'
@@ -745,6 +745,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
   const { deleteProposal, detachProposal, mergeProposalGroups, members } = useStore()
   const phone = useIsPhone()
   const [priceListFor, setPriceListFor] = useState(null)
+  const priceList = usePriceList()   // its own switch (Settings › Team › Access)
   const me = useStore(s => s.me)
   const allProposals = useStore(s => s.proposals)
   // Archive / delete only while the client keeps another live proposal, so every
@@ -883,7 +884,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                 { label: 'Merge into client', icon: GitMerge, onClick: onMerge },
                 ...(altCount > 0 ? [{ label: 'Detach', icon: Unlink, onClick: () => onDetach(p.id) }] : []),
                 ...(p.status === 'Won' ? [{ label: 'Generate Contract', icon: FileSignature, onClick: () => onGenerateContract(p) }] : []),
-                { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) },
+                ...(priceList ? [{ label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) }] : []),
                 ...((p.status === 'Sent' || p.status === 'Followed Up') && p.email ? [{ label: 'Send Follow-up', icon: Send, onClick: () => setFollowUpProposal(p) }] : []),
                 ...removeItems(p),
               ]} />
@@ -926,7 +927,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
       { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(p) },
       ...(!alt ? [{ label: 'Add reminder', icon: Bell, onClick: () => onReminderOpen(p.id) }] : []),
       ...(!alt && (p.status === 'Sent' || p.status === 'Followed Up') && p.email ? [{ label: 'Send follow-up', icon: Send, onClick: () => setFollowUpProposal(p) }] : []),
-      { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) },
+      ...(priceList ? [{ label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(p) }] : []),
       ...(!alt ? [{ label: 'Merge into client', icon: GitMerge, onClick: onMerge }] : []),
       ...(alt || altCount > 0 ? [{ label: 'Detach', icon: Unlink, onClick: () => handleDetach(p.id) }] : []),
       ...removeItems(p),
@@ -953,7 +954,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       {followUpProposal && <FollowUpModal proposal={followUpProposal} onClose={() => setFollowUpProposal(null)} />}
-      {priceListFor && (
+      {priceListFor && priceList && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto" onClick={() => setPriceListFor(null)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
@@ -1069,7 +1070,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                           <RowMenu items={[
                             { label: 'Copy shareable link', icon: Link2, onClick: () => copyProposalLink(alt) },
                             { label: 'Revise', icon: Copy, onClick: () => onRevise(alt) },
-                            { label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(alt) },
+                            ...(priceList ? [{ label: 'Open price list', icon: ReceiptText, onClick: () => setPriceListFor(alt) }] : []),
                             { label: 'Detach', icon: Unlink, onClick: () => handleDetach(alt.id) },
                             ...removeItems(alt),
                           ]} />
@@ -1387,6 +1388,7 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
 
   // A la carte item selection modal state
   const [aLaCarteProposal, setALaCarteProposal] = useState(null)
+  const [pkgPick, setPkgPick] = useState(null)   // Good / Better / Best: { proposal, key, customer }
   const [selectedLineIds, setSelectedLineIds] = useState(new Set())
 
   const toggleLineId = (id) => setSelectedLineIds(prev => {
@@ -1424,6 +1426,15 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
       setALaCarteProposal(proposal)
       return
     }
+    // Good / Better / Best: which package is the contract for? (the customer's pick, if they made one)
+    if ((proposal.packages || []).length > 1) {
+      setPkgPick({ proposal, key: 'better', customer: null })
+      if (proposal.viewToken) fetch(`/api/sign/pdata-${proposal.viewToken}`).then(r => (r.ok ? r.json() : null)).then(d => {
+        const key = d?.choice?.key
+        if (key && proposal.packages.some(p => p.key === key)) setPkgPick(cur => (cur && cur.proposal.id === proposal.id ? { ...cur, key, customer: key } : cur))
+      }).catch(() => {})
+      return
+    }
     launchContract(proposal, proposal.lines || [])
   }
 
@@ -1442,6 +1453,7 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
       isAlaCarte: !!proposal.isAlaCarte,
       priceRange: proposal.priceRange || null,
       upgrades: proposal.upgrades || [],
+      pkgSetup: proposal.pkgSetup || null,
       projectTypes: proposal.projectTypes || [],
       projectSummary: proposal.projectSummary || '',
     }))
@@ -1625,6 +1637,42 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
       )}
       {tab === 'analytics' && (
         <AnalyticsView proposals={proposals} sales={sales} periodKey={wlPeriod} />
+      )}
+
+      {/* Good / Better / Best: which package the contract is for */}
+      {pkgPick && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-bold text-gray-900 text-base">Which package?</h2>
+              <button onClick={() => setPkgPick(null)} aria-label="Close" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"><X size={16} /></button>
+            </div>
+            <div className="px-6 py-4 space-y-2">
+              {pkgPick.proposal.packages.map(p => (
+                <label key={p.key} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer ${pkgPick.key === p.key ? 'border-[var(--brand-500)] bg-[var(--brand-50)]' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input type="radio" name="pkg" className="mt-1 accent-[var(--brand-600)]" checked={pkgPick.key === p.key} onChange={() => setPkgPick(cur => ({ ...cur, key: p.key }))} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">{p.label}
+                      {p.key === 'better' && <span className="ml-1.5 font-normal text-gray-500">· as quoted</span>}
+                      {pkgPick.customer === p.key && <span className="ml-1.5 text-xs font-semibold text-[var(--brand-700)]">Customer's pick</span>}</p>
+                    <p className="text-xs text-gray-500">{(p.decks || []).map(d => `${d.decking} · ${d.railing}`).join(' / ')}</p>
+                  </div>
+                  <span className="text-sm font-bold text-gray-800 whitespace-nowrap">${Number(p.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </label>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
+              <button onClick={() => setPkgPick(null)} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={() => {
+                const { proposal, key } = pkgPick
+                const pkg = proposal.packages.find(p => p.key === key)
+                setPkgPick(null)
+                if (key === 'better' || !pkg?.lines?.length) launchContract(proposal, proposal.lines || [])
+                else launchContract(proposal, pkg.lines, true)
+              }} className="flex-1 py-2 rounded-xl bg-[var(--brand-600)] text-white text-sm font-semibold hover:bg-[var(--brand-700)]">Build Contract →</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* A la Carte Item Selection Modal */}
