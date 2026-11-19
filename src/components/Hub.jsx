@@ -42,13 +42,13 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
   if (layout === 'rail') return (
     <div className="min-h-full flex flex-col sm:flex-row">
       <nav aria-label={`${title} views`}
-        className="no-print shrink-0 bg-white border-b sm:border-b-0 sm:border-r border-gray-200 flex sm:flex-col gap-1 p-2 sm:w-[96px] sm:sticky sm:top-0 sm:self-start sm:h-[calc(100dvh-3.5rem)]">
+        className="no-print shrink-0 border-b sm:border-b-0 border-gray-200 flex sm:flex-col gap-1 p-2 sm:pl-5 sm:pr-0 sm:pt-6 sm:w-[124px] sm:sticky sm:top-0 sm:self-start">
         {visible.map(t => {
           const on = t.key === current.key
           return (
             <button key={t.key} onClick={() => setActive(t.key)} aria-current={on ? 'page' : undefined} title={t.hint || t.label}
-              className={`relative flex-1 min-w-0 sm:flex-none sm:w-[80px] flex flex-col items-center gap-1 px-1 py-3 rounded-xl text-sm font-medium transition-colors ${
-                on ? 'bg-[var(--brand-50)] text-[var(--brand-700)]' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              className={`relative flex-1 min-w-0 sm:flex-none sm:w-full flex flex-col items-center gap-1 px-1 py-2.5 rounded-lg text-sm transition-colors ${
+                on ? 'bg-[var(--brand-50)] text-[var(--brand-800)] font-semibold' : 'text-gray-600 font-medium hover:bg-gray-100 hover:text-gray-900'
               }`}>
               {t.label}
               {t.count ? <span className={`absolute top-1 right-2 text-[10px] font-bold rounded-full px-1.5 min-w-[18px] text-center ${t.countTone === 'alert' ? 'qx-badge' : 'bg-gray-100 text-gray-500'}`}>{t.count}</span> : null}

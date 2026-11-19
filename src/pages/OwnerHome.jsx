@@ -107,7 +107,7 @@ function Change({ now, then, kind }) {
   return <span className={`font-semibold ${good ? 'text-emerald-700' : 'text-red-700'}`}>{text}</span>
 }
 
-export default function OwnerHome() {
+export default function OwnerHome({ pill = null }) {
   const navigate = useNavigate()
   const { can, role } = useNav()
   const me = useStore(s => s.me)
@@ -207,6 +207,7 @@ export default function OwnerHome() {
       <header className="flex items-center gap-3 flex-wrap">
         <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{first ? `, ${first}` : ''}</h1>
         <p className="text-sm text-gray-500">{now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        {pill}
         <div className="ml-auto"><MenuChip label="Period" value={periodKey} onChange={setPeriodKey} align="right" options={PERIODS.map(({ value, label }) => ({ value, label }))} /></div>
       </header>
 

@@ -473,7 +473,7 @@ html.dark select:not([multiple]):not([size]):not(.appearance-none) {
 .qx-fit.qx-fixed[data-compact]:not([data-stacked]) td, .qx-fit.qx-fixed[data-compact]:not([data-stacked]) td * { font-size: 13px; }
 .qx-fit.qx-fixed[data-compact]:not([data-stacked]) th, .qx-fit.qx-fixed[data-compact]:not([data-stacked]) td { padding-left: 5px; padding-right: 5px; }
 .qx-fit.qx-fixed[data-compact]:not([data-stacked]) td:first-child { padding-left: 8px; }
-.qx-fit.qx-fixed[data-compact]:not([data-stacked]) td:first-child > span { min-height: 40px; padding-left: 4px; padding-right: 4px; }
+.qx-fit.qx-fixed[data-compact]:not([data-stacked]) td:first-child > span { min-height: 30px; padding-left: 4px; padding-right: 4px; font-size: 12px; }
 .qx-fit.qx-fixed[data-compact]:not([data-stacked]) td button svg { width: 20px; height: 20px; }
 
 .qx-fit[data-stacked] table, .qx-fit[data-stacked] tbody, .qx-fit[data-stacked] tfoot {

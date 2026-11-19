@@ -49,12 +49,14 @@ export function MenuChip({ label, value, options, onChange, placeholder, active,
   )
 }
 
-// The one search box: a magnifier and plain text on the filter line, no box.
-// Always the first thing on the line, so search is top left on every list.
+// The one search box: a quiet outlined box at the right end of the filter line
+// (the choices read left to right first, as in the rebuild). On a phone it
+// takes the whole first row.
 //   <SearchLine value={q} onChange={setQ} placeholder="Search clients" />
 export function SearchLine({ value, onChange, placeholder = 'Search', label, autoFocus = false }) {
   return (
-    <label className="flex items-center gap-2 h-9 w-60 max-w-full min-w-0 text-sm">
+    <label className="flex items-center gap-2 h-9 mb-1.5 px-2.5 w-64 max-w-full min-w-0 text-sm rounded-lg border border-gray-300 bg-white
+      sm:order-last sm:ml-auto max-sm:w-full max-sm:basis-full">
       <Search size={14} className="text-gray-400 shrink-0" />
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} aria-label={label || placeholder} autoFocus={autoFocus}
         className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none" />
@@ -94,17 +96,19 @@ export function SwitchChip({ label, checked, onChange, title }) {
   )
 }
 
-// Whose deals: each sales rep by name. Nothing picked = every rep; click a
-// name to see just theirs, click it again to go back to everyone.
+// Whose deals: Everyone, or one sales rep (first names; the full name shows on hover).
 export function RepToggle({ reps, repId, setRep }) {
+  const firsts = reps.map(r => String(r.name || '').trim().split(/\s+/)[0])
+  const short = (r, i) => (firsts.indexOf(firsts[i]) === firsts.lastIndexOf(firsts[i]) ? firsts[i] : r.name)
+  const cls = (on) => `h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${on ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`
   return (
     <div className="inline-flex flex-wrap items-center gap-4" role="group" aria-label="Sales rep">
       <span className="h-9 flex items-center text-sm font-medium text-gray-400 -mr-1.5">Sales rep</span>
-      {reps.map(r => (
+      <button type="button" onClick={() => setRep(null)} aria-pressed={!repId} className={cls(!repId)}>Everyone</button>
+      {reps.map((r, i) => (
         <button key={r.id} type="button" onClick={() => setRep(repId === r.id ? null : r.id)} aria-pressed={repId === r.id}
-          title={repId === r.id ? 'Show every rep again' : `Only ${r.name}'s deals`}
-          className={`h-9 -mb-px border-b-2 text-sm font-medium transition-colors whitespace-nowrap ${repId === r.id ? 'border-[var(--brand-600)] text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
-          {r.name}
+          title={`Only ${r.name}'s deals`} className={cls(repId === r.id)}>
+          {short(r, i) || r.name}
         </button>
       ))}
     </div>

@@ -145,6 +145,16 @@ export function jobLastName(job) {
   const words = c.replace(/[()]/g, ' ').split(/\s+/).filter(w => w && !/^(jr|sr|ii|iii|iv)\.?$/i.test(w))
   return (words[words.length - 1] || c).replace(/[.,;]+$/, '').toUpperCase()
 }
+// Who an invoice is for, short: last name and first initial ("Kimberly Tarbox"
+// and "TARBOX, Kimberly" → "TARBOX, K."; "Keith & Amy Allen" → "ALLEN, K.").
+export function jobForName(job) {
+  const c = String(job?.client || job?.name || '').trim()
+  const last = jobLastName(job)
+  if (!last) return '—'
+  const first = c.includes(',') ? c.split(',').slice(1).join(' ').trim() : c
+  const initial = (first.match(/[A-Za-z]/) || [''])[0].toUpperCase()
+  return initial && first.toUpperCase() !== last ? `${last}, ${initial}.` : last
+}
 // The street part of the job's address ("1502 Old Tara Lane, Fort Mill, SC" →
 // "1502 Old Tara Lane") and its house number ("1502").
 export const jobStreet = (job) => String(job?.address || '').split(',')[0].trim()
@@ -199,15 +209,16 @@ export function nextInvoiceNumber(invoices = [], kind = 'progress') {
   return kind === 'change' ? `A${next}` : String(next)
 }
 
+// Soft tags (tinted background, dark text), as in the rebuild screenshots.
 export const STATUS_STYLE = {
-  outstanding: { label: 'Outstanding', cls: 'bg-amber-500 text-white' },
-  overdue:     { label: 'Overdue',     cls: 'bg-red-600 text-white' },
-  paid:        { label: 'Paid',        cls: 'bg-gray-400 text-white' },
+  outstanding: { label: 'Outstanding', cls: 'bg-orange-50 text-orange-800' },
+  overdue:     { label: 'Overdue',     cls: 'bg-red-50 text-red-800' },
+  paid:        { label: 'Paid',        cls: 'bg-emerald-50 text-emerald-800' },
   draft:       { label: 'Draft',       cls: 'bg-gray-100 text-gray-600' },
   void:        { label: 'Void',        cls: 'bg-gray-100 text-gray-400 line-through' },
-  open:        { label: 'Open',        cls: 'bg-green-600 text-white' },
-  active:      { label: 'Active',      cls: 'bg-green-500 text-white' },   // an open PO, as Knowify shows it
-  closed:      { label: 'Closed',      cls: 'bg-gray-400 text-white' },
+  open:        { label: 'Open',        cls: 'bg-[var(--brand-50)] text-[var(--brand-800)]' },
+  active:      { label: 'Active',      cls: 'bg-[var(--brand-50)] text-[var(--brand-800)]' },   // an open PO, as Knowify shows it
+  closed:      { label: 'Closed',      cls: 'bg-gray-100 text-gray-600' },
 }
 
 // Banner totals: outstanding, due within N days, overdue (amount + count).

@@ -483,7 +483,7 @@ export default function Settings() {
   const canBrand   = canCustomizeBranding(plan) && canManage
 
   // Keep preview in sync
-  const brandOpts = () => ({ sidebar: sidebarColor, sidebarDark: sidebarDark || null, accent: accentColor || null, background: bgColor || null, backgroundDark: bgDark || null, badge: badgeColor || null })
+  const brandOpts = () => ({ office: true, sidebar: sidebarColor, sidebarDark: sidebarDark || null, accent: accentColor || null, background: bgColor || null, backgroundDark: bgDark || null, badge: badgeColor || null })
   useEffect(() => {
     applyBrandStyles(primaryColor, brandOpts())
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -526,7 +526,7 @@ export default function Settings() {
     setPrimaryColor(FREE_PRIMARY_COLOR)
     setSidebarColor(FREE_SIDEBAR_COLOR)
     setAccentColor('')
-    applyBrandStyles(FREE_PRIMARY_COLOR, { sidebar: FREE_SIDEBAR_COLOR })
+    applyBrandStyles(FREE_PRIMARY_COLOR, { sidebar: FREE_SIDEBAR_COLOR, office: true })
     if (fileRef.current) fileRef.current.value = ''
   }
 

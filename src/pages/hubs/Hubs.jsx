@@ -67,7 +67,8 @@ export function SalesHub() {
   const old = params.get('tab')
   if (old === 'clients') return <Navigate to={`/sales?tab=proposals${q ? `&q=${encodeURIComponent(q)}` : ''}`} replace />
   if (old === 'opens') return <Navigate to="/sales?tab=proposals&opens=1" replace />
-  return <Hub layout="views" title="Sales" tabs={tabs} rememberKey="sales" actions={can('/quote') && (
+  // Sales always opens on List (the owner's call); Board is one click away
+  return <Hub layout="views" title="Sales" tabs={tabs} defaultTab="proposals" actions={can('/quote') && (
     <button onClick={() => navigate('/quote')} className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)]">+ New quote</button>
   )} />
 }

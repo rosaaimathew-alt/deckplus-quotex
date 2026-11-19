@@ -12,22 +12,22 @@ export const btnGhost = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg t
 
 export function StatusPill({ status, className = '' }) {
   const st = STATUS_STYLE[status] || { label: status, cls: 'bg-gray-100 text-gray-600' }
-  return <span className={`inline-flex items-center justify-center text-xs font-semibold rounded-md px-2.5 py-1 min-w-[92px] ${st.cls} ${className}`}>{st.label}</span>
+  return <span className={`inline-flex items-center justify-center text-xs font-semibold rounded-md px-2.5 py-1 ${st.cls} ${className}`}>{st.label}</span>
 }
 
 // Outstanding / due soon / overdue strip — one line each, like Knowify:
 // "Outstanding: $2,827,834.91 (160)".
 export function DueBanner({ sum, soonLabel, counts = true }) {
   const cell = (label, amt, count, tone) => (
-    <p className="text-center text-[17px] text-gray-800 px-2">
-      {label}: <span className={tone}>{money(amt)}{counts ? ` (${count})` : ''}</span>
+    <p className="text-[15px] text-gray-600">
+      {label}: <span className={`font-semibold tabular-nums ${tone}`}>{money(amt)}{counts ? ` (${count})` : ''}</span>
     </p>
   )
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-2 border-amber-300 bg-amber-50 rounded-2xl px-4 py-4">
-      {cell('Outstanding', sum.outstanding, sum.outstandingCount, 'text-amber-600')}
-      {cell(soonLabel, sum.dueSoon, sum.dueSoonCount, 'text-amber-600')}
-      {cell('Overdue', sum.overdue, sum.overdueCount, 'text-red-600')}
+    <div className="flex flex-wrap items-center gap-x-10 gap-y-1 bg-white border border-gray-200 rounded-xl px-5 py-3.5">
+      {cell('Outstanding', sum.outstanding, sum.outstandingCount, 'text-amber-700')}
+      {cell(soonLabel, sum.dueSoon, sum.dueSoonCount, 'text-amber-700')}
+      {cell('Overdue', sum.overdue, sum.overdueCount, sum.overdue > 0 ? 'text-red-700' : 'text-emerald-700')}
     </div>
   )
 }
@@ -42,7 +42,7 @@ export const btnHeadPrimary = 'inline-flex items-center gap-1.5 px-4 py-2.5 roun
 export function PageHead({ title, children }) {
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap">
-      <h1 className="qx-sans text-[28px] sm:text-[32px] font-bold text-gray-900 leading-tight">{title}</h1>
+      <h1 className="qx-sans text-2xl font-bold text-gray-900 leading-tight">{title}</h1>
       {children && <div className="flex items-center gap-2 flex-wrap">{children}</div>}
     </div>
   )
@@ -125,8 +125,8 @@ export function FilterGroup({ title, options, value, onChange }) {
 export function StatusCell({ status }) {
   const st = STATUS_STYLE[status] || { label: status, cls: 'bg-gray-100 text-gray-600' }
   return (
-    <td className="w-[124px] min-w-[116px] pl-3 pr-1.5 py-2.5">
-      <span className={`flex items-center justify-center min-h-[48px] rounded-xl px-2 text-center text-[15px] font-semibold ${st.cls}`}>{st.label}</span>
+    <td className="w-[124px] min-w-[116px] pl-4 pr-1.5 py-2.5">
+      <span className={`flex items-center justify-center min-h-[30px] rounded-md px-1 text-center text-[13px] font-semibold ${st.cls}`}>{st.label}</span>
     </td>
   )
 }
@@ -207,13 +207,13 @@ export function usePaged(rows, size = 20) {
 
 // Sortable header cell.
 export function Th({ children, sortKey, sort, setSort, className = '' }) {
-  const base = `px-2 py-3.5 text-[15px] font-semibold whitespace-nowrap ${className}`
-  if (!sortKey) return <th className={`${base} text-gray-600`}>{children}</th>
+  const base = `px-2 py-3 text-[13px] font-semibold whitespace-nowrap ${className}`
+  if (!sortKey) return <th className={`${base} text-gray-500`}>{children}</th>
   const on = sort.key === sortKey
   return (
-    <th className={`${base} ${on ? 'text-gray-900' : 'text-gray-600'}`}>
-      <button onClick={() => setSort({ key: sortKey, dir: on && sort.dir === 'desc' ? 'asc' : 'desc' })} className="inline-flex items-center gap-1 hover:text-gray-900">
-        {children}<span className={`text-sm ${on ? 'text-[var(--brand-600)]' : 'text-gray-400'}`}>{on ? (sort.dir === 'desc' ? '↓' : '↑') : '↑'}</span>
+    <th className={`${base} ${on ? 'text-gray-900' : 'text-gray-500'}`}>
+      <button onClick={() => setSort({ key: sortKey, dir: on && sort.dir === 'desc' ? 'asc' : 'desc' })} className="group inline-flex items-center gap-1 hover:text-gray-900">
+        {children}<span className={`text-sm ${on ? 'text-[var(--brand-600)]' : 'text-gray-400 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'}`}>{on ? (sort.dir === 'desc' ? '↓' : '↑') : '↑'}</span>
       </button>
     </th>
   )
