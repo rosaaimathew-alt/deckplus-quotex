@@ -823,7 +823,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
         <tr className="border-t border-gray-50 hover:bg-gray-50 align-top">
           <td className="px-4 py-3">
             <p className="font-medium text-gray-900">{p.client || <span className="text-gray-400 italic">No name</span>}</p>
-            {p.email && <p className="text-xs text-gray-400 mt-0.5">{p.email}</p>}
+            {(p.projectTypes || []).length > 0 && <p className="text-xs text-gray-500 mt-0.5">{p.projectTypes.join(' + ')}</p>}
             {p.winLossReason?.category && (
               <span className={`inline-block mt-1 text-xs px-1.5 py-0.5 rounded font-medium ${p.status === 'Won' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
                 {p.winLossReason.category}
@@ -1084,68 +1084,85 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
 }
 
 // ── Pipeline / Kanban View ─────────────────────────────────────────────────
+// The card's next step: the earliest follow-up you set (late ones in orange),
+// or "Not sent yet" on a draft.
+function nextStepOf(p) {
+  const due = (p.reminders || []).filter(r => !r.dismissed).map(r => ({ r, d: nextReminderDate(r) })).filter(x => x.d)
+    .sort((a, b) => a.d.localeCompare(b.d))[0]
+  if (due) {
+    const late = isOverdue(due.d)
+    const when = new Date(`${due.d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return { text: `${due.r.note || 'Follow up'} · ${late ? `was due ${when}` : when}`, late }
+  }
+  if (p.status === 'Draft') return { text: 'Not sent yet', late: false }
+  return null
+}
+
+// The four open stages always show; Won, Lost, MIA and Archived only when the
+// filter brings cards into them.
+const BOARD_ALWAYS = ['Draft', 'Sent', 'Followed Up', 'Negotiating']
+
 function PipelineView({ proposals, onStatusChange, showRep }) {
   const members = useStore(s => s.members)
   const phone = useIsPhone()
+  const navigate = useNavigate()
+  const columns = PROPOSAL_STATUSES.filter(st => BOARD_ALWAYS.includes(st) || proposals.some(p => p.status === st))
   return (
     <div className={phone ? 'space-y-3 pb-4' : 'grid gap-3 pb-4 items-start grid-cols-[repeat(auto-fill,minmax(13rem,1fr))]'}>
-      {PROPOSAL_STATUSES.map(status => {
+      {columns.map(status => {
         const cards = proposals.filter(p => p.status === status)
         const colTotal = cards.reduce((s, p) => s + (p.total || 0), 0)
         // Phone: an empty stage is one thin line, so the stages with deals in them come first to the eye
         if (phone && cards.length === 0) return (
-          <div key={status} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 bg-gray-50">
-            <span className={`text-xs font-bold uppercase tracking-wider opacity-60 ${STATUS_STYLES[status].split(' ')[1]}`}>{status}</span>
+          <div key={status} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 bg-white">
+            <span className="text-sm font-semibold text-gray-500">{status}</span>
             <span className="text-xs text-gray-400 font-medium">0</span>
           </div>
         )
         return (
           <div key={status} className="min-w-0">
-            {/* Column header */}
-            <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border border-b-0 border-gray-200 bg-gray-50`}>
-              <span className={`text-xs font-bold uppercase tracking-wider ${STATUS_STYLES[status].split(' ')[1]}`}>{status}</span>
-              <span className="text-xs text-gray-400 font-medium">{cards.length}{phone && cards.length > 0 ? ` · ${fmtShort(colTotal)}` : ''}</span>
+            {/* Column header: stage, how many, how much */}
+            <div className="flex items-baseline justify-between px-1 pb-2">
+              <span className="text-sm font-semibold text-gray-800">{status}</span>
+              <span className="text-xs text-gray-500 tabular-nums">{cards.length}{cards.length > 0 ? ` · ${fmtShort(colTotal)}` : ''}</span>
             </div>
-            {/* Cards */}
-            <div className={`border border-t-0 rounded-b-lg space-y-2 p-2 border-gray-200 bg-gray-50 ${phone ? '' : 'min-h-32'}`}>
+            <div className={`space-y-2 ${phone ? '' : 'min-h-24'}`}>
               {cards.length === 0 && (
-                <p className="text-xs text-gray-300 text-center py-4 italic">Empty</p>
+                <p className="text-xs text-gray-400 text-center py-6 rounded-lg border border-dashed border-gray-200">Nothing here</p>
               )}
-              {cards.map(p => (
-                <div key={p.id} className="bg-white rounded-lg border border-gray-100 shadow-sm p-3">
-                  <p className={`text-sm font-semibold text-gray-800 ${phone ? 'break-words' : 'truncate'}`}>{p.client || 'Unnamed'}</p>
-                  <p className="text-xs text-[var(--brand-600)] font-medium mt-0.5">${fmt(p.total || 0)}</p>
-                  {showRep && repName(members, p.ownerId) && <p className="text-xs text-gray-500 mt-0.5">Rep: {repName(members, p.ownerId)}</p>}
-                  {p.email && <p className="text-xs text-gray-400 truncate mt-0.5">{p.email}</p>}
-                  {/* Active reminder indicator */}
-                  {(p.reminders || []).some(r => !r.dismissed && isOverdue(nextReminderDate(r))) && (
-                    <div className="flex items-center gap-1 mt-1.5 text-xs text-red-600">
-                      <AlertCircle size={10} /> Follow-up overdue
+              {cards.map(p => {
+                const next = nextStepOf(p)
+                const what = (p.projectTypes || []).join(' + ')
+                return (
+                  <div key={p.id} className="bg-white rounded-lg border border-gray-200 p-3">
+                    <button onClick={() => openProposal(p, navigate)} className={`block w-full text-left text-sm font-semibold text-gray-900 hover:text-[var(--brand-700)] ${phone ? 'break-words' : 'truncate'}`}>{p.client || 'Unnamed'}</button>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate"><span className="font-semibold text-gray-800 tabular-nums">${Math.round(p.total || 0).toLocaleString('en-US')}</span>{what ? ` · ${what}` : ''}</p>
+                    {showRep && repName(members, p.ownerId) && <p className="text-xs text-gray-500 mt-0.5">{repName(members, p.ownerId)}</p>}
+                    {next && (
+                      <p className={`inline-block max-w-full truncate text-xs mt-1.5 rounded px-1.5 py-0.5 ${next.late ? 'bg-orange-50 text-orange-800 font-medium' : 'bg-[var(--brand-50)] text-[var(--brand-800)]'}`}>{next.text}</p>
+                    )}
+                    {p.winLossReason?.category && (
+                      <p className={`text-xs mt-1 font-medium ${p.status === 'Won' ? 'text-green-600' : 'text-red-500'}`}>
+                        {p.winLossReason.category}
+                      </p>
+                    )}
+                    {/* Move status — single dropdown (reuses the status list) */}
+                    <div className="mt-2">
+                      <select
+                        value=""
+                        aria-label={`Move ${p.client || 'this quote'} to another stage`}
+                        onChange={e => { if (e.target.value) onStatusChange(p, e.target.value) }}
+                        className={`w-full bg-white border border-gray-200 rounded-md px-2 text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] ${phone ? 'h-10 text-sm' : 'py-1 text-xs'}`}
+                      >
+                        <option value="">Move to…</option>
+                        {PROPOSAL_STATUSES.filter(s => s !== status).map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
                     </div>
-                  )}
-                  {p.winLossReason?.category && (
-                    <p className={`text-xs mt-1 font-medium ${p.status === 'Won' ? 'text-green-600' : 'text-red-500'}`}>
-                      {p.winLossReason.category}
-                    </p>
-                  )}
-                  {/* Move status — single dropdown (reuses the status list) */}
-                  <div className="mt-2">
-                    <select
-                      value=""
-                      onChange={e => { if (e.target.value) onStatusChange(p, e.target.value) }}
-                      className={`w-full bg-white border border-gray-200 rounded-md px-2 text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] ${phone ? 'h-10 text-sm' : 'py-1 text-xs'}`}
-                    >
-                      <option value="">Move to…</option>
-                      {PROPOSAL_STATUSES.filter(s => s !== status).map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
                   </div>
-                </div>
-              ))}
-              {cards.length > 0 && !phone && (
-                <p className="text-xs text-gray-400 text-right font-medium px-1 pt-1">{fmtShort(colTotal)}</p>
-              )}
+                )
+              })}
             </div>
           </div>
         )

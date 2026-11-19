@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CalendarDays } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { useNav } from '../nav'
 import { attentionItems, isJobClosed, isJob } from '../lib/attention'
@@ -7,10 +7,14 @@ import { getStages } from './Jobs'
 import NeedsAttention from '../components/NeedsAttention'
 import { TodoCard } from '../components/TodoPanel'
 import PMCalendar from './PMCalendar'
+import StatCard from '../components/StatCard'
+import { jobPhaseOf, subStartedIds } from '../lib/jobPhase'
+import { usePermitDesk } from '../lib/permitDesk'
 
 // ── Project manager home ─────────────────────────────────────────────────────
-// What needs scheduling or setup first, this week's milestones and the team
-// to-do list, then the job calendar PMs plan from all day.
+// Four numbers (active jobs, starts and inspections this week, jobs with no
+// start date), what needs scheduling or setup, this week's milestones and the
+// team to-do list, then the job calendar PMs plan from all day.
 
 const ymd = (d) => d.toISOString().split('T')[0]
 
@@ -19,6 +23,18 @@ export default function PMHome() {
   const { can, role } = useNav()
   const me = useStore(s => s.me)
   const items = attentionItems({ proposals, can, role })
+  const navigate = useNavigate()
+  const subTasks = useStore(s => s.subTasks)
+  const desk = usePermitDesk()
+  const counts = useMemo(() => {
+    const started = subStartedIds(subTasks)
+    const open = proposals.filter(p => isJob(p) && !isJobClosed(p))
+    return {
+      open: open.length,
+      active: open.filter(p => jobPhaseOf(p, started) === 'active').length,
+      noDate: open.filter(p => p.status === 'Won' && !p.jobData?.startDate).length,
+    }
+  }, [proposals, subTasks])
 
   // Milestones dated in the next 7 days, not yet done
   const week = useMemo(() => {
@@ -54,12 +70,17 @@ export default function PMHome() {
           <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}!</h1>
           <p className="text-sm text-gray-400 mt-0.5">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
         </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard label="Active jobs" value={counts.active} sub={`${counts.open} open in all`} onClick={() => navigate('/projects?tab=jobs')} />
+          <StatCard label="Starting this week" value={week.filter(w => w.stage === 'Job starts').length} sub={week.filter(w => w.stage === 'Job starts').map(w => w.client).slice(0, 2).join(', ') || 'none'} onClick={() => navigate('/projects?tab=calendar')} />
+          <StatCard label="Inspections this week" value={desk.scheduled} sub={desk.failed ? `${desk.failed} failed · re-inspect` : 'none failed'} onClick={() => navigate('/projects?tab=inspections')} />
+          <StatCard label="Need a start date" value={counts.noDate} sub="sold jobs" tone={counts.noDate ? 'text-amber-700' : 'text-gray-900'} onClick={() => navigate('/projects?tab=calendar')} />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-5">
             <NeedsAttention items={items} />
             <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
-                <CalendarDays size={15} className="text-[var(--brand-600)]" />
                 <p className="text-sm font-semibold text-gray-900">This week</p>
               </div>
               {week.length === 0 ? (
