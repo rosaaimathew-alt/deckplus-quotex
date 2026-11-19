@@ -38,14 +38,28 @@ function RoleHome() {
   const me = useStore(s => s.me)
   const homePages = useStore(s => s.homePages)
   const location = useLocation()
-  const own = role === 'manager' ? (homePages?.[me?.id] || (me?.role === 'office' ? 'office' : '')) : ''
-  // The owner's view is the owner's alone (the person whose Today page is
-  // "Owner"): nobody else can flip to it or preview it.
-  const isOwner = own === 'owner'
+  // The owner's view is the owner's alone (ownerUserId, the company owner's
+  // login): nobody else gets it, flips to it or previews it, whatever page
+  // they were given.
+  const ownerUserId = useStore(s => s.ownerUserId)
+  const isOwner = !!me?.id && String(me.id) === String(ownerUserId || '')
+  const given = role === 'manager' ? (homePages?.[me?.id] || (me?.role === 'office' ? 'office' : '')) : ''
+  const own = given === 'owner' && !isOwner ? (me?.role === 'office' ? 'office' : '') : given
   const asked = role === 'manager' ? new URLSearchParams(location.search).get('home') : null
   const preview = asked === 'owner' && !isOwner ? null : asked
-  const picked = preview || own
-  const pill = null
+  // The owner flips their Today page between their own and the owner's view
+  // (the pill beside the greeting); remembered on this device.
+  const [ownerView, setOwnerView] = useState(() => { try { return localStorage.getItem('qx_today_owner') === '1' } catch { return false } })
+  const flip = (on) => { setOwnerView(on); try { localStorage.setItem('qx_today_owner', on ? '1' : '0') } catch { /* private mode */ } }
+  const picked = preview || (isOwner && ownerView && own !== 'owner' ? 'owner' : own)
+  const pill = isOwner && own !== 'owner' && !preview ? (
+    <span className="inline-flex rounded-full border border-gray-300 bg-white p-0.5 text-xs font-semibold" role="group" aria-label="Which Today page">
+      {[[false, 'My view'], [true, 'Owner view']].map(([on, label]) => (
+        <button key={label} type="button" onClick={() => flip(on)} aria-pressed={ownerView === on}
+          className={`px-3 py-1 rounded-full transition-colors ${ownerView === on ? 'bg-[var(--brand-600)] text-white' : 'text-gray-600 hover:text-gray-900'}`}>{label}</button>
+      ))}
+    </span>
+  ) : null
   const home = role === 'pm' ? <PMHome />
     : picked === 'owner' ? <OwnerHome pill={pill} />
     : picked === 'permits' ? <OfficeHome permits pill={pill} />
