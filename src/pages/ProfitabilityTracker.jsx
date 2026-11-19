@@ -33,121 +33,6 @@ const MARGIN_BAR = (m) => {
   return 'bg-red-400'
 }
 
-// ── Cost Editor ───────────────────────────────────────────────────────────────
-function CostEditor({ proposal, existing, onSave, onDelete, onClose }) {
-  const [form, setForm] = useState({
-    materials:     existing?.materials     ?? '',
-    labor:         existing?.labor         ?? '',
-    subcontractors:existing?.subcontractors ?? '',
-    other:         existing?.other         ?? '',
-    notes:         existing?.notes         ?? '',
-  })
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  const totalCost = ['materials', 'labor', 'subcontractors', 'other']
-    .reduce((s, k) => s + (Number(form[k]) || 0), 0)
-  const revenue = wonRevenueOf(proposal)
-  const profit  = revenue - totalCost
-  const margin  = revenue > 0 ? (profit / revenue) * 100 : 0
-
-  const FIELDS = [
-    { key: 'materials',      label: 'Materials',       icon: Package },
-    { key: 'labor',          label: 'Labor',           icon: Hammer  },
-    { key: 'subcontractors', label: 'Subcontractors',  icon: Users   },
-    { key: 'other',          label: 'Other / Overhead',icon: MoreHorizontal },
-  ]
-
-  return (
-    <div className="bg-gray-50 border-t border-gray-200 px-5 py-4">
-      <div className="max-w-2xl">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">
-            Actual Job Costs — {proposal.client}
-          </p>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={15} /></button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          {FIELDS.map(({ key, label, icon: Icon }) => (
-            <div key={key}>
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 mb-1">
-                <Icon size={11} /> {label}
-              </label>
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="w-full pl-6 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  placeholder="0.00"
-                  value={form[key]}
-                  onChange={e => set(key, e.target.value)}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mb-3">
-          <label className="text-xs font-medium text-gray-500 block mb-1">Notes</label>
-          <textarea
-            rows={2}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-            placeholder="e.g. permit delays added labor; material overage on decking"
-            value={form.notes}
-            onChange={e => set('notes', e.target.value)}
-          />
-        </div>
-
-        {/* Live preview */}
-        <div className="flex items-center gap-6 py-2.5 px-3 bg-white rounded-lg border border-gray-200 mb-3 text-sm">
-          <div>
-            <p className="text-xs text-gray-400">Revenue</p>
-            <p className="font-semibold text-gray-900">${fmt(revenue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Total Cost</p>
-            <p className="font-semibold text-gray-900">${fmt(totalCost)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Gross Profit</p>
-            <p className={`font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>${fmt(profit)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Margin</p>
-            <p className={`font-bold ${MARGIN_COLOR(margin)}`}>{pct(margin)}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            {existing && (
-              <button
-                onClick={onDelete}
-                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700"
-              >
-                <Trash2 size={11} /> Clear costs
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button
-              onClick={() => onSave(form)}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-            >
-              <Check size={13} /> Save Costs
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ── Monthly Trend Chart ───────────────────────────────────────────────────────
 function MonthlyChart({ jobs }) {
@@ -205,17 +90,17 @@ function MonthlyChart({ jobs }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
+// When the page loaded: the date a deal with no dates of its own counts under
+const LOADED_AT = Date.now()
+
 export default function ProfitabilityTracker() {
   const proposals  = useStore(s => s.proposals)
   const jobCosts   = useStore(s => s.jobCosts)
-  const saveJobCosts   = useStore(s => s.saveJobCosts)
-  const deleteJobCosts = useStore(s => s.deleteJobCosts)
   const navigate   = useNavigate()
   // Job cost = Money's POs and bills + job receipts + older hand-entered
   // totals — the same figure as Projects › Jobs (lib/jobCost.js)
   const costOf     = useJobCostOf()
 
-  const [editingId, setEditingId] = useState(null)
   const [sortField, setSortField] = useState('closedAt')
   const [sortDir, setSortDir]     = useState('desc')
   const [filterHasCosts, setFilterHasCosts] = useState('all')
@@ -225,7 +110,7 @@ export default function ProfitabilityTracker() {
   // "pay yourself first." Period scopes every metric; defaults to this year.
   const CURRENT_YEAR = new Date().getFullYear()
   const [statsYear, setStatsYear] = useState(CURRENT_YEAR)
-  const saleYearOf = (p) => new Date(p.closedAt || p.sentAt || p.createdAt || Date.now()).getFullYear()
+  const saleYearOf = (p) => new Date(p.closedAt || p.sentAt || p.createdAt || LOADED_AT).getFullYear()
 
   const wonJobs = useMemo(
     () => proposals.filter(p => p.status === 'Won'),
@@ -278,7 +163,7 @@ export default function ProfitabilityTracker() {
     // Group by month of createdAt
     const map = {}
     proposals.forEach(p => {
-      const d = new Date(p.createdAt || Date.now())
+      const d = new Date(p.createdAt || LOADED_AT)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       if (!map[key]) map[key] = { label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), total: 0, won: 0 }
       map[key].total++
@@ -316,7 +201,8 @@ export default function ProfitabilityTracker() {
     else { setSortField(field); setSortDir('desc') }
   }
 
-  const SortIcon = ({ field }) =>
+  // the sort arrow beside a column heading (a plain call, not a component made during render)
+  const sortIcon = (field) =>
     sortField !== field ? null
       : sortDir === 'asc' ? <ChevronUp size={11} className="ml-0.5" />
       : <ChevronDown size={11} className="ml-0.5" />
@@ -378,7 +264,7 @@ export default function ProfitabilityTracker() {
                   className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-28 cursor-pointer hover:text-gray-700"
                   onClick={() => toggleSort('rev')}
                 >
-                  <span className="flex items-center justify-end">Revenue <SortIcon field="rev" /></span>
+                  <span className="flex items-center justify-end">Revenue {sortIcon('rev')}</span>
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">
                   Cost
@@ -387,19 +273,19 @@ export default function ProfitabilityTracker() {
                   className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-28 cursor-pointer hover:text-gray-700"
                   onClick={() => toggleSort('profit')}
                 >
-                  <span className="flex items-center justify-end">Profit <SortIcon field="profit" /></span>
+                  <span className="flex items-center justify-end">Profit {sortIcon('profit')}</span>
                 </th>
                 <th
                   className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-24 cursor-pointer hover:text-gray-700"
                   onClick={() => toggleSort('margin')}
                 >
-                  <span className="flex items-center justify-end">Margin <SortIcon field="margin" /></span>
+                  <span className="flex items-center justify-end">Margin {sortIcon('margin')}</span>
                 </th>
                 <th
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-24 cursor-pointer hover:text-gray-700"
                   onClick={() => toggleSort('closedAt')}
                 >
-                  <span className="flex items-center">Date <SortIcon field="closedAt" /></span>
+                  <span className="flex items-center">Date {sortIcon('closedAt')}</span>
                 </th>
                 <th className="px-4 py-3 w-24"></th>
               </tr>
@@ -409,7 +295,7 @@ export default function ProfitabilityTracker() {
                 <Fragment key={job.id}>
                   <tr
                     key={job.id}
-                    className={`border-t border-gray-50 hover:bg-gray-50 align-top ${editingId === job.id ? 'bg-blue-50/30' : ''}`}
+                    className="border-t border-gray-50 hover:bg-gray-50 align-top"
                   >
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{job.client || <span className="text-gray-400 italic">Unnamed</span>}</p>
@@ -462,48 +348,9 @@ export default function ProfitabilityTracker() {
                         >
                           <Eye size={13} />
                         </button>
-                        <button
-                          onClick={() => setEditingId(editingId === job.id ? null : job.id)}
-                          className={`p-1.5 rounded transition-colors ${
-                            editingId === job.id
-                              ? 'text-blue-600 bg-blue-100'
-                              : 'text-gray-300 hover:text-blue-600 hover:bg-blue-50'
-                          }`}
-                          title="Other costs not in Money (entered by hand)"
-                        >
-                          <Edit3 size={13} />
-                        </button>
-                        {jobCosts[job.id] && editingId !== job.id && (
-                          <button
-                            onClick={() => { deleteJobCosts(job.id); setEditingId(null) }}
-                            className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50"
-                            title="Clear the hand-entered costs"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>
-                  {editingId === job.id && (
-                    <tr key={`${job.id}-editor`} className="border-t border-blue-100">
-                      <td colSpan={7} className="p-0">
-                        <CostEditor
-                          proposal={job}
-                          existing={jobCosts[job.id] || null}
-                          onSave={(costs) => {
-                            saveJobCosts(job.id, costs)
-                            setEditingId(null)
-                          }}
-                          onDelete={() => {
-                            deleteJobCosts(job.id)
-                            setEditingId(null)
-                          }}
-                          onClose={() => setEditingId(null)}
-                        />
-                      </td>
-                    </tr>
-                  )}
                 </Fragment>
               ))}
             </tbody>

@@ -1613,49 +1613,29 @@ function PaymentReminderModal({ proposal, onClose }) {
 
 // ── Close-Out Modal ──────────────────────────────────────────────────────────
 function CloseOutModal({ proposal, onClose }) {
-  const { toggleJobStage, updateJobData, saveJobCosts } = useStore()
-  const money = useJobMoney()   // off: no profit entry at close-out
+  const { toggleJobStage, updateJobData } = useStore()
+  const money = useJobMoney()   // off: the job's profit isn't shown at close-out
   const draft = proposal.contractDraft || {}
   const contractNum = draft.contractNum || contractNumberFor(proposal.id)
   const projectTypes = (draft.projectTypes || []).join(', ') || ''
 
-  // Job revenue (signed contract + approved change orders) — the base for margin.
-  const revenue = contractTotalOf(proposal) + approvedChangeOrderTotal(proposal)
-
   const [completionDate, setCompletionDate] = useState(today())
-  // Costs already recorded (Money's POs and bills, job receipts) — not counting
-  // an older hand-entered total, which this close-out replaces.
+  // The job's numbers from the books (lib/jobCost.js): revenue is the signed contract plus
+  // approved change orders; cost is its POs, bills and receipts. Profit is what they say,
+  // shown here and never typed over.
   const costOf = useJobCostOf()
   const fin = costOf(proposal)
   // A job is closed only once every payment is collected and entered (Money › Invoices / the job's payments)
   const owed = Math.round((Number(fin.balanceDue) || 0) * 100) / 100
-  const legacy = useStore(s => s.jobCosts?.[proposal.id])
-  const legacyCost = ['materials', 'labor', 'subcontractors', 'other'].reduce((t, k) => t + (Number(legacy?.[k]) || 0), 0)
-  const recordedCost = Math.max(0, fin.actualCost - legacyCost)
-  // Starts at what the books say; the PM can still correct it
-  const [profit, setProfit] = useState(() => (recordedCost > 0 ? String(Math.round(revenue - recordedCost)) : ''))   // total profit $ achieved
   const [sendEmail, setSendEmail] = useState(true)
   const [closing, setClosing] = useState(false)
   const [error, setError] = useState('')
-
-  // Two-way link between profit $ and margin %, both derived from revenue.
-  const marginVal = (revenue > 0 && profit !== '' && !Number.isNaN(Number(profit)))
-    ? +((Number(profit) / revenue) * 100).toFixed(1) : ''
-  const onMargin = (v) => setProfit(revenue > 0 && v !== '' ? String(Math.round(revenue * (Number(v) || 0) / 100)) : '')
 
   const closeOut = async () => {
     if (owed > 0) return
     setClosing(true); setError('')
     try {
       updateJobData(proposal.id, { completionDate, closedAt: new Date().toISOString() })
-      // If a profit was entered, record the cost the books don't already
-      // have (revenue - profit - recorded costs), so Insights › Profit shows
-      // exactly this profit without counting the POs and bills twice.
-      if (profit !== '' && !Number.isNaN(Number(profit))) {
-        const p = Number(profit)
-        const gap = Math.max(0, revenue - p - recordedCost)
-        if (gap > 0 || legacy) saveJobCosts(proposal.id, { other: gap, enteredProfit: p, source: 'manual-closeout' })
-      }
       toggleJobStage(proposal.id, 'payment')
       toggleJobStage(proposal.id, 'closed')
 
@@ -1704,26 +1684,13 @@ function CloseOutModal({ proposal, onClose }) {
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
           </div>
 
-          {/* Profit achieved — optional, feeds the Profitability tracker */}
+          {/* The job's profit, from the books: shown, never typed over */}
           {money && (
-          <div className="border border-gray-200 rounded-xl p-3">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-700">Profit on this job <span className="font-normal text-gray-400">(optional)</span></label>
-              <span className="text-xs text-gray-400">Revenue ${fmtDol(revenue)}{recordedCost > 0 ? ` · costs on file $${fmtDol(recordedCost)}` : ''}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="block text-[11px] text-gray-500 mb-0.5">Profit $</span>
-                <input type="number" value={profit} onChange={e => setProfit(e.target.value)} placeholder="0"
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
-              </div>
-              <div>
-                <span className="block text-[11px] text-gray-500 mb-0.5">Margin %</span>
-                <input type="number" value={marginVal} onChange={e => onMargin(e.target.value)} placeholder="0"
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
-              </div>
-            </div>
-            <p className="text-[11px] text-gray-400 mt-1.5">Enter either one — it logs to your Profitability metrics. Leave blank to skip.</p>
+          <div className="border border-gray-200 rounded-xl p-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <span className="text-gray-500">Revenue</span><span className="text-right text-gray-900">${fmtDol(fin.revenue)}</span>
+            <span className="text-gray-500">Costs on file</span><span className="text-right text-gray-900">${fmtDol(fin.actualCost)}</span>
+            <span className="font-semibold text-gray-900">Profit</span>
+            <span className="text-right font-semibold text-gray-900">${fmtDol(fin.profit)}{fin.margin != null ? <span className="font-normal text-gray-500"> · {fin.margin.toFixed(1)}%</span> : null}</span>
           </div>
           )}
 
