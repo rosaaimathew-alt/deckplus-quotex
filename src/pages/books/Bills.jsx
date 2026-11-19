@@ -4,7 +4,7 @@
 // fixed and operating costs the CFO tracks.
 import FitTable from '../../components/FitTable'
 import { useMemo, useState } from 'react'
-import { Plus, CheckSquare, Trash2 } from 'lucide-react'
+import { Plus, CheckSquare, Trash2, Printer } from 'lucide-react'
 import { useStore } from '../../store'
 import SubDrawsReview from './SubDrawsReview'
 import {
@@ -18,6 +18,34 @@ import {
 } from './ui'
 
 const STATUS_FILTERS = [['open', 'Unpaid'], ['outstanding', 'Outstanding'], ['overdue', 'Overdue'], ['paid', 'Paid'], ['all', 'All']]
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
+// One bill on a page of its own, for the paper file (same look as a printed invoice).
+function printBill(b, job, branding = {}) {
+  const total = Number(b.total) || 0, balance = billBalance(b), pays = b.payments || []
+  const forWhat = [b.poNumber ? `PO #${b.poNumber}` : '', job ? jobLabel(job) : '', !job && b.bucket ? (OVERHEAD_BUCKETS.find(x => x.key === b.bucket)?.label || b.bucket) : '', b.category || ''].filter(Boolean)
+  const w = window.open('', '_blank')
+  if (!w) return
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Bill ${esc(b.vendorName || '')}${b.number ? ` #${esc(b.number)}` : ''}</title>
+  <style>body{font:14px/1.45 system-ui,sans-serif;color:#111;margin:40px;max-width:760px}h1{font-size:28px;margin:0}
+  table{width:100%;border-collapse:collapse;margin-top:24px}td,th{padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:left}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280}.r{text-align:right}.muted{color:#6b7280}
+  .top{display:flex;justify-content:space-between;gap:24px}.tot td{border:0;padding:4px 6px}</style></head><body>
+  <div class="top"><div>${branding.logo ? `<img src="${esc(branding.logo)}" style="height:56px"><br>` : ''}<strong>${esc(branding.companyName || '')}</strong></div>
+  <div style="text-align:right"><h1>Bill</h1>${b.number ? `<div class="muted">Vendor invoice #${esc(b.number)}</div>` : ''}
+  <div>Bill date: ${esc(shortDate(b.date))}</div><div>Due: ${esc(shortDate(b.dueDate))}</div><div>Status: ${esc(billStatus(b))}</div></div></div>
+  <p style="margin-top:28px"><span class="muted">Payee / vendor</span><br><strong>${esc(b.vendorName || '')}</strong></p>
+  ${forWhat.length ? `<p><span class="muted">For</span><br>${forWhat.map(esc).join('<br>')}${job?.address ? `<br><span class="muted">${esc(job.address)}</span>` : ''}</p>` : ''}
+  ${pays.length ? `<table><thead><tr><th>Payment date</th><th>Method</th><th class="r">Amount</th></tr></thead><tbody>
+  ${pays.map(p => `<tr><td>${esc(shortDate(p.date))}</td><td>${esc(p.method || '')}</td><td class="r">${esc(money(p.amount))}</td></tr>`).join('')}</tbody></table>` : ''}
+  <table class="tot" style="width:280px;margin-left:auto;margin-top:12px">
+  <tr><td>Total</td><td class="r"><strong>${esc(money(total))}</strong></td></tr>
+  <tr><td>Paid</td><td class="r">${esc(money(total - balance))}</td></tr>
+  <tr><td>Balance</td><td class="r"><strong>${esc(money(balance))}</strong></td></tr></table>
+  ${b.notes ? `<p class="muted" style="margin-top:28px;white-space:pre-wrap">${esc(b.notes)}</p>` : ''}
+  <script>window.onload=()=>window.print()</script></body></html>`)
+  w.document.close()
+}
 
 // presetPo: "Enter bill" from a purchase order (Purchases › clipboard).
 export function BillModal({ bill, presetJobId = null, presetPo = null, onClose }) {
@@ -38,6 +66,8 @@ export function BillModal({ bill, presetJobId = null, presetPo = null, onClose }
   })
   const set = (patch) => setF(x => ({ ...x, ...patch }))
   const live = bill ? bills.find(b => b.id === bill.id) || bill : null
+  const branding = useStore(s => s.branding)
+  const proposals = useStore(s => s.proposals)
 
   // POs from this vendor first, open ones only (plus the one already linked).
   const poOptions = useMemo(() => purchases
@@ -70,6 +100,7 @@ export function BillModal({ bill, presetJobId = null, presetPo = null, onClose }
       footer={<>
         {bill && <button onClick={() => { if (window.confirm('Delete this bill?')) { deleteBill(bill.id); onClose() } }} className="mr-auto inline-flex items-center gap-1 text-sm text-red-600 hover:underline"><Trash2 size={14} /> Delete</button>}
         {bill && live?.status !== 'void' && <button onClick={() => { updateBill(bill.id, { status: 'void' }); onClose() }} className={btnGhost}>Void</button>}
+        {bill && <button onClick={() => printBill(live, jobIndex(proposals).get(String(live.jobId)), branding)} className={btnGhost}><Printer size={14} /> Print</button>}
         <button onClick={save} disabled={!canSave} className={btnPrimary}>{bill ? 'Save' : 'Add bill'}</button>
       </>}>
       <div className="grid sm:grid-cols-2 gap-3">
@@ -131,6 +162,7 @@ function PayBillModal({ billId, onClose }) {
 export default function Bills() {
   const bills = useStore(s => s.bills)
   const proposals = useStore(s => s.proposals)
+  const branding = useStore(s => s.branding)
   const byId = useMemo(() => jobIndex(proposals), [proposals])
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('open')
@@ -217,6 +249,7 @@ export default function Bills() {
                   <td className="px-2 text-gray-800">{r.bill.number || ''}</td>
                   <td className="px-2 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     {(r.status === 'outstanding' || r.status === 'overdue') && <RowIcon icon={CheckSquare} title="Pay bill" onClick={() => setPaying(r.bill.id)} />}
+                    <RowIcon icon={Printer} title="Print bill" onClick={() => printBill(r.bill, r.job, branding)} />
                   </td>
                 </tr>
               ))}
