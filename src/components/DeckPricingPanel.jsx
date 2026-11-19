@@ -191,6 +191,8 @@ export default function DeckPricingPanel({ onClose, onAdd, initial, saved }) {
     setSizeMode(g.sizeMode); setWidth(g.width); setDepth(g.depth); setAreaSF(g.areaSF); setOpenEdgeLF(g.openEdgeLF)
     setHeight(g.height); setSections([]); setFreestanding(g.freestanding); if (g.border) setBorder(g.border)
     setLandings(g.landings); setStairs(autoStairSteps(g.stairs, g.height, g.landings))
+    // the railing chosen in the drawing, when the deck has railing and the price list has it
+    if (g.railLF > 0 && DECK_RAILS.some(r => r.key === g.rail)) { setRail(g.rail); setBronze(!!g.bronze) }
     setQtyOv({})
   })
   const drawn = draw.last ? deckFromDrawing(draw.last, S?.drawKey) : null

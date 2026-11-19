@@ -303,6 +303,23 @@
   // Whole-build finishes (same choices as the 3D builder): decking line + color, railing,
   // skirting, house exterior, porch trim.
   const BUILD_DEF = { decking: 'enhance', color: 'enhance-toasted-sand', rail: 'hybrid', skirt: 'none', house: 'almond', trim: 'almond' };
+  // The railings on the price list (Catalog › Railing): the key the 3D draws, the name shown
+  // here, and the catalog item the quote prices.
+  const RAIL_OPTS = [
+    ['wood', '2×2 pickets, wood rail', '2x2 pickets wood rail'],
+    ['hybridwood', 'Hybrid, wood cap', 'Hybrid Railing / wood cap'],
+    ['hybrid', 'Hybrid, Trex cap', 'Hybrid Railing / trex cap'],
+    ['transcend', 'Trex Transcend', 'Trex Transcend Railing'],
+    ['selectwhite', 'Trex Select (white only)', 'Trex Select Railing WHITE ONLY'],
+    ['aluminum', 'Trex Select aluminum', 'Trex Select Alum. Railing'],
+    ['selectalum-bp', 'Trex Select aluminum, between posts only', 'Trex Select Alum. Railing BETWEEN POSTS ONLY'],
+    ['sigalum', 'Trex Signature aluminum', 'Trex SIGNATURE Alum. Railing'],
+    ['sigalum-bp', 'Trex Signature aluminum, between posts only', 'Trex SIGNATURE Alum. Railing BETWEEN POSTS ONLY'],
+    ['ttalum', 'TimberTech aluminum', 'TimberTech Alum. Railing'],
+    ['tt-bp', 'TimberTech, between posts only', 'TimberTech Railing BETWEEN POSTS ONLY'],
+    ['cable', 'TimberTech IRX cable rail', 'TimberTech IRX Cable Rail'],
+    ['ironrod', 'Iron rod railing', 'Iron Rod Railing LF'],
+  ];
   const PORCH_DEF = { ptype: 'ezebreeze', tie: 'wall', roof: 'shed', floor: 'deck', h: 3, wallH: 8, enclose: 'front2', cornerSide: 'right', sideGable: 'open', gableEnd: null };
   const S = {
     color: 'Toasted Sand', build: { ...BUILD_DEF },
@@ -692,6 +709,8 @@
     const LINE_OF = [['enhance', 'enhance'], ['lineage', 'lineage'], ['transcend', 'transcend'], ['signature', 'signature'], ['prime', 'prime'], ['terrain', 'terrain'], ['reserve', 'reserve'], ['harvest', 'harvest'], ['landmark', 'landmark'], ['vintage', 'vintage'], ['pvc', 'vintage']];
     const ln = LINE_OF.find(([k]) => coll.includes(k));
     if (ln) { S.build.decking = ln[1]; S.build.color = null; } else if (/\bpt\b|pressure/.test(coll)) { S.build.decking = 'pt'; S.build.color = 'pt-pt'; }
+    // Railing from the deck quote, by its name on the price list
+    { const rn = (DESIGN.decks || []).map(q => q.rail).find(v => v && !/^none$/i.test(v)), rk = RAIL_OPTS.find(r => r[2] === rn); if (rk) S.build.rail = rk[0]; }
     // Skirting from the deck quote: "Trex skirt", "PT skirt (stained)", "Lattice (stained)", "None".
     const sk = String((DESIGN.decks || []).map(q => q.skirt).find(v => v && !/^none$/i.test(v)) || '');
     if (sk) S.build.skirt = /lattice/i.test(sk) ? 'lattice' : /\bpt\b|pressure|wood/i.test(sk) ? 'pt' : 'horizontal';
@@ -1622,7 +1641,8 @@
       if (!OPTS) h += '<span class="ro" style="align-self:center">Loading options…</span>';
       else if (propTab === 'deck') h += grp('Decking & railing', pick('b:decking', 'Decking', OPTS.lines.map(l => [l.key, l.label]), b.decking)
           + (line && line.colors.length > 1 ? pick('b:color', 'Color', line.colors.map(c => [c.key, c.name]), b.color) : '')
-          + pick('b:rail', 'Railing', [['hybrid', 'Hybrid (white, black balusters)'], ['aluminum', 'Aluminum (all black)']], b.rail), 'all decks, stairs and landings')
+          + pick('b:rail', 'Railing', RAIL_OPTS.map(([k, n]) => [k, n]), b.rail)
+          + pick('b:infill', 'Balusters / infill', [['', 'Standard for this railing'], ['black', 'Black balusters'], ['bronze', 'Bronze balusters'], ['cable', 'Cable'], ['rod', 'Iron rod']], b.infill || ''), 'all decks, stairs and landings')
         + grp('Skirting', pick('b:skirt', 'Skirting', [['none', 'None'], ['horizontal', 'Composite, horizontal'], ['pt', 'PT boards, stained'], ['lattice', 'Lattice, stained']], b.skirt), 'decks and landings, unless one has its own');
       else if (propTab === 'porch') h += grp('Porch finishes', pick('b:trim', 'Trim color', OPTS.trims.map(x => [x.key, x.name]), b.trim), 'all porches')
         + `<span class="ro phint">Select a porch on the plan for its size, roof, walls, door, steps and skirting</span>`;
@@ -1808,7 +1828,7 @@
     const porches = S.els.filter(e => e.type === 'porch').map(e => ({ id: e.id, w: e.w, d: e.d, ptype: e.ptype, tie: e.tie, roof: e.roof,
       pitch: Number(e.pitch) > 0 ? Number(e.pitch) : null, floor: e.floor, h: e.h, wallH: e.wallH, enclose: e.enclose, doorWall: e.doorWall || 'front',
       gableEnd: e.gableEnd || null, steps: e.floor === 'deck' && e.steps !== false, stairW: e.stairW || 4, landing: e.landing || 'none', ...(e.conv ? { conv: true } : {}) }));
-    return { decks, stairs, landings, porches, build: { decking: S.build.decking, rail: S.build.rail, skirt: S.build.skirt } };
+    return { decks, stairs, landings, porches, build: { decking: S.build.decking, rail: S.build.rail, railItem: S.build.infill === 'cable' ? 'TimberTech IRX Cable Rail' : S.build.infill === 'rod' ? 'Iron Rod Railing LF' : (RAIL_OPTS.find(([k]) => k === S.build.rail) || [])[2] || '', infill: S.build.infill || '', skirt: S.build.skirt } };
   }
   function send3D(force) {
     clearTimeout(sendT);

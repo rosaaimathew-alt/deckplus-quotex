@@ -103,6 +103,8 @@ function groupTakeoff(d, { H, pieces: main, area: areaAll, lead }) {
     freestanding: !main.some(x => x.house),
     stairs, landings,
     railLF: main.reduce((a, x) => a + x.railLF, 0),
+    // the railing picked in the drawing, as the price list names it (bronze balusters are an add-on)
+    rail: d.build?.railItem || '', bronze: d.build?.infill === 'bronze',
     // picture-frame border, as the Deck Builder names it
     border: lead.border === '2' ? '2-board' : lead.border === '1' ? '1-board' : 'None',
   }
