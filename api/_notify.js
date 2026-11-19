@@ -22,6 +22,8 @@
  *   message (job chat)             → the other side of that conversation: the sub's manager,
  *                                    or the Deck Plus PM on the job
  *   todo_assigned (To-do › Shared) → the office teammate the task was given to, in the giver's name
+ *   job_ready (id = the job)        → the Deck Plus PM on the job: its last permit approval came in, the
+ *                                    job is ready to start (once per job)
  *   job_inspection (id = the job)   → the Deck Plus PM on the job: an inspection got a result, or was
  *                                    scheduled or moved (supabase/job_inspection_alerts.sql). Only
  *                                    what's new since the last alert about that job is told.
@@ -34,7 +36,7 @@ import { getKV } from './_kv.js'
 
 const TEAL = '#1d758b'
 const ORANGE = '#ea7a24'
-export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message', 'todo_assigned', 'photos', 'job_inspection']
+export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message', 'todo_assigned', 'photos', 'job_inspection', 'job_ready']
 const CHAT_QUIET_SECONDS = 300   // a back-and-forth emails each side at most once every five minutes per job
 const QUIET_SECONDS = 60   // the same alert about the same booking is not repeated inside a minute
 const PHOTO_QUIET_SECONDS = 600   // new photos on a booking: one alert per 10 minutes, however many batches
@@ -219,6 +221,18 @@ export function messageFor(info) {
         path: `/field/job/${encodeURIComponent(j.id || '')}`, cta: 'Open the job',
       }
     }
+    // The job's last permit approval came in: ready to start
+    case 'job_ready': {
+      const j = info.job || {}
+      const client = tidy(j.client, 60) || 'your job'
+      return {
+        subject: `Permit approved: ${client} is ready to start`,
+        en: `${by} recorded the permit approval for ${[tidy(j.client), tidy(j.address)].filter(Boolean).join(', ') || 'your job'}. The job is ready to start: set the start date and line up the crew.`,
+        es: null,
+        sms: `Deck Plus: permit approved, ${client} is ready to start.`,
+        path: `/field/job/${encodeURIComponent(j.id || '')}`, cta: 'Open the job',
+      }
+    }
     // A task one person in the office gave another (To-do › Shared)
     case 'todo_assigned': {
       const what = tidy(info.todo?.text, 400)
@@ -325,7 +339,7 @@ export async function sendNotification(req, res, body) {
   if (!KINDS.includes(kind) || !id) return res.status(400).json({ error: 'Unknown alert.' })
 
   // Who is told, and about what: the database decides, as the signed-in person.
-  const { data: info, error } = kind === 'job_inspection'
+  const { data: info, error } = kind === 'job_inspection' || kind === 'job_ready'
     ? await asUser(token).rpc('job_inspection_targets', { p_id: id })
     : await asUser(token).rpc('notify_targets', { p_kind: kind, p_id: id })
   if (error) return res.status(500).json({ sent: false, error: 'Could not look up who to tell.' })
@@ -343,7 +357,13 @@ export async function sendNotification(req, res, body) {
   // Chat: per conversation and direction, not per message
   const quietKey = kind === 'message' ? `notify:message:${info.message?.proposalId}:${info.message?.subId}:${info.message?.from}` : `notify:${kind}:${id}`
   // (inspections need none: they only ever tell what's new, see inspectionNews)
-  if (kind !== 'job_inspection') try {
+  // Ready to start: once per job (a permit unticked and ticked again doesn't repeat it)
+  if (kind === 'job_ready') try {
+    const kv = await getKV(), key = `notify:jobready:${id}`
+    if (await kv.get(key)) return res.status(200).json({ sent: false, reason: 'Already told.' })
+    await kv.set(key, { at: Date.now() }, { ex: 365 * 86400 })
+  } catch { /* storage hiccup: better a repeat than no alert */ }
+  if (kind !== 'job_inspection' && kind !== 'job_ready') try {
     const kv = await getKV()
     if (await kv.get(quietKey)) return res.status(200).json({ sent: false, reason: 'Already sent a moment ago.' })
     await kv.set(quietKey, { at: Date.now() }, { ex: kind === 'message' ? CHAT_QUIET_SECONDS : kind === 'photos' ? PHOTO_QUIET_SECONDS : QUIET_SECONDS })

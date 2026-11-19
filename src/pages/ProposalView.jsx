@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Printer, Copy, ArrowLeft, CheckCircle, Send, X, Loader, Link2 } from 'lucide-react'
+import { Printer, Copy, ArrowLeft, CheckCircle, Send, X, Loader, Link2, MessageSquare } from 'lucide-react'
 import { useStore } from '../store'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import { withSavedDesign } from '../lib/designSnapshot'
@@ -54,6 +54,7 @@ export default function ProposalView() {
   const [data, setData] = useState(null)
   const [copied, setCopied] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [textTo, setTextTo] = useState(null)   // "Text it": { href, phone } once the link is ready
   const [gettingLink, setGettingLink] = useState(false)
 
   // Send modal state
@@ -288,11 +289,9 @@ export default function ProposalView() {
     }
   }
 
-  // Create/refresh the permanent tracked link and copy it, so it can be pasted
-  // into your own email. Same link + open-logging as the "Send to Client" button.
-  const handleGetLink = async () => {
-    setGettingLink(true)
-    try {
+  // Create/refresh the permanent tracked link (same link + open-logging as the
+  // "Send to Client" button) → its URL.
+  const makeLink = async () => {
       const pid = proposalIdRef.current ?? data.id ?? null
       const snapshot = await withSavedDesign(buildProposalSnapshot(data, branding), pid)
       const r = await fetch('/api/sign/pcreate', {
@@ -306,9 +305,33 @@ export default function ProposalView() {
       // draft, so the next quote starts as a NEW estimate instead of editing this one.
       if (proposalIdRef.current) markProposalSent(proposalIdRef.current)
       if (data?.fromBuilder) localStorage.removeItem('quotex:draft-proposal')
-      try { await navigator.clipboard.writeText(d.url); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000) }
-      catch { window.prompt('Copy your proposal link:', d.url) }
+      return d.url
+  }
+  // …and copy it, so it can be pasted into your own email.
+  const handleGetLink = async () => {
+    setGettingLink(true)
+    try {
+      const url = await makeLink()
+      try { await navigator.clipboard.writeText(url); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000) }
+      catch { window.prompt('Copy your proposal link:', url) }
     } catch { /* no-op — user can retry */ }
+    finally { setGettingLink(false) }
+  }
+  // Text it from your own phone: Messages opens (iPhone, iPad, Mac) with the customer's
+  // number and a short note with the link filled in; you tap Send. It goes from your own
+  // number (iMessage or text), not from the app.
+  const smsHref = (url) => {
+    const digits = String(data?.phone || '').replace(/[^\d+]/g, '')
+    // "Smith, Ann" (last, first) → Ann; "Ann Smith" → Ann
+    const who = String(data?.client || ''), hi = (who.includes(',') ? who.split(',')[1] : who).split(/[\s&/]+/).filter(Boolean)[0] || ''
+    const mine = String(me?.displayName || '').split(' ')[0]
+    const body = `Hi${hi ? ` ${hi}` : ''}, here's your proposal from ${companyName && companyName !== 'QUOTEX' ? companyName : 'us'}: ${url}${mine ? `\n${mine}` : ''}`
+    return `sms:${digits}${/iphone|ipad|macintosh/i.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`
+  }
+  const handleText = async () => {
+    setGettingLink(true)
+    try { const url = await makeLink(); setTextTo({ href: smsHref(url), phone: data?.phone || '' }) }
+    catch { /* no-op — user can retry */ }
     finally { setGettingLink(false) }
   }
 
@@ -350,7 +373,29 @@ export default function ProposalView() {
             {linkCopied ? <CheckCircle size={14} className="text-[var(--brand-500)]" /> : <Link2 size={14} />}
             {gettingLink ? 'Creating…' : linkCopied ? 'Link copied!' : 'Get link'}
           </button>
+          <button
+            onClick={handleText}
+            disabled={gettingLink}
+            title="Text the link from your own phone (opens Messages)"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <MessageSquare size={14} /> Text it
+          </button>
         </div>
+        {/* The link is ready: one tap opens Messages with it filled in (a tap of its own, so phones allow it) */}
+        {textTo && (
+          <div className="no-print fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setTextTo(null)}>
+            <div className="w-full max-w-sm bg-white rounded-2xl p-5 space-y-3" onClick={e => e.stopPropagation()}>
+              <p className="font-semibold text-gray-900">Text the proposal</p>
+              <p className="text-sm text-gray-600">{textTo.phone ? `To ${textTo.phone}, from your own number.` : 'No phone number on this proposal: pick the customer in Messages.'}</p>
+              <a href={textTo.href} onClick={() => { if (proposalIdRef.current) markProposalSent(proposalIdRef.current); setTimeout(() => setTextTo(null), 300) }}
+                className="flex items-center justify-center gap-2 min-h-[48px] rounded-xl bg-[var(--brand-600)] text-white font-semibold hover:bg-[var(--brand-700)]">
+                <MessageSquare size={16} /> Open Messages
+              </a>
+              <button onClick={() => setTextTo(null)} className="w-full min-h-[44px] rounded-xl border border-gray-200 text-sm text-gray-600">Cancel</button>
+            </div>
+          </div>
+        )}
         <button
           onClick={() => { setShowSend(true); setSendSuccess(false); setSendError('') }}
           className="flex items-center gap-1.5 min-h-[44px] sm:min-h-0 px-4 py-1.5 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)]"
