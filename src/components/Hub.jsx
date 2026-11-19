@@ -83,7 +83,8 @@ export default function Hub({ title, subtitle, tabs, actions = null, defaultTab,
             })}
           </nav>
         )}
-        {actions && <div className="ml-auto flex items-center gap-2 flex-wrap">{actions}</div>}
+        {/* The open view's own button (tab.action) sits beside the main one */}
+        {(actions || current.action) && <div className="ml-auto flex items-center gap-2 flex-wrap">{current.action}{actions}</div>}
       </div>
       <div className="flex-1 qx-embedded" key={current.key}>
         {current.render()}

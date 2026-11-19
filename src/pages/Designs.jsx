@@ -33,15 +33,10 @@ export default function Designs() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl space-y-4">
-      {/* One flat line like every other list: search and whose designs on the left, the editor on the right */}
+      {/* One flat line like every other list: search and whose designs (the Design editor button is in the page header) */}
       <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200">
         <SearchLine value={q} onChange={setQ} placeholder="Search client or address" label="Search designs" />
         {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
-        {/* Free-form editor: draw decks, stair runs and landings anywhere, with live 3D */}
-        <a href="/design-editor.html" target="_blank" rel="noopener"
-          className="ml-auto flex items-center gap-1.5 px-3 h-8 my-0.5 rounded-lg text-sm font-medium text-white bg-[var(--brand-600)] hover:bg-[var(--brand-700)] whitespace-nowrap">
-          <PenTool size={15} /> Design editor
-        </a>
       </div>
 
       {rows.length === 0 ? (

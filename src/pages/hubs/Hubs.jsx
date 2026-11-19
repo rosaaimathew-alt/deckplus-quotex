@@ -54,7 +54,14 @@ export function SalesHub() {
     designs:   () => <Designs />,
     leads:     () => <Leads />,
     contracts: () => <ContractsList initialFilter={params.get('filter') || undefined} />,
-  }, { proposals: { count: dueCount, countTone: 'alert' } })
+  }, {
+    proposals: { count: dueCount, countTone: 'alert' },
+    // Free-form editor: draw decks, stair runs and landings anywhere, with live 3D
+    designs: { action: (
+      <a href="/design-editor.html" target="_blank" rel="noopener"
+        className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-800 bg-white border border-gray-300 hover:bg-gray-50 whitespace-nowrap">Design editor</a>
+    ) },
+  })
 
   // Clients and Opens now live inside Proposals (search box, Opens switch)
   const old = params.get('tab')
