@@ -8,6 +8,7 @@
 // Inventory later used on a job is logged as an *allocation* (kind:
 // 'allocation'): it adds to that job's cost and lowers inventory on hand, but
 // it is not new cash out — the purchase was already counted.
+import { shareFor, isSplit } from './split'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
 
 export const BUCKETS = [
@@ -121,7 +122,9 @@ export function jobFinancials(proposal, expenses = [], legacyCosts = null, books
   const contract = contractTotalOf(proposal)
   const changeOrders = approvedChangeOrderTotal(proposal)
   const revenue = contract + changeOrders
-  const mine = expenses.filter(e => e.jobId === proposal.id)
+  // a card charge shared by several jobs (a dump run for three) counts only this job's share
+  const mine = expenses.map(e => ({ e, share: shareFor(e, e.amount, proposal.id) })).filter(x => x.share)
+    .map(({ e, share }) => (isSplit(e) ? { ...e, amount: share, fullAmount: n(e.amount) } : e))
   const byCategory = {}
   for (const e of mine) {
     const c = isAllocation(e) ? 'Materials (from inventory)' : (e.category || 'Other job cost')

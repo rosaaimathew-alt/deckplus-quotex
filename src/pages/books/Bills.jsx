@@ -7,6 +7,8 @@ import { useMemo, useState } from 'react'
 import { Plus, CheckSquare, Trash2, Printer } from 'lucide-react'
 import { useStore } from '../../store'
 import SubDrawsReview from './SubDrawsReview'
+import JobSplit from './JobSplit'
+import { splitPatch, isSplit, splitReady } from '../../lib/split'
 import {
   OVERHEAD_BUCKETS, PO_TYPES, money, shortDate, todayISO, addDays, jobIndex, jobLabel, billBalance, billStatus,
   poAllocations, dueSummary, downloadCsv,
@@ -65,6 +67,8 @@ export function BillModal({ bill, presetJobId = null, presetPo = null, onClose }
     target: presetJobId != null && !presetPo ? 'job' : 'po', poId: presetPo ? presetPo.id : null, jobId: presetJobId, bucket: 'operating', category: '', notes: '',
   })
   const set = (patch) => setF(x => ({ ...x, ...patch }))
+  // One bill shared by several jobs (a dump run for three): a row per job with its amount
+  const [splitRows, setSplitRows] = useState(() => (isSplit(bill) ? bill.splits.map(r => ({ ...r })) : null))
   const live = bill ? bills.find(b => b.id === bill.id) || bill : null
   const branding = useStore(s => s.branding)
   const proposals = useStore(s => s.proposals)
@@ -76,7 +80,9 @@ export function BillModal({ bill, presetJobId = null, presetPo = null, onClose }
     .map(p => ({ value: p.id, label: `PO #${p.number} · ${money(p.amount)}`, sub: `${p.vendorName || ''}${p.items ? ` · ${p.items}` : ''}` })), [purchases, f.vendorRef, f.poId])
 
   const canSave = Number(f.total) !== 0 && (f.vendorRef || f.vendorName.trim()) &&
-    (f.target === 'po' ? f.poId != null : f.target === 'job' ? f.jobId != null : !!f.bucket)
+    (f.target === 'po' ? f.poId != null
+      : f.target === 'job' ? (splitRows ? splitReady(splitRows, f.total) : f.jobId != null)
+      : !!f.bucket)
 
   const save = () => {
     const vendorName = f.vendorRef ? (vendorList.find(v => v.ref === f.vendorRef)?.name || f.vendorName) : f.vendorName.trim()
@@ -86,7 +92,8 @@ export function BillModal({ bill, presetJobId = null, presetPo = null, onClose }
       vendorRef: f.vendorRef, vendorName, number: f.number.trim(), date: f.date, dueDate: f.dueDate || f.date, total: Number(f.total) || 0,
       poId: po ? po.id : null, poNumber: po ? po.number : null,
       // A PO's single job carries over so the bill shows on that job.
-      jobId: f.target === 'job' ? f.jobId : (allocs.length === 1 ? allocs[0].jobId : null),
+      jobId: f.target === 'job' ? f.jobId : (allocs.length === 1 ? allocs[0].jobId : null), splits: null,
+      ...(f.target === 'job' && splitRows ? splitPatch(splitRows) : {}),
       type: f.target === 'job' ? (f.type || 'materials') : null,
       bucket: f.target === 'overhead' ? f.bucket : null, category: String(f.category || '').trim(), notes: f.notes,
     }
@@ -122,8 +129,21 @@ export function BillModal({ bill, presetJobId = null, presetPo = null, onClose }
           ))}
         </div>
         {f.target === 'po' && <Combo options={poOptions} value={f.poId} onChange={v => set({ poId: v })} placeholder={poOptions.length ? 'Pick the PO…' : 'No open POs for this vendor'} />}
-        {f.target === 'job' && (
+        {f.target === 'job' && splitRows && (
+          <div className="space-y-2">
+            <JobSplit rows={splitRows} setRows={setSplitRows} total={f.total} jobOptions={jobOptions} />
+            <div className="flex items-center gap-3">
+              <select value={f.type || 'materials'} onChange={e => set({ type: e.target.value })} className={`${inputCls} sm:w-[180px]`} aria-label="Cost type">
+                {PO_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
+              <button type="button" onClick={() => { set({ jobId: splitRows.find(r => r.jobId != null)?.jobId ?? null }); setSplitRows(null) }} className="text-xs text-gray-500 hover:underline whitespace-nowrap">One job only</button>
+            </div>
+          </div>
+        )}
+        {f.target === 'job' && !splitRows && (
           <div className="grid sm:grid-cols-[1fr_180px] gap-2">
+            <button type="button" onClick={() => setSplitRows([{ jobId: f.jobId, amount: f.total || '' }, { jobId: null, amount: '' }])}
+              className="sm:col-span-2 order-last justify-self-start text-xs text-[var(--brand-700)] hover:underline">Split across jobs</button>
             <Combo options={jobOptions} value={f.jobId} onChange={v => set({ jobId: v })} placeholder="Pick a job…" />
             <select value={f.type || 'materials'} onChange={e => set({ type: e.target.value })} className={inputCls} aria-label="Cost type">
               {PO_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
@@ -244,7 +264,7 @@ export default function Bills() {
                   <td className="px-2 text-right text-gray-900">{money(r.balance)}</td>
                   <td className="px-2 text-right text-gray-900">{money(r.total)}</td>
                   <td className="px-2 max-w-[180px] truncate text-gray-900">{r.bill.vendorName || '—'}</td>
-                  <td className="px-2 py-3 whitespace-nowrap"><p className="font-semibold text-gray-900">{r.jobName || '—'}</p><p className="text-gray-600 text-sm">{jobStreet(r.job)}</p></td>
+                  <td className="px-2 py-3 whitespace-nowrap"><p className="font-semibold text-gray-900">{r.jobName || '—'}{isSplit(r.bill) && <span className="ml-1 font-normal text-gray-500">+{r.bill.splits.length - 1} job{r.bill.splits.length > 2 ? 's' : ''}</span>}</p><p className="text-gray-600 text-sm">{jobStreet(r.job)}</p></td>
                   <td className="px-2 py-3 max-w-[240px]">{r.forLabel.map((l, i) => <p key={i} className="truncate text-gray-800">{l}</p>)}</td>
                   <td className="px-2 text-gray-800">{r.bill.number || ''}</td>
                   <td className="px-2 whitespace-nowrap" onClick={e => e.stopPropagation()}>

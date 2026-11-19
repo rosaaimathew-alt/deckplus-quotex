@@ -14,6 +14,7 @@ import {
   adjustedForUnaccounted, monthlyCostOf, yearlyCostOf, nextRenewal, suggestBucket, matchSubscription, inventorySummary,
 } from '../lib/finance'
 import JobFinancials from '../components/JobFinancials'
+import { SplitChargeModal } from './books/JobSplit'
 import { parseStatementText } from '../lib/statementParse'
 
 
@@ -149,7 +150,7 @@ function JobPicker({ jobs, value, onChange }) {
 // The bucket shown in a picker: a job pick, else what was chosen.
 const pickerBucket = (e) => (e.jobId ? 'job' : e.bucket || '')
 // Apply a bucket choice to an expense patch.
-const bucketPatch = (b) => (b === 'job' ? { bucket: 'job' } : { bucket: b || null, jobId: null })
+const bucketPatch = (b) => (b === 'job' ? { bucket: 'job' } : { bucket: b || null, jobId: null, splits: null })
 
 // ── Statement import ─────────────────────────────────────────────────────────
 function ImportModal({ cards, jobs, subscriptions, onClose }) {
@@ -374,6 +375,7 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
   const deleteExpense = useStore(s => s.deleteExpense)
   const [search, setSearch] = useState('')
   const [cardFilter, setCardFilter] = useState('all')
+  const [splitting, setSplitting] = useState(null)   // a charge being split across jobs (a dump run for three)
   const cardOf = (id) => cards.find(c => c.id === id)
   const rows = list.filter(e => {
     if (bucketFilter !== 'all' && bucketOf(e) !== bucketFilter) return false
@@ -423,7 +425,10 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1 flex-wrap">
                           <BucketPicker value={b} onChange={nb => updateExpense(e.id, { ...bucketPatch(nb), category: '' })} />
-                          {b === 'job' && <JobPicker jobs={jobs} value={e.jobId} onChange={id => updateExpense(e.id, { jobId: id, bucket: 'job' })} />}
+                          {b === 'job' && (Array.isArray(e.splits) && e.splits.length > 1
+                            ? <button onClick={() => setSplitting(e)} className="text-xs rounded px-1.5 py-1 border border-blue-300 bg-blue-50 text-blue-700">Split · {e.splits.length} jobs</button>
+                            : <JobPicker jobs={jobs} value={e.jobId} onChange={id => updateExpense(e.id, { jobId: id, bucket: 'job' })} />)}
+                          {b === 'job' && !(Array.isArray(e.splits) && e.splits.length > 1) && <button onClick={() => setSplitting(e)} className="text-xs text-[var(--brand-700)] hover:underline">Split</button>}
                         </div>
                       </td>
                       <td className="px-3 py-2">{b ? <CategoryPicker bucket={b} value={e.category} onChange={cat => updateExpense(e.id, { category: cat })} /> : <span className="text-xs text-gray-400">{e.category || '—'}</span>}</td>
@@ -438,6 +443,7 @@ function ExpensesTab({ list, cards, jobs, bucketFilter, setBucketFilter }) {
             </table>
           </FitTable>
         )}
+        {splitting && <SplitChargeModal charge={splitting} onSave={patch => updateExpense(splitting.id, patch)} onClose={() => setSplitting(null)} />}
       </div>
     </div>
   )

@@ -16,6 +16,7 @@
 //   vendor    a supplier / service company. Subcontractors stay in their own
 //             list (Projects › Subcontractors) and show on Vendors too, so a
 //             sub is never entered twice; vendor refs are 'v:<id>' / 's:<id>'.
+import { splitsOf, shareFor, isSplit } from './split'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
 
 const n = (v) => Number(v) || 0
@@ -256,15 +257,19 @@ export function jobBooks(job, { invoices = [], purchases = [], bills = [] } = {}
     committedByType[po.type in committedByType ? po.type : 'misc'] += amt
   }
   // A bill straight to the job (no PO) is cost too — there's no PO to commit it.
+  // A bill shared by several jobs counts only this job's share (lib/split.js).
   for (const b of bills) {
-    if (b.status === 'void' || b.poId != null || String(b.jobId) !== id) continue
-    committedByType[b.type in committedByType ? b.type : 'misc'] += n(b.total)
+    if (b.status === 'void' || b.poId != null) continue
+    const share = shareFor(b, b.total, id)
+    if (share) committedByType[b.type in committedByType ? b.type : 'misc'] += share
   }
   const committed = round2(Object.values(committedByType).reduce((s, v) => s + v, 0))
   const poIds = new Set(myPos.map(p => String(p.id)))
-  const myBills = bills.filter(b => b.status !== 'void' && (String(b.jobId) === id || (b.poId != null && poIds.has(String(b.poId)))))
-  const billed = round2(myBills.reduce((s, b) => s + n(b.total), 0))
-  const paidOut = round2(myBills.reduce((s, b) => s + billPaid(b), 0))
+  const myBills = bills.filter(b => b.status !== 'void' && (b.poId != null ? poIds.has(String(b.poId)) : shareFor(b, b.total, id) > 0))
+  // a shared bill: this job's share of it, and of what's been paid on it
+  const part = (b) => (b.poId != null || !n(b.total) ? 1 : shareFor(b, b.total, id) / n(b.total))
+  const billed = round2(myBills.reduce((s, b) => s + n(b.total) * part(b), 0))
+  const paidOut = round2(myBills.reduce((s, b) => s + billPaid(b) * part(b), 0))
   const collected = (job?.jobData?.paymentsReceived || []).reduce((s, p) => s + n(p.amount), 0)
   const profit = round2(revenue - committed)
   return {
@@ -298,10 +303,12 @@ export function booksIndex({ invoices = [], purchases = [], bills = [] } = {}) {
     }
   }
   for (const b of bills) {
-    if (b.status === 'void' || b.poId != null || b.jobId == null) continue
-    const r = row(b.jobId)
-    r.committed += n(b.total)
-    r.committedByType[b.type in r.committedByType ? b.type : 'misc'] += n(b.total)
+    if (b.status === 'void' || b.poId != null) continue
+    for (const sp of splitsOf(b, b.total)) {
+      const r = row(sp.jobId)
+      r.committed += n(sp.amount)
+      r.committedByType[b.type in r.committedByType ? b.type : 'misc'] += n(sp.amount)
+    }
   }
   return idx
 }
@@ -329,11 +336,12 @@ export function jobTransactions(job, { invoices = [], purchases = [], bills = []
       details: `PO#${po.number || '—'}${po.vendorName ? ` for ${po.vendorName}` : ''}`, total: n(po.amount), toJob: amt, split: poAllocations(po).length > 1, rec: po })
   }
   for (const b of bills) {
-    if (String(b.jobId) !== id) continue
+    const share = b.poId != null ? 0 : shareFor(b, b.total, id)
+    if (b.poId != null ? String(b.jobId) !== id : !share) continue
     // A bill against a PO is already counted on the PO, so it adds nothing here.
     rows.push({ key: `b${b.id}`, date: b.date, kind: 'bill', type: 'Bill', status: billStatus(b),
       details: `${b.vendorName || 'Vendor'}${b.number ? ` · #${b.number}` : ''}${b.poNumber ? ` · on PO#${b.poNumber}` : ''}`,
-      total: n(b.total), toJob: b.poId != null ? null : n(b.total), rec: b })
+      total: n(b.total), toJob: b.poId != null ? null : share, split: isSplit(b), rec: b })
   }
   return rows.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
 }

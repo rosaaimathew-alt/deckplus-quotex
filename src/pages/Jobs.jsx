@@ -18,7 +18,7 @@ import { jobPhaseOf, subStartedIds } from '../lib/jobPhase'
 import { useNav, useJobMoney, usePriceList, useCanCloseJobs } from '../nav'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
 import { useJobCostOf } from '../lib/jobCost'
-import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'
+import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'; import { shareFor } from '../lib/split'
 import { QuickPicks, MenuChip, SearchLine } from '../components/FilterBar'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
@@ -1835,7 +1835,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const openWarranty  = (jobData.warrantyItems || []).filter(w => w.status === 'Open').length
   const logCount      = (jobData.dailyLogs || []).length
   const docCount      = jobDocuments(proposal, money).length
-  const costCount     = (allExpenses || []).filter(e => e.jobId === proposal.id).length
+  const costCount     = (allExpenses || []).filter(e => shareFor(e, e.amount, proposal.id)).length
   const showPermits   = !!permitAccess && (permitTracked(proposal) || noPermit(proposal))
   const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0, needsPick: false }
   const nextInsp      = showPermits ? jobData.nextInspection : null
