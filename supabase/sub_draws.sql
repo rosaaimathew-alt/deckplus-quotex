@@ -130,7 +130,11 @@ begin
     raise exception '%a sent invoice can''t be changed', bad using errcode = '42501';
   end if;
   -- Subs send invoices Monday 12:00 AM through Wednesday 11:59 PM, Charlotte time.
-  if extract(isodow from (now() at time zone 'America/New_York')) > 3 then
+  if extract(isodow from (now() at time zone 'America/New_York')) > 3
+     -- the office can open the window for one sub until a set time (subcontractors.data.invoiceOpenUntil)
+     and not exists (select 1 from public.subcontractors sc where sc.org_id = new.org_id and sc.deleted_at is null
+                     and sc.data->>'userId' = auth.uid()::text and coalesce(sc.data->>'invoiceOpenUntil', '') ~ '^\d{4}-\d{2}-\d{2}T'
+                     and (sc.data->>'invoiceOpenUntil')::timestamptz > now()) then
     raise exception '%invoices can only be sent Monday through Wednesday', bad using errcode = '42501';
   end if;
   if new.data->>'status' is distinct from 'submitted' then
@@ -255,3 +259,15 @@ begin
     alter publication supabase_realtime add table public.sub_task_terms;
   end if;
 end $$;
+
+-- 5. The office opening the window for one sub until a set time: the sub's own app asks when.
+create or replace function public.my_invoice_open_until() returns timestamptz
+language sql stable security definer set search_path = public as $$
+  select max((sc.data->>'invoiceOpenUntil')::timestamptz)
+  from public.subcontractors sc
+  where sc.org_id = public.auth_org() and sc.deleted_at is null
+    and sc.data->>'userId' = auth.uid()::text
+    and coalesce(sc.data->>'invoiceOpenUntil', '') ~ '^\d{4}-\d{2}-\d{2}T'
+$$;
+revoke all on function public.my_invoice_open_until() from public, anon;
+grant execute on function public.my_invoice_open_until() to authenticated;
