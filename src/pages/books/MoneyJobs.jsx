@@ -11,7 +11,7 @@ import { useStore, contractNumberFor } from '../../store'
 import { useNav, useJobMoney } from '../../nav'
 import { isJob } from '../../lib/attention'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../../lib/books'
-import { useJobCostOf } from '../../lib/jobCost'
+import { useJobCostOf } from '../../lib/jobCost'; import { shareFor } from '../../lib/split'
 import { QuickPicks, SearchLine } from '../../components/FilterBar'
 import { JobMoneyTab } from '../Jobs'
 
@@ -101,7 +101,7 @@ export default function MoneyJobs() {
                 </button>
                 {isOpen && (
                   <div className="px-4 pb-5 pt-1 space-y-3">
-                    <JobMoneyTab proposal={p} books={books} withSummary costCount={(expenses || []).filter(e => e.jobId === p.id).length} />
+                    <JobMoneyTab proposal={p} books={books} withSummary costCount={(expenses || []).filter(e => shareFor(e, e.amount, p.id)).length} />
                     <Link to={`/projects?tab=jobs&job=${encodeURIComponent(p.id)}`} className="inline-block text-sm font-medium text-[var(--brand-700)] hover:underline">Open the job in Projects ›</Link>
                   </div>
                 )}
