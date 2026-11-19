@@ -133,12 +133,11 @@ export default function Dashboard({ pill = null }) {
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5">
-      <header>
-        <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
-          {pill}
-        </div>
-        <p className="text-sm text-gray-500 mt-0.5">{dateStr} · {summary}</p>
+      {/* One line, the same as the owner's view: greeting, date, then the view pill */}
+      <header className="flex items-center gap-3 flex-wrap">
+        <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
+        <p className="text-sm text-gray-500">{dateStr} · {summary}</p>
+        {pill}
       </header>
 
       {/* Numbers — one quiet strip with a single period choice */}
