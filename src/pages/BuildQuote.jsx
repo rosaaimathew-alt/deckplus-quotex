@@ -738,12 +738,13 @@ export default function BuildQuote() {
       {/* Left: Catalog picker (on a phone it comes after the customer and the
           quote, so the form isn't buried under 20 catalog cards) */}
       <div className="order-2 lg:order-1 lg:w-64 shrink-0 flex flex-col gap-3">
-        <h3 className="font-semibold text-gray-800 text-sm">Catalog</h3>
+        {/* Same height as the step cards beside it, so the two line up */}
         <div className="relative">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
-            className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            placeholder="Search..."
+            aria-label="Search the catalog"
+            className="w-full h-10 pl-8 pr-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            placeholder="Search the catalog"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -771,6 +772,22 @@ export default function BuildQuote() {
 
       {/* Right: Quote builder */}
       <div className="order-1 lg:order-2 flex-1 flex flex-col gap-4">
+        {/* The four steps of a quote; each one jumps to its part of the page */}
+        <ol className="no-print flex gap-2 text-sm" aria-label="Steps">
+          {[
+            ['bq-customer', 'Customer', !!client],
+            ['bq-design', 'Design it', lines.length > 0],
+            ['bq-price', 'Price it', lines.length > 0 && !!client],
+            ['bq-send', 'Send it', false],
+          ].map(([id, label, done], i) => (
+            <li key={id} className="flex-1 min-w-0">
+              <button type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                className={`w-full h-10 text-left px-3 rounded-lg border truncate ${done ? 'bg-[var(--brand-50)] border-[var(--brand-200)] text-[var(--brand-800)]' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                <span className="font-semibold">{i + 1}</span> · {label}
+              </button>
+            </li>
+          ))}
+        </ol>
         {revisingParentId && (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
             <Copy size={13} className="shrink-0" />
@@ -787,22 +804,6 @@ export default function BuildQuote() {
             <button onClick={() => setRestoredFrom(null)} aria-label="Dismiss" className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
           </div>
         )}
-        {/* The four steps of a quote; each one jumps to its part of the page */}
-        <ol className="no-print flex gap-2 text-sm" aria-label="Steps">
-          {[
-            ['bq-customer', 'Customer', !!client],
-            ['bq-design', 'Design it', lines.length > 0],
-            ['bq-price', 'Price it', lines.length > 0 && !!client],
-            ['bq-send', 'Send it', false],
-          ].map(([id, label, done], i) => (
-            <li key={id} className="flex-1 min-w-0">
-              <button type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                className={`w-full text-left px-3 py-2 rounded-lg border truncate ${done ? 'bg-[var(--brand-50)] border-[var(--brand-200)] text-[var(--brand-800)]' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                <span className="font-semibold">{i + 1}</span> · {label}
-              </button>
-            </li>
-          ))}
-        </ol>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-gray-900">New quote</h2>
