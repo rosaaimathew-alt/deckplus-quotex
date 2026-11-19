@@ -177,6 +177,17 @@ const findJob = (get, id) => (get().proposals || []).find((x) => String(x.id) ==
 function tellPmIfInspectionsChanged(get, proposalId, before) {
   if (inspectionSig(findJob(get, proposalId)) !== before) notify('job_inspection', proposalId, 4000)
 }
+// A permit approved (HOA, zoning, building permit) that leaves the job with no approval
+// still open: the job is ready to start, and its PM hears it (api/_notify.js, job_ready;
+// once per job). jobPhase is loaded when needed: it reads the Jobs page's step lists.
+const APPROVAL_STEPS = ['hoa', 'zoning', 'building']
+function tellPmIfReady(get, proposalId, before) {
+  import('./lib/jobPhase').then(({ jobPhaseOf }) => {
+    const after = findJob(get, proposalId)
+    if (!before || !after) return
+    if (jobPhaseOf(before) === 'permitting' && jobPhaseOf(after) === 'ready') notify('job_ready', proposalId, 3000)
+  }).catch(() => {})
+}
 function syncSubInspections(get, set, proposalId, alert = true) {
   const s = get()
   const p = (s.proposals || []).find((x) => String(x.id) === String(proposalId))
@@ -1009,7 +1020,7 @@ export const useStore = create(
       // County permit results from the inspection pulse. Stages the county
       // has passed are checked off; nothing is ever unchecked.
       setCountyPermit: (proposalId, countyPermit, passedStages = []) => {
-        const insBefore = inspectionSig(findJob(get, proposalId))
+        const jobBefore = findJob(get, proposalId), insBefore = inspectionSig(jobBefore)
         set((s) => ({
           proposals: s.proposals.map((p) => {
             if (p.id !== proposalId) return p
@@ -1024,9 +1035,11 @@ export const useStore = create(
         }))
         syncSubInspections(get, set, proposalId)   // each sub hears about their own trade's results
         tellPmIfInspectionsChanged(get, proposalId, insBefore)   // and the job's PM about anything new
+        if (passedStages.some(k => APPROVAL_STEPS.includes(k))) tellPmIfReady(get, proposalId, jobBefore)   // the county issued the permit
       },
 
-      toggleJobStage: (proposalId, stageKey) =>
+      toggleJobStage: (proposalId, stageKey) => {
+        const before = APPROVAL_STEPS.includes(stageKey) ? findJob(get, proposalId) : null
         set((s) => ({
           proposals: s.proposals.map((p) => {
             if (p.id !== proposalId) return p
@@ -1035,7 +1048,9 @@ export const useStore = create(
             else completed.add(stageKey)
             return { ...p, jobData: { ...(p.jobData || {}), completedStages: [...completed] } }
           }),
-        })),
+        }))
+        if (before) tellPmIfReady(get, proposalId, before)   // a permit approved: ready to start?
+      },
 
       // ── Change Orders ────────────────────────────────────────────────────
       addChangeOrder: (proposalId, co) =>
