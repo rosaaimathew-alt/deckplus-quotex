@@ -206,7 +206,7 @@
     </div>
     <div class="barR">
       <label class="share-tg" title="Off by default: the customer gets just the proposal. Tick to add this design (3D and floor plan) to their proposal link."><input type="checkbox" id="b-share"> Show on proposal</label>
-      <div class="sheetg"><select id="sheet" aria-label="Design sheet"><option value="auto">Sheet</option><option value="s11">11×17</option><option value="s24">18×24</option></select>
+      <div class="sheetg"><select id="sheet" aria-label="Design sheet"><option value="auto">Sheet</option><option value="s11">11×17</option><option value="s24">18×24</option></select><select id="sheet-frame" aria-label="Sheets to print or export"><option value="both">Plan + framing</option><option value="plan">Plan only</option></select>
         <button type="button" class="act-btn" id="b-print">Print plan</button><button type="button" class="act-btn" id="b-svg">Export SVG</button></div>
       <button type="button" class="ghost-btn" id="b-reset" hidden title="Rebuild the drawing from the proposal (undo brings it back)">Reset</button>
       <div class="saveg"><button type="button" class="save-btn" id="b-save" disabled>Save to proposal</button></div>
@@ -2036,30 +2036,40 @@
     // Floor plan on the design sheet, drawn from this same design
     window.addEventListener('message', (ev) => {
       if (ev.source !== frame.contentWindow || ev.data?.type !== 'qx-plan') return;
-      const { w, h, label, action, place } = ev.data, sv = place ? ev.data.svg.replace(/<g id="drawing">[\s\S]*?<\/g><g id="project-info">/, () => `<g id="drawing">${planForSheet(place)}</g><g id="project-info">`) : ev.data.svg, fname = `deckplus-plan-${new Date().toISOString().slice(0, 10)}.svg`;
+      const { w, h, label, action, place } = ev.data, day = new Date().toISOString().slice(0, 10);
+      // a floor plan, and (unless "Plan only") the framing plan: footings, beams and joists
+      const framed = place && $('sheet-frame')?.value !== 'plan' && S.els.some(e => e.type === 'deck' || (e.type === 'porch' && e.floor === 'deck'));
+      const pages = !place ? [{ sv: ev.data.svg, name: 'plan' }] : [[false, 'FLOOR PLAN', 'plan'], ...(framed ? [[true, 'FRAMING PLAN · FOOTINGS, BEAMS AND JOISTS', 'framing']] : [])].map(([fr, t, name], k, all) => ({ name,
+        sv: ev.data.svg.replace(/<g id="drawing">[\s\S]*?<\/g><g id="project-info">/, () => `<g id="drawing">${planForSheet(place, fr, all.length > 1 ? `${t} · SHEET ${k + 1} OF ${all.length}` : t)}</g><g id="project-info">`) }));
       if (action === 'svg') {
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + sv], { type: 'image/svg+xml' })); a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+        pages.forEach(({ sv, name }, k) => setTimeout(() => {
+          const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + sv], { type: 'image/svg+xml' })); a.download = `deckplus-${name}-${day}.svg`; document.body.appendChild(a); a.click(); a.remove();
+        }, k * 400));
         return;
       }
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Deck Plus plan</title><style>@page{size:${w}in ${h}in;margin:0}html,body{margin:0}svg{display:block;width:${w}in;height:${h}in}</style></head><body>${sv}<script>onload=()=>{print()}<\/script></body></html>`;
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Deck Plus plan</title><style>@page{size:${w}in ${h}in;margin:0}html,body{margin:0}svg{display:block;width:${w}in;height:${h}in;break-after:page;page-break-after:always}svg:last-child{break-after:auto;page-break-after:auto}</style></head><body>${pages.map(p => p.sv).join('')}<script>onload=()=>{print()}<\/script></body></html>`;
       const win = window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
       if (!win) alert(`Allow pop-ups to print. Print at 100% (Actual size) on ${label} to keep the scale.`);
     });
     // The plan exactly as drawn here (framing too when Framing is on), at the sheet's scale, for
     // the design sheet: no grid (the sheet has its dots), no handles or selection.
-    function planForSheet(pl) {
-      const keep = { vb: { ...vb }, sel, edgeHover, draft };
-      sel = null; edgeHover = null; draft = null;
+    function planForSheet(pl, framing, title) {
+      const keep = { vb: { ...vb }, sel, edgeHover, draft, fr: FRAMING };
+      sel = null; edgeHover = null; draft = null; FRAMING = framing;      // the sheet's own choice, not the screen's
       Object.assign(vb, { x: pl.xo, z: pl.zo, w: pl.GW });
       EXPORT = { P: 0.55 / pl.PX, h: pl.GH };
       let inner = '';
       try { drawPlan(); inner = svg.innerHTML; }
-      finally { EXPORT = null; Object.assign(vb, keep.vb); sel = keep.sel; edgeHover = keep.edgeHover; draft = keep.draft; drawPlan(); }
+      finally { EXPORT = null; Object.assign(vb, keep.vb); sel = keep.sel; edgeHover = keep.edgeHover; draft = keep.draft; FRAMING = keep.fr; drawPlan(); }
       inner = inner.replace(/ (data-h|data-hd|data-id)="[^"]*"/g, '').replace(/ style="cursor:[^"]*"/g, '').replace(/var\(--[a-z0-9-]+\)/g, '#d9dde3');
       const W = pl.GW * pl.PX, H = pl.GH * pl.PX;
       return `<clipPath id="qx-plan-area"><rect x="${pl.x0}" y="${pl.y0}" width="${W}" height="${H}"/></clipPath>`
-        + `<g clip-path="url(#qx-plan-area)" font-family="Helvetica, Arial, sans-serif"><g transform="translate(${(pl.x0 - pl.xo * pl.PX).toFixed(3)} ${(pl.y0 - pl.zo * pl.PX).toFixed(3)}) scale(${pl.PX})">${inner}</g></g>`;
+        + `<g clip-path="url(#qx-plan-area)" font-family="Helvetica, Arial, sans-serif"><g transform="translate(${(pl.x0 - pl.xo * pl.PX).toFixed(3)} ${(pl.y0 - pl.zo * pl.PX).toFixed(3)}) scale(${pl.PX})">${inner}</g></g>`
+        + (title ? `<text x="${pl.x0 + 8}" y="${pl.y0 + 18}" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#1a1c38" letter-spacing="0.6">${String(title).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>` : '');
     }
+    // Framing on the printed / exported sheet: chosen beside the sheet size, remembered here
+    try { const v = localStorage.getItem('qx-sheet-pages'); if (v && $('sheet-frame')) $('sheet-frame').value = v; } catch { /* private window */ }
+    $('sheet-frame')?.addEventListener('change', (ev) => { try { localStorage.setItem('qx-sheet-pages', ev.target.value); } catch { /* private window */ } });
     const askPlan = (action) => { clearTimeout(sendT); if (!frame?.contentWindow || !OPTS) return; frame.contentWindow.postMessage(renderModel(), '*'); frame.contentWindow.postMessage({ type: 'qx-plan-request', sheet: $('sheet').value, action }, '*'); };
     $('b-print').addEventListener('click', () => askPlan('print'));
     // Whether the design goes on the customer's proposal link (saved with the design).
