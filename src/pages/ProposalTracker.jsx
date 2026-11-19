@@ -42,23 +42,26 @@ function versionLabelFor(p, group) {
 // Fetch and flatten open events for a set of proposals that have tracked links.
 // Each event: { at, proposalId, client, versionLabel, contractNum }. Only hits
 // proposals that were actually shared (have a viewToken), so it stays light.
+// All of them in ONE request (pdata-batch), not one per link: a request per
+// link (a hundred-plus) left the list loading for minutes.
 async function gatherOpenEvents(proposals, groupProposals) {
   const tracked = proposals.filter(p => p.viewToken)
-  const lists = await Promise.all(tracked.map(async (p) => {
-    try {
-      const r = await fetch(`/api/sign/pdata-${p.viewToken}`)
-      if (!r.ok) return []
-      const d = await r.json()
+  if (!tracked.length) return []
+  let byToken = {}
+  try {
+    const r = await fetch('/api/sign/pdata-batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tokens: tracked.map(p => p.viewToken) }) })
+    if (r.ok) byToken = (await r.json()).opens || {}
+  } catch { /* no opens shown */ }
+  const lists = tracked.map((p) => {
       const contractNum = p.contractDraft?.contractNum || contractNumberFor(p.id)
-      return (d.opens || []).map(o => ({
+      return (byToken[p.viewToken] || []).map(o => ({
         at: o.at,
         proposalId: p.id,
         client: p.client || 'No name',
         versionLabel: versionLabelFor(p, groupProposals || proposals),
         contractNum,
       }))
-    } catch { return [] }
-  }))
+  })
   return lists.flat().sort((a, b) => b.at - a.at)
 }
 
