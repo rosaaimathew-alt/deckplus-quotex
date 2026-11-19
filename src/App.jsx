@@ -37,12 +37,25 @@ function RoleHome() {
   const homePages = useStore(s => s.homePages)
   const location = useLocation()
   const preview = role === 'manager' ? new URLSearchParams(location.search).get('home') : null
-  const picked = role === 'manager' ? (preview || homePages?.[me?.id] || (me?.role === 'office' ? 'office' : '')) : ''
+  const own = role === 'manager' ? (homePages?.[me?.id] || (me?.role === 'office' ? 'office' : '')) : ''
+  // Office / admin can flip their Today page to the owner's view and back (the
+  // pill beside the greeting); the choice is remembered on this device.
+  const [ownerView, setOwnerView] = useState(() => { try { return localStorage.getItem('qx_today_owner') === '1' } catch { return false } })
+  const flip = (on) => { setOwnerView(on); try { localStorage.setItem('qx_today_owner', on ? '1' : '0') } catch { /* private mode */ } }
+  const picked = preview || (ownerView && own !== 'owner' ? 'owner' : own)
+  const pill = role === 'manager' && own !== 'owner' && !preview ? (
+    <span className="inline-flex rounded-full border border-gray-300 bg-white p-0.5 text-xs font-semibold" role="group" aria-label="Which Today page">
+      {[[false, 'My view'], [true, 'Owner view']].map(([on, label]) => (
+        <button key={label} type="button" onClick={() => flip(on)} aria-pressed={ownerView === on}
+          className={`px-3 py-1 rounded-full transition-colors ${ownerView === on ? 'bg-[var(--brand-600)] text-white' : 'text-gray-600 hover:text-gray-900'}`}>{label}</button>
+      ))}
+    </span>
+  ) : null
   const home = role === 'pm' ? <PMHome />
-    : picked === 'owner' ? <OwnerHome />
-    : picked === 'permits' ? <OfficeHome permits />
-    : picked === 'office' ? <OfficeHome />
-    : <Dashboard />
+    : picked === 'owner' ? <OwnerHome pill={pill} />
+    : picked === 'permits' ? <OfficeHome permits pill={pill} />
+    : picked === 'office' ? <OfficeHome pill={pill} />
+    : <Dashboard pill={pill} />
   // Pop-up alerts for the office too (lib/push): the card hides once they're on
   return <><div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 empty:hidden"><PushCard compact /></div>{home}</>
 }
@@ -117,6 +130,9 @@ export default function AppShell() {
   const setTodoPin     = useStore(s => s.setTodoPin)
   const openTodos      = useStore(s => (s.todos || []).filter(t => !t.done).length)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // Desktop: the menu can be tucked away for a full-width screen (remembered on this device)
+  const [menuHidden, setMenuHidden] = useState(() => { try { return localStorage.getItem('qx_menu_hidden') === '1' } catch { return false } })
+  const hideMenu = (on) => { setMenuHidden(on); try { localStorage.setItem('qx_menu_hidden', on ? '1' : '0') } catch { /* private mode */ } }
   const [paletteOpen, setPaletteOpen] = useState(false)
   const navigate = useNavigate()
 
@@ -133,7 +149,7 @@ export default function AppShell() {
   useEffect(() => { autoExpireStaleSent() }, [autoExpireStaleSent])
 
   useEffect(() => {
-    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, brandOptions(branding || {}))
+    applyBrandStyles(branding?.primaryColor || DEFAULT_BRAND_COLOR, { ...brandOptions(branding || {}), office: true })
   }, [branding])
 
   useEffect(() => { applyTheme(isDark) }, [isDark])
@@ -176,24 +192,24 @@ export default function AppShell() {
   const mobileTabsRight = destinations.filter(d => !mobileTabs.includes(d)).slice(0, 1)
 
   return (
-    <div className="h-screen flex qx-ground overflow-hidden">
+    <div className="h-screen flex qx-ground qx-office overflow-hidden">
 
       {/* Mobile backdrop */}
       {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={closeSidebar} />}
 
       {/* Sidebar — drawer on phones/tablets, fixed column on desktop */}
       <aside
-        className={`w-64 flex flex-col no-print shrink-0
-          fixed lg:relative inset-y-0 left-0 z-50 h-full
+        className={`w-64 lg:w-56 flex flex-col no-print shrink-0 border-r border-gray-200
+          fixed inset-y-0 left-0 z-50 h-full
           transition-transform duration-200 ease-in-out
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${menuHidden ? '' : 'lg:relative lg:translate-x-0'}`}
         style={{ backgroundColor: 'var(--sidebar)' }}
         aria-label="Main navigation"
       >
         <div className="px-5 pt-5 pb-4 flex items-center justify-between">
           <button onClick={() => navigate('/')} className="flex-1 flex justify-center" aria-label="Home">
             {logo
-              ? <img src={logo} alt={companyName} className="h-11 object-contain" />
+              ? <img src={logo} alt={companyName} className="h-16 max-w-full object-contain" />
               : <span className="text-xl font-black text-white tracking-widest leading-tight">{companyName}</span>}
           </button>
           <button onClick={closeSidebar} className="lg:hidden text-white/60 hover:text-white ml-2" aria-label="Close menu"><X size={18} /></button>
@@ -202,9 +218,9 @@ export default function AppShell() {
         {canQuote && (
           <div className="px-3 pb-3">
             <button onClick={() => { navigate('/quote'); closeSidebar() }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md transition-transform active:scale-[0.98]"
+              className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-transform active:scale-[0.98]"
               style={{ background: 'var(--accent)' }}>
-              <Plus size={17} /> New quote
+              + New quote
             </button>
           </div>
         )}
@@ -222,31 +238,42 @@ export default function AppShell() {
               <span className="flex-1 text-left">Field mode</span>
             </button>
           )}
-          {/* Search lives in the top bar (and Ctrl K) — no second copy here */}
+          {/* Desktop has no top bar: search and the to-do list open from here */}
+          <button onClick={() => { setPaletteOpen(true); closeSidebar() }} title="Search clients, jobs, or jump to a page (Ctrl K)"
+            className="hidden lg:flex w-full items-center px-3 py-2 rounded-xl text-sm font-medium brand-nav-inactive">
+            <span className="flex-1 text-left">Search</span><kbd className="text-[10px] font-semibold opacity-60">Ctrl K</kbd>
+          </button>
+          <button onClick={() => { setTodoPin(todoPin === 'right' ? 'off' : 'right'); closeSidebar() }} aria-pressed={todoPin === 'right'}
+            title={todoPin === 'right' ? 'Hide to-do list' : 'Show to-do list'}
+            className={`hidden lg:flex w-full items-center px-3 py-2 rounded-xl text-sm font-medium ${todoPin === 'right' ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
+            <span className="flex-1 text-left">To-do</span>
+            {openTodos > 0 && <span className="qx-badge text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center leading-none">{openTodos}</span>}
+          </button>
           <NavLink to="/settings" onClick={closeSidebar}
             className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${isActive ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
             <span>Settings</span>
           </NavLink>
         </div>
 
-        <div className="px-4 py-3 border-t flex items-center gap-2" style={{ borderColor: 'var(--sidebar-border)' }}>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-white/90 truncate">{me?.displayName || (DEMO ? 'Demo user' : companyName)}</p>
-            <p className="text-[11px] brand-footer opacity-70 truncate">{ROLE_LABEL[role] || role}</p>
-          </div>
-          <button onClick={() => setTheme(isDark ? 'light' : 'dark')} title={isDark ? 'Light mode' : 'Dark mode'}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors brand-nav-inactive">
-            {isDark ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
-          <button onClick={DEMO ? resetDemo : logout} title={DEMO ? 'Reset demo data' : 'Log out'}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors brand-nav-inactive">
-            <LogOut size={15} />
-          </button>
+        <button onClick={() => { hideMenu(true); closeSidebar() }} title="Hide the menu for a full-width screen"
+          className="hidden lg:block mx-3 mb-1 px-3 py-2 rounded-xl text-left text-sm font-medium brand-nav-inactive">Hide menu</button>
+
+        {/* Who's signed in, and the way out. Light / dark is in Settings › Branding. */}
+        <div className="px-6 pb-4 pt-1 flex items-center gap-2 text-xs brand-footer">
+          <span className="flex-1 min-w-0 truncate opacity-70" title={ROLE_LABEL[role] || role}>{me?.displayName || (DEMO ? 'Demo user' : companyName)}</span>
+          <button onClick={() => setTheme(isDark ? 'light' : 'dark')} className="opacity-70 hover:opacity-100 hover:underline">{isDark ? 'Light' : 'Dark'}</button>
+          <button onClick={DEMO ? resetDemo : logout} className="opacity-70 hover:opacity-100 hover:underline">{DEMO ? 'Reset demo' : 'Log out'}</button>
         </div>
       </aside>
 
+      {/* Menu tucked away (desktop): one small button brings it back */}
+      {menuHidden && (
+        <button onClick={() => hideMenu(false)} title="Show the menu"
+          className="hidden lg:block fixed top-3 left-3 z-40 no-print px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">Menu</button>
+      )}
+
       {/* Main column */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div className={`flex-1 flex flex-col overflow-hidden min-w-0 ${menuHidden ? 'lg:pt-12' : ''}`}>
         {DEMO && (
           <div className="bg-[var(--brand-600)] text-white text-xs px-4 py-1.5 flex items-center justify-center gap-3 no-print shrink-0">
             <span className="font-medium">🎬 Demo — sample data only. Your changes stay in this browser and never affect real accounts.</span>
@@ -255,7 +282,7 @@ export default function AppShell() {
         )}
 
         {/* Top bar: search everything, to-do */}
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 no-print shrink-0">
+        <header className="lg:hidden h-14 bg-white border-b border-gray-200 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 no-print shrink-0">
           <button className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
             <Menu size={20} />
           </button>

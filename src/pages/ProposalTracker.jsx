@@ -865,14 +865,6 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
             {p.sentAt
               ? new Date(p.sentAt).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
               : <span className="italic text-gray-300">Not sent</span>}
-            {p.closedAt && (
-              <p className="text-gray-300 mt-0.5">
-                Closed {new Date(p.closedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                {p.sentAt && daysBetween(p.sentAt, p.closedAt) != null && (
-                  <span> · {daysBetween(p.sentAt, p.closedAt)}d</span>
-                )}
-              </p>
-            )}
           </td>
           <td className="px-3 py-3 text-right">
             <div className="flex items-center justify-end gap-1">
@@ -1157,11 +1149,10 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
                 const what = (p.projectTypes || []).join(' + ')
                 return (
                   <div key={p.id} className="bg-white rounded-lg border border-gray-200 p-3">
-                    <button onClick={() => openProposal(p, navigate)} className={`block w-full text-left text-sm font-semibold text-gray-900 hover:text-[var(--brand-700)] ${phone ? 'break-words' : 'truncate'}`}>{p.client || 'Unnamed'}</button>
-                    <p className="text-xs text-gray-500 mt-0.5 truncate"><span className="font-semibold text-gray-800 tabular-nums">${Math.round(p.total || 0).toLocaleString('en-US')}</span>{what ? ` · ${what}` : ''}</p>
-                    {showRep && repName(members, p.ownerId) && <p className="text-xs text-gray-500 mt-0.5">{repName(members, p.ownerId)}</p>}
+                    <button onClick={() => openProposal(p, navigate)} className="block w-full text-left text-sm font-semibold text-gray-900 hover:text-[var(--brand-700)] break-words">{p.client || 'Unnamed'}</button>
+                    <p className="text-xs text-gray-500 mt-1">{what ? `${what} · ` : ''}<span className="tabular-nums">${Math.round(p.total || 0).toLocaleString('en-US')}</span>{showRep && repName(members, p.ownerId) ? ` · ${repName(members, p.ownerId).split(' ')[0]}` : ''}</p>
                     {next && (
-                      <p className={`inline-block max-w-full truncate text-xs mt-1.5 rounded px-1.5 py-0.5 ${next.late ? 'bg-orange-50 text-orange-800 font-medium' : 'bg-[var(--brand-50)] text-[var(--brand-800)]'}`}>{next.text}</p>
+                      <p className={`inline-block max-w-full text-xs mt-2 rounded px-1.5 py-0.5 ${next.late ? 'bg-orange-50 text-orange-800 font-medium' : 'bg-[var(--brand-50)] text-[var(--brand-800)]'}`}>{next.text}</p>
                     )}
                     {p.winLossReason?.category && (
                       <p className={`text-xs mt-1 font-medium ${p.status === 'Won' ? 'text-green-600' : 'text-red-500'}`}>
@@ -1169,12 +1160,12 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
                       </p>
                     )}
                     {/* Move status — single dropdown (reuses the status list) */}
-                    <div className="mt-2">
+                    <div className={phone ? 'mt-2' : 'mt-1.5 -mb-1 text-right'}>
                       <select
                         value=""
                         aria-label={`Move ${p.client || 'this quote'} to another stage`}
                         onChange={e => { if (e.target.value) onStatusChange(p, e.target.value) }}
-                        className={`w-full bg-white border border-gray-200 rounded-md px-2 text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] ${phone ? 'h-10 text-sm' : 'py-1 text-xs'}`}
+                        className={phone ? 'w-full h-10 text-sm bg-white border border-gray-200 rounded-md px-2 text-gray-600' : 'max-w-full bg-transparent text-[11px] text-gray-400 hover:text-gray-700 cursor-pointer focus:outline-none'}
                       >
                         <option value="">Move to…</option>
                         {PROPOSAL_STATUSES.filter(s => s !== p.status).map(s => (
@@ -1540,7 +1531,8 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
               onChange={setFilterStatus} options={MORE_STATUS.map(s => ({ value: s, label: s, count: statusCount(s) }))} />
           </>
         )}
-        <div className="ml-auto flex items-center gap-x-5 gap-y-1 flex-wrap">
+        {/* List: these sit on their own second row, so the search stays top right */}
+        <div className={`flex items-center gap-x-5 gap-y-1 flex-wrap ${tab === 'list' ? 'sm:order-[10000] sm:basis-full' : ''}`}>
           {dueCount > 0 && (
             <span className="flex items-center gap-1.5 h-9 text-sm font-medium text-amber-700">
               <Bell size={14} /> {dueCount} follow-up{dueCount !== 1 ? 's' : ''} due

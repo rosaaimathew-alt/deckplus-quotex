@@ -23,7 +23,7 @@ function Tile({ label, note, tone = 'amber', onClick }) {
 
 // permits: the permitting version (picked per person in Settings › Team):
 // permits and inspections first, then the jump-in tiles led by Permitting.
-export default function OfficeHome({ permits = false }) {
+export default function OfficeHome({ permits = false, pill = null }) {
   const navigate = useNavigate()
   const { can, tabsOf } = useNav()
   const me = useStore(s => s.me)
@@ -88,7 +88,10 @@ export default function OfficeHome({ permits = false }) {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-7">
       <div>
         <p className="text-sm text-gray-500">Home{branding?.companyName ? ` | ${branding.companyName}` : ''}</p>
-        <h1 className="qx-greeting text-2xl sm:text-3xl font-bold text-gray-900">Welcome, <span className="text-[var(--brand-600)]">{first}</span></h1>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="qx-greeting text-2xl sm:text-3xl font-bold text-gray-900">Welcome, <span className="text-[var(--brand-600)]">{first}</span></h1>
+          {pill}
+        </div>
       </div>
 
       {permits && <PermitDesk />}

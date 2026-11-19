@@ -83,6 +83,7 @@ export const DEFAULT_BACKGROUND = '#ebe5d8'       // .qx-ground in index.css
 export const DEFAULT_BACKGROUND_DARK = '#1c1c20'
 
 // The applyBrandStyles options for a saved branding record.
+// (AppShell adds `office: true` for the office app's own look; see applyBrandStyles.)
 export const brandOptions = (b = {}) => ({
   sidebar: b.sidebarColor || null, sidebarDark: b.sidebarDark || null, accent: b.accentColor || null,
   background: b.backgroundColor || null, backgroundDark: b.backgroundDark || null, badge: b.badgeColor || null,
@@ -100,14 +101,23 @@ export function applyCachedBrand() {
 
 export function applyBrandStyles(primaryHex, opts = {}, { remember = true } = {}) {
   if (remember) { try { localStorage.setItem(BRAND_CACHE, JSON.stringify({ primary: primaryHex, opts })) } catch { /* private mode */ } }
-  const p = generatePalette(primaryHex || FREE_PRIMARY_COLOR)
+  const brand = primaryHex || FREE_PRIMARY_COLOR
+  const gen = generatePalette(brand)
+  // Office app (opts.office): buttons and links (600) use the brand color itself when the
+  // generated shade comes out lighter than it, since a pale 600 is too faint under white
+  // button text. 700/800 step darker. The sub, paint and customer pages keep their shades.
+  const p = opts.office && hexToHsl(brand)[2] < hexToHsl(gen[600])[2]
+    ? { ...gen, 600: brand, 700: darken(brand, 0.06), 800: darken(brand, 0.12) } : gen
   const badge         = opts.badge || DP_ORANGE
   const badgeText     = isLight(badge) ? '#1f1300' : '#ffffff'
   const sidebar       = opts.sidebar || p[700]
   const sidebarBorder = darken(sidebar, 0.08)
   const sidebarHover  = isLight(sidebar) ? darken(sidebar, 0.08) : p[600]
   const navText       = isLight(sidebar) ? '#1f2937' : p[100]
-  const accent        = opts.accent || p[500]
+  const accent        = opts.accent || (opts.office ? p[600] : p[500])
+  // A light menu (office app): the open page is a soft tint of the brand, and
+  // hovering never turns the words white on a pale background.
+  const lightNav      = !!opts.office && isLight(sidebar)
 
   let el = document.getElementById('qx-brand')
   if (!el) { el = document.createElement('style'); el.id = 'qx-brand'; document.head.appendChild(el) }
@@ -143,8 +153,11 @@ export function applyBrandStyles(primaryHex, opts = {}, { remember = true } = {}
       ${opts.backgroundDark ? `html.dark .qx-ground, html.dark body { background-color: ${opts.backgroundDark}; }` : ''}
     }
     .brand-nav-inactive        { color: ${navText}; }
-    .brand-nav-inactive:hover  { background-color: ${sidebarHover}; color: #fff; }
-    .brand-nav-active          { background-color: #fff; color: ${p[700]}; }
+    .brand-nav-inactive:hover  { background-color: ${lightNav ? p[50] : sidebarHover}; color: ${lightNav ? '#111827' : '#fff'}; }
+    .brand-nav-active          { background-color: ${lightNav ? p[50] : '#fff'}; color: ${lightNav ? p[800] : p[700]}; ${lightNav ? 'box-shadow: none; font-weight: 600;' : ''} }
+    ${opts.office ? `/* Office app: small grey text dark enough to read on white */
+    html:not(.dark) .qx-office .text-gray-400 { color: #6b7280; }
+    html:not(.dark) .qx-office ::placeholder { color: #6b7280; }` : ''}
     .brand-badge               { color: ${p[700]}; }
     .brand-footer              { color: ${navText}; }
     ${opts.sidebarDark ? (() => {

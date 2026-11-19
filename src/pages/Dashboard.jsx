@@ -64,7 +64,7 @@ const LinkBtn = ({ onClick, children }) => (
   </button>
 )
 
-export default function Dashboard() {
+export default function Dashboard({ pill = null }) {
   const navigate   = useNavigate()
   // Office / admin: your own deals by default, one rep's, or the whole organization's.
   const { proposals, sales, canChoose, reps, repId, mineOnly, repName, setRep } = useScopedProposals()
@@ -134,7 +134,10 @@ export default function Dashboard() {
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5">
       <header>
-        <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="qx-greeting text-2xl font-bold text-gray-900">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
+          {pill}
+        </div>
         <p className="text-sm text-gray-500 mt-0.5">{dateStr} · {summary}</p>
       </header>
 
