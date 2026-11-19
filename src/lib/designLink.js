@@ -45,6 +45,7 @@ export function designParts(lines = []) {
         // Stair runs and landings as the deck builder links them (from 'deck' / a landing → to a landing / 'grade'), for the design editor
         stairs: (st.stairs || []).filter(s => s.auto || n(s.steps) > 0).map(s => ({ id: s.id, across: n(s.across) || 4, steps: n(s.steps), from: s.from || 'deck', to: s.to || 'grade', boxed: /box/i.test(s.style || '') })),
         landings: (st.landings || []).map(x => ({ id: x.id, width: n(x.width), depth: n(x.depth), height: n(x.height) })),
+        border: st.border || 'None',
         link: st.drawLink || '',
       })
       continue

@@ -25,7 +25,7 @@
   /* Layout: one-screen tool. Control rail on the left, live 3D scene filling the rest; stacks on phones. */
   :root {
     --bg: #eef2ef; --panel: #ffffff; --fg: #1b2520; --muted: #5a675f; --line: #d5ddd7;
-    --accent: #2c6a4d; --accent-fg: #ffffff; --accent-soft: #e3efe8; --sky: #cddfe8;
+    --accent: #1d758b; --accent-fg: #ffffff; --accent-soft: #e8f3f6; --sky: #cddfe8;
     --tag-bg: rgba(255,255,255,.93); --tag-fg: #1b2520; --danger: #a23b2a;
     --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
     --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -990,7 +990,7 @@
           });
         }
         // roof outline (dashed), ridges/hips, pitch arrows
-        const ov = 1, rz0 = gg.free ? zo2 - ov : zo2, rz1 = zo2 + x.d + ov;
+        const ov = 1, rz0 = gg.free ? zo2 - ov : x.tie === 'roof' ? zo2 - x.d / 3 : zo2, rz1 = zo2 + x.d + ov;
         box(cx - hw - ov, rz0, cx + hw + ov, rz1, 'roofline');
         const pitch = pitchOf(x);
         if (x.roof === 'shed') pitchMark(cx + hw * 0.55, zo2 + x.d * 0.3, [0, 1], pitch);
@@ -2013,6 +2013,7 @@
     const { w: W, d: D } = s, hw = W / 2, cx = s.x;
     const pl = porchPlan(s), { onDeck, fy, beamH, col, shed, free, gp, zF, beamTop, frontTop, sideTop } = pl.g;
     const rz = 0.55, t = M.trim(), dp = pl.dp, roofTie = s.tie === 'roof';
+    // Roof tie: the porch roof floods at least a third of the porch depth into the house roof.
     // Roof-tie shed: the rafters run up past the house eave and into the house roof,
     // so the pitch steepens (3/12 to 5/12) until the high end clears the eave.
     const shedPitch = shed && roofTie && !(Number(s.pitch) > 0) ? Math.min(5 / 12, Math.max(3 / 12, (E + 0.45 - beamTop) / zF)) : pl.g.shedPitch;
@@ -2085,7 +2086,7 @@
       if (shed) {
         const k = 1 / Math.cos(Math.atan(shedPitch)), z2 = D + 1.0, y2 = roofAt(z2);
         let zs = 0;
-        if (roofTie) { let d = 0.5; while (d < 12 && houseRoofTop(d) < roofAt(-d) + (rz + 0.15) * k + 0.25) d += 0.25; zs = -d; }
+        if (roofTie) { let d = D / 3; while (d < 12 && houseRoofTop(d) < roofAt(-d) + (rz + 0.15) * k + 0.25) d += 0.25; zs = -d; }
         const y1 = roofAt(zs);
         beamYZ(0, y1 + rz / 2 * k, zs, y2 + rz / 2 * k, z2, W + 2, rz, t);
         beamYZ(0, y1 + (rz + 0.05) * k, zs, y2 + (rz + 0.05) * k, z2 + 0.08, W + 2.15, 0.1, M.shingle());
@@ -2106,7 +2107,7 @@
         const a = Math.atan(gp), k = 1 / Math.cos(a);
         span = hw + 1; ridgeU = beamTop + hw * gp;
         let zBack = 0;
-        if (roofTie) { let d = 2; while (houseRoofTop(d) < ridgeU + (rz + 0.2) * k + 0.3 && d < 12) d += 0.5; zBack = -d; }
+        if (roofTie) { let d = D / 3; while (houseRoofTop(d) < ridgeU + (rz + 0.2) * k + 0.3 && d < 12) d += 0.5; zBack = -d; }
         hipRoof(zBack, zB, span, beamTop - gp, ridgeU, rz * k, t);
         const gy = beamTop - gp + rz * k - 0.22;
         B(2 * span + 0.4, 0.38, 0.4, M.gutter(), 0, gy, zB + 0.2);
@@ -2121,7 +2122,7 @@
         const a = Math.atan(gp), k = 1 / Math.cos(a), len = (hw + 1) * k, semi = s.roof === 'semivault';
         span = hw + 1; ridgeU = beamTop + hw * gp;
         let zA = 0;                                   // wall tie: the roof stops at the house wall
-        if (roofTie) { let back = 2; while (houseRoofTop(back) < ridgeU + (rz + 0.2) * k + 0.3 && back < 12) back += 0.5; zA = -back; }
+        if (roofTie) { let back = D / 3; while (houseRoofTop(back) < ridgeU + (rz + 0.2) * k + 0.3 && back < 12) back += 0.5; zA = -back; }
         if (free) zA = -1;                            // freestanding: overhang at the back too
         const zc = (zA + zB) / 2, L = zB - zA;
         [-1, 1].forEach(sd => {

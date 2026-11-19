@@ -5,7 +5,7 @@
 // online, already have a quote, or are a past customer. A row opens to show
 // everything that person has (bookings, quotes, jobs) and their contact details.
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CalendarDays, FileText, Hammer } from 'lucide-react'
 import { useStore } from '../store'
 import { supabase, supabaseReady } from '../supabase'
@@ -16,6 +16,7 @@ import { openProposal } from '../lib/openProposal'
 import { money0 } from '../lib/books'
 import { QuickPicks, RepToggle, SearchLine } from '../components/FilterBar'
 import FitTable from '../components/FitTable'
+import CustomerProfile from './CustomerProfile'
 
 const TZ = 'America/New_York'
 const day = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric', year: 'numeric' }) : '')
@@ -88,7 +89,7 @@ function summaryOf(lead) {
   }
 }
 
-function LeadRow({ lead, onOpen }) {
+function LeadRow({ lead, onOpen, onProfile }) {
   const [open, setOpen] = useState(false)
   const stage = stageOf(lead)
   const { wants, from, booked, deal } = summaryOf(lead)
@@ -98,7 +99,7 @@ function LeadRow({ lead, onOpen }) {
     <Fragment>
       <tr className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setOpen(o => !o)}>
         <td className={td}>
-          <span className="font-semibold text-gray-900">{lead.name}</span>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onProfile() }} className="font-semibold text-gray-900 hover:text-[var(--brand-700)] hover:underline text-left">{lead.name}</button>
           {other.length > 0 && <span className="ml-2 text-xs text-gray-400">also {other.slice(0, 2).join(', ')}</span>}
         </td>
         <td className={`${td} whitespace-nowrap text-gray-700`}>{lead.phone || <span className="text-gray-300">—</span>}</td>
@@ -139,6 +140,10 @@ export default function Leads() {
   const [query, setQuery] = useState('')
   const [show, setShow] = useState('all')
   const [limit, setLimit] = useState(PAGE)
+  // ?person=<any of their record keys>: that person's profile
+  const [params, setParams] = useSearchParams()
+  const person = params.get('person')
+  const showPerson = (key) => setParams(p => { const n = new URLSearchParams(p); if (key) n.set('person', key); else n.delete('person'); return n })
 
   const leads = useMemo(() => {
     const quotes = latestIterations(proposals.filter(p => p.status !== 'Imported'))
@@ -157,6 +162,9 @@ export default function Leads() {
     if (r.kind === 'job' || r.status === 'Won') navigate(`/projects?tab=jobs&job=${encodeURIComponent(r.proposal.id)}`)
     else openProposal(r.proposal, navigate)
   }
+
+  const profile = person ? leads.find(l => l.records.some(r => r.key === person)) : null
+  if (profile) return <CustomerProfile lead={profile} onBack={() => showPerson(null)} onOpen={open} />
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl">
@@ -182,7 +190,7 @@ export default function Leads() {
                 <tr>{['Name', 'Phone', 'Wants', 'Came from', 'Visit', 'Status', ''].map((h, i) => <th key={i} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody>
-                {shown.slice(0, limit).map(l => <LeadRow key={l.id} lead={l} onOpen={open} />)}
+                {shown.slice(0, limit).map(l => <LeadRow key={l.id} lead={l} onOpen={open} onProfile={() => showPerson(l.records[0].key)} />)}
               </tbody>
             </table>
           </FitTable>
