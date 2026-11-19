@@ -1,5 +1,5 @@
 // ── Navigation map ───────────────────────────────────────────────────────────
-// The whole app in seven places. Every tab still answers to the page path it came
+// The whole app in six places: Today, Sales, Projects, Money, Catalog, Insights. Every tab still answers to the page path it came
 // from (`access`), so plan and role permissions (src/plans.js, src/roles.js)
 // work exactly as before: a tab shows only when its old page was allowed, and
 // a destination shows only when at least one of its tabs is allowed.
@@ -18,8 +18,8 @@ import { canRoleAccess } from './roles'
 import { isOff, PATH_KEYS, JOB_MONEY } from './permissions'
 
 export const DESTINATIONS = [
-  { key: 'home', to: '/', label: 'Home', icon: House, access: ['/'],
-    hint: 'What needs you today', keywords: 'dashboard today start overview' },
+  { key: 'home', to: '/', label: 'Today', icon: House, access: ['/'],
+    hint: 'What needs you today', keywords: 'dashboard today start overview home' },
 
   { key: 'sales', to: '/sales', label: 'Sales', icon: Handshake,
     hint: 'Proposals, pipeline and designs', keywords: 'proposal tracker crm quotes leads clients customers',
@@ -29,14 +29,9 @@ export const DESTINATIONS = [
       { key: 'designs',   label: 'Designs',   icon: Ruler, access: '/tracker', hint: '3D renderings and floor plans', keywords: 'drawings floor plan rendering 3d 2d cad illustrator design' },
       // Office / admin only: website bookings can't be read by anyone else
       { key: 'leads',     label: 'Leads',     icon: Users, access: '/leads', hint: 'Everyone who booked online, got a quote or had a job, to check before booking', keywords: 'master lead list double booked duplicate website calendar booking caller phone' },
-    ] },
-
-  // Contracts get their own place: sales prepares and sends them, managers and
-  // project managers track signatures — everyone finds them in one spot.
-  { key: 'contracts', to: '/contracts', label: 'Contracts', icon: FileSignature,
-    hint: 'Prepare, send and track signatures', keywords: 'sign signature agreement contract',
-    tabs: [
-      { key: 'all', label: 'Contracts', icon: FileSignature, access: '/contracts', hint: 'Every contract and its signing status', keywords: 'sign signature agreement' },
+      // Contracts: sales prepares and sends them, managers and project managers
+      // track signatures. Project managers see Sales with this tab only.
+      { key: 'contracts', label: 'Contracts', icon: FileSignature, access: '/contracts', hint: 'Prepare, send and track signatures', keywords: 'sign signature agreement contract' },
     ] },
 
   { key: 'projects', to: '/projects', label: 'Projects', icon: HardHat,
@@ -47,15 +42,6 @@ export const DESTINATIONS = [
       { key: 'inspections', label: 'Inspections', icon: ShieldCheck, access: '/jobs', hint: 'Mecklenburg permits and inspections, every job on one screen', keywords: 'permit inspection county mecklenburg footing framing final failed' },
       { key: 'calendar',   label: 'Calendar',   icon: CalendarDays, access: '/scheduler', hint: 'Start dates, milestones, planned work', keywords: 'schedule scheduler dates planner milestones' },
       { key: 'checklists', label: 'Checklists', icon: ClipboardCheck, access: '/checklists', hint: 'Shared team checklists', keywords: 'punch list todo tasks' },
-    ] },
-
-  { key: 'insights', to: '/insights', label: 'Insights', icon: ChartColumn,
-    hint: 'Revenue, win rate, profit and spend', keywords: 'reports analytics numbers metrics',
-    tabs: [
-      { key: 'overview', label: 'Overview',   icon: TrendingUp, access: '/analytics', hint: 'Revenue trend, win rate, project types, map', keywords: 'analytics revenue seasonality heat map past jobs' },
-      { key: 'winloss',  label: 'Win / loss', icon: Target, access: ['/analytics', '/tracker'], hint: 'Pipeline by status, reasons, days to close', keywords: 'reasons funnel close rate' },
-      { key: 'profit',   label: 'Profit',     icon: Calculator, access: '/profitability', hint: 'Actual job costs and margins', keywords: 'profitability margin job costs' },
-      { key: 'expenses', label: 'Expenses',   icon: Wallet, access: '/finance', hint: 'Card spend, fixed costs, subscriptions and inventory', keywords: 'finance cards statement spend fixed operating inventory subscriptions' },
     ] },
 
   // The office's money: what we bill, what we owe, what we've committed to
@@ -82,6 +68,15 @@ export const DESTINATIONS = [
       { key: 'rates',     label: 'Builder rates', icon: Calculator, access: '/catalog', hint: 'Deck and porch builder pricing', keywords: 'tools formulas deck porch rates lock' },
       { key: 'import',    label: 'Import & AI',   icon: Sparkles, access: '/analyze', hint: 'Pull prices from estimates or spreadsheets, or bulk-edit them in plain English', keywords: 'analyze estimate spreadsheet excel csv pdf ai assistant chat bulk' },
     ] },
+
+  { key: 'insights', to: '/insights', label: 'Insights', icon: ChartColumn,
+    hint: 'Revenue, win rate, profit and spend', keywords: 'reports analytics numbers metrics',
+    tabs: [
+      { key: 'overview', label: 'Overview',   icon: TrendingUp, access: '/analytics', hint: 'Revenue trend, win rate, project types, map', keywords: 'analytics revenue seasonality heat map past jobs' },
+      { key: 'winloss',  label: 'Win / loss', icon: Target, access: ['/analytics', '/tracker'], hint: 'Pipeline by status, reasons, days to close', keywords: 'reasons funnel close rate' },
+      { key: 'profit',   label: 'Profit',     icon: Calculator, access: '/profitability', hint: 'Actual job costs and margins', keywords: 'profitability margin job costs' },
+      { key: 'expenses', label: 'Expenses',   icon: Wallet, access: '/finance', hint: 'Card spend, fixed costs, subscriptions and inventory', keywords: 'finance cards statement spend fixed operating inventory subscriptions' },
+    ] },
 ]
 
 // Old page → new place
@@ -90,6 +85,7 @@ export const LEGACY_REDIRECTS = {
   '/pipeline':      '/sales?tab=pipeline',
   '/clients':       '/sales?tab=proposals',
   '/leads':         '/sales?tab=leads',
+  '/contracts':     '/sales?tab=contracts',
   '/jobs':          '/projects?tab=jobs',
   '/scheduler':     '/projects?tab=calendar',
   '/subs':          '/money?tab=vendors',

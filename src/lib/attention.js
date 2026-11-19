@@ -92,14 +92,14 @@ export function attentionItems({ proposals = [], jobCosts = {}, costOf = null, c
       key: 'contracts', tone: 'warn', title: `${toStart.length} won job${toStart.length !== 1 ? 's' : ''} need${toStart.length === 1 ? 's' : ''} a contract`,
       detail: 'Won, but the contract hasn’t been started', count: toStart.length,
       people: toStart.map(p => ({ id: p.id, name: p.client || 'Unnamed', note: 'not started' })),
-      to: '/contracts?filter=Not+Started', cta: 'Start contracts',
+      to: '/sales?tab=contracts&filter=Not+Started', cta: 'Start contracts',
     })
     const outForSig = won.filter(p => contractStatusOf(p) === 'in-progress')
     if (outForSig.length) items.push({
       key: 'signing', tone: 'info', title: `${outForSig.length} contract${outForSig.length !== 1 ? 's' : ''} in progress`,
       detail: 'Prepared or sent, not fully signed yet', count: outForSig.length,
       people: outForSig.map(p => ({ id: p.id, name: p.client || 'Unnamed', note: p.contractDraft?.linksSentAt ? 'sent for signature' : 'draft' })),
-      to: '/contracts?filter=In+Progress', cta: 'Check signatures',
+      to: '/sales?tab=contracts&filter=In+Progress', cta: 'Check signatures',
     })
   }
 

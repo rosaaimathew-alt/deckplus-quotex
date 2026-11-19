@@ -1,5 +1,5 @@
 import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, ListChecks, Wallet, ClipboardList, Wrench, Smartphone } from 'lucide-react'
+import { Search, X, Settings as SettingsIcon, Sun, Moon, LogOut, Menu, Plus, ListChecks, Wallet, ClipboardList, Wrench } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import PMHome from './pages/PMHome'
@@ -8,8 +8,9 @@ import ProposalView from './pages/ProposalView'
 import SettingsPage from './pages/Settings'
 import ContractView from './pages/ContractView'
 import EsignCertificate from './pages/EsignCertificate'
-import { SalesHub, ContractsHub, ProjectsHub, InsightsHub, CatalogHub, MoneyHub } from './pages/hubs/Hubs'
+import { SalesHub, ProjectsHub, InsightsHub, CatalogHub, MoneyHub } from './pages/hubs/Hubs'
 import OfficeHome from './pages/OfficeHome'
+import OwnerHome from './pages/OwnerHome'
 import CommandPalette from './components/CommandPalette'
 import PermitPulse from './components/PermitPulse'
 import { logout } from './components/AuthGuard'
@@ -26,14 +27,21 @@ import { useIsPhone, canUseField, setViewPref } from './field/fieldMode'
 
 const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
 
-// Home depends on role: project managers plan from the job calendar.
-// Office logins get the office manager home (anyone can preview it at /?home=office).
+// Today depends on the person: the page picked for them in Settings › Team
+// (homePages: owner / office / permits), else their department's: project
+// managers plan from the job calendar, office logins get the office home.
+// Office / admin can preview any of them at /?home=owner|office|permits.
 function RoleHome() {
   const role = useStore(s => s.role || 'manager')
   const me = useStore(s => s.me)
+  const homePages = useStore(s => s.homePages)
   const location = useLocation()
+  const preview = role === 'manager' ? new URLSearchParams(location.search).get('home') : null
+  const picked = role === 'manager' ? (preview || homePages?.[me?.id] || (me?.role === 'office' ? 'office' : '')) : ''
   const home = role === 'pm' ? <PMHome />
-    : role === 'manager' && (me?.role === 'office' || new URLSearchParams(location.search).get('home') === 'office') ? <OfficeHome />
+    : picked === 'owner' ? <OwnerHome />
+    : picked === 'permits' ? <OfficeHome permits />
+    : picked === 'office' ? <OfficeHome />
     : <Dashboard />
   // Pop-up alerts for the office too (lib/push): the card hides once they're on
   return <><div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 empty:hidden"><PushCard compact /></div>{home}</>
@@ -79,16 +87,15 @@ function useBadges() {
     const won = proposals.filter(p => p.status === 'Won')
     const contracts = can('/contracts') ? won.filter(p => contractStatusOf(p) === 'not-started').length : 0
     const projects  = can('/scheduler') ? won.filter(p => !isJobClosed(p) && !p.jobData?.startDate).length : 0
-    return { sales: followUps, contracts, projects }
+    return { sales: followUps + contracts, projects }
   }, [proposals, can])
 }
 
+// Text only, no icons (the owner's call).
 function NavItem({ d, badge, onClick }) {
-  const Icon = d.icon
   return (
     <NavLink to={d.to} end={d.to === '/'} onClick={onClick} title={d.hint}
       className={({ isActive }) => `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-colors ${isActive ? 'brand-nav-active shadow-sm' : 'brand-nav-inactive'}`}>
-      <Icon size={19} className="shrink-0" />
       <span className="flex-1 truncate">{d.label}</span>
       {badge > 0 && (
         <span className="qx-badge text-[11px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center leading-none">{badge > 99 ? '99+' : badge}</span>
@@ -212,13 +219,13 @@ export default function AppShell() {
           {showFieldSwitch && (
             <button onClick={() => { setViewPref('field'); closeSidebar(); navigate('/field') }}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold brand-nav-inactive">
-              <Smartphone size={17} /> <span className="flex-1 text-left">Field mode</span>
+              <span className="flex-1 text-left">Field mode</span>
             </button>
           )}
           {/* Search lives in the top bar (and Ctrl K) — no second copy here */}
           <NavLink to="/settings" onClick={closeSidebar}
             className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${isActive ? 'brand-nav-active' : 'brand-nav-inactive'}`}>
-            <SettingsIcon size={17} /> <span>Settings</span>
+            <span>Settings</span>
           </NavLink>
         </div>
 
@@ -272,7 +279,6 @@ export default function AppShell() {
           <Routes>
             <Route path="/"          element={<Gated path="/"><RoleHome /></Gated>} />
             <Route path="/sales"     element={<GatedDestination dkey="sales"><SalesHub /></GatedDestination>} />
-            <Route path="/contracts" element={<GatedDestination dkey="contracts"><ContractsHub /></GatedDestination>} />
             <Route path="/projects"  element={<GatedDestination dkey="projects"><ProjectsHub /></GatedDestination>} />
             <Route path="/insights"  element={<GatedDestination dkey="insights"><InsightsHub /></GatedDestination>} />
             <Route path="/catalog"   element={<GatedDestination dkey="catalog"><CatalogHub /></GatedDestination>} />
@@ -299,8 +305,8 @@ export default function AppShell() {
             </button>
           )}
           {mobileTabsRight.map(d => <MobileTab key={d.key} d={d} badge={badges[d.key] || 0} />)}
-          <button onClick={() => setSidebarOpen(true)} className="flex-1 flex flex-col items-center justify-center py-2 text-gray-500">
-            <Menu size={20} /><span className="text-[10px] font-medium mt-0.5">More</span>
+          <button onClick={() => setSidebarOpen(true)} className="flex-1 flex flex-col items-center justify-center py-3 text-gray-500">
+            <span className="text-xs font-semibold">More</span>
           </button>
         </nav>
       </div>
@@ -317,12 +323,10 @@ export default function AppShell() {
 }
 
 function MobileTab({ d, badge }) {
-  const Icon = d.icon
   return (
     <NavLink to={d.to} end={d.to === '/'}
-      className={({ isActive }) => `relative flex-1 flex flex-col items-center justify-center py-2 ${isActive ? 'text-[var(--brand-700)]' : 'text-gray-500'}`}>
-      <Icon size={20} />
-      <span className="text-[10px] font-medium mt-0.5">{d.label}</span>
+      className={({ isActive }) => `relative flex-1 flex flex-col items-center justify-center py-3 ${isActive ? 'text-[var(--brand-700)]' : 'text-gray-500'}`}>
+      <span className="text-xs font-semibold">{d.label}</span>
       {badge > 0 && <span className="absolute top-1 right-1/2 translate-x-4 qx-badge text-[9px] font-bold rounded-full min-w-4 h-4 px-1 flex items-center justify-center">{badge}</span>}
     </NavLink>
   )
