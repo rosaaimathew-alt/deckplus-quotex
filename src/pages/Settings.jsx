@@ -555,16 +555,28 @@ export default function Settings() {
       )}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Customize your branding — changes apply across the whole platform.</p>
       </div>
 
-      <div className="flex gap-6 flex-wrap">
+      <div className="flex gap-6 flex-wrap lg:flex-nowrap items-start">
+
+        {/* Side menu: jump to a section (desktop); the sections stay one page */}
+        <nav aria-label="Settings sections" className="hidden lg:block w-48 shrink-0 sticky top-4 bg-white rounded-xl border border-gray-200 p-2">
+          {[
+            ['set-branding', 'Branding', true],
+            ['set-team', 'Team & account', !DEMO],
+            ['set-contracts', 'Contracts', !DEMO && (me?.role === 'admin' || me?.role === 'office')],
+            ['set-data', 'Connections & data', true],
+          ].filter(x => x[2]).map(([id, label]) => (
+            <button key={id} type="button" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="block w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-[var(--brand-50)] hover:text-[var(--brand-800)]">{label}</button>
+          ))}
+        </nav>
 
         {/* Left: form */}
         <div className="flex-1 min-w-0 sm:min-w-80 space-y-5">
 
           {/* ── Branding ───────────────────────────────────────────── */}
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Branding</h3>
+          <h3 id="set-branding" className="scroll-mt-4 text-xs font-semibold uppercase tracking-wider text-gray-400">Branding</h3>
 
           {!canManage && (
             <div className="bg-gray-50 rounded-xl border border-dashed border-gray-300 p-5 text-center">
@@ -859,7 +871,7 @@ export default function Settings() {
           {/* ── Team & account ───────────────────────────────────── */}
           {!DEMO && (
             <>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Team &amp; Account</h3>
+              <h3 id="set-team" className="scroll-mt-4 text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Team &amp; Account</h3>
               {(me?.role === 'admin' || me?.role === 'office') && <TeamCard />}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><PasswordCard /></div>
             </>
@@ -868,14 +880,14 @@ export default function Settings() {
           {/* ── Contracts: company signature + welcome email (office / admin) ── */}
           {!DEMO && (me?.role === 'admin' || me?.role === 'office') && (
             <>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Contracts</h3>
+              <h3 id="set-contracts" className="scroll-mt-4 text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Contracts</h3>
               <CompanySignatureCard />
               <WelcomeEmailCard />
             </>
           )}
 
           {/* ── Connections & Data ─────────────────────────────────── */}
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Connections &amp; Data</h3>
+          <h3 id="set-data" className="scroll-mt-4 text-xs font-semibold uppercase tracking-wider text-gray-400 pt-4 border-t border-gray-100">Connections &amp; Data</h3>
 
           {/* Email connection — available to all tiers (needed to send proposals) */}
           <EmailConnectCard />
