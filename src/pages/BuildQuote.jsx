@@ -17,7 +17,7 @@ import PorchBuildPanel from '../components/PorchBuildPanel'; import DrawingStrip
 import UnderDeckPanel from '../components/UnderDeckPanel'
 import HardscapePanel from '../components/HardscapePanel'
 import DeckPricingPanel from '../components/DeckPricingPanel'
-import { requiredFees } from '../lib/permitFees'
+import { requiredFees } from '../lib/permitFees'; import { suggestPackages, withPackages, applyPackage } from '../lib/packages'
 import { JicField } from '../components/Jic'
 import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
@@ -333,6 +333,7 @@ export default function BuildQuote() {
   const [priceRange, setPriceRange] = useState(null)
   // Optional upgrades: priced under the total on the proposal, never part of it.
   const [upgrades, setUpgrades] = useState([])
+  const [packagesOff, setPackagesOff] = useState([])        // suggested packages the rep removed from this quote
   const [projectTypes, setProjectTypes] = useState([])
   const [projectSummary, setProjectSummary] = useState('')
   // Permit & jurisdiction fees are worked out from the address (src/lib/permitFees.js).
@@ -410,6 +411,7 @@ export default function BuildQuote() {
         if (d.isAlaCarte !== undefined) setIsAlaCarte(!!d.isAlaCarte)
         setPriceRange(d.priceRange || null)
         setUpgrades(freshIds(d.upgrades || []))
+        setPackagesOff(d.packagesOff || [])
         if (d.projectTypes) setProjectTypes(d.projectTypes)
         if (d.projectSummary) setProjectSummary(d.projectSummary)
         setRevisingParentId(d.parentId || null)
@@ -436,6 +438,7 @@ export default function BuildQuote() {
       setShowBreakdown(d.showBreakdown ?? false)
       setPriceRange(d.priceRange || null)
       setUpgrades(freshIds(d.upgrades || []))
+      setPackagesOff(d.packagesOff || [])
       setProjectTypes(d.projectTypes || [])
       setProjectSummary(d.projectSummary || '')
       setRevisingParentId(d.revisingParentId || null)
@@ -451,7 +454,7 @@ export default function BuildQuote() {
   const startFresh = () => {
     localStorage.removeItem(DRAFT_KEY)
     setClient(''); setEmail(''); setPhone(''); setAddress(''); setExpiration('')
-    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false); setPriceRange(null); setUpgrades([])
+    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false); setPriceRange(null); setUpgrades([]); setPackagesOff([])
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
     setDraftProposalId(null); setDraftClient(''); setRevisingClient(''); setRestoredFrom(null)
     setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({}); setDiscount(null); setDrawLink(null)
@@ -464,9 +467,9 @@ export default function BuildQuote() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
       isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
-      feeDismissed, feeEdits, feeOverrides, discount, drawLink,
+      feeDismissed, feeEdits, feeOverrides, discount, drawLink, packagesOff,
     }))
-  }, [client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount, drawLink])
+  }, [packagesOff, client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount, drawLink])
 
   // Permit fees for this address + work, as quote lines (derived, never stored twice)
   const feePlan = useMemo(() => requiredFees({ address, lines, projectTypes, catalog: catalogRaw, overrides: feeOverrides }),
@@ -556,10 +559,14 @@ export default function BuildQuote() {
     setUpgrades(cur => [...cur, { ...line, mergeInto: null, hidden: false }])
   }
   const moveToQuote = (u) => {
+    // a suggested package isn't a line of its own: taking it steps the decks themselves up
+    if (u.auto) { setLines(cur => applyPackage(cur, u.auto, pkgCtx)); return }
     setUpgrades(cur => cur.filter(x => x.id !== u.id))
     setLines(cur => [...cur, u])
   }
-  const updateUpgrade = (id, patch) => setUpgrades(cur => cur.map(u => u.id === id ? { ...u, ...patch } : u))
+  // Editing a suggested package makes it the rep's own (it stops following the quote)
+  const updateUpgrade = (id, patch) => setUpgrades(cur => cur.map(u => u.id === id ? { ...u, ...patch, auto: undefined } : u))
+  const removeUpgrade = (u) => { if (u.auto) setPackagesOff(cur => [...new Set([...cur, u.auto])]); setUpgrades(cur => cur.filter(x => x.id !== u.id)) }
   const setMerge = (id, into) => setLines(prev => prev.map(l => l.id === id ? { ...l, mergeInto: into ?? null } : l))
   const [mergePickFor, setMergePickFor] = useState(null)   // line id whose "Merge into" picker is open
 
@@ -582,6 +589,11 @@ export default function BuildQuote() {
   const quoteDraw = useDrawingLink(null, (d, link) => setLines(ls => syncLinesFromDrawing(ls, d, link,
     { catalog: catalogRaw, customComponents: deckCustom || [], scopeTemplate: deckScopeTpl, savedRates: porchRatesSaved || {}, scopes: porchScopes }, editingLineId)), [drawLink, setDrawLink])
   const drawQuote = () => quoteDraw.open({ ...designParts(lines), client, address, phone, email })
+  // Good / Better / Best: the quote as built is Good; Better and Best are suggested for every
+  // deck on it, priced as upgrades under the total, and kept up to date as the quote changes.
+  const pkgCtx = useMemo(() => ({ catalog: catalogRaw, customComponents: deckCustom || [], scopeTemplate: deckScopeTpl }), [catalogRaw, deckCustom, deckScopeTpl])
+  const suggestedPkgs = useMemo(() => suggestPackages(lines, pkgCtx), [lines, pkgCtx])
+  useEffect(() => { setUpgrades(cur => withPackages(cur, suggestedPkgs, packagesOff)) }, [suggestedPkgs, packagesOff])
   const openTool = (t) => {
     setEditingLineId(null)
     setAssemblyInitial(t.initial || null)
@@ -705,6 +717,7 @@ export default function BuildQuote() {
     sessionStorage.setItem('proposal', JSON.stringify({
       client, email, phone, address, expiration, lines: allLines.map(l => { const c = { ...l }; delete c.why; return c }), margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
       priceRange: !isAlaCarte && priceRange ? priceRange : null,
+      packagesOff,
       upgrades: upgrades.filter(u => (u.name || '').trim() || Number(u.unitPrice) > 0).map(u => { const c = { ...u }; delete c.why; return c }),
       feeDismissed, feeOverrides, discount: discountLine ? discount : null,
       ...(revisingParentId && sameClient(revisingClient, client) ? { parentId: revisingParentId } : {}),
@@ -1335,7 +1348,7 @@ export default function BuildQuote() {
           <div className="bg-white rounded-xl border border-gray-200">
             <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
               <div>
-                <p className="text-sm font-semibold text-gray-900">Optional upgrades</p>
+                <p className="text-sm font-semibold text-gray-900">Optional upgrades{suggestedPkgs.length > 0 && <span className="ml-1.5 font-normal text-gray-500">· Good / Better / Best</span>}</p>
                 <p className="text-xs text-gray-500">Shown on the proposal under the total, each with its price. Not included in the total, the contract or the job.</p>
               </div>
               <button onClick={() => setUpgrades(cur => [...cur, { id: Date.now() + Math.random(), name: '', description: '', qty: 1, unit: 'EA', unitPrice: 0 }])}
@@ -1356,9 +1369,10 @@ export default function BuildQuote() {
                         className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right" />
                     </div>
                     <div className="flex items-center gap-0.5">
-                      <button title="Move into the quote (adds it to the total)" aria-label={`Move ${u.name || 'upgrade'} into the quote`} onClick={() => moveToQuote(u)}
+                      {u.auto && <span title="Suggested from the deck on this quote: it re-prices as the quote changes. Edit it to keep your own wording and price." className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--brand-700)] bg-[var(--brand-50)] rounded px-1.5 py-0.5">Suggested</span>}
+                      <button title={u.auto ? 'Take this package: the deck on the quote steps up to it' : 'Move into the quote (adds it to the total)'} aria-label={u.auto ? `Take the ${u.name.split(':')[0]} package` : `Move ${u.name || 'upgrade'} into the quote`} onClick={() => moveToQuote(u)}
                         className="p-1.5 rounded text-gray-400 hover:text-[var(--brand-600)] hover:bg-gray-100"><ArrowUpToLine size={14} /></button>
-                      <button title="Remove upgrade" aria-label={`Remove ${u.name || 'upgrade'}`} onClick={() => setUpgrades(cur => cur.filter(x => x.id !== u.id))}
+                      <button title="Remove upgrade" aria-label={`Remove ${u.name || 'upgrade'}`} onClick={() => removeUpgrade(u)}
                         className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50"><Trash2 size={14} /></button>
                     </div>
                     <textarea aria-label="Upgrade description" rows={u.description ? 2 : 1} value={u.description || ''} onChange={e => updateUpgrade(u.id, { description: e.target.value })}
