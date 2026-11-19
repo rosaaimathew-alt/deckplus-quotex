@@ -7,7 +7,8 @@ import { MenuChip, QuickPicks, SwitchChip, RepToggle, SearchLine } from '../comp
 import { useScopedProposals } from '../lib/proposalScope'
 import { useIsPhone } from '../field/fieldMode'
 import { clientGroups, latestIterations } from '../lib/proposalGroups'
-import { headlineNumbers } from '../lib/headline'
+import { headlineNumbers, wonDateOf } from '../lib/headline'
+import { contractStatusOf } from '../lib/attention'
 import { buildProposalSnapshot } from '../proposalSnapshot'
 import { withSavedDesign } from '../lib/designSnapshot'
 import DesignShareToggle from '../components/DesignShareToggle'
@@ -440,7 +441,7 @@ function ReminderBadges({ proposal, wide = false }) {
         return (
           <div key={r.id} className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md ${overdue ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-500'}`}>
             {overdue ? <AlertCircle size={11} /> : <Clock size={11} />}
-            <span>{nd ? new Date(nd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}</span>
+            <span className="whitespace-nowrap">{nd ? new Date(nd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}</span>
             {r.frequency !== 'once' && <span className="opacity-60">· {FREQUENCIES.find(f => f.value === r.frequency)?.label}</span>}
             {r.note && <span className={`opacity-70 truncate ${wide ? 'min-w-0 flex-1' : 'max-w-[80px]'}`}>· {r.note}</span>}
             <button onClick={() => dismissReminder(proposal.id, r.id)} aria-label="Dismiss reminder"
@@ -821,17 +822,16 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
     return (
       <>
         <tr className="border-t border-gray-50 hover:bg-gray-50 align-top">
-          <td className="px-4 py-3">
+          <td className="px-3 py-3">
             <p className="font-medium text-gray-900">{p.client || <span className="text-gray-400 italic">No name</span>}</p>
-            {(p.projectTypes || []).length > 0 && <p className="text-xs text-gray-500 mt-0.5">{p.projectTypes.join(' + ')}</p>}
             {p.winLossReason?.category && (
               <span className={`inline-block mt-1 text-xs px-1.5 py-0.5 rounded font-medium ${p.status === 'Won' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
                 {p.winLossReason.category}
               </span>
             )}
-            <ReminderBadges proposal={p} />
           </td>
-          <td className="px-4 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
+          <td className="px-3 py-3 text-xs text-gray-600">{(p.projectTypes || []).join(' + ') || <span className="text-gray-300">—</span>}</td>
+          <td className="px-3 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
             ${fmt(p.total || 0)}
             {altCount > 0 && (
               <div className="mt-0.5">
@@ -844,17 +844,26 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
               </div>
             )}
           </td>
-          <td className="px-4 py-3">
+          <td className="px-3 py-3">
             <StatusSelect value={p.status} onChange={e => onStatusChange(p, e.target.value)} />
           </td>
           {showRep && (
-            <td className="px-4 py-3 text-xs text-gray-700 whitespace-nowrap">
+            <td className="px-3 py-3 text-xs text-gray-700 whitespace-nowrap">
               {repName(members, p.ownerId) || <span className="italic text-gray-300">—</span>}
             </td>
           )}
-          <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+          {/* Next step: the follow-ups set on this quote, or a quiet way to set one */}
+          <td className="px-3 py-3">
+            {(p.reminders || []).some(r => !r.dismissed)
+              ? <div className="-mt-1.5 max-w-[11rem]"><ReminderBadges proposal={p} /></div>
+              : p.status === 'Draft' ? <span className="text-xs text-gray-500">Not sent yet</span>
+              : ['Sent', 'Followed Up', 'Negotiating'].includes(p.status)
+                ? <button onClick={() => onReminderOpen(p.id)} className="text-xs font-medium text-[var(--brand-700)] hover:underline whitespace-nowrap">+ Follow-up</button>
+                : <span className="text-gray-300">—</span>}
+          </td>
+          <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">
             {p.sentAt
-              ? new Date(p.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+              ? new Date(p.sentAt).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
               : <span className="italic text-gray-300">Not sent</span>}
             {p.closedAt && (
               <p className="text-gray-300 mt-0.5">
@@ -865,7 +874,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
               </p>
             )}
           </td>
-          <td className="px-4 py-3 text-right">
+          <td className="px-3 py-3 text-right">
             <div className="flex items-center justify-end gap-1">
               {/* Primary inline actions: Open + Activity log */}
               <button onClick={() => onOpen(p)} className="p-1.5 rounded text-gray-300 hover:bg-gray-50 hover:text-gray-700 transition-colors" title="Open proposal">
@@ -891,7 +900,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
         </tr>
         {expandedLog === p.id && (
           <tr className="border-t border-gray-100">
-            <td colSpan={showRep ? 6 : 5} className="p-0">
+            <td colSpan={showRep ? 8 : 7} className="p-0">
               <ActivityLog proposal={p} groupProposals={groupProposals} />
             </td>
           </tr>
@@ -1004,19 +1013,21 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
         </div>
       ) : (
         <FitTable>
-        <table className="w-full text-sm min-w-[640px]">
-          <thead className="bg-gray-50 border-b border-gray-100">
+        <table className="w-full text-sm min-w-[900px] table-fixed">
+          <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               {[
                 { key: 'client', label: 'Client', align: 'text-left' },
-                { key: 'total', label: 'Total', align: 'text-right', w: 'w-28' },
-                { key: 'status', label: 'Status', align: 'text-left', w: 'w-36' },
-                ...(showRep ? [{ key: 'rep', label: 'Sales rep', align: 'text-left', w: 'w-28' }] : []),
-                { key: 'date', label: 'Date', align: 'text-left', w: 'w-28' },
+                { key: 'project', label: 'Project', align: 'text-left', w: 'w-[150px]', fixed: true },
+                { key: 'total', label: 'Total', align: 'text-right', w: 'w-[104px]' },
+                { key: 'status', label: 'Status', align: 'text-left', w: 'w-[128px]' },
+                ...(showRep ? [{ key: 'rep', label: 'Sales rep', align: 'text-left', w: 'w-[100px]' }] : []),
+                { key: 'next', label: 'Next step', align: 'text-left', w: 'w-[176px]', fixed: true },
+                { key: 'date', label: 'Date', align: 'text-left', w: 'w-[76px]' },
               ].map(col => (
                 <th key={col.key}
-                  onClick={() => toggleSort(col.key)}
-                  className={`px-4 py-3 ${col.align} text-xs font-semibold text-gray-500 uppercase tracking-wider ${col.w || ''} cursor-pointer select-none hover:text-gray-800 transition-colors`}
+                  onClick={col.fixed ? undefined : () => toggleSort(col.key)}
+                  className={`px-3 py-3 ${col.align} text-xs font-semibold text-gray-500 ${col.w || ''} ${col.fixed ? '' : 'cursor-pointer hover:text-gray-800'} select-none transition-colors`}
                 >
                   <span className="inline-flex items-center gap-1">
                     {col.label}
@@ -1024,7 +1035,7 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                   </span>
                 </th>
               ))}
-              <th className="px-4 py-3 w-28"></th>
+              <th className="px-3 py-3 w-[96px]"></th>
             </tr>
           </thead>
           <tbody>
@@ -1043,22 +1054,24 @@ function ListView({ proposals, filterStatus, onStatusChange, onReminderOpen, onO
                   })}
                   {isAltExpanded && alts.map(alt => (
                     <tr key={alt.id} className="border-t border-gray-100 bg-gray-50 align-top">
-                      <td className="px-4 py-2.5 pl-8">
+                      <td className="px-3 py-2.5 pl-8">
                         <div className="flex items-center gap-2">
                           <GitBranch size={11} className="text-[var(--brand-300)] shrink-0" />
                           <span className="text-xs font-semibold text-gray-600 mr-1">Alt {alt.version || '—'}</span>
                           <span className="text-xs text-gray-500">{alt.client || '—'}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-right text-xs font-semibold text-gray-700">${fmt(alt.total || 0)}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-3 py-2.5 text-xs text-gray-500">{(alt.projectTypes || []).join(' + ')}</td>
+                      <td className="px-3 py-2.5 text-right text-xs font-semibold text-gray-700">${fmt(alt.total || 0)}</td>
+                      <td className="px-3 py-2.5">
                         <StatusSelect value={alt.status} onChange={e => onStatusChange(alt, e.target.value)} />
                       </td>
-                      {showRep && <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{repName(members, alt.ownerId)}</td>}
-                      <td className="px-4 py-2.5 text-xs text-gray-400">
+                      {showRep && <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{repName(members, alt.ownerId)}</td>}
+                      <td />
+                      <td className="px-3 py-2.5 text-xs text-gray-400">
                         {alt.createdAt ? new Date(alt.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                       </td>
-                      <td className="px-4 py-2.5 text-right">
+                      <td className="px-3 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => onOpen(alt)} className="p-1 rounded text-gray-300 hover:bg-gray-50 hover:text-gray-700 transition-colors" title="Open"><Eye size={12} /></button>
                           <RowMenu items={[
@@ -1095,27 +1108,36 @@ function nextStepOf(p) {
     return { text: `${due.r.note || 'Follow up'} · ${late ? `was due ${when}` : when}`, late }
   }
   if (p.status === 'Draft') return { text: 'Not sent yet', late: false }
+  if (p.status === 'Won') return { text: contractStatusOf(p) === 'in-progress' ? 'Contract out to sign' : contractStatusOf(p) === 'signed' ? 'Signed' : 'Needs a contract', late: false }
   return null
 }
 
-// The four open stages always show; Won, Lost, MIA and Archived only when the
-// filter brings cards into them.
-const BOARD_ALWAYS = ['Draft', 'Sent', 'Followed Up', 'Negotiating']
+// The board's columns, left to right. Signing: won, with the contract out for
+// signature. Won: won this month (earlier ones are jobs in Projects by now).
+// Lost, MIA and archived quotes are in List.
+const thisMonth = (iso) => { if (!iso) return false; const d = new Date(iso), n = new Date(); return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() }
+const BOARD_COLUMNS = [
+  { key: 'Draft', label: 'Draft', has: p => p.status === 'Draft' },
+  { key: 'Sent', label: 'Sent', has: p => p.status === 'Sent' },
+  { key: 'Followed Up', label: 'Followed up', has: p => p.status === 'Followed Up' },
+  { key: 'Negotiating', label: 'Negotiating', has: p => p.status === 'Negotiating' },
+  { key: 'Signing', label: 'Signing', has: p => p.status === 'Won' && contractStatusOf(p) === 'in-progress' },
+  { key: 'Won', label: 'Won', note: 'this month', has: p => p.status === 'Won' && contractStatusOf(p) !== 'in-progress' && thisMonth(wonDateOf(p)) },
+]
 
 function PipelineView({ proposals, onStatusChange, showRep }) {
   const members = useStore(s => s.members)
   const phone = useIsPhone()
   const navigate = useNavigate()
-  const columns = PROPOSAL_STATUSES.filter(st => BOARD_ALWAYS.includes(st) || proposals.some(p => p.status === st))
   return (
-    <div className={phone ? 'space-y-3 pb-4' : 'grid gap-3 pb-4 items-start grid-cols-[repeat(auto-fill,minmax(13rem,1fr))]'}>
-      {columns.map(status => {
-        const cards = proposals.filter(p => p.status === status)
+    <div className={phone ? 'space-y-3 pb-4' : 'grid gap-3 pb-4 items-start grid-cols-3 xl:grid-cols-6'}>
+      {BOARD_COLUMNS.map(({ key: status, label, note, has }) => {
+        const cards = proposals.filter(has)
         const colTotal = cards.reduce((s, p) => s + (p.total || 0), 0)
         // Phone: an empty stage is one thin line, so the stages with deals in them come first to the eye
         if (phone && cards.length === 0) return (
           <div key={status} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 bg-white">
-            <span className="text-sm font-semibold text-gray-500">{status}</span>
+            <span className="text-sm font-semibold text-gray-500">{label}</span>
             <span className="text-xs text-gray-400 font-medium">0</span>
           </div>
         )
@@ -1123,8 +1145,8 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
           <div key={status} className="min-w-0">
             {/* Column header: stage, how many, how much */}
             <div className="flex items-baseline justify-between px-1 pb-2">
-              <span className="text-sm font-semibold text-gray-800">{status}</span>
-              <span className="text-xs text-gray-500 tabular-nums">{cards.length}{cards.length > 0 ? ` · ${fmtShort(colTotal)}` : ''}</span>
+              <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">{label}{note && <span className="font-normal text-gray-500"> {note}</span>}</span>
+              <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">{cards.length}{cards.length > 0 && !note ? ` · ${fmtShort(colTotal)}` : ''}</span>
             </div>
             <div className={`space-y-2 ${phone ? '' : 'min-h-24'}`}>
               {cards.length === 0 && (
@@ -1155,7 +1177,7 @@ function PipelineView({ proposals, onStatusChange, showRep }) {
                         className={`w-full bg-white border border-gray-200 rounded-md px-2 text-gray-600 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand-300)] ${phone ? 'h-10 text-sm' : 'py-1 text-xs'}`}
                       >
                         <option value="">Move to…</option>
-                        {PROPOSAL_STATUSES.filter(s => s !== status).map(s => (
+                        {PROPOSAL_STATUSES.filter(s => s !== p.status).map(s => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
@@ -1436,7 +1458,10 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
   }
 
   // Pipeline cards: one per client — its latest version — so revisions aren't counted twice
-  const pipelineCards = latestIterations(proposals).filter(p => matchesStatus(p, filterStatus))
+  // Board: the same search as the list, plus Decks / Porches
+  const [boardType, setBoardType] = useState(null)
+  const pipelineCards = latestIterations(searched).filter(p => matchesStatus(p, filterStatus))
+    .filter(p => !boardType || (p.projectTypes || []).some(t => t.toLowerCase().includes(boardType)))
   // Counts per filter, by client (one row per client, as the list shows)
   const statusCount = (f) => buildGroups(proposals).filter(({ root, revisions }) =>
     [root, ...revisions].some(p => matchesStatus(p, f))).length
@@ -1501,8 +1526,12 @@ export default function ProposalTracker({ view, initialStatus, initialQuery = ''
           ))}
         </div>
         {/* Search first (top left, the same on every list), then whose deals */}
-        {tab === 'list' && <SearchLine value={query} onChange={setQuery} placeholder="Search clients" />}
+        {(tab === 'list' || tab === 'pipeline') && <SearchLine value={query} onChange={setQuery} placeholder="Search name, address or phone" />}
         {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
+        {tab === 'pipeline' && (
+          <QuickPicks value={boardType} onChange={v => setBoardType(v === boardType ? null : v)}
+            options={[{ value: 'deck', label: 'Decks' }, { value: 'porch', label: 'Porches' }]} />
+        )}
         {tab === 'list' && !showOpens && (
           <>
             <QuickPicks value={QUICK_STATUS.includes(filterStatus) ? filterStatus : null} onChange={setFilterStatus}

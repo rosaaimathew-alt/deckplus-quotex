@@ -1939,6 +1939,12 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
               : <>{projectTypes} · ${fmt(contractTotalOf(proposal))} · <span className="font-mono">{contractNum}</span></>}
             {pmLabel && <> · PM {pmLabel}</>}
           </p>
+          {/* The step this job is waiting on right now */}
+          {!completedStages.includes('closed') && (
+            <p className="text-xs text-[var(--brand-700)] mt-0.5 truncate">
+              Next: {stages.length === 0 ? 'Set the job type' : (stages.find(st => !completedStages.includes(st.key) && st.key !== 'closed')?.label || 'Close the job')}
+            </p>
+          )}
         </div>
 
         {jobMoney && (

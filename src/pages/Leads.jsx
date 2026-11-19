@@ -2,8 +2,9 @@
 // One row per person, from the website calendar, quotes and Knowify jobs
 // (src/lib/leads.js). The office searches a caller's name, phone, email or
 // street before booking them, and sees right away if they already booked
-// online, already have a quote, or are a past customer.
-import { useEffect, useMemo, useState } from 'react'
+// online, already have a quote, or are a past customer. A row opens to show
+// everything that person has (bookings, quotes, jobs) and their contact details.
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CalendarDays, FileText, Hammer } from 'lucide-react'
 import { useStore } from '../store'
@@ -14,7 +15,7 @@ import { buildLeads, matchesLead } from '../lib/leads'
 import { openProposal } from '../lib/openProposal'
 import { money0 } from '../lib/books'
 import { QuickPicks, RepToggle, SearchLine } from '../components/FilterBar'
-import StatCard from '../components/StatCard'
+import FitTable from '../components/FitTable'
 import CustomerProfile from './CustomerProfile'
 
 const TZ = 'America/New_York'
@@ -64,33 +65,69 @@ function RecordLine({ r, onOpen, leadName }) {
   )
 }
 
+// Where a lead stands, from what they have: a job, a quote, a visit booked.
+const STAGE_TONE = {
+  Customer: 'bg-emerald-50 text-emerald-800', Quoted: 'bg-blue-50 text-blue-800',
+  'Visit booked': 'bg-[var(--brand-50)] text-[var(--brand-800)]', Cancelled: 'bg-gray-100 text-gray-600',
+}
+function stageOf(lead) {
+  if (lead.jobs > 0) return 'Customer'
+  if (lead.quotes > 0) return 'Quoted'
+  if (lead.liveBookings > 0) return 'Visit booked'
+  return 'Cancelled'
+}
+function summaryOf(lead) {
+  const deal = lead.records.find(r => r.kind !== 'booking')
+  const first = lead.records[lead.records.length - 1]
+  const visit = lead.records.filter(r => r.kind === 'booking' && r.status === 'Booked' && r.startsAt)
+    .sort((a, b) => String(b.startsAt).localeCompare(String(a.startsAt)))[0]
+  return {
+    wants: (deal?.proposal?.projectTypes || []).join(' + '),
+    from: first?.kind === 'booking' ? 'Website booking' : first?.kind === 'job' ? 'Knowify job' : 'Quote',
+    booked: visit ? when(visit.startsAt) : '',
+    deal,
+  }
+}
+
 function LeadRow({ lead, onOpen, onProfile }) {
-  const [all, setAll] = useState(false)
-  const shown = all ? lead.records : lead.records.slice(0, 4)
+  const [open, setOpen] = useState(false)
+  const stage = stageOf(lead)
+  const { wants, from, booked, deal } = summaryOf(lead)
   const other = lead.names.filter(n => n.toLowerCase() !== lead.name.toLowerCase())
+  const td = 'px-4 py-2.5'
   return (
-    <li className="bg-white rounded-xl border border-gray-200 px-4 py-3">
-      <div className="flex items-start gap-3 flex-wrap">
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-gray-900">
-            <button type="button" onClick={onProfile} className="font-semibold text-gray-900 hover:text-[var(--brand-700)] hover:underline text-left">{lead.name}</button>
-            {other.length > 0 && <span className="ml-2 text-sm font-normal text-gray-400">also {other.slice(0, 2).join(', ')}</span>}
-          </p>
-          <p className="text-sm text-gray-500 truncate">{[lead.phone, lead.email, lead.address].filter(Boolean).join(' · ')}</p>
-        </div>
-        {lead.repeat && (
-          <span className="text-sm font-semibold text-red-600 whitespace-nowrap">Booked {lead.liveBookings} times</span>
-        )}
-      </div>
-      <div className="mt-2 border-t border-gray-100 pt-1.5">
-        {shown.map(r => <RecordLine key={r.key} r={r} leadName={lead.name} onOpen={r.kind !== 'booking' ? () => onOpen(r) : null} />)}
-        {lead.records.length > 4 && (
-          <button type="button" onClick={() => setAll(a => !a)} className="text-xs font-medium text-gray-500 hover:text-gray-800 mt-1">
-            {all ? 'Show less' : `${lead.records.length - 4} more`}
+    <Fragment>
+      <tr className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setOpen(o => !o)}>
+        <td className={td}>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onProfile() }} className="font-semibold text-gray-900 hover:text-[var(--brand-700)] hover:underline text-left">{lead.name}</button>
+          {other.length > 0 && <span className="ml-2 text-xs text-gray-400">also {other.slice(0, 2).join(', ')}</span>}
+        </td>
+        <td className={`${td} whitespace-nowrap text-gray-700`}>{lead.phone || <span className="text-gray-300">—</span>}</td>
+        <td className={`${td} whitespace-nowrap text-gray-700`}>{wants || <span className="text-gray-300">—</span>}</td>
+        <td className={`${td} whitespace-nowrap text-gray-700`}>{from}</td>
+        <td className={`${td} whitespace-nowrap text-gray-700`}>{booked || <span className="text-gray-300">—</span>}</td>
+        <td className={`${td} whitespace-nowrap`}>
+          <span className={`inline-block text-xs font-semibold rounded px-2 py-0.5 ${STAGE_TONE[stage]}`}>{stage}</span>
+          {lead.repeat && <span className="ml-2 text-xs font-semibold text-red-600">Booked {lead.liveBookings} times</span>}
+        </td>
+        <td className={`${td} text-right whitespace-nowrap`}>
+          <button type="button" onClick={(e) => { e.stopPropagation(); deal ? onOpen(deal) : setOpen(o => !o) }}
+            className="px-3 py-1 rounded-lg border border-[var(--brand-200)] bg-white text-xs font-semibold text-[var(--brand-700)] hover:bg-[var(--brand-50)]">
+            {deal ? 'Open' : open ? 'Hide' : 'Details'}
           </button>
-        )}
-      </div>
-    </li>
+        </td>
+      </tr>
+      {open && (
+        <tr className="bg-gray-50">
+          <td colSpan={7} className="px-4 py-2">
+            <p className="text-sm text-gray-600">{[lead.phone, lead.email, lead.address].filter(Boolean).join(' · ') || 'No contact details'}</p>
+            <div className="mt-1">
+              {lead.records.map(r => <RecordLine key={r.key} r={r} leadName={lead.name} onOpen={r.kind !== 'booking' ? () => onOpen(r) : null} />)}
+            </div>
+          </td>
+        </tr>
+      )}
+    </Fragment>
   )
 }
 
@@ -116,9 +153,9 @@ export default function Leads() {
 
   const mine = useMemo(() => (repId ? leads.filter(l => l.ownerIds.has(repId)) : leads), [leads, repId])
   const repeats = mine.filter(l => l.repeat).length
-  const online = mine.filter(l => l.bookings > 0).length
+  const count = (st) => mine.filter(l => stageOf(l) === st).length
   const shown = useMemo(() => mine.filter(l =>
-    (show === 'all' || (show === 'online' && l.bookings > 0) || (show === 'repeat' && l.repeat))
+    (show === 'all' || (show === 'repeat' ? l.repeat : stageOf(l) === show))
     && matchesLead(l, query)), [mine, show, query])
 
   const open = (r) => {
@@ -131,19 +168,14 @@ export default function Leads() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-        <StatCard label="People" value={mine.length.toLocaleString()} />
-        <StatCard label="Booked on the website" value={loading ? '…' : online.toLocaleString()} onClick={() => setShow('online')} />
-        <StatCard label="Booked more than once" value={loading ? '…' : repeats.toLocaleString()} tone={repeats ? 'text-red-600' : 'text-gray-900'}
-          onClick={() => setShow('repeat')} />
-      </div>
-
       <div className="flex items-center gap-x-5 gap-y-1 flex-wrap border-b border-gray-200 mb-4">
         <SearchLine value={query} onChange={v => { setQuery(v); setLimit(PAGE) }} placeholder="Search name, phone, email or street" label="Search leads" autoFocus />
         {canChoose && <RepToggle reps={reps} repId={repId} setRep={setRep} />}
         <QuickPicks value={show} onChange={(v) => { setShow(v); setLimit(PAGE) }} options={[
-          { value: 'all', label: 'Everyone' },
-          { value: 'online', label: 'Booked online', count: loading ? null : online },
+          { value: 'all', label: 'Everyone', count: mine.length },
+          { value: 'Visit booked', label: 'Visit booked', count: loading ? null : count('Visit booked') },
+          { value: 'Quoted', label: 'Quoted', count: count('Quoted') },
+          { value: 'Customer', label: 'Customers', count: count('Customer') },
           { value: 'repeat', label: 'Booked more than once', count: loading ? null : repeats },
         ]} />
       </div>
@@ -152,9 +184,16 @@ export default function Leads() {
       {shown.length === 0
         ? <p className="text-sm text-gray-500 py-8 text-center">{query ? `No one matches “${query}”.` : 'No one here yet.'}</p>
         : (
-          <ul className="space-y-2">
-            {shown.slice(0, limit).map(l => <LeadRow key={l.id} lead={l} onOpen={open} onProfile={() => showPerson(l.records[0].key)} />)}
-          </ul>
+          <FitTable className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>{['Name', 'Phone', 'Wants', 'Came from', 'Visit', 'Status', ''].map((h, i) => <th key={i} className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {shown.slice(0, limit).map(l => <LeadRow key={l.id} lead={l} onOpen={open} onProfile={() => showPerson(l.records[0].key)} />)}
+              </tbody>
+            </table>
+          </FitTable>
         )}
       {shown.length > limit && (
         <button type="button" onClick={() => setLimit(n => n + PAGE)}
