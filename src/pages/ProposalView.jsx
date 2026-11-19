@@ -9,8 +9,43 @@ import { DEFAULT_BRAND_COLOR } from '../brand'
 import { customerLines, discountOf } from '../lib/hiddenLines'
 import { priceRangeOf, rangeText, depositPctOf } from '../lib/priceRange'
 import { customerUpgrades } from '../lib/upgrades'
+import { nextReminderDate } from '../lib/attention'
 
 const fmt = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+// ── Where this deal stands (our side only, never printed) ────────────────────
+// The stages from Draft to Won with this quote's stage marked, and its next
+// step: the earliest follow-up set on it, or sending it while it's a draft.
+const DEAL_STEPS = ['Draft', 'Sent', 'Followed Up', 'Negotiating', 'Won']
+function DealStrip({ p }) {
+  const at = DEAL_STEPS.indexOf(p.status)
+  const due = (p.reminders || []).filter(r => !r.dismissed).map(r => ({ r, d: nextReminderDate(r) })).filter(x => x.d)
+    .sort((a, b) => a.d.localeCompare(b.d))[0]
+  const today = new Date().toISOString().slice(0, 10)
+  const next = due
+    ? { what: due.r.note || 'Follow up', when: new Date(`${due.d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), late: due.d < today }
+    : p.status === 'Draft' ? { what: 'Send it to the customer', when: '' } : null
+  return (
+    <div className="no-print bg-white border-b border-gray-200 px-3 sm:px-6 py-3">
+      <div className="max-w-3xl mx-auto space-y-2.5">
+        {at >= 0 ? (
+          <ol className="flex gap-1 text-xs" aria-label="Stage">
+            {DEAL_STEPS.map((st, i) => (
+              <li key={st} aria-current={i === at ? 'step' : undefined}
+                className={`flex-1 pt-1.5 border-t-4 ${i < at ? 'border-[var(--brand-600)] text-gray-700' : i === at ? 'border-orange-500 text-gray-900 font-bold' : 'border-gray-200 text-gray-400'}`}>{st}</li>
+            ))}
+          </ol>
+        ) : <p className="text-sm text-gray-700">Stage: <span className="font-semibold">{p.status}</span></p>}
+        {next && (
+          <p className={`text-sm rounded-lg px-3 py-2 border ${next.late ? 'bg-orange-50 border-orange-200 text-orange-900' : 'bg-[var(--brand-50)] border-[var(--brand-200)] text-gray-800'}`}>
+            <span className="text-xs font-bold uppercase tracking-wide mr-2">Next step</span>
+            <span className="font-semibold">{next.what}</span>{next.when ? ` · ${next.late ? `was due ${next.when}` : next.when}` : ''}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function ProposalView() {
   const navigate = useNavigate()
@@ -33,6 +68,9 @@ export default function ProposalView() {
   const proposalIdRef = useRef(null)
   const { saveProposal, markProposalSent, setProposalViewToken } = useStore()
   const branding = useStore(s => s.branding)
+  // The saved quote behind this page, for its stage and next step (DealStrip)
+  const storedId = data?.proposalId ?? data?.id ?? null
+  const stored = useStore(s => (storedId != null ? s.proposals.find(p => String(p.id) === String(storedId)) : null))
   const blue     = branding?.primaryColor || DEFAULT_BRAND_COLOR   // Deck Plus blue — PROPOSAL title and company name
   const companyName = branding?.companyName || 'QUOTEX'
 
@@ -312,6 +350,7 @@ export default function ProposalView() {
           <Send size={14} /> Send to Client
         </button>
       </div>
+      {stored && <DealStrip p={stored} />}
       {range && (
         <div className="no-print bg-[var(--brand-50)] border-b border-[var(--brand-200)] px-3 sm:px-6 py-2 text-sm text-gray-700">
           The customer sees <strong>{rangeText(range)}</strong>. Exact price on our side: <strong>${fmt(subtotal)}</strong> (not shown to the customer).
