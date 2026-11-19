@@ -838,6 +838,7 @@
   }
   let PLAN = null, planSel = true;                       // last plan's transform; show selection?
   const isSel = (x) => planSel && !customer && mode === '2d' && x.id === S.sel;
+  let PLACE = null;
   function planSVG(interactive = false) {
     planSel = interactive;
     const pick = S.sheetLock ? S.sheetLock.pick : pickSheet(), sheet = pick.sheet, g = sheet.grid, PX = g.step / pick.ftPerDot;  // pt per foot
@@ -847,6 +848,7 @@
     const zo = S.sheetLock ? S.sheetLock.zo : Math.floor((e.z0 - (GH - (e.z1 - e.z0)) / 2) / q) * q;
     const X = (x) => (g.x0 + (x - xo) * PX).toFixed(2), Z = (z) => (g.y0 + (z - zo) * PX).toFixed(2);
     if (interactive) PLAN = { pick, xo, zo, PX, g, toFt: (sx, sy) => [xo + (sx - g.x0) / PX, zo + (sy - g.y0) / PX] };
+    PLACE = { xo, zo, PX, x0: g.x0, y0: g.y0, GW, GH };          // where the plan sits on the sheet (the editor draws its own there)
     const gx0 = xo, gx1 = xo + GW, gz0 = zo, gz1 = zo + GH;      // grid bounds in feet
     const out = [];
     const line = (xa, za, xb, zb, cls) => out.push(`<line class="${cls}" x1="${X(xa)}" y1="${Z(za)}" x2="${X(xb)}" y2="${Z(zb)}"/>`);
@@ -3188,7 +3190,8 @@ ${CHECK} No split screen and no text.`;
       if (ev.source !== window.parent || ev.data?.type !== 'qx-plan-request') return;
       S.sheet = ev.data.sheet || 'auto';
       const pk = pickSheet();
-      window.parent.postMessage({ type: 'qx-plan', svg: planSVG(false), w: pk.sheet.w / 72, h: pk.sheet.h / 72, label: pk.sheet.label, action: ev.data.action }, '*');
+      const svg = planSVG(false);
+      window.parent.postMessage({ type: 'qx-plan', svg, place: PLACE, w: pk.sheet.w / 72, h: pk.sheet.h / 72, label: pk.sheet.label, action: ev.data.action }, '*');
     });
     const lines = Object.entries(LINES).map(([key, l]) => ({ key, label: l.label, brand: l.brand, colors: COLORS.filter(c => c.line === key).map(({ key: k2, name, hex }) => ({ key: k2, name, hex })) }));
     window.parent.postMessage({ type: 'qx-3d-ready', lines, trims: TRIMS, houses: HOUSES }, '*');
