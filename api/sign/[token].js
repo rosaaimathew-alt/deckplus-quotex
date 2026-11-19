@@ -254,7 +254,25 @@ export default async function handler(req, res) {
       // Strip contact PII from the PUBLIC response — the quote page doesn't need
       // the customer's email/phone, so don't expose it to anyone holding the link.
       const { email, phone, ...publicSnapshot } = rec.snapshot || {}
-      return res.json({ snapshot: publicSnapshot, openCount: opens.length })
+      return res.json({ snapshot: publicSnapshot, openCount: opens.length, choice: rec.choice?.key || null })
+    }
+
+    // ── PUBLIC: the customer picks a Good / Better / Best package ─────
+    // Stored on the link (the office sees it when it makes the contract) and
+    // the person who made the proposal gets a pop-up.
+    if (token.startsWith('pchoose-')) {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+      const viewToken = token.slice('pchoose-'.length)
+      const rec = await kv.get(`pview:${viewToken}`)
+      if (!rec) return res.status(404).json({ error: 'Proposal not found' })
+      const key = String(req.body?.key || '')
+      const pkg = (rec.snapshot?.packages || []).find(p => p.key === key)
+      if (!pkg) return res.status(400).json({ error: 'Unknown package' })
+      if (rec.choice?.key !== key) {
+        await kv.set(`pview:${viewToken}`, { ...rec, choice: { key, at: Date.now() } })
+        if (rec.proposalId != null) await alertMakerOfOpen({ kind: 'choice', proposalId: rec.proposalId, client: rec.snapshot?.client, pkg: pkg.label, origin: originOf(req), quietKey: `notify:choice:${viewToken}:${key}`, kv })
+      }
+      return res.json({ ok: true, choice: key })
     }
 
     // ── ADMIN: open history + customer contact for the activity log / sender agent.
@@ -270,6 +288,7 @@ export default async function handler(req, res) {
       return res.json({
         opens,
         openCount: opens.length,
+        choice: rec?.choice || null,
         contact: { name: s.client || '', email: s.email || '', phone: s.phone || '' },
       })
     }

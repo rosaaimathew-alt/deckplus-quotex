@@ -17,7 +17,7 @@ import PorchBuildPanel from '../components/PorchBuildPanel'; import DrawingStrip
 import UnderDeckPanel from '../components/UnderDeckPanel'
 import HardscapePanel from '../components/HardscapePanel'
 import DeckPricingPanel from '../components/DeckPricingPanel'
-import { requiredFees } from '../lib/permitFees'; import { suggestPackages, withPackages, applyPackage } from '../lib/packages'
+import { requiredFees } from '../lib/permitFees'; import { packageOptions, suggestedPick, deckName, railName, DECKING_CHOICES, RAIL_CHOICES } from '../lib/packages'
 import { JicField } from '../components/Jic'
 import { scopeFor, countWords } from '../lib/scopeText'
 import { JIC_DEFAULT, jicAmount } from '../lib/jic'
@@ -333,7 +333,7 @@ export default function BuildQuote() {
   const [priceRange, setPriceRange] = useState(null)
   // Optional upgrades: priced under the total on the proposal, never part of it.
   const [upgrades, setUpgrades] = useState([])
-  const [packagesOff, setPackagesOff] = useState([])        // suggested packages the rep removed from this quote
+  const [pkgSetup, setPkgSetup] = useState({ show: true, picks: {} })   // Good / Better / Best: shown to the customer? the rep's picks
   const [projectTypes, setProjectTypes] = useState([])
   const [projectSummary, setProjectSummary] = useState('')
   // Permit & jurisdiction fees are worked out from the address (src/lib/permitFees.js).
@@ -410,8 +410,8 @@ export default function BuildQuote() {
         if (d.showBreakdown !== undefined) setShowBreakdown(d.showBreakdown)
         if (d.isAlaCarte !== undefined) setIsAlaCarte(!!d.isAlaCarte)
         setPriceRange(d.priceRange || null)
-        setUpgrades(freshIds(d.upgrades || []))
-        setPackagesOff(d.packagesOff || [])
+        setUpgrades(freshIds((d.upgrades || []).filter(u => !u.auto)))
+        setPkgSetup(d.pkgSetup || { show: true, picks: {} })
         if (d.projectTypes) setProjectTypes(d.projectTypes)
         if (d.projectSummary) setProjectSummary(d.projectSummary)
         setRevisingParentId(d.parentId || null)
@@ -437,8 +437,8 @@ export default function BuildQuote() {
       setIsAlaCarte(d.isAlaCarte || false)
       setShowBreakdown(d.showBreakdown ?? false)
       setPriceRange(d.priceRange || null)
-      setUpgrades(freshIds(d.upgrades || []))
-      setPackagesOff(d.packagesOff || [])
+      setUpgrades(freshIds((d.upgrades || []).filter(u => !u.auto)))
+      setPkgSetup(d.pkgSetup || { show: true, picks: {} })
       setProjectTypes(d.projectTypes || [])
       setProjectSummary(d.projectSummary || '')
       setRevisingParentId(d.revisingParentId || null)
@@ -454,7 +454,7 @@ export default function BuildQuote() {
   const startFresh = () => {
     localStorage.removeItem(DRAFT_KEY)
     setClient(''); setEmail(''); setPhone(''); setAddress(''); setExpiration('')
-    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false); setPriceRange(null); setUpgrades([]); setPackagesOff([])
+    setLines([]); setMargin(MARGIN_DEFAULT); setIsAlaCarte(false); setShowBreakdown(false); setPriceRange(null); setUpgrades([]); setPkgSetup({ show: true, picks: {} })
     setProjectTypes([]); setProjectSummary(''); setRevisingParentId(null)
     setDraftProposalId(null); setDraftClient(''); setRevisingClient(''); setRestoredFrom(null)
     setFeeDismissed([]); setFeeEdits({}); setFeeOverrides({}); setDiscount(null); setDrawLink(null)
@@ -467,9 +467,9 @@ export default function BuildQuote() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
       client, email, phone, address, expiration, margin, lines,
       isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient,
-      feeDismissed, feeEdits, feeOverrides, discount, drawLink, packagesOff,
+      feeDismissed, feeEdits, feeOverrides, discount, drawLink, pkgSetup,
     }))
-  }, [packagesOff, client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount, drawLink])
+  }, [pkgSetup, client, email, phone, address, expiration, margin, lines, isAlaCarte, showBreakdown, priceRange, upgrades, projectTypes, projectSummary, revisingParentId, draftProposalId, draftClient, revisingClient, feeDismissed, feeEdits, feeOverrides, discount, drawLink])
 
   // Permit fees for this address + work, as quote lines (derived, never stored twice)
   const feePlan = useMemo(() => requiredFees({ address, lines, projectTypes, catalog: catalogRaw, overrides: feeOverrides }),
@@ -559,14 +559,11 @@ export default function BuildQuote() {
     setUpgrades(cur => [...cur, { ...line, mergeInto: null, hidden: false }])
   }
   const moveToQuote = (u) => {
-    // a suggested package isn't a line of its own: taking it steps the decks themselves up
-    if (u.auto) { setLines(cur => applyPackage(cur, u.auto, pkgCtx)); return }
     setUpgrades(cur => cur.filter(x => x.id !== u.id))
     setLines(cur => [...cur, u])
   }
-  // Editing a suggested package makes it the rep's own (it stops following the quote)
-  const updateUpgrade = (id, patch) => setUpgrades(cur => cur.map(u => u.id === id ? { ...u, ...patch, auto: undefined } : u))
-  const removeUpgrade = (u) => { if (u.auto) setPackagesOff(cur => [...new Set([...cur, u.auto])]); setUpgrades(cur => cur.filter(x => x.id !== u.id)) }
+  const updateUpgrade = (id, patch) => setUpgrades(cur => cur.map(u => u.id === id ? { ...u, ...patch } : u))
+  const removeUpgrade = (u) => setUpgrades(cur => cur.filter(x => x.id !== u.id))
   const setMerge = (id, into) => setLines(prev => prev.map(l => l.id === id ? { ...l, mergeInto: into ?? null } : l))
   const [mergePickFor, setMergePickFor] = useState(null)   // line id whose "Merge into" picker is open
 
@@ -589,11 +586,23 @@ export default function BuildQuote() {
   const quoteDraw = useDrawingLink(null, (d, link) => setLines(ls => syncLinesFromDrawing(ls, d, link,
     { catalog: catalogRaw, customComponents: deckCustom || [], scopeTemplate: deckScopeTpl, savedRates: porchRatesSaved || {}, scopes: porchScopes }, editingLineId)), [drawLink, setDrawLink])
   const drawQuote = () => quoteDraw.open({ ...designParts(lines), client, address, phone, email })
-  // Good / Better / Best: the quote as built is Good; Better and Best are suggested for every
-  // deck on it, priced as upgrades under the total, and kept up to date as the quote changes.
+  // Good / Better / Best: three complete options for a quote with a deck on it, each with
+  // its own total (permit fees and the discount included). The quote as built is Good.
   const pkgCtx = useMemo(() => ({ catalog: catalogRaw, customComponents: deckCustom || [], scopeTemplate: deckScopeTpl }), [catalogRaw, deckCustom, deckScopeTpl])
-  const suggestedPkgs = useMemo(() => suggestPackages(lines, pkgCtx), [lines, pkgCtx])
-  useEffect(() => { setUpgrades(cur => withPackages(cur, suggestedPkgs, packagesOff)) }, [suggestedPkgs, packagesOff])
+  const pkgAll = useMemo(() => {
+    if (isAlaCarte) return []
+    const finish = (ls) => {
+      const pre = [...ls, ...(feeLine ? [feeLine] : [])]
+      if (!discountLine) return pre
+      const sum = pre.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0), v = Math.max(0, Number(discount.value) || 0)
+      const amount = Math.min(sum, discount.mode === 'percent' ? Math.round(sum * Math.min(v, 100)) / 100 : v)
+      return [...pre, { ...discountLine, unitPrice: -Math.round(amount * 100) / 100 }]
+    }
+    return packageOptions(lines, pkgCtx, finish, pkgSetup.picks)
+  }, [lines, pkgCtx, isAlaCarte, feeLine, discountLine, discount, pkgSetup.picks])
+  const pkgDeck = lines.find(l => l.builder?.tool === 'deck' && l.builder.state)?.builder.state || null
+  const packages = pkgSetup.show ? pkgAll : []
+  const setPick = (key, patch) => setPkgSetup(cur => ({ ...cur, picks: { ...cur.picks, [key]: { ...(cur.picks?.[key] || {}), ...patch } } }))
   const openTool = (t) => {
     setEditingLineId(null)
     setAssemblyInitial(t.initial || null)
@@ -717,7 +726,7 @@ export default function BuildQuote() {
     sessionStorage.setItem('proposal', JSON.stringify({
       client, email, phone, address, expiration, lines: allLines.map(l => { const c = { ...l }; delete c.why; return c }), margin, isAlaCarte, showBreakdown, projectTypes, projectSummary,
       priceRange: !isAlaCarte && priceRange ? priceRange : null,
-      packagesOff,
+      pkgSetup, packages,
       upgrades: upgrades.filter(u => (u.name || '').trim() || Number(u.unitPrice) > 0).map(u => { const c = { ...u }; delete c.why; return c }),
       feeDismissed, feeOverrides, discount: discountLine ? discount : null,
       ...(revisingParentId && sameClient(revisingClient, client) ? { parentId: revisingParentId } : {}),
@@ -1343,12 +1352,93 @@ export default function BuildQuote() {
           </div>
         </div>
 
+        {/* Good / Better / Best: whole-project options, the customer picks one. Ours is always Better. */}
+        {!isAlaCarte && pkgDeck && (() => {
+          const cols = ['good', 'better', 'best']
+          const opt = (k) => pkgAll.find(o => o.key === k)
+          const label = { good: 'Good', better: 'Better', best: 'Best' }
+          const pickOf = (k) => ({ ...suggestedPick(pkgDeck, k), ...(pkgSetup.picks?.[k] || {}) })
+          const hasRail = pkgDeck.rail && pkgDeck.rail !== 'None'
+          const better = opt('better')
+          const cell = 'px-3 py-2 align-middle'
+          const mid = 'border-x-2 border-[var(--brand-500)] bg-[var(--brand-50)]'
+          return (
+            <div className="bg-white rounded-xl border border-gray-200">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
+                <p className="text-sm font-semibold text-gray-900">Good / Better / Best</p>
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  Show to the customer
+                  <input type="checkbox" className="accent-[var(--brand-600)] w-4 h-4" checked={pkgSetup.show !== false}
+                    onChange={e => setPkgSetup(cur => ({ ...cur, show: e.target.checked }))} />
+                </label>
+              </div>
+              <div className="overflow-x-auto px-2 pb-3">
+                <table className="w-full text-sm min-w-[40rem] table-fixed">
+                  <thead>
+                    <tr>
+                      <th className="w-20" />
+                      {cols.map(k => (
+                        <th key={k} className={`${cell} pt-3 text-left ${k === 'better' ? `${mid} border-t-2 rounded-t-lg` : ''}`}>
+                          <span className="block text-sm font-bold text-[var(--brand-700)]">{label[k]}</span>
+                          <span className="block text-xs font-normal text-gray-500">{k === 'better' ? 'Your quote' : k === 'good' ? 'One step down' : 'One step up'}</span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-gray-100">
+                      <td className={`${cell} text-gray-500`}>Decking</td>
+                      {cols.map(k => k === 'better'
+                        ? <td key={k} className={`${cell} ${mid}`}>{deckName(pkgDeck.collKey)}</td>
+                        : <td key={k} className={cell}>
+                            <select aria-label={`${label[k]} decking`} value={pickOf(k).collKey || ''} onChange={e => setPick(k, { collKey: e.target.value || null })}
+                              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white">
+                              <option value="">Not offered</option>
+                              {DECKING_CHOICES.map(c => <option key={c} value={c}>{deckName(c)}</option>)}
+                            </select>
+                          </td>)}
+                    </tr>
+                    {hasRail && (
+                      <tr className="border-t border-gray-100">
+                        <td className={`${cell} text-gray-500`}>Railing</td>
+                        {cols.map(k => k === 'better'
+                          ? <td key={k} className={`${cell} ${mid}`}>{railName(pkgDeck.rail)}</td>
+                          : <td key={k} className={cell}>
+                              <select aria-label={`${label[k]} railing`} value={pickOf(k).rail || ''} onChange={e => setPick(k, { rail: e.target.value })}
+                                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white">
+                                {RAIL_CHOICES.map(c => <option key={c} value={c}>{railName(c)}</option>)}
+                              </select>
+                            </td>)}
+                      </tr>
+                    )}
+                    <tr className="border-t border-gray-100">
+                      <td className={`${cell} font-semibold text-gray-900`}>Total</td>
+                      {cols.map(k => {
+                        const o = k === 'better' ? better : opt(k)
+                        return (
+                          <td key={k} className={`${cell} ${k === 'better' ? `${mid} border-b-2 rounded-b-lg` : ''}`}>
+                            {k === 'better'
+                              ? <span className="font-bold text-gray-900">${money2(better ? better.total : subtotal)}</span>
+                              : o ? <><span className="font-bold text-gray-900">${money2(o.total)}</span>
+                                  <span className="block text-xs text-gray-500">{o.total < (better?.total || 0) ? '−' : '+'}${money2(Math.abs(o.total - (better?.total || 0)))}</span></>
+                              : <span className="text-xs text-gray-400">Not offered</span>}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Optional upgrades: priced under the total, never part of it */}
         {!isAlaCarte && (
           <div className="bg-white rounded-xl border border-gray-200">
             <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
               <div>
-                <p className="text-sm font-semibold text-gray-900">Optional upgrades{suggestedPkgs.length > 0 && <span className="ml-1.5 font-normal text-gray-500">· Good / Better / Best</span>}</p>
+                <p className="text-sm font-semibold text-gray-900">Optional upgrades</p>
                 <p className="text-xs text-gray-500">Shown on the proposal under the total, each with its price. Not included in the total, the contract or the job.</p>
               </div>
               <button onClick={() => setUpgrades(cur => [...cur, { id: Date.now() + Math.random(), name: '', description: '', qty: 1, unit: 'EA', unitPrice: 0 }])}
@@ -1369,8 +1459,7 @@ export default function BuildQuote() {
                         className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right" />
                     </div>
                     <div className="flex items-center gap-0.5">
-                      {u.auto && <span title="Suggested from the deck on this quote: it re-prices as the quote changes. Edit it to keep your own wording and price." className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--brand-700)] bg-[var(--brand-50)] rounded px-1.5 py-0.5">Suggested</span>}
-                      <button title={u.auto ? 'Take this package: the deck on the quote steps up to it' : 'Move into the quote (adds it to the total)'} aria-label={u.auto ? `Take the ${u.name.split(':')[0]} package` : `Move ${u.name || 'upgrade'} into the quote`} onClick={() => moveToQuote(u)}
+                      <button title="Move into the quote (adds it to the total)" aria-label={`Move ${u.name || 'upgrade'} into the quote`} onClick={() => moveToQuote(u)}
                         className="p-1.5 rounded text-gray-400 hover:text-[var(--brand-600)] hover:bg-gray-100"><ArrowUpToLine size={14} /></button>
                       <button title="Remove upgrade" aria-label={`Remove ${u.name || 'upgrade'}`} onClick={() => removeUpgrade(u)}
                         className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50"><Trash2 size={14} /></button>

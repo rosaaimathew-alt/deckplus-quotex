@@ -9,6 +9,8 @@ import { DEFAULT_BRAND_COLOR } from '../brand'
 import { customerLines, discountOf } from '../lib/hiddenLines'
 import { priceRangeOf, rangeText, depositPctOf } from '../lib/priceRange'
 import { customerUpgrades } from '../lib/upgrades'
+import { customerPackages } from '../lib/packages'
+import PackageChoices from '../components/PackageChoices'
 import { nextReminderDate } from '../lib/attention'
 
 const fmt = (n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -115,6 +117,7 @@ export default function ProposalView() {
           expiration: parsed.expiration,
           total: parsed.lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0),
           lines: parsed.lines, isAlaCarte: parsed.isAlaCarte || false, showBreakdown: parsed.showBreakdown, priceRange: parsed.priceRange || null, upgrades: parsed.upgrades || [],
+          packages: parsed.packages || [], pkgSetup: parsed.pkgSetup || null,
           margin: parsed.margin, projectTypes: parsed.projectTypes || [], projectSummary: parsed.projectSummary || '',
         })
         proposalIdRef.current = existing.id
@@ -131,6 +134,7 @@ export default function ProposalView() {
           showBreakdown: parsed.showBreakdown,
           priceRange: parsed.priceRange || null,
           upgrades: parsed.upgrades || [],
+          packages: parsed.packages || [], pkgSetup: parsed.pkgSetup || null,
           margin: parsed.margin,
           projectTypes: parsed.projectTypes || [],
           projectSummary: parsed.projectSummary || '',
@@ -168,6 +172,8 @@ export default function ProposalView() {
   const range = isAlaCarte ? null : priceRangeOf(subtotal, data.priceRange)
   // Optional upgrades: listed under the total, never in it.
   const upgrades = isAlaCarte ? [] : customerUpgrades(data.upgrades)
+  // Good / Better / Best: whole-project options (not with a price range)
+  const packages = isAlaCarte || range ? [] : customerPackages(data.packages)
   // Lines hidden on a summed proposal count in the total but are never shown.
   const shownLines = customerLines(lines, { showBreakdown, isAlaCarte })
   // Discount: shown under the items as Project Total → Discount → Total.
@@ -225,6 +231,8 @@ export default function ProposalView() {
       disc && !range ? `PROJECT TOTAL: $${fmt(beforeDiscount)}` : '',
       disc && !range ? `${disc.label.toUpperCase()}: -$${fmt(disc.amount)}` : '',
       range ? `ESTIMATED INVESTMENT: ${rangeText(range)}` : isAlaCarte ? '' : `TOTAL: $${fmt(subtotal)}`,
+      packages.length ? '\nCHOOSE YOUR PACKAGE' : '',
+      ...packages.map(p => `• ${p.label} (${p.tag}) — $${fmt(p.total)}\n  ${p.decks.map(d => `${d.name}: ${d.decking}, ${d.railing}`).join('\n  ')}`),
       upgrades.length ? '\nOPTIONAL UPGRADES (not included in the total above)' : '',
       ...upgrades.map(u => `• ${u.name}  —  $${fmt(u.price)}${u.description ? `\n  ${u.description}` : ''}`),
     ].filter(Boolean).join('\n')
@@ -553,6 +561,7 @@ export default function ProposalView() {
             </div>
           )}
           </>)}
+          <PackageChoices packages={packages} accent={blue} />
           {upgrades.length > 0 && (
             <div className="mt-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
               <p className="text-xs font-semibold uppercase tracking-widest text-black">Optional upgrades</p>

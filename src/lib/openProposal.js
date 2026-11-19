@@ -9,6 +9,7 @@ export function proposalHandoff(p) {
     showBreakdown: p.showBreakdown !== false,
     priceRange: p.priceRange || null,
     upgrades: p.upgrades || [],
+    packages: p.packages || [], pkgSetup: p.pkgSetup || null,
     projectTypes: p.projectTypes || [],
     projectSummary: p.projectSummary || '',
   }

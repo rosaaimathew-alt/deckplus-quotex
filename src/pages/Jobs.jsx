@@ -15,7 +15,7 @@ import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel, noPermit
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
 import { jobPhaseOf, subStartedIds } from '../lib/jobPhase'
-import { useNav, useJobMoney } from '../nav'
+import { useNav, useJobMoney, usePriceList } from '../nav'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
 import { useJobCostOf } from '../lib/jobCost'
 import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'
@@ -1793,22 +1793,22 @@ const BOOK_TABS = ['invoices', 'bills', 'purchases']
 
 // The job's Money tab. Money › Jobs shows the same, with the job's Summary
 // first (withSummary), so the office reaches it from either side.
-export function JobMoneyTab({ proposal, books, costCount, withSummary = false }) {
+// money / priceList: this person's two switches (Settings › Team › Access).
+export function JobMoneyTab({ proposal, books, costCount, withSummary = false, money = true, priceList = true }) {
   const parts = [
     ...(withSummary && books ? [{ value: 'summary', label: 'Summary' }] : []),
-    { value: 'budget', label: 'Budget' },
-    { value: 'costs', label: 'Costs', count: costCount || null },
-    { value: 'pricelist', label: 'Price list' },
+    ...(money ? [{ value: 'budget', label: 'Budget' }, { value: 'costs', label: 'Costs', count: costCount || null }] : []),
+    ...(priceList ? [{ value: 'pricelist', label: 'Price list' }] : []),
     ...(books ? [{ value: 'transactions', label: 'Invoices, POs & bills' }] : []),
   ]
-  const [part, setPart] = useState(withSummary && books ? 'summary' : 'budget')
+  const [part, setPart] = useState(parts[0]?.value || 'pricelist')
   return (
     <div className="space-y-4">
       <div className="border-b border-gray-200"><QuickPicks value={part} onChange={setPart} options={parts} /></div>
       {part === 'summary' && books && <JobSummary proposal={proposal} />}
-      {part === 'budget' && <BudgetTab proposal={proposal} />}
-      {part === 'costs' && <JobFinancials proposal={proposal} />}
-      {part === 'pricelist' && <JobPriceList proposal={proposal} />}
+      {part === 'budget' && money && <BudgetTab proposal={proposal} />}
+      {part === 'costs' && money && <JobFinancials proposal={proposal} />}
+      {part === 'pricelist' && priceList && <JobPriceList proposal={proposal} />}
       {part === 'transactions' && books && <JobTransactions proposal={proposal} />}
     </div>
   )
@@ -1825,7 +1825,8 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const pmName = (members || []).find(m => m.id === proposal.pmId)
   const pmLabel = pmName ? (pmName.displayName || pmName.email || '').split(' ')[0] : ''
   const { tabsOf } = useNav()
-  const money = useJobMoney()   // off: no Budget / Price list / Costs / Receipts (Settings › Team › Access)
+  const money = useJobMoney()   // off: no Budget / Costs / Receipts (Settings › Team › Access)
+  const priceList = usePriceList()   // the price list has its own switch
   // Invoices, POs and bills: office / admin with the Money pages and job money on.
   const books = money && tabsOf('money').some(t => BOOK_TABS.includes(t.key))
   const [expanded, setExpanded] = useState(focus)
@@ -1875,7 +1876,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
     { key: 'stages',  label: 'Stages' },
     ...(showPermits ? [{ key: 'permits', label: `${permitAccess === 'edit' ? 'Permits' : 'Inspections'}${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0) ? ` (${permitFlags.failed + permitFlags.expiring + (permitFlags.needsPick ? 1 : 0)})` : ''}` }] : []),
     // Budget, costs, price list and the job's invoices / POs / bills: one Money tab
-    ...(money ? [{ key: 'money', label: 'Money' }] : []),
+    ...(money || priceList ? [{ key: 'money', label: money ? 'Money' : 'Price list' }] : []),
     ...(showSubs ? [{ key: 'subs', label: `Subs${jobTasks.length ? ` (${jobTasks.length})` : ''}` }] : []),
     { key: 'co',      label: `Change Orders${coCount ? ` (${coCount})` : ''}` },
     // Two tabs hold several pages each, picked on a line under the tab bar:
@@ -2176,7 +2177,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
               </div>
             )}
             {tab === 'permits' && showPermits && <PermitsTab proposal={proposal} stages={stages} readOnly={permitAccess !== 'edit'} />}
-            {tab === 'money' && money && <JobMoneyTab proposal={proposal} books={books} costCount={costCount} />}
+            {tab === 'money' && (money || priceList) && <JobMoneyTab proposal={proposal} books={books} costCount={costCount} money={money} priceList={priceList} />}
             {tab === 'subs' && showSubs && <JobSubsTab proposal={proposal} />}
             {tab === 'co'      && <ChangeOrdersTab proposal={proposal} />}
             {tab === 'log'     && <DailyLogTab proposal={proposal} />}

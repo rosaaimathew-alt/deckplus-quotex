@@ -31,27 +31,21 @@ const ROLE_LABEL = { sales: 'Sales', pm: 'Project manager', manager: 'Manager' }
 // Today depends on the person: the page picked for them in Settings › Team
 // (homePages: owner / office / permits), else their department's: project
 // managers plan from the job calendar, office logins get the office home.
-// Office / admin can preview any of them at /?home=owner|office|permits.
+// Office / admin can preview the office and permits pages at /?home=office|permits;
+// only the owner opens the owner's page.
 function RoleHome() {
   const role = useStore(s => s.role || 'manager')
   const me = useStore(s => s.me)
   const homePages = useStore(s => s.homePages)
   const location = useLocation()
-  const preview = role === 'manager' ? new URLSearchParams(location.search).get('home') : null
   const own = role === 'manager' ? (homePages?.[me?.id] || (me?.role === 'office' ? 'office' : '')) : ''
-  // Office / admin can flip their Today page to the owner's view and back (the
-  // pill beside the greeting); the choice is remembered on this device.
-  const [ownerView, setOwnerView] = useState(() => { try { return localStorage.getItem('qx_today_owner') === '1' } catch { return false } })
-  const flip = (on) => { setOwnerView(on); try { localStorage.setItem('qx_today_owner', on ? '1' : '0') } catch { /* private mode */ } }
-  const picked = preview || (ownerView && own !== 'owner' ? 'owner' : own)
-  const pill = role === 'manager' && own !== 'owner' && !preview ? (
-    <span className="inline-flex rounded-full border border-gray-300 bg-white p-0.5 text-xs font-semibold" role="group" aria-label="Which Today page">
-      {[[false, 'My view'], [true, 'Owner view']].map(([on, label]) => (
-        <button key={label} type="button" onClick={() => flip(on)} aria-pressed={ownerView === on}
-          className={`px-3 py-1 rounded-full transition-colors ${ownerView === on ? 'bg-[var(--brand-600)] text-white' : 'text-gray-600 hover:text-gray-900'}`}>{label}</button>
-      ))}
-    </span>
-  ) : null
+  // The owner's view is the owner's alone (the person whose Today page is
+  // "Owner"): nobody else can flip to it or preview it.
+  const isOwner = own === 'owner'
+  const asked = role === 'manager' ? new URLSearchParams(location.search).get('home') : null
+  const preview = asked === 'owner' && !isOwner ? null : asked
+  const picked = preview || own
+  const pill = null
   const home = role === 'pm' ? <PMHome />
     : picked === 'owner' ? <OwnerHome pill={pill} />
     : picked === 'permits' ? <OfficeHome permits pill={pill} />

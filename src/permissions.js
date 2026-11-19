@@ -13,7 +13,10 @@
 //                          emailed an alert, and no alert is sent through their
 //                          mailbox, which stays for customers. Also off for a
 //                          shared login whose address isn't a real mailbox.
-//   'job.money'            the money inside a job: Budget, Price list, Costs,
+//   'job.pricelist'        the itemized price list on a job (Projects › Jobs ›
+//                          Money) and on a quote (Sales › List › Open price list).
+//                          Its own switch: on or off whatever 'job.money' is.
+//   'job.money'            the money inside a job: Budget, Costs,
 //                          Receipts, payments, close-out profit, Money › Bills
 //                          and Purchases, and the quote builder's cost / margin.
 //                          The job's value stays.
@@ -28,6 +31,7 @@ import { appRoleOf } from './roles'
 
 export const JOB_MONEY = 'job.money'
 export const ALERT_EMAILS = 'email.alerts'
+export const PRICE_LIST = 'job.pricelist'
 
 // The switch list shown to the admin, grouped like the menu.
 export const permissionGroups = () => [
@@ -38,7 +42,9 @@ export const permissionGroups = () => [
   {
     label: 'Money',
     items: [{ key: JOB_MONEY, label: 'Job money & profit', access: '/jobs',
-      hint: 'Budget, price list, costs, receipts, payments and profit on a job; Money › Bills and Purchases; cost and margin in the quote builder' }],
+      hint: 'Budget, costs, receipts, payments and profit on a job; Money › Bills and Purchases; cost and margin in the quote builder' },
+      { key: PRICE_LIST, label: 'Price list', access: '/',
+      hint: 'The itemized price list on a job and on a quote, with its PDF and Excel downloads' }],
   },
   {
     label: 'Emails',
