@@ -14,6 +14,7 @@ import { jobPhotoCount } from '../lib/taskPhotos'
 import { usePermitAccess, permitTracked, permitAlerts, inspectionLabel, noPermit, PERMIT_KEYS, isInspectionKey } from '../lib/permitTracking'
 import { startPulse } from '../lib/permitPulse'
 import { isJob } from '../lib/attention'
+import { jobPhaseOf, subStartedIds } from '../lib/jobPhase'
 import { useNav, useJobMoney } from '../nav'
 import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
 import { useJobCostOf } from '../lib/jobCost'
@@ -2221,16 +2222,8 @@ export default function Jobs() {
   // the start date has come, a building step is checked off, or a sub has started on it),
   // or closed.
   const today = new Date().toISOString().slice(0, 10)
-  const subStarted = useMemo(() => new Set((subTasks || []).filter(t => t && ['started', 'near', 'done'].includes(t.status)).map(t => String(t.proposalId))), [subTasks])
-  const phaseOf = (p) => {
-    const cs = p.jobData?.completedStages || []
-    if (cs.includes('closed')) return 'closed'
-    const stages = getStages(p) || []
-    const building = (p.jobData?.startDate && p.jobData.startDate <= today) || subStarted.has(String(p.id))
-      || stages.some(s => cs.includes(s.key) && !PRE_BUILD.has(s.key))
-    if (building) return 'active'
-    return stages.some(s => APPROVALS.includes(s.key) && !cs.includes(s.key)) ? 'permitting' : 'ready'
-  }
+  const subStarted = useMemo(() => subStartedIds(subTasks), [subTasks])
+  const phaseOf = (p) => jobPhaseOf(p, subStarted, today)
 
   // Where each open job is right now: its first unfinished stage
   const currentStageOf = (p) => {

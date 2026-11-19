@@ -1550,6 +1550,15 @@ export const useStore = create(
       // (default) or 'everyone' (the whole organization). Remembered per browser.
       officeView: (() => { try { return localStorage.getItem('qx_office_view') || 'everyone' } catch { return 'everyone' } })(),   // office / admin start on All
       contractPrefix: 'DP',
+      // Which Today page each person opens to (Settings › Team › Access):
+      // { [userId]: 'owner' | 'office' | 'permits' }. Anyone not listed gets
+      // their department's page (App.jsx RoleHome).
+      homePages: {},
+      setHomePage: (userId, kind) => set((s) => {
+        const next = { ...(s.homePages || {}) }
+        if (kind) next[userId] = kind; else delete next[userId]
+        return { homePages: next }
+      }),
       // The company's signature on file (office/admin adopt it in Settings) and
       // the welcome email a customer gets once the contract is fully signed.
       companySignature: null,       // { enabled, signatureDataUrl, printedName, title, adoptedBy, adoptedAt }
@@ -1624,7 +1633,7 @@ const SETTINGS_DEFAULTS = () => ({
   paymentScheduleLearning: {}, scopeExamples: [], historyImported: false, calendarHiddenJobs: [],
   contractPrefix: 'DP', companySignature: null, welcomeEmail: null, permitPulse: null,
   porchBuildRates: {}, porchBuildLocked: false, porchBuildScopes: { ...PORCH_BUILD_SCOPE_DEFAULTS },
-  subscriptions: [],
+  subscriptions: [], homePages: {},
 })
 const ID_COUNTERS = ['nextProposalId', 'nextCatalogId', 'nextTemplateId', 'nextScopeTemplateId', 'nextPaymentScheduleId', 'nextSubId']
 

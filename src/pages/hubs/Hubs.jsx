@@ -52,6 +52,7 @@ export function SalesHub() {
     pipeline:  () => <ProposalTracker view="pipeline" initialStatus={status} />,
     designs:   () => <Designs />,
     leads:     () => <Leads />,
+    contracts: () => <ContractsList initialFilter={params.get('filter') || undefined} />,
   }, { proposals: { count: dueCount, countTone: 'alert' } })
 
   // Clients and Opens now live inside Proposals (search box, Opens switch)
@@ -86,23 +87,12 @@ export function ProjectsHub() {
 
   // Subcontractors moved to Money › Vendors
   if (params.get('tab') === 'crews') return <Navigate to="/money?tab=vendors" replace />
-  // Contracts used to be a tab here — send old links to their own page
+  // Contracts used to be a tab here — they live in Sales now
   if (params.get('tab') === 'contracts') {
     const filter = params.get('filter')
-    return <Navigate to={`/contracts${filter ? `?filter=${encodeURIComponent(filter)}` : ''}`} replace />
+    return <Navigate to={`/sales?tab=contracts${filter ? `&filter=${encodeURIComponent(filter)}` : ''}`} replace />
   }
   return <Hub title="Projects" tabs={tabs} rememberKey="projects" />
-}
-
-// ── Contracts ────────────────────────────────────────────────────────────────
-// Its own place because both sales and management live in it.
-export function ContractsHub() {
-  const { tabsOf } = useNav()
-  const [params] = useSearchParams()
-  const tabs = withRender(tabsOf('contracts'), {
-    all: () => <ContractsList initialFilter={params.get('filter') || undefined} />,
-  })
-  return <Hub title="Contracts" tabs={tabs} />
 }
 
 // ── Insights ─────────────────────────────────────────────────────────────────

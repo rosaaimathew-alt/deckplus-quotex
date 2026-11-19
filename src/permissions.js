@@ -55,7 +55,7 @@ export const isOff = (permissions, key) => permissions?.[key] === false
 // switching one of those tabs off doesn't take the others with it.
 export const PATH_KEYS = {
   '/clients':       'sales.proposals',
-  '/contracts':     'contracts.all',
+  '/contracts':     'sales.contracts',
   '/scheduler':     'projects.calendar',
   '/subs':          'money.vendors',
   '/checklists':    'projects.checklists',
