@@ -107,6 +107,12 @@
   .sheetg select { height: 34px; }
   .keyc { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); font-size: 12.5px; color: var(--fg); max-width: 300px; }
   .keyc[hidden] { display: none; }
+  /* Closed by default: one small "Key" button, so the legend never covers the drawing. */
+  .keyc #keyc-t { display: flex; align-items: center; gap: 6px; padding: 0; background: none; border: 0; cursor: pointer; text-align: left; }
+  .keyc #keyc-t::after { content: '▸'; font-size: 10px; color: var(--muted); }
+  .keyc.open #keyc-t::after { content: '▾'; }
+  .keyc:not(.open) { padding: 7px 12px; gap: 0; }
+  .keyc:not(.open) span, .keyc:not(.open) em { display: none !important; }
   .keyc b { font: 600 11px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
   .keyc span { display: flex; align-items: center; gap: 8px; }
   .keyc svg { width: 18px; height: 18px; flex: none; fill: none; }
@@ -262,7 +268,7 @@
           <dt>?</dt><dd>Show this list</dd>
         </dl>
       </div>
-      <div class="keyc" id="keyc" hidden><b>Key</b>
+      <div class="keyc" id="keyc" hidden><button type="button" id="keyc-t" aria-expanded="false" title="Show or hide what the symbols mean"><b>Key</b></button>
         <span class="rk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18" stroke="#1e3a8a" stroke-width="2.6"/><path d="M4 7h16M4 12h16M4 17h16" stroke="#9db9e8" stroke-width="1.4"/></svg>Ridge, hips and rafters 16″ o.c.</span>
         <span class="rk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18" stroke="#9a3412" stroke-width="3"/><rect x="2" y="9" width="6" height="6" fill="#111827"/><rect x="16" y="9" width="6" height="6" fill="#111827"/></svg>Header on the porch columns</span>
         <span class="rk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h10" stroke="#b42318" stroke-width="2"/><path d="M15 14l5 4-5 4z" fill="#b42318"/></svg>Roof slope and pitch</span>
@@ -955,6 +961,13 @@
     svg.appendChild(frameLayer);
     svg.appendChild(dimLayer);
     const kc = $('keyc'); if (kc) kc.hidden = !((FRAME && postNo > 0) || (ROOF && S.els.some(x => x.type === 'porch')));
+    if (kc && !kc.dataset.wired) {
+      kc.dataset.wired = '1';
+      const setKey = (on) => { kc.classList.toggle('open', on); $('keyc-t').setAttribute('aria-expanded', on ? 'true' : 'false'); try { localStorage.setItem('qx-editor-key', on ? 'open' : 'closed'); } catch (e) { /* private mode */ } };
+      let was = 'closed'; try { was = localStorage.getItem('qx-editor-key') || 'closed'; } catch (e) { /* private mode */ }
+      setKey(was === 'open');
+      $('keyc-t').addEventListener('click', () => setKey(!kc.classList.contains('open')));
+    }
     const defs = el('defs', {}); const m = el('marker', { id: 'arrow', viewBox: '0 0 6 6', refX: 5, refY: 3, markerWidth: 6, markerHeight: 6, orient: 'auto' }, defs); el('path', { d: 'M0 0L6 3L0 6Z', fill: '#1a1c38' }, m);
     // selection handles
     const e = byId(sel);
