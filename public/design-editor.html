@@ -548,6 +548,17 @@
     const flush = porch || S.els.some(o => o.type === 'porch' && o !== e && (touches(pts, polyOf(o)) || touches(polyOf(o), pts)));
     const cantFor = (reach) => Math.min(CANT_MAX, Math.max(0.5, Math.round(reach * 0.12 * 2) / 2));
     const runs = [], flats = [];
+    // A beam halfway back runs the full width of the deck at that line, edge to edge
+    // (not just as wide as the front it was planned from: a deck that widens behind
+    // a clipped corner or a bump-out gets the beam out to its side).
+    const across = (z, lo, hi) => {
+      const xs = [];
+      edges(pts).forEach(([a, b]) => { if ((a[1] - z) * (b[1] - z) < 0 || (a[1] === z) !== (b[1] === z)) { const t = (z - a[1]) / ((b[1] - a[1]) || 1e-9); if (t >= 0 && t <= 1) xs.push(a[0] + (b[0] - a[0]) * t); } });
+      xs.sort((p, q) => p - q);
+      const cx = (lo + hi) / 2;
+      for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i] <= cx + 0.01 && cx <= xs[i + 1] + 0.01) return [Math.min(lo, xs[i]), Math.max(hi, xs[i + 1])];
+      return [lo, hi];
+    };
     edges(pts).forEach(([a, b]) => {
       if (isHouse([a, b])) return;
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 2) return;
@@ -562,7 +573,7 @@
       // a joist span over 14′ gets a second beam halfway back
       const midZ = house.length && flat && A[1] - back > MAX_SPAN ? back + (A[1] - back) / 2 : null;
       runs.push({ A, B, ux, uz, flat, cant, porch, flush, sup: midZ ?? back });
-      if (midZ != null) runs.push({ A: [A[0], midZ], B: [B[0], midZ], ux, uz, flat: true, cant: 0, mid: true, sup: back });
+      if (midZ != null) { const [x0, x1] = across(midZ, Math.min(A[0], B[0]), Math.max(A[0], B[0])), fw = B[0] >= A[0]; runs.push({ A: [fw ? x0 : x1, midZ], B: [fw ? x1 : x0, midZ], ux: fw ? 1 : -1, uz: 0, flat: true, cant: 0, mid: true, sup: back }); }
     });
     // sides in one line: one beam, also across a gap the floor covers (under a bump-out)
     flats.sort((p, q) => p.z - q.z || p.lo - q.lo);
@@ -578,7 +589,7 @@
       const cant = cantFor(over), z = l.z - cant, midZ = z - from > MAX_SPAN ? from + (z - from) / 2 : null;
       runs.push({ A: [l.lo, z], B: [l.hi, z], ux: 1, uz: 0, flat: true, cant, sup: midZ ?? from, thru: behind ? [cx, behind.z] : null });
       beams.push({ lo: l.lo, hi: l.hi, z });
-      if (midZ != null) runs.push({ A: [l.lo, midZ], B: [l.hi, midZ], ux: 1, uz: 0, flat: true, cant: 0, mid: true, sup: from });
+      if (midZ != null) { const [x0, x1] = across(midZ, l.lo, l.hi); runs.push({ A: [x0, midZ], B: [x1, midZ], ux: 1, uz: 0, flat: true, cant: 0, mid: true, sup: from }); }
     });
     runs.forEach(r => {
       if (r.hang) return;
