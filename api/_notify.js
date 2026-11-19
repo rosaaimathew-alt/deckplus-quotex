@@ -20,6 +20,7 @@
  *   invoice_submitted              → the office      invoice_decision → the sub
  *   message (job chat)             → the other side of that conversation: the sub's manager,
  *                                    or the Deck Plus PM on the job
+ *   todo_assigned (To-do › Shared) → the office teammate the task was given to, in the giver's name
  */
 import { verifyToken, asUser, staffMembership } from './_auth.js'
 import { sendMail } from './_mailer.js'
@@ -29,7 +30,7 @@ import { getKV } from './_kv.js'
 
 const TEAL = '#1d758b'
 const ORANGE = '#ea7a24'
-export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message']
+export const KINDS = ['booked', 'changed', 'inspection', 'inspection_result', 'assigned', 'done', 'invoice_submitted', 'invoice_decision', 'message', 'todo_assigned']
 const CHAT_QUIET_SECONDS = 300   // a back-and-forth emails each side at most once every five minutes per job
 const QUIET_SECONDS = 60   // the same alert about the same booking is not repeated inside a minute
 
@@ -180,6 +181,18 @@ export function messageFor(info) {
         sms: `Deck Plus: ${by} (${tidy(m.client, 40) || 'job'}): ${tidy(m.text, 200)}`,
         path: toSub ? (m.taskId ? `/task/${encodeURIComponent(m.taskId)}` : '/') : (m.proposalId ? `/field/job/${encodeURIComponent(m.proposalId)}` : '/field'),
         cta: toSub ? 'Reply / Responder' : 'Reply',
+      }
+    }
+    // A task one person in the office gave another (To-do › Shared)
+    case 'todo_assigned': {
+      const what = tidy(info.todo?.text, 400)
+      if (!what) return null
+      return {
+        subject: `New task from ${by}`,
+        en: `${by} gave you a task: "${what}"`,
+        es: null,
+        sms: `Deck Plus: task from ${by}: ${tidy(info.todo?.text, 200)}`,
+        path: '/?todo=1', cta: 'Open your to-do list',
       }
     }
     default: return null

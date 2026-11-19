@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdBlock } from './supabase'
 import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { notify, alertForTaskChange } from './lib/notify'
+import { ASSIGNABLE_ROLES, canDeleteTodo, personalTodos, todosIAssigned } from './lib/todos'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
 import { appRoleOf } from './roles'
@@ -1456,18 +1457,41 @@ export const useStore = create(
       // the union merge and propagate to other users instead of resurrecting.
       tombstones: [],
       todoPin: 'off', // 'off' | 'right' — pins the list as a side panel
-      addTodo: (text) =>
-        set((s) => ({ todos: [{ id: Date.now(), text, done: false, createdAt: new Date().toISOString() }, ...s.todos] })),
+      // A to-do belongs to the person who wrote it. Given to someone else
+      // (assignee: a team member), it is shared with just that person, who is
+      // told about it (lib/todos, lib/notify).
+      addTodo: (text, assignee = null) => {
+        const me = get().me, id = Date.now(), now = new Date().toISOString()
+        const to = assignee?.id && assignee.id !== me?.id && ASSIGNABLE_ROLES.includes(assignee.role) ? assignee : null
+        const todo = {
+          id, text, done: false, createdAt: now,
+          ...(me?.id ? { ownerId: me.id, ownerName: me.displayName || me.email || '' } : {}),
+          ...(to ? { assignedTo: to.id, assignedToName: to.displayName || to.email || '', assignedAt: now } : {}),
+        }
+        set((s) => ({ todos: [todo, ...s.todos] }))
+        if (to) notify('todo_assigned', id)
+      },
       toggleTodo: (id) =>
         set((s) => ({ todos: s.todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) })),
       deleteTodo: (id) =>
-        set((s) => ({ todos: s.todos.filter((t) => t.id !== id), tombstones: [...(s.tombstones || []), `todo:${id}`] })),
-      clearDoneTodos: () =>
-        set((s) => ({
-          todos: s.todos.filter((t) => !t.done),
-          tombstones: [...(s.tombstones || []), ...s.todos.filter((t) => t.done).map((t) => `todo:${t.id}`)],
-        })),
+        set((s) => {
+          const t = s.todos.find((x) => x.id === id)
+          if (!t || !canDeleteTodo(t, s.me)) return {}          // a task given to me is the giver's to remove
+          return { todos: s.todos.filter((x) => x.id !== id), tombstones: [...(s.tombstones || []), `todo:${id}`] }
+        }),
+      // scope 'mine': my own finished to-dos; 'shared': finished tasks I gave out
+      clearDoneTodos: (scope = 'mine') =>
+        set((s) => {
+          const gone = (scope === 'shared' ? todosIAssigned(s.todos, s.me) : personalTodos(s.todos, s.me)).filter((t) => t.done)
+          const ids = new Set(gone.map((t) => t.id))
+          return {
+            todos: s.todos.filter((t) => !ids.has(t.id)),
+            tombstones: [...(s.tombstones || []), ...gone.map((t) => `todo:${t.id}`)],
+          }
+        }),
       setTodoPin: (side) => set({ todoPin: side }),
+      todoTab: 'mine', // 'mine' | 'shared' — which list the panel shows
+      setTodoTab: (tab) => set({ todoTab: tab === 'shared' ? 'shared' : 'mine' }),
 
       // ── Shared checklists ────────────────────────────────────────────────────
       // Named checklists that live in the shared workspace, so every member of the
