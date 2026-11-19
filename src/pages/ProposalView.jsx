@@ -54,6 +54,7 @@ export default function ProposalView() {
   const [data, setData] = useState(null)
   const [copied, setCopied] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [choosing, setChoosing] = useState(false)   // the "Send to customer" choice: email, text or copy link
   const [textTo, setTextTo] = useState(null)   // "Text it": { href, phone } once the link is ready
   const [gettingLink, setGettingLink] = useState(false)
 
@@ -364,24 +365,28 @@ export default function ProposalView() {
             <Printer size={14} /> <span className="sm:hidden">PDF</span><span className="hidden sm:inline">Print / Save PDF</span>
           </button>
           <DesignShareToggle proposalId={proposalIdRef.current ?? data?.id ?? null} className="px-1" />
-          <button
-            onClick={handleGetLink}
-            disabled={gettingLink}
-            title="Create a tracked link you can paste into your own email"
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            {linkCopied ? <CheckCircle size={14} className="text-[var(--brand-500)]" /> : <Link2 size={14} />}
-            {gettingLink ? 'Creating…' : linkCopied ? 'Link copied!' : 'Get link'}
-          </button>
-          <button
-            onClick={handleText}
-            disabled={gettingLink}
-            title="Text the link from your own phone (opens Messages)"
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            <MessageSquare size={14} /> Text it
-          </button>
         </div>
+        {/* Send to customer: pick how — email, text from your own phone, or copy the link */}
+        {choosing && (
+          <div className="no-print fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setChoosing(false)}>
+            <div className="w-full max-w-sm bg-white rounded-2xl p-5 space-y-2" onClick={e => e.stopPropagation()}>
+              <p className="font-semibold text-gray-900 mb-1">Send to {data?.client || 'customer'}</p>
+              {[
+                { icon: Send, label: 'Email', sub: data?.email || 'Sent from your email account', go: () => { setChoosing(false); setShowSend(true); setSendSuccess(false); setSendError('') } },
+                { icon: MessageSquare, label: 'Text', sub: data?.phone ? `From your own phone to ${data.phone}` : 'From your own phone', go: () => { setChoosing(false); handleText() } },
+                { icon: linkCopied ? CheckCircle : Link2, label: linkCopied ? 'Link copied' : 'Copy link', sub: 'Paste it anywhere', go: () => handleGetLink() },
+              ].map(o => (
+                <button key={o.label} onClick={o.go} disabled={gettingLink}
+                  className="w-full flex items-center gap-3 min-h-[56px] px-3 rounded-xl border border-gray-200 text-left hover:bg-gray-50 disabled:opacity-50">
+                  <o.icon size={18} className="text-[var(--brand-600)] shrink-0" />
+                  <span className="flex-1 min-w-0"><span className="block font-medium text-gray-900">{o.label}</span><span className="block text-xs text-gray-500 truncate">{o.sub}</span></span>
+                </button>
+              ))}
+              {gettingLink && <p className="text-xs text-gray-500 flex items-center gap-1.5"><Loader size={12} className="animate-spin" /> Making the link…</p>}
+              <button onClick={() => setChoosing(false)} className="w-full min-h-[44px] rounded-xl text-sm text-gray-600">Cancel</button>
+            </div>
+          </div>
+        )}
         {/* The link is ready: one tap opens Messages with it filled in (a tap of its own, so phones allow it) */}
         {textTo && (
           <div className="no-print fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setTextTo(null)}>
@@ -397,10 +402,10 @@ export default function ProposalView() {
           </div>
         )}
         <button
-          onClick={() => { setShowSend(true); setSendSuccess(false); setSendError('') }}
+          onClick={() => setChoosing(true)}
           className="flex items-center gap-1.5 min-h-[44px] sm:min-h-0 px-4 py-1.5 bg-[var(--brand-600)] text-white rounded-lg text-sm font-medium hover:bg-[var(--brand-700)]"
         >
-          <Send size={14} /> Send to Client
+          <Send size={14} /> Send to customer
         </button>
       </div>
       {stored && <DealStrip p={stored} />}
