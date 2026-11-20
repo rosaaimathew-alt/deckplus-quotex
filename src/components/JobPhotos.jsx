@@ -63,7 +63,8 @@ export function PhotoViewer({ docs, index, onIndex, onClose, onRemove }) {
   )
 }
 
-export default function JobPhotosTab({ proposal, tasks = [] }) {
+// canRemove: false for the paint PM, who adds photos but never deletes them.
+export default function JobPhotosTab({ proposal, tasks = [], canRemove = true }) {
   const orgId = useStore(s => s.orgId)
   const me = useStore(s => s.me)
   const subs = useStore(s => s.subcontractors)
@@ -147,7 +148,7 @@ export default function JobPhotosTab({ proposal, tasks = [] }) {
           ))}
         </div>
       )}
-      {open != null && <PhotoViewer docs={photos} index={open} onIndex={setOpen} onClose={() => setOpen(null)} onRemove={remove} />}
+      {open != null && <PhotoViewer docs={photos} index={open} onIndex={setOpen} onClose={() => setOpen(null)} onRemove={canRemove ? remove : undefined} />}
     </div>
   )
 }

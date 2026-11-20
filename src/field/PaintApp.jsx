@@ -31,6 +31,7 @@ import { DEMO } from '../demo'
 import { blankColor, tidyColor, hasColor, paintColorsOf, BRANDS, colorDetail } from '../lib/paintColors'
 import { STATUS_PILL, statusKey, statusLabel } from '../lib/subTasks'
 import { PhotoDays } from '../components/TaskPhotos'
+import JobPhotosTab from '../components/JobPhotos'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { usePaintCrew } from './usePaintCrew'
 import { isJob, isJobClosed } from '../lib/attention'
@@ -349,6 +350,11 @@ export function PaintJob() {
       </Card>
 
       <PaintersOnJob proposal={proposal} />
+      {/* The job's photos: the paint PM adds their own (kept on the job, the office sees them) */}
+      <Card className="p-4 space-y-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Photos</p>
+        <JobPhotosTab proposal={proposal} canRemove={false} />
+      </Card>
       <PaintDetails paint={paint} onSave={setPaint} />
       <TouchUps proposal={proposal} onToast={showToast} />
       <PrePaintPayment proposal={proposal} onToast={showToast} />
