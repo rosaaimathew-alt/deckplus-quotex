@@ -25,7 +25,7 @@ import { JOB_TYPE_OPTIONS } from '../pages/Jobs'
 import { logout } from '../components/AuthGuard'
 import { DEMO, resetDemo } from '../demo'
 import { setViewPref, usePaintView } from './fieldMode'
-import { PaintQueue, PaintSchedule, PaintTouchUps, PaintJob, PaintCrew } from './PaintApp'
+import { PaintQueue, PaintJobsList, PaintSchedule, PaintTouchUps, PaintJob, PaintCrew } from './PaintApp'
 import InstallCard from './InstallCard'
 import PushCard from '../components/PushCard'
 import JobMoney from './JobMoney'
@@ -526,6 +526,7 @@ const TABS = [
 ]
 const PAINT_TABS = [
   { to: '/field', label: 'Queue', icon: PaintRoller, end: true },
+  { to: '/field/jobs', label: 'Jobs', icon: HardHat },
   { to: '/field/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/field/touchups', label: 'Touch-ups', icon: ListChecks },
   { to: '/field/crew', label: 'Crew', icon: Users },
@@ -593,6 +594,7 @@ export default function FieldApp() {
           <Routes>
             <Route path="/" element={<PaintQueue />} />
             <Route path="/field" element={<PaintQueue />} />
+            <Route path="/field/jobs" element={<PaintJobsList />} />
             <Route path="/field/schedule" element={<PaintSchedule />} />
             <Route path="/field/touchups" element={<PaintTouchUps />} />
             <Route path="/field/crew" element={<PaintCrew />} />
@@ -613,7 +615,7 @@ export default function FieldApp() {
       </main>
 
       <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]" aria-label="Field navigation">
-        <div className={`max-w-xl mx-auto grid ${tabs.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <div className={`max-w-xl mx-auto grid ${({ 5: 'grid-cols-5', 4: 'grid-cols-4' })[tabs.length] || 'grid-cols-3'}`}>
           {tabs.map(t => (
             <NavLink key={t.to} to={t.to} end={t.end}
               className={({ isActive }) => `h-16 flex flex-col items-center justify-center gap-0.5 text-xs font-semibold ${isActive ? 'text-[var(--brand-700)]' : 'text-gray-500'}`}>
