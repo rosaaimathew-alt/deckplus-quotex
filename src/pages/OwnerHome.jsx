@@ -29,6 +29,7 @@ const PERIODS = [
   { value: 'quarter',    label: 'This quarter', p: 'quarter', back: 0 },
   { value: 'year',       label: 'This year',    p: 'year',    back: 0 },
   { value: 'last-year',  label: 'Last year',    p: 'year',    back: -1 },
+  { value: 'all',        label: 'All time' },
 ]
 
 const SALES_STAGES = [
@@ -125,9 +126,12 @@ export default function OwnerHome({ pill = null }) {
   const { reps } = useScopedProposals()
   const [periodKey, setPeriodKey] = useState('year')
   const pick = PERIODS.find(x => x.value === periodKey) || PERIODS[3]
-  const { start, end: periodEnd } = getPeriodRange(pick.p, shiftPeriod(pick.p, new Date(), pick.back))
   const now = new Date()
-  const end = periodEnd > now ? now : periodEnd
+  // All time: no bounds (null start / end count everything)
+  const allTime = !pick.p
+  const range = allTime ? null : getPeriodRange(pick.p, shiftPeriod(pick.p, now, pick.back))
+  const start = range ? range.start : null
+  const end = range ? (range.end > now ? now : range.end) : null
   const pLabel = pick.label.toLowerCase()
 
   const props = useMemo(() => all.filter(p => p.status !== 'Imported'), [all])
@@ -178,10 +182,11 @@ export default function OwnerHome({ pill = null }) {
   stageRows.push({ label: 'Contract out to sign', n: signing.length, value: signing.reduce((s, p) => s + (Number(p.total) || 0), 0), to: '/sales?tab=contracts&filter=In+Progress' })
 
   // ── Same days last year ────────────────────────────────────────────────────
-  const thisYear = yearNumbers(props, sales, jobs, start, end)
-  const lastYear = yearNumbers(props, sales, jobs, minusYear(start), minusYear(end))
+  // (not for all time: there's no "same days last year")
+  const thisYear = allTime ? null : yearNumbers(props, sales, jobs, start, end)
+  const lastYear = allTime ? null : yearNumbers(props, sales, jobs, minusYear(start), minusYear(end))
   const fmtDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const ty = end.getFullYear(), ly = ty - 1
+  const ty = (end || now).getFullYear(), ly = ty - 1
   const yoy = [
     ['Won revenue', 'wonRevenue', money, 'pct'],
     ['Jobs won', 'jobsWon', String, 'count'],
@@ -229,7 +234,7 @@ export default function OwnerHome({ pill = null }) {
           {cells.map(([label, value, sub, to]) => (
             <button key={label} onClick={() => navigate(to)} className="text-left bg-white px-5 py-4 hover:bg-gray-50 min-w-0">
               <p className="text-xs font-medium text-gray-500">{label}</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1 leading-none tabular-nums truncate">{value}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 leading-none tabular-nums truncate">{value}</p>
               <p className="text-xs text-gray-500 mt-1.5">{sub}</p>
             </button>
           ))}
@@ -248,7 +253,7 @@ export default function OwnerHome({ pill = null }) {
         </Panel>
       )}
 
-      <Panel title="Compared to this time last year" link={can('/analytics') ? 'Win / loss' : null} onLink={() => navigate('/insights?tab=winloss')}>
+      {!allTime && <Panel title="Compared to this time last year" link={can('/analytics') ? 'Win / loss' : null} onLink={() => navigate('/insights?tab=winloss')}>
         <Table
           cols={[[''], ...yoy.map(([label]) => [label, 1])]}
           rows={[
@@ -257,7 +262,7 @@ export default function OwnerHome({ pill = null }) {
           ]}
           foot={['Change', ...yoy.map(([, k, , kind]) => <Change key={k} now={thisYear[k]} then={lastYear[k]} kind={kind} />)]} />
         <p className="text-xs text-gray-500 mt-1.5">{fmtDate(start)} – {fmtDate(end)}, against the same days in {ly}</p>
-      </Panel>
+      </Panel>}
 
       <div className="grid lg:grid-cols-[1fr_1.3fr] gap-5 items-start">
         <Panel title="Sales" link="Open sales" onLink={() => navigate('/sales?tab=pipeline')}>

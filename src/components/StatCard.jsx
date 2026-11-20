@@ -8,7 +8,7 @@ export default function StatCard({ label, value, sub, tone = 'text-gray-900', on
     <Tag type={onClick ? 'button' : undefined} onClick={onClick} title={title}
       className={`text-left bg-white rounded-xl border border-gray-200 px-5 py-4 min-w-0 ${onClick ? 'hover:bg-gray-50 transition-colors' : ''} ${className}`}>
       <p className="text-xs font-medium text-gray-500 truncate">{label}</p>
-      <p className={`text-2xl font-bold mt-1 leading-none tabular-nums truncate ${tone}`}>{value}</p>
+      <p className={`text-xl sm:text-2xl font-bold mt-1 leading-none tabular-nums truncate ${tone}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-1.5 truncate" title={typeof sub === 'string' ? sub : undefined}>{sub}</p>}
     </Tag>
   )

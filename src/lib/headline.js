@@ -27,7 +27,9 @@ export const isWonDeal = (p) => p.status === 'Won' || p.contractDraft?.signed ==
 export const wonDateOf = (p) => p.closedAt || p.contractDraft?.signedAt || p.sentAt || p.createdAt
 
 // A job sold in Knowify (not a cancelled one): value and sale date are known.
-export const isImportedSale = (p) => p?.status === 'Imported' && p.knowify?.source === 'jobs report'
+// 'jobs report' jobs came with them; the older 'invoices' history got them from
+// Knowify's jobs export (contract + change orders, on the activated date).
+export const isImportedSale = (p) => p?.status === 'Imported' && ['jobs report', 'invoices'].includes(p.knowify?.source)
   && !p.knowify.cancelled && !!p.knowify.proposalDate && Number(p.knowify.contractValue) > 0
 // Any sale: won in the app, or sold in Knowify.
 export const isSale = (p) => p?.status === 'Won' || isImportedSale(p)
