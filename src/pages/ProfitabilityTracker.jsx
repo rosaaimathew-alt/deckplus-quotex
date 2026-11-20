@@ -142,14 +142,18 @@ export default function ProfitabilityTracker() {
   const stats = useMemo(() => {
     const withCosts = periodJobs.filter(j => j.hasCosts)
     const totalRev     = periodJobs.reduce((s, j) => s + j.rev, 0)
+    // margin over the jobs that have costs (the others would count as 100%)
+    const costedRev    = withCosts.reduce((s, j) => s + j.rev, 0)
     const totalCost    = withCosts.reduce((s, j) => s + j.totalCost, 0)
     const totalProfit  = withCosts.reduce((s, j) => s + j.profit, 0)
-    const avgMargin    = withCosts.length > 0
-      ? withCosts.reduce((s, j) => s + j.margin, 0) / withCosts.length
-      : null
+    // The middle job's margin: one job with a tiny sold value (a $1 Knowify
+    // placeholder) can't drag it to -8,000% the way an average does.
+    const margins = withCosts.map(j => j.margin).filter(Number.isFinite).sort((a, b) => a - b)
+    const mid = Math.floor(margins.length / 2)
+    const avgMargin = margins.length ? (margins.length % 2 ? margins[mid] : (margins[mid - 1] + margins[mid]) / 2) : null
     const jobsEntered  = withCosts.length
     const jobsPending  = periodJobs.length - withCosts.length
-    return { totalRev, totalCost, totalProfit, avgMargin, jobsEntered, jobsPending, withCosts: withCosts.length, jobCount: periodJobs.length }
+    return { totalRev, costedRev, totalCost, totalProfit, avgMargin, jobsEntered, jobsPending, withCosts: withCosts.length, jobCount: periodJobs.length }
   }, [periodJobs])
 
   // Close rate overall + monthly breakdown
@@ -228,9 +232,9 @@ export default function ProfitabilityTracker() {
         <StatCard label="Total costs" value={stats.withCosts > 0 ? fmtSh(stats.totalCost) : '—'} sub={`${stats.withCosts} job${stats.withCosts !== 1 ? 's' : ''} with costs`} />
         <StatCard label="Gross profit" value={stats.withCosts > 0 ? fmtSh(stats.totalProfit) : '—'}
           tone={stats.withCosts > 0 ? (stats.totalProfit >= 0 ? 'text-green-600' : 'text-red-600') : 'text-gray-900'}
-          sub={stats.withCosts > 0 && stats.totalRev > 0 ? `${pct((stats.totalProfit / stats.totalRev) * 100)} overall margin` : 'add POs or bills in Money'} />
-        <StatCard label="Average margin" value={stats.avgMargin !== null ? pct(stats.avgMargin) : '—'}
-          tone={stats.avgMargin !== null ? MARGIN_COLOR(stats.avgMargin) : 'text-gray-900'} sub="per-job average" />
+          sub={stats.withCosts > 0 && stats.costedRev > 0 ? `${pct((stats.totalProfit / stats.costedRev) * 100)} overall margin` : 'add POs or bills in Money'} />
+        <StatCard label="Typical margin" value={stats.avgMargin !== null ? pct(stats.avgMargin) : '—'}
+          tone={stats.avgMargin !== null ? MARGIN_COLOR(stats.avgMargin) : 'text-gray-900'} sub="the middle job" />
       </div>
 
       {/* Monthly Revenue vs Profit — collapsible */}
