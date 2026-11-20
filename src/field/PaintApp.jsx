@@ -158,7 +158,7 @@ function QueueList({ title, jobs, empty, tone, sub }) {
   const move = useMove(jobs)
   return (
     <div className="space-y-2.5">
-      <H2>{title} ({jobs.length})</H2>
+      {title && <H2>{title} ({jobs.length})</H2>}
       {jobs.length === 0 && <p className="text-sm text-gray-500 px-1">{empty}</p>}
       {jobs.map((j, i) => (
         <PaintRow key={j.p.id} j={j} tone={tone(j)} sub={sub(j)}
@@ -176,7 +176,7 @@ const whenLine = (j) => [
 // ── Queue ───────────────────────────────────────────────────────────────────
 export function PaintQueue() {
   const all = usePaintJobs()
-  // Back for touch-ups and warranty work: their own lists, apart from the rest
+  // Back for touch-ups and warranty work: their own lists, next to Active
   const touchups = all.filter(j => j.followUp?.kind === 'touchup' && !j.closed)
   const warranty = all.filter(j => j.followUp?.kind === 'warranty')
   const jobs = all.filter(j => !j.closed && !j.painted && !j.followUp)
@@ -188,6 +188,7 @@ export function PaintQueue() {
   const queue = inOrder(jobs.filter(j => !started(j) && j.paintIndex > 0 && j.paintIndex <= 3)
     .sort((a, b) => a.paintIndex - b.paintIndex))
   const unscheduled = ready.filter(j => !j.paintDate).length
+  const [section, setSection] = useState('active')
 
   return (
     <div className="space-y-5">
@@ -202,19 +203,22 @@ export function PaintQueue() {
           <p className="text-sm text-gray-500">need a date</p>
         </Card>
       </div>
-      {touchups.length > 0 && (
-        <div className="space-y-2.5">
-          <H2>Touch-ups ({touchups.length})</H2>
-          {touchups.map(j => <PaintRow key={j.p.id} j={j} tone="amber" sub={followLine(j)} />)}
+      {/* One section: jobs being painted, back for touch-ups, and warranty work */}
+      <div className="space-y-2.5">
+        <div className="flex border-b border-gray-200" role="tablist" aria-label="Active jobs">
+          {[['active', 'Active', ongoing.length], ['touchup', 'Touch-ups', touchups.length], ['warranty', 'Warranty', warranty.length]].map(([k, label, n]) => (
+            <button key={k} role="tab" aria-selected={section === k} onClick={() => setSection(k)}
+              className={`flex-1 px-1 h-11 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px ${section === k ? 'border-[var(--brand-600)] text-[var(--brand-700)]' : 'border-transparent text-gray-500'}`}>
+              {label} <span className={n && k !== 'active' ? 'text-amber-600' : 'font-normal'}>{n}</span>
+            </button>
+          ))}
         </div>
-      )}
-      {warranty.length > 0 && (
-        <div className="space-y-2.5">
-          <H2>Warranty ({warranty.length})</H2>
-          {warranty.map(j => <PaintRow key={j.p.id} j={j} tone="amber" sub={followLine(j)} />)}
-        </div>
-      )}
-      {ongoing.length > 0 && <QueueList title="Ongoing" jobs={ongoing} tone={() => 'blue'} sub={whenLine} />}
+        {section === 'active' && <QueueList jobs={ongoing} empty="No one is painting right now." tone={() => 'blue'} sub={whenLine} />}
+        {section !== 'active' && (section === 'touchup' ? touchups : warranty).length === 0 && (
+          <p className="text-sm text-gray-500 px-1">{section === 'touchup' ? 'No jobs back for touch-ups.' : 'No warranty work open.'}</p>
+        )}
+        {section !== 'active' && (section === 'touchup' ? touchups : warranty).map(j => <PaintRow key={j.p.id} j={j} tone="amber" sub={followLine(j)} />)}
+      </div>
       <QueueList title="Ready to start" jobs={ready} empty="Nothing is waiting on paint."
         tone={j => (j.paintDate ? 'blue' : 'amber')} sub={whenLine} />
       <QueueList title="In queue" jobs={queue} empty="Nothing lined up behind those." tone={() => null}
