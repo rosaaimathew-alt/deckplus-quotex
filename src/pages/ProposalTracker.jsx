@@ -26,6 +26,7 @@ import {
 import JobPriceList from '../components/JobPriceList'
 import { getPeriodRange, shiftPeriod } from '../periodUtils'
 import { wonRevenueOf } from '../contractTotal'
+import { shortMoney } from '../lib/shortMoney'
 
 // Group proposals into root → revisions trees
 // One row per client: every version of the deal, however it was revised (src/lib/proposalGroups.js)
@@ -113,7 +114,7 @@ function ActivityView({ proposals }) {
 const fmt = (n) =>
   Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-const fmtShort = (n) => { const v = Number(n); if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`; if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}k`; return `$${v.toFixed(0)}` }
+const fmtShort = (n) => shortMoney(n, { kDecimals: 1 })
 
 // One soft pill system: bg-<sem>-100 text-<sem>-700 across the board.
 const STATUS_STYLES = {

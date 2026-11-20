@@ -11,14 +11,10 @@ import { useStore } from '../store'
 import { wonRevenueOf } from '../contractTotal'
 import { MenuChip, QuickPicks } from '../components/FilterBar'
 import { useJobCostOf } from '../lib/jobCost'
+import { shortMoney } from '../lib/shortMoney'
 
 const fmt   = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const fmtSh = (n) => {
-  const v = Number(n)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`
-  if (v >= 1_000)     return `$${(v / 1_000).toFixed(1)}k`
-  return `$${v.toFixed(0)}`
-}
+const fmtSh = (n) => shortMoney(n, { kDecimals: 1 })
 const pct = (n) => `${Number(n).toFixed(1)}%`
 
 const MARGIN_COLOR = (m) => {
