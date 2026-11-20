@@ -204,9 +204,12 @@ export function invoiceStatus(inv, job, today = todayISO()) {
   return 'outstanding'
 }
 // Contract invoices count up (4989, 4990…); change-order invoices get an 'A'.
+// Knowify kept issuing numbers after the move, up to 5011 (Nov 2026): the app
+// starts after it, so no number is ever used twice.
+const LAST_KNOWIFY_NUMBER = 5011
 export function nextInvoiceNumber(invoices = [], kind = 'progress') {
   const nums = invoices.map(i => parseInt(String(i.number || '').replace(/\D/g, ''), 10)).filter(Number.isFinite)
-  const next = (nums.length ? Math.max(...nums) : 1000) + 1
+  const next = Math.max(LAST_KNOWIFY_NUMBER, ...nums, 1000) + 1
   return kind === 'change' ? `A${next}` : String(next)
 }
 
