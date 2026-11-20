@@ -195,6 +195,10 @@ export const RECORD_TABLES = {
 // the whole sign-in, and nothing is written to it until it exists.
 const OPTIONAL_TABLES = new Set(['vendors', 'purchases', 'bills', 'invoices', 'sub_tasks', 'sub_draws', 'sub_task_terms', 'sub_messages'])
 const _missing = new Set()
+// Too big to wait for at sign-in (the Knowify history is tens of thousands of
+// purchase orders): the app opens without them and they load right after
+// (loadDeferred).
+const DEFERRED_TABLES = new Set(['purchases'])
 const isMissingTable = (e) => e && (e.code === '42P01' || e.code === 'PGRST205' || /does not exist|could not find the table/i.test(e.message || ''))
 // Object-keyed-by-id collections → a table whose row id is the key.
 export const MAP_TABLES = { jobCosts: 'job_costs' }
@@ -297,6 +301,7 @@ async function loadOrgData(orgId) {
     supabase.from('org_members').select('user_id, role, display_name, email, permissions, phone').eq('org_id', orgId),
     supabase.from('org_settings').select('data').eq('org_id', orgId).maybeSingle(),
     ...Object.entries(RECORD_TABLES).map(async ([key, table]) => {
+      if (DEFERRED_TABLES.has(table)) { collections[key] = []; return }
       try {
         const rows = await fetchAll(table, orgId)
         collections[key] = rows.map(r => r.data)
@@ -554,6 +559,28 @@ export function armAdapter(store, orgId, settings) {
     (p) => applyRemoteSettings(store, p))
   _channel = ch.subscribe()
   flush()
+}
+
+// The deferred tables, after the app is open and the adapter is armed. Rows
+// added or changed here meanwhile (or by someone else, live) win over the
+// download; the downloaded ones go into the snapshot as they are, so nothing
+// is written back.
+export async function loadDeferred(store, orgId) {
+  for (const [key, table] of Object.entries(RECORD_TABLES)) {
+    if (!DEFERRED_TABLES.has(table)) continue
+    let rows
+    try { rows = await fetchAll(table, orgId) }
+    catch (e) { if (OPTIONAL_TABLES.has(table) && isMissingTable(e)) { _missing.add(table); continue } throw e }
+    if (_orgId !== orgId) return
+    const byId = new Map(rows.map(r => [String(r.id), r.data]))
+    for (const rec of store.getState()[key] || []) if (rec?.id != null) byId.set(String(rec.id), rec)
+    const merged = [...byId.values()]
+    const snap = _snap[key] || new Map()
+    for (const rec of merged) if (rec?.id != null && !snap.has(String(rec.id))) snap.set(String(rec.id), rec)
+    _snap[key] = snap
+    _applyingRemote = true
+    try { store.setState({ [key]: merged }) } finally { _applyingRemote = false }
+  }
 }
 
 export function disarmAdapter() {
