@@ -1,8 +1,10 @@
 // ── Paint view ───────────────────────────────────────────────────────────────
 // Field mode for the paint PM. Three tabs and a paint-only job page:
 //
-//   Queue      — jobs being painted, jobs ready to start, and the ones a few
-//                steps away; the paint PM moves jobs up and down in each list
+//   Queue      — jobs back for touch-ups, warranty work, jobs being painted,
+//                jobs ready to start, and the ones a few steps away; the paint
+//                PM moves jobs up and down in the last three lists
+//   Jobs       — every paint job: Ready to start / Active / Completed / Closed
 //   Schedule   — paint dates and crews for the next two weeks
 //   Touch-ups  — every open touch-up, across jobs
 //   Paint job  — date + crew, Mark paint done, paint details (product,
@@ -15,7 +17,10 @@
 // Data (all on the job, so the office sees it too):
 //   jobData.stageDates.paint      paint date (same as the PM calendar)
 //   jobData.paint                 { crew, colors: [{ color, areas, brand, product, sheen }], notes,
-//                                   rank: the job's place in its queue list (lowest first) }
+//                                   rank: the job's place in its queue list (lowest first),
+//                                   followUp: { kind: 'touchup' | 'warranty', at, by } while the
+//                                   job is back for touch-ups (paint reopened) or warranty work
+//                                   (a closed job), followUps: the finished ones }
 //                                 (+ the first color in product / color / sheen / areas)
 //   jobData.touchUps              [{ id, text, done, createdAt, doneAt, by }]
 //   jobData.paymentsReceived      the Pre-Paint payment, when collected
@@ -23,7 +28,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Check, CheckCircle2, Circle, CalendarDays, Users, Phone, MessageSquare, Navigation,
-  PaintRoller, Plus, Wallet, ChevronRight, ChevronUp, ChevronDown, UserPlus,
+  PaintRoller, Plus, Wallet, ChevronRight, ChevronUp, ChevronDown, UserPlus, Search, Undo2,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { createPaintCrewInvite } from '../supabase'
@@ -55,7 +60,7 @@ function usePaintJobs() {
   const proposals = useStore(s => s.proposals)
   const subTasks = useStore(s => s.subTasks)
   return useMemo(() => proposals
-    .filter(p => isJob(p) && !isJobClosed(p) && !clientPaints(p))
+    .filter(p => isJob(p) && !clientPaints(p))
     .map(p => describeJob(p, null))
     .filter(j => j.stages.some(s => s.key === 'paint'))
     .map(j => {
@@ -63,6 +68,8 @@ function usePaintJobs() {
       return {
         ...j,
         painted: j.done.has('paint'),
+        closed: isJobClosed(j.p),
+        followUp: jd.paint?.followUp?.kind ? jd.paint.followUp : null,
         crew: jd.paint?.crew || '',
         touchUps: (jd.touchUps || []).filter(t => !t.done),
         // The painters put on this job (PaintersOnJob), each with where they stand
@@ -71,6 +78,20 @@ function usePaintJobs() {
     })
     .sort((a, b) => (a.p.client || '').localeCompare(b.p.client || '')), [proposals, subTasks])
 }
+
+// A painter on the job has started.
+const started = (j) => (j.painters || []).some(t => statusKey(t) !== 'booked')
+
+// Where a paint job stands: 'ready' (paint is the next step), 'active' (being
+// painted, or back for touch-ups), 'completed' (paint done), 'closed' (the job
+// is closed out), or 'queue' (still a few steps before paint).
+function paintStatus(j) {
+  if (j.closed) return 'closed'
+  if (j.followUp?.kind === 'touchup' || started(j)) return j.painted && j.followUp?.kind !== 'touchup' ? 'completed' : 'active'
+  if (j.painted) return 'completed'
+  return j.paintIndex === 0 ? 'ready' : 'queue'
+}
+const shortDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '')
 
 // Every painter put on the job has tapped Completed (and there is at least one).
 const paintersDone = (painters) => (painters || []).length > 0 && painters.every(t => statusKey(t) === 'done')
@@ -154,10 +175,14 @@ const whenLine = (j) => [
 
 // ── Queue ───────────────────────────────────────────────────────────────────
 export function PaintQueue() {
-  const jobs = usePaintJobs().filter(j => !j.painted)
+  const all = usePaintJobs()
+  // Back for touch-ups and warranty work: their own lists, apart from the rest
+  const touchups = all.filter(j => j.followUp?.kind === 'touchup' && !j.closed)
+  const warranty = all.filter(j => j.followUp?.kind === 'warranty')
+  const jobs = all.filter(j => !j.closed && !j.painted && !j.followUp)
   // Ongoing: a painter on the job has started. Ready to start: paint is the
   // next step. In queue: one to three steps before paint.
-  const started = (j) => (j.painters || []).some(t => statusKey(t) !== 'booked')
+  const followLine = (j) => [`Since ${shortDay(j.followUp.at)}`, j.touchUps.length ? `${j.touchUps.length} touch-up${j.touchUps.length === 1 ? '' : 's'} open` : null].filter(Boolean).join(' · ')
   const ongoing = inOrder(jobs.filter(started))
   const ready = inOrder(jobs.filter(j => !started(j) && j.paintIndex === 0))
   const queue = inOrder(jobs.filter(j => !started(j) && j.paintIndex > 0 && j.paintIndex <= 3)
@@ -177,6 +202,18 @@ export function PaintQueue() {
           <p className="text-sm text-gray-500">need a date</p>
         </Card>
       </div>
+      {touchups.length > 0 && (
+        <div className="space-y-2.5">
+          <H2>Touch-ups ({touchups.length})</H2>
+          {touchups.map(j => <PaintRow key={j.p.id} j={j} tone="amber" sub={followLine(j)} />)}
+        </div>
+      )}
+      {warranty.length > 0 && (
+        <div className="space-y-2.5">
+          <H2>Warranty ({warranty.length})</H2>
+          {warranty.map(j => <PaintRow key={j.p.id} j={j} tone="amber" sub={followLine(j)} />)}
+        </div>
+      )}
       {ongoing.length > 0 && <QueueList title="Ongoing" jobs={ongoing} tone={() => 'blue'} sub={whenLine} />}
       <QueueList title="Ready to start" jobs={ready} empty="Nothing is waiting on paint."
         tone={j => (j.paintDate ? 'blue' : 'amber')} sub={whenLine} />
@@ -188,7 +225,7 @@ export function PaintQueue() {
 
 // ── Schedule ────────────────────────────────────────────────────────────────
 export function PaintSchedule() {
-  const jobs = usePaintJobs()
+  const jobs = usePaintJobs().filter(j => !j.closed)
   const today = todayStr()
   const end = addDays(14)
   const dated = jobs.filter(j => !j.painted && j.paintDate && j.paintDate < end)
@@ -216,6 +253,47 @@ export function PaintSchedule() {
         <H2>Ready, no date yet ({unscheduled.length})</H2>
         {unscheduled.length === 0 && <p className="text-sm text-gray-500 px-1">Every ready job has a date.</p>}
         {unscheduled.map(j => <PaintRow key={j.p.id} j={j} tone="amber" sub="Tap to set a date and crew" />)}
+      </div>
+    </div>
+  )
+}
+
+// ── Jobs ────────────────────────────────────────────────────────────────────
+// Every paint job by where it stands. A completed job comes back to Active for
+// touch-ups, a closed one goes on the Warranty list, from the job's page.
+const STATUS_TABS = [['ready', 'Ready to start'], ['active', 'Active'], ['completed', 'Completed'], ['closed', 'Closed']]
+export function PaintJobsList() {
+  const all = usePaintJobs()
+  const [tab, setTab] = useState('active')
+  const [q, setQ] = useState('')
+  const counts = Object.fromEntries(STATUS_TABS.map(([k]) => [k, all.filter(j => paintStatus(j) === k).length]))
+  const needle = q.trim().toLowerCase()
+  const list = all.filter(j => paintStatus(j) === tab)
+    .filter(j => !needle || `${j.p.client || ''} ${j.p.address || ''}`.toLowerCase().includes(needle))
+  const line = (j) => {
+    if (j.followUp) return j.followUp.kind === 'warranty' ? `Warranty work since ${shortDay(j.followUp.at)}` : `Back for touch-ups since ${shortDay(j.followUp.at)}`
+    if (tab === 'completed') return 'Paint done'
+    if (tab === 'closed') return 'Job closed'
+    return whenLine(j)
+  }
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
+      <div className="flex border-b border-gray-200 overflow-x-auto" role="tablist">
+        {STATUS_TABS.map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+            className={`flex-1 px-1 h-11 text-[13px] font-semibold whitespace-nowrap border-b-2 -mb-px ${tab === k ? 'border-[var(--brand-600)] text-[var(--brand-700)]' : 'border-transparent text-gray-500'}`}>
+            {label} <span className="font-normal">{counts[k]}</span>
+          </button>
+        ))}
+      </div>
+      <label className="flex items-center gap-2 h-12 px-4 rounded-2xl border border-gray-200 bg-white">
+        <Search size={18} className="text-gray-400" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Name or street" className="flex-1 bg-transparent text-base text-gray-900 outline-none" />
+      </label>
+      <div className="space-y-2.5">
+        {list.length === 0 && <p className="text-sm text-gray-500 px-1">No jobs here{needle ? ' match that' : ''}.</p>}
+        {list.map(j => <PaintRow key={j.p.id} j={j} tone={j.followUp ? 'amber' : null} sub={line(j)} />)}
       </div>
     </div>
   )
@@ -282,6 +360,7 @@ export function PaintJob() {
   const updateJobData = useStore(s => s.updateJobData)
   const allProposals = useStore(s => s.proposals)
   const subTasks = useStore(s => s.subTasks)
+  const me = useStore(s => s.me)
   const [toast, showToast] = useUndo()
 
   // Crews used on other jobs, offered as suggestions
@@ -295,7 +374,32 @@ export function PaintJob() {
   // The painters put on this job (PaintersOnJob below)
   const onJob = (subTasks || []).filter(t => t && t.paint && t.crewName && String(t.proposalId) === String(proposal.id))
   const setPaint = (changes) => updateJobData(proposal.id, { paint: { ...paint, ...changes } })
+  const closed = (jd.completedStages || []).includes('closed')
+  const followUp = paint.followUp?.kind ? paint.followUp : null
+  // Back for touch-ups (paint reopened) or warranty work (a closed job), and done again
+  const finishFollowUp = () => ({ followUp: null, followUps: [...(paint.followUps || []), { ...followUp, doneAt: new Date().toISOString() }] })
+  const startFollowUp = (kind) => {
+    const was = paint
+    setPaint({ followUp: { kind, at: new Date().toISOString(), by: me?.displayName || '' } })
+    if (kind === 'touchup' && painted) toggleJobStage(proposal.id, 'paint')
+    showToast(kind === 'touchup' ? 'Back in Active for touch-ups' : 'On the warranty list', () => {
+      updateJobData(proposal.id, { paint: was })
+      if (kind === 'touchup' && painted) toggleJobStage(proposal.id, 'paint')
+    })
+  }
+  const endFollowUp = () => {
+    const was = paint
+    setPaint(finishFollowUp())
+    const reMark = followUp.kind === 'touchup' && !painted
+    if (reMark) toggleJobStage(proposal.id, 'paint')
+    showToast(followUp.kind === 'touchup' ? 'Touch-ups done' : 'Warranty work done', () => {
+      updateJobData(proposal.id, { paint: was })
+      if (reMark) toggleJobStage(proposal.id, 'paint')
+    })
+  }
   const togglePaint = () => {
+    // Marking paint done on a job back for touch-ups finishes the touch-ups too
+    if (!painted && followUp?.kind === 'touchup') { endFollowUp(); return }
     toggleJobStage(proposal.id, 'paint')
     showToast(painted ? 'Paint marked not done' : 'Paint done', () => toggleJobStage(proposal.id, 'paint'))
   }
@@ -348,6 +452,22 @@ export function PaintJob() {
           </>
         )}
       </Card>
+
+      {/* Touch-ups / warranty: back to work after paint was done or the job closed */}
+      {followUp ? (
+        <Card className="p-4 space-y-3 border-amber-300">
+          <p className="text-base font-semibold text-amber-800">{followUp.kind === 'warranty' ? 'Warranty work' : 'Back for touch-ups'} since {shortDay(followUp.at)}{followUp.by ? ` · ${followUp.by}` : ''}</p>
+          <button onClick={endFollowUp}
+            className="w-full h-14 rounded-xl bg-green-600 active:bg-green-700 text-white text-base font-bold flex items-center justify-center gap-2">
+            <Check size={22} /> {followUp.kind === 'warranty' ? 'Warranty work done' : 'Touch-ups done'}
+          </button>
+        </Card>
+      ) : (closed || painted) && (
+        <button onClick={() => startFollowUp(closed ? 'warranty' : 'touchup')}
+          className="w-full h-12 rounded-xl border border-gray-300 bg-white text-base font-semibold text-gray-800 flex items-center justify-center gap-2 active:bg-gray-50">
+          <Undo2 size={18} /> {closed ? 'Warranty work' : 'Back to active for touch-ups'}
+        </button>
+      )}
 
       <PaintersOnJob proposal={proposal} />
       {/* The job's photos: the paint PM adds their own (kept on the job, the office sees them) */}
