@@ -752,10 +752,17 @@ function Bar({ pct, color, label, count, revenue }) {
 
 // SVG line chart with hover tooltip
 // The Overview's period as [start, end] Dates ([null, null] = all time)
-function periodBounds(id) {
+function periodBounds(id, custom) {
   const now = new Date(), y = now.getFullYear(), q = Math.floor(now.getMonth() / 3)
   const span = (y0, m0, y1, m1) => [new Date(y0, m0, 1), new Date(y1, m1 + 1, 0, 23, 59, 59, 999)]
   if (id === 'all') return [null, null]
+  if (id === 'custom') {
+    // From / To days (YYYY-MM-DD), either way round
+    const [a, b] = [custom?.from, custom?.to].filter(Boolean).sort()
+    if (!a) return [null, null]
+    const [y0, m0, d0] = a.split('-').map(Number), [y1, m1, d1] = (b || a).split('-').map(Number)
+    return [new Date(y0, m0 - 1, d0), new Date(y1, m1 - 1, d1, 23, 59, 59, 999)]
+  }
   if (id === 'this-month') return span(y, now.getMonth(), y, now.getMonth())
   if (id === 'this-quarter') return span(y, q * 3, y, q * 3 + 2)
   if (id === 'last-quarter') { const lq = q === 0 ? 3 : q - 1, ly = q === 0 ? y - 1 : y; return span(ly, lq * 3, ly, lq * 3 + 2) }
@@ -767,11 +774,21 @@ const APPT_COLOR = '#0d9488' // teal — appointments line (right axis)
 
 function TrendChart({ months, activeTypes, allTypes }) {
   const svgRef = useRef(null)
+  const boxRef = useRef(null)
   const [tooltip, setTooltip] = useState(null)
+  // Drawn at the box's real width, so the text stays readable on a phone
+  const [boxW, setBoxW] = useState(700)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([e]) => { const w = Math.round(e.contentRect.width); if (w > 0) setBoxW(w) })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const showAppts = activeTypes.has('Appointments')
-  const W = 700, H = 220
-  const PAD = { top: 16, right: showAppts ? 44 : 20, bottom: 40, left: 56 }
+  const W = Math.max(300, boxW), H = W < 500 ? 200 : 220
+  const PAD = { top: 16, right: showAppts ? 40 : 16, bottom: 32, left: 52 }
   const chartW = W - PAD.left - PAD.right
   const chartH = H - PAD.top - PAD.bottom
 
@@ -795,7 +812,8 @@ function TrendChart({ months, activeTypes, allTypes }) {
     months.map((m, i) => `${xScale(i)},${yScale(type === 'Total' ? m.total : (m.byType[type] || 0))}`).join(' ')
   const apptPoints = months.map((m, i) => `${xScale(i)},${yScaleAppt(m.apptCount || 0)}`).join(' ')
 
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => ({ val: maxVal * f, y: yScale(maxVal * f), appt: Math.round(maxAppt * f) }))
+  // Appointment ticks only where the count is a whole number (no 1, 1, 1)
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map(f => ({ val: maxVal * f, y: yScale(maxVal * f), appt: Number.isInteger(maxAppt * f) ? maxAppt * f : null }))
 
   const handleMouseMove = e => {
     if (!svgRef.current) return
@@ -809,8 +827,22 @@ function TrendChart({ months, activeTypes, allTypes }) {
 
   const tip = tooltip ? months[tooltip.idx] : null
 
+  // Month labels: as many as fit. Over two years, one per year (January).
+  const fit = Math.max(2, Math.floor(chartW / 52))
+  const manyYears = months.length > 24
+  const crossesYear = months.some(m => m.year !== months[0].year)
+  const xLabels = []
+  if (manyYears) {
+    const jans = months.map((m, i) => i).filter(i => months[i].month === 0)
+    const every = Math.ceil(jans.length / fit)
+    jans.forEach((i, k) => { if (k % every === 0) xLabels.push([i, String(months[i].year)]) })
+  } else {
+    const every = Math.ceil(months.length / fit)
+    months.forEach((m, i) => { if (i % every === 0) xLabels.push([i, crossesYear ? `${m.label} ’${String(m.year).slice(2)}` : m.label]) })
+  }
+
   return (
-    <div className="relative">
+    <div className="relative" ref={boxRef}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
@@ -822,28 +854,28 @@ function TrendChart({ months, activeTypes, allTypes }) {
         {yTicks.map(({ val, y, appt }) => (
           <g key={val}>
             <line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y} stroke="#f3f4f6" strokeWidth="1" />
-            <text x={PAD.left - 6} y={y + 4} textAnchor="end" fontSize="9" fill="#9ca3af">{fmtK(val)}</text>
-            {showAppts && (
-              <text x={W - PAD.right + 6} y={y + 4} textAnchor="start" fontSize="9" fill={APPT_COLOR}>{appt}</text>
+            <text x={PAD.left - 6} y={y + 4} textAnchor="end" fontSize="11" fill="#6b7280">{fmtK(val)}</text>
+            {showAppts && appt != null && (
+              <text x={W - PAD.right + 6} y={y + 4} textAnchor="start" fontSize="11" fill={APPT_COLOR}>{appt}</text>
             )}
           </g>
         ))}
         {showAppts && (
-          <text x={W - PAD.right + 6} y={PAD.top - 4} textAnchor="start" fontSize="8" fill={APPT_COLOR} fontWeight="600">appts</text>
+          <text x={W - PAD.right + 4} y={PAD.top - 5} textAnchor="start" fontSize="10" fill={APPT_COLOR} fontWeight="600">appts</text>
         )}
 
         {/* X labels */}
-        {months.map((m, i) => (
-          <text key={i} x={xScale(i)} y={H - PAD.bottom + 14} textAnchor="middle" fontSize="9" fill="#9ca3af">
-            {m.label}
+        {xLabels.map(([i, text]) => (
+          <text key={i} x={xScale(i)} y={H - PAD.bottom + 16} textAnchor={manyYears ? 'start' : 'middle'} fontSize="11" fill="#6b7280">
+            {text}
           </text>
         ))}
 
-        {/* Year change markers */}
+        {/* Year change markers (the labels carry the year when it's many years) */}
         {months.map((m, i) => i > 0 && months[i - 1].year !== m.year ? (
           <g key={`yr-${i}`}>
             <line x1={xScale(i)} y1={PAD.top} x2={xScale(i)} y2={H - PAD.bottom} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3,3" />
-            <text x={xScale(i) + 3} y={PAD.top + 8} fontSize="8" fill="#d1d5db">{m.year}</text>
+            {!manyYears && !crossesYear && <text x={xScale(i) + 3} y={PAD.top + 8} fontSize="10" fill="#9ca3af">{m.year}</text>}
           </g>
         ) : null)}
 
@@ -865,7 +897,7 @@ function TrendChart({ months, activeTypes, allTypes }) {
               />
               {months.map((m, i) => {
                 const val = type === 'Total' ? m.total : (m.byType[type] || 0)
-                if (val === 0) return null
+                if (val === 0 || months.length > 36) return null
                 return (
                   <circle key={i} cx={xScale(i)} cy={yScale(val)} r={isTotal ? 3.5 : 2.5}
                     fill="white" stroke={color} strokeWidth={isTotal ? 2 : 1.5} />
@@ -887,7 +919,7 @@ function TrendChart({ months, activeTypes, allTypes }) {
               strokeLinejoin="round"
               strokeLinecap="round"
             />
-            {months.map((m, i) => (m.apptCount || 0) > 0 ? (
+            {months.length <= 36 && months.map((m, i) => (m.apptCount || 0) > 0 ? (
               <circle key={i} cx={xScale(i)} cy={yScaleAppt(m.apptCount)} r={3}
                 fill="white" stroke={APPT_COLOR} strokeWidth={1.8} />
             ) : null)}
@@ -903,8 +935,8 @@ function TrendChart({ months, activeTypes, allTypes }) {
 
       {/* Tooltip */}
       {tooltip && tip && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-0 pointer-events-none z-10 bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2.5 text-xs min-w-[140px]"
-          style={{ transform: `translateX(calc(${tooltip.x / W * 100}% - 50%))`, top: 0 }}>
+        <div className="absolute -translate-x-1/2 top-0 pointer-events-none z-10 bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2.5 text-xs min-w-[140px]"
+          style={{ left: `${Math.min(80, Math.max(20, tooltip.x / W * 100))}%` }}>
           <p className="font-semibold text-gray-800 mb-1.5">{tip.labelFull}</p>
           {activeTypes.has('Total') && <p className="text-blue-600 font-medium">Total: {fmtK(tip.total)}</p>}
           {allTypes.filter(t => activeTypes.has(t) && tip.byType[t] > 0).map(t => (
@@ -926,6 +958,12 @@ export default function Analytics() {
   // Stat-card period: month / quarter / last-quarter / this-year (YTD) / a prior
   // year / all time. Defaults to this year.
   const [statsPeriod, setStatsPeriod]   = useState('this-year')
+  // Custom range: any From / To days (starts as the last three months)
+  const [custom, setCustom] = useState(() => {
+    const t = new Date(), iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return { from: iso(new Date(t.getFullYear(), t.getMonth() - 2, 1)), to: iso(t) }
+  })
+  const bounds = useMemo(() => periodBounds(statsPeriod, custom), [statsPeriod, custom])
   const statsPeriods = useMemo(() => {
     const priorYears = new Set()
     proposals.forEach(p => { const y = new Date(p.closedAt || p.createdAt || p.sentAt).getFullYear(); if (!Number.isNaN(y) && y !== CURRENT_YEAR) priorYears.add(y) })
@@ -936,9 +974,13 @@ export default function Analytics() {
       { id: 'this-year',    label: `${CURRENT_YEAR} YTD` },
       ...[...priorYears].sort((a, b) => b - a).map(y => ({ id: y, label: String(y) })),
       { id: 'all',          label: 'All time' },
+      { id: 'custom',       label: 'Custom range' },
     ]
   }, [proposals])
-  const periodLabel = statsPeriods.find(p => p.id === statsPeriod)?.label || 'All time'
+  const shortDay = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const periodLabel = statsPeriod === 'custom'
+    ? (bounds[0] ? `${bounds[0].getFullYear() === bounds[1].getFullYear() ? bounds[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : shortDay(bounds[0])} – ${shortDay(bounds[1])}` : 'All time')
+    : statsPeriods.find(p => p.id === statsPeriod)?.label || 'All time'
   const [activeTypes, setActiveTypes]   = useState(new Set(['Total', 'Appointments']))
   const [managingTypes, setManagingTypes] = useState(false)
   const [remapping, setRemapping] = useState(false)
@@ -951,18 +993,14 @@ export default function Analytics() {
     // Period scope: revenue counts the year a deal WON (closedAt); win-rate &
     // appointments count the year the estimate was DONE (createdAt). 'all' = all time.
     const now = new Date()
+    const [start, end] = bounds
     const matchesPeriod = (dateStr) => {
-      if (statsPeriod === 'all') return true
+      if (!start) return true
       const d = new Date(dateStr || now)
-      const y = d.getFullYear(), q = Math.floor(d.getMonth() / 3)
-      if (statsPeriod === 'this-month')   return y === now.getFullYear() && d.getMonth() === now.getMonth()
-      if (statsPeriod === 'this-quarter') return y === now.getFullYear() && q === Math.floor(now.getMonth() / 3)
-      if (statsPeriod === 'last-quarter') { let ly = now.getFullYear(), lq = Math.floor(now.getMonth() / 3) - 1; if (lq < 0) { lq = 3; ly-- } return y === ly && q === lq }
-      if (statsPeriod === 'this-year')    return y === now.getFullYear()
-      return y === statsPeriod   // a specific prior year
+      return d >= start && d <= end
     }
     // Headline numbers: the same rules as Home and Win / loss (lib/headline.js)
-    const h = headlineNumbers(proposals, ...periodBounds(statsPeriod))
+    const h = headlineNumbers(proposals, start, end)
     const won = h.won
     // 'Archived' is a superseded revision — neutral, never counted as a loss.
     const lost = proposals.filter(p => p.status !== 'Won' && p.status !== 'Archived' && p.status !== 'Imported' && matchesPeriod(p.createdAt || p.sentAt || p.closedAt))
@@ -1003,23 +1041,26 @@ export default function Analytics() {
       trendMonths: [],
       allTypes,
     }
-  }, [proposals, statsPeriod])
+  }, [proposals, bounds])
 
   // Trend months span the SELECTED period, and count won/appointments the same
   // way the cards do — so the chart totals reconcile with the cards exactly.
   const trendData = useMemo(() => {
     const now = new Date()
     const list = []
-    if (statsPeriod === 'this-month') list.push([now.getFullYear(), now.getMonth()])
-    else if (statsPeriod === 'this-quarter') { const q = Math.floor(now.getMonth() / 3); for (let m = q * 3; m <= now.getMonth(); m++) list.push([now.getFullYear(), m]) }
-    else if (statsPeriod === 'last-quarter') { let y = now.getFullYear(), lq = Math.floor(now.getMonth() / 3) - 1; if (lq < 0) { lq = 3; y-- } for (let m = lq * 3; m < lq * 3 + 3; m++) list.push([y, m]) }
-    else if (statsPeriod === 'this-year') { for (let m = 0; m <= now.getMonth(); m++) list.push([now.getFullYear(), m]) }
-    else if (statsPeriod === 'all') {
-      let min = now
-      proposals.forEach(p => { const d = new Date(p.closedAt || p.createdAt || p.sentAt); if (!Number.isNaN(d.getTime()) && d < min) min = d })
-      let y = min.getFullYear(), m = min.getMonth()
-      while (y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth())) { list.push([y, m]); if (++m > 11) { m = 0; y++ } }
-    } else { for (let m = 0; m < 12; m++) list.push([statsPeriod, m]) }  // a specific prior year
+    // Every month from the period's start to its end (never past this month);
+    // all time starts at the earliest sale or estimate.
+    let [from, to] = bounds
+    if (!from) {
+      from = now
+      proposals.forEach(p => { const d = new Date(isSale(p) ? saleDateOf(p) : (p.closedAt || p.createdAt || p.sentAt)); if (!Number.isNaN(d.getTime()) && d < from) from = d })
+      to = now
+    }
+    if (to > now && from <= now) to = now
+    let y = from.getFullYear(), m = from.getMonth()
+    while (y < to.getFullYear() || (y === to.getFullYear() && m <= to.getMonth())) { list.push([y, m]); if (++m > 11) { m = 0; y++ } }
+    const [start, end] = bounds
+    const inRange = (d) => !start || (d >= start && d <= end)
 
     const months = list.map(([y, m]) => {
       const d = new Date(y, m, 1)
@@ -1031,7 +1072,8 @@ export default function Analytics() {
     // only counts realized Won contracts — a signed-but-not-yet-tagged deal is a win
     // but not recognized revenue yet — so the graph's sales total matches the cards.
     proposals.filter(p => isSale(p) || (p.status !== 'Imported' && p.contractDraft?.signed === true)).forEach(p => {
-      const m = find(new Date(saleDateOf(p) || now))
+      const d = new Date(saleDateOf(p) || now)
+      const m = inRange(d) && find(d)
       if (!m) return
       m.jobCount += 1
       if (!isSale(p)) return   // signed-only deals: count as a win, not revenue
@@ -1048,11 +1090,12 @@ export default function Analytics() {
     estimated.filter(p => !p.parentId || !ids.has(p.parentId)).forEach(root => {
       const group = [root, ...estimated.filter(p => p.parentId === root.id)]
       if (!group.some(p => p.status !== 'Archived' && p.status !== 'Draft')) return
-      const m = find(new Date(root.createdAt || root.sentAt || root.closedAt || now))
+      const d = new Date(root.createdAt || root.sentAt || root.closedAt || now)
+      const m = inRange(d) && find(d)
       if (m) m.apptCount += 1
     })
     return months
-  }, [proposals, statsPeriod])
+  }, [proposals, bounds])
 
   // The heat map: a Knowify sale shows as a won job at its sold value; other
   // imported jobs (history with no sale on record) stay off the map.
@@ -1083,6 +1126,16 @@ export default function Analytics() {
           <MenuChip label="Period" value={statsPeriod} onChange={setStatsPeriod} align="right"
             options={statsPeriods.map(p => ({ value: p.id, label: p.label }))} />
         </div>
+        {statsPeriod === 'custom' && (
+          <div className="w-full sm:w-auto flex items-center gap-2 pb-2 sm:pb-0 text-sm text-gray-500">
+            <label className="flex items-center gap-1.5">From
+              <input type="date" value={custom.from} max={custom.to || undefined} onChange={e => setCustom(c => ({ ...c, from: e.target.value }))}
+                className="h-9 border-b border-gray-300 bg-transparent text-gray-900 focus:outline-none focus:border-[var(--brand-600)]" /></label>
+            <label className="flex items-center gap-1.5">To
+              <input type="date" value={custom.to} min={custom.from || undefined} onChange={e => setCustom(c => ({ ...c, to: e.target.value }))}
+                className="h-9 border-b border-gray-300 bg-transparent text-gray-900 focus:outline-none focus:border-[var(--brand-600)]" /></label>
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard label="Won revenue"  value={`$${fmt(stats.totalRevenue)}`} sub={`${stats.won.length} jobs won · ${periodLabel}`} />
