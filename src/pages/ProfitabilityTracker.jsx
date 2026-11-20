@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { openProposal as showProposal } from '../lib/openProposal'
 import { useStore } from '../store'
-import { wonRevenueOf } from '../contractTotal'
+import { isSale, saleDateOf, saleValueOf } from '../lib/headline'
 import { MenuChip, QuickPicks } from '../components/FilterBar'
 import { useJobCostOf } from '../lib/jobCost'
 import { shortMoney } from '../lib/shortMoney'
@@ -106,10 +106,11 @@ export default function ProfitabilityTracker() {
   // "pay yourself first." Period scopes every metric; defaults to this year.
   const CURRENT_YEAR = new Date().getFullYear()
   const [statsYear, setStatsYear] = useState(CURRENT_YEAR)
-  const saleYearOf = (p) => new Date(p.closedAt || p.sentAt || p.createdAt || LOADED_AT).getFullYear()
+  // Sold here or in Knowify, on its sale date (lib/headline.js)
+  const saleYearOf = (p) => new Date(saleDateOf(p) || LOADED_AT).getFullYear()
 
   const wonJobs = useMemo(
-    () => proposals.filter(p => p.status === 'Won'),
+    () => proposals.filter(isSale),
     [proposals]
   )
 
@@ -123,11 +124,12 @@ export default function ProfitabilityTracker() {
   // Derived per-job metrics
   const jobs = useMemo(() => wonJobs.map(p => {
     const fin  = costOf(p)
-    const rev  = wonRevenueOf(p)
+    const rev  = saleValueOf(p)
     const totalCost = fin.hasCosts ? fin.actualCost : null
     const profit = totalCost !== null ? rev - totalCost : null
     const margin = (totalCost !== null && rev > 0) ? (profit / rev) * 100 : null
-    return { ...p, rev, totalCost, profit, margin, hasCosts: totalCost !== null, fromBooks: fin.fromBooks }
+    // closedAt here = the sale date (a Knowify sale has no close date in the app)
+    return { ...p, closedAt: p.status === 'Won' ? p.closedAt : saleDateOf(p), rev, totalCost, profit, margin, hasCosts: totalCost !== null, fromBooks: fin.fromBooks }
   }), [wonJobs, costOf])
 
   // Everything below is scoped to the selected period, by SALE (won) month.

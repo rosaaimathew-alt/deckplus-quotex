@@ -318,7 +318,7 @@ function Overview({ sum, period, onReviewUnaccounted }) {
         <Kpi label="Collected" value={money(sum.collected)} sub={`Customer payments · ${period.label.toLowerCase()}`} tone="text-green-700" />
         <Kpi label="Spent" value={money(sum.spend)} sub="All money out" tone="text-red-600" />
         <Kpi label="Net cash" value={money(sum.net)} sub="Collected − spent" tone={sum.net >= 0 ? 'text-gray-900' : 'text-red-600'} />
-        <Kpi label="Owed by customers" value={money(sum.outstanding)} sub="Open balances on won jobs" />
+        <Kpi label="Owed by customers" value={money(sum.outstanding)} sub="Open invoice balances" />
       </div>
 
       {/* Unaccounted */}
@@ -705,6 +705,9 @@ export default function Finance() {
   const proposals   = useStore(s => s.proposals)
   const subsRaw     = useStore(s => s.subscriptions)
   const jobCosts    = useStore(s => s.jobCosts)
+  const purchasesRaw = useStore(s => s.purchases)
+  const billsRaw    = useStore(s => s.bills)
+  const invoicesRaw = useStore(s => s.invoices)
   const cards = useMemo(() => cardsRaw || [], [cardsRaw])
   const expenses = useMemo(() => expensesRaw || [], [expensesRaw])
   const subscriptions = useMemo(() => subsRaw || [], [subsRaw])
@@ -719,8 +722,9 @@ export default function Finance() {
   const period = useMemo(() => periodFor(periodKey), [periodKey])
   const jobs = useMemo(() => (proposals || []).filter(p => p.status === 'Won'), [proposals])
   const costOf = useJobCostOf()
-  const sum = useMemo(() => companySummary({ expenses, proposals: proposals || [], subscriptions, jobCosts, period, costOf }), [expenses, proposals, subscriptions, jobCosts, period, costOf])
-  const rateYear = useMemo(() => companySummary({ expenses, proposals: proposals || [], subscriptions, jobCosts, period: periodFor('year'), costOf }).unaccountedRate, [expenses, proposals, subscriptions, jobCosts, costOf])
+  const books = useMemo(() => ({ purchases: purchasesRaw || [], bills: billsRaw || [], invoices: invoicesRaw || [] }), [purchasesRaw, billsRaw, invoicesRaw])
+  const sum = useMemo(() => companySummary({ expenses, proposals: proposals || [], subscriptions, jobCosts, period, costOf, ...books }), [expenses, proposals, subscriptions, jobCosts, period, costOf, books])
+  const rateYear = useMemo(() => companySummary({ expenses, proposals: proposals || [], subscriptions, jobCosts, period: periodFor('year'), costOf, ...books }).unaccountedRate, [expenses, proposals, subscriptions, jobCosts, costOf, books])
   const cashInPeriod = useMemo(() => expenses.filter(e => !isAllocation(e) && inPeriod(e.date, period)), [expenses, period])
 
   return (

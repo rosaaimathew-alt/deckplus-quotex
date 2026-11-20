@@ -8,8 +8,10 @@
 // Inventory later used on a job is logged as an *allocation* (kind:
 // 'allocation'): it adds to that job's cost and lowers inventory on hand, but
 // it is not new cash out — the purchase was already counted.
-import { shareFor, isSplit } from './split'
+import { shareFor, isSplit, splitsOf } from './split'
 import { contractTotalOf, approvedChangeOrderTotal } from '../contractTotal'
+import { isSale, isImportedSale, saleDateOf, saleValueOf } from './headline'
+import { poIsLive, poAllocations, jobIndex, invoiceStatus, invoiceBalance } from './books'
 
 export const BUCKETS = [
   { key: 'job',          label: 'Job costs',     color: '#2563eb' },
@@ -119,8 +121,10 @@ const BOOK_CATEGORY = { materials: 'Materials', sub: 'Subcontractor', labor: 'La
 // and bills from Money. Use lib/jobCost.js's useJobCostOf() rather than
 // calling this directly, so every page counts the same costs.
 export function jobFinancials(proposal, expenses = [], legacyCosts = null, books = null) {
-  const contract = contractTotalOf(proposal)
-  const changeOrders = approvedChangeOrderTotal(proposal)
+  // A job sold in Knowify: its sold value already includes change orders
+  const imported = isImportedSale(proposal)
+  const contract = imported ? saleValueOf(proposal) : contractTotalOf(proposal)
+  const changeOrders = imported ? 0 : approvedChangeOrderTotal(proposal)
   const revenue = contract + changeOrders
   // a card charge shared by several jobs (a dump run for three) counts only this job's share
   const mine = expenses.map(e => ({ e, share: shareFor(e, e.amount, proposal.id) })).filter(x => x.share)
@@ -160,27 +164,55 @@ export function jobFinancials(proposal, expenses = [], legacyCosts = null, books
 
 // ── The whole company for a period ───────────────────────────────────────────
 // costOf: lib/jobCost.js's useJobCostOf() — so job profit includes Money's POs and bills.
-export function companySummary({ expenses = [], proposals = [], subscriptions = [], jobCosts = {}, period, costOf = null }) {
+// purchases / bills / invoices are Money's books (Knowify's history included):
+// purchase orders and bills count as money out, invoices give what customers owe.
+export function companySummary({ expenses = [], proposals = [], subscriptions = [], jobCosts = {}, period, costOf = null, purchases = [], bills = [], invoices = null }) {
   const cash = expenses.filter(e => !isAllocation(e) && inPeriod(e.date, period))
   const byBucket = Object.fromEntries(BUCKETS.map(b => [b.key, 0]))
   const countBy = Object.fromEntries(BUCKETS.map(b => [b.key, 0]))
   for (const e of cash) { const b = bucketOf(e); byBucket[b] += n(e.amount); countBy[b]++ }
+  // A PO or bill on a job is job cost; otherwise its overhead bucket, or
+  // unaccounted when it has neither.
+  const bookBucket = (onJob, bucket) => (onJob ? 'job' : bucket in byBucket && bucket !== 'job' ? bucket : 'misc')
+  for (const po of purchases) {
+    if (!poIsLive(po) || !inPeriod(po.date, period)) continue
+    const b = bookBucket(poAllocations(po).length > 0, po.bucket)
+    byBucket[b] += n(po.amount); countBy[b]++
+  }
+  for (const bill of bills) {
+    if (bill.status === 'void' || bill.poId != null || !inPeriod(bill.date, period)) continue
+    const b = bookBucket(splitsOf(bill, bill.total).some(sp => sp.jobId != null), bill.bucket)
+    byBucket[b] += n(bill.total); countBy[b]++
+  }
   const spend = Object.values(byBucket).reduce((s, v) => s + v, 0)
 
-  const jobs = proposals.filter(p => p.status === 'Won')
+  // Every job's customer payments: won here or sold in Knowify
+  const jobs = proposals.filter(p => p.status === 'Won' || p.status === 'Imported')
   const collected = jobs.reduce((s, p) => s + (p.jobData?.paymentsReceived || [])
     .filter(x => inPeriod(x.date, period)).reduce((a, x) => a + n(x.amount), 0), 0)
-  const sold = jobs.filter(p => inPeriod(p.closedAt || p.sentAt || p.createdAt, period))
-    .reduce((s, p) => s + contractTotalOf(p) + approvedChangeOrderTotal(p), 0)
-  const outstanding = jobs.reduce((s, p) => {
-    const rev = contractTotalOf(p) + approvedChangeOrderTotal(p)
-    const got = (p.jobData?.paymentsReceived || []).reduce((a, x) => a + n(x.amount), 0)
-    return s + Math.max(0, rev - got)
-  }, 0)
+  // Jobs sold in the period, at their sold value (lib/headline.js)
+  const soldJobs = proposals.filter(p => isSale(p) && inPeriod(saleDateOf(p), period))
+  const sold = soldJobs.reduce((s, p) => s + saleValueOf(p), 0)
+  // Owed: open invoice balances (the same as Money › Invoices); without the
+  // invoices, each won job's value less what's been paid.
+  let outstanding = 0
+  if (invoices) {
+    const byId = jobIndex(proposals)
+    for (const inv of invoices) {
+      const job = byId.get(String(inv.jobId))
+      const st = invoiceStatus(inv, job)
+      if (st === 'outstanding' || st === 'overdue') outstanding += invoiceBalance(inv, job)
+    }
+  } else {
+    outstanding = proposals.filter(p => p.status === 'Won').reduce((s, p) => {
+      const rev = contractTotalOf(p) + approvedChangeOrderTotal(p)
+      const got = (p.jobData?.paymentsReceived || []).reduce((a, x) => a + n(x.amount), 0)
+      return s + Math.max(0, rev - got)
+    }, 0)
+  }
 
   // Job profit for jobs sold in the period, and the same profit once the
   // unaccounted (misc) spend is assumed to be project cost spread over them.
-  const soldJobs = jobs.filter(p => inPeriod(p.closedAt || p.sentAt || p.createdAt, period))
   const jobProfit = soldJobs.reduce((s, p) => s + (costOf ? costOf(p) : jobFinancials(p, expenses, jobCosts?.[p.id])).profit, 0)
   const unaccountedRate = sold > 0 ? (byBucket.misc / sold) * 100 : 0
   const adjustedJobProfit = jobProfit - byBucket.misc
@@ -201,8 +233,7 @@ export function companySummary({ expenses = [], proposals = [], subscriptions = 
 // to take off every job's profit if those costs really were project costs.
 export function unaccountedRate({ expenses = [], proposals = [], period }) {
   const misc = expenses.filter(e => !isAllocation(e) && inPeriod(e.date, period) && bucketOf(e) === 'misc').reduce((s, e) => s + n(e.amount), 0)
-  const sold = proposals.filter(p => p.status === 'Won' && inPeriod(p.closedAt || p.sentAt || p.createdAt, period))
-    .reduce((s, p) => s + contractTotalOf(p) + approvedChangeOrderTotal(p), 0)
+  const sold = proposals.filter(p => isSale(p) && inPeriod(saleDateOf(p), period)).reduce((s, p) => s + saleValueOf(p), 0)
   return { misc, sold, rate: sold > 0 ? (misc / sold) * 100 : 0 }
 }
 
