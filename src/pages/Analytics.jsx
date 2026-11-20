@@ -6,7 +6,7 @@ import { MenuChip, QuickPicks, RepToggle } from '../components/FilterBar'
 import { useScopedProposals } from '../lib/proposalScope'
 import { headlineNumbers, isSale, isImportedSale, saleDateOf, saleValueOf } from '../lib/headline'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from '../historicalData'
-import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'
+import { TrendingUp, DollarSign, Award, XCircle, Target, Plus, ChevronDown, ChevronUp, Trash2, Clock, MapPin, Settings2, Pencil, Check, X, MoreHorizontal, BarChart3 } from 'lucide-react'; import { shortMoney } from '../lib/shortMoney'
 
 // ── Sales Heat Map ────────────────────────────────────────────────────────────
 const GEO_CACHE_KEY = 'quotex-geo-cache'
@@ -143,7 +143,7 @@ function SalesHeatMap({ proposals }) {
         radius, fillColor: color, fillOpacity: 0.78, color: '#fff', weight: 2,
       }).bindPopup(
         `<div style="font-family:sans-serif;font-size:13px;line-height:1.7;min-width:160px">` +
-        `<b>${g.label}</b><br>${g.count} proposal${g.count !== 1 ? 's' : ''} · $${(g.revenue/1000).toFixed(0)}k` +
+        `<b>${g.label}</b><br>${g.count} proposal${g.count !== 1 ? 's' : ''} · ${shortMoney(g.revenue)}` +
         clientLines + `</div>`,
         { maxWidth: 240 }
       ).addTo(map)
@@ -225,7 +225,7 @@ function SalesHeatMap({ proposals }) {
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-medium text-gray-800 truncate">{c.city}</span>
                         <div className="flex items-center gap-2 shrink-0 ml-3">
-                          {c.revenue > 0 && <span className="text-xs font-semibold text-gray-600">${(c.revenue/1000).toFixed(0)}k</span>}
+                          {c.revenue > 0 && <span className="text-xs font-semibold text-gray-600">{shortMoney(c.revenue)}</span>}
                           {c.won > 0 && <span className="text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full">{c.won} won</span>}
                           {c.active > 0 && <span className="text-xs px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded-full">{c.active} active</span>}
                         </div>
@@ -662,7 +662,7 @@ function RemapProjectsModal({ onClose }) {
 }
 
 const fmt  = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(0)}k` : `$${fmt(n)}`
+const fmtK = n => shortMoney(n)
 
 // Color palette cycles through for types not explicitly mapped
 const COLOR_PALETTE = [
