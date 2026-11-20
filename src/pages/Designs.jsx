@@ -4,7 +4,13 @@
 // proposal's own builder inputs (see src/lib/designLink.js). Each card's
 // little plan is drawn from those same sizes: the house wall on top, then
 // every porch, deck and patio side by side, to scale with each other.
+//
+// A customer's alternatives stay together, like the proposals: one stacked
+// card per customer (the same grouping as Sales › Proposals), its newest live
+// drawing on top; open the stack to see every alternative side by side.
 import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import { clientGroups } from '../lib/proposalGroups'
 import { useScopedProposals } from '../lib/proposalScope'
 import { QuickPicks, RepToggle, SearchLine } from '../components/FilterBar'
 import { designParts, designSummary, editorUrl, hasDesign } from '../lib/designLink'
@@ -54,15 +60,23 @@ export default function Designs() {
   const [q, setQ] = useState('')
   const [kind, setKind] = useState('all')   // all | decks | porches
 
-  const rows = useMemo(() => {
-    // Latest version of each proposal only: skip any that a newer revision replaced.
-    const replaced = new Set(proposals.map(p => p.parentId).filter(Boolean))
+  const [open, setOpen] = useState(null)   // the stack opened (its top design's id)
+
+  // One stack per customer: every version with a design, newest first; on top
+  // the newest one still in play (not archived or lost), else the newest.
+  const stacks = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    return proposals
-      .filter(p => !replaced.has(p.id) && hasDesign(p))
-      .filter(p => !needle || `${p.client || ''} ${p.address || ''}`.toLowerCase().includes(needle))
-      .filter(p => kind === 'all' || designParts(p.lines)[kind].length > 0)
-      .sort((a, b) => String(b.sentAt || b.createdAt || '').localeCompare(String(a.sentAt || a.createdAt || '')))
+    const when = (p) => String(p.sentAt || p.createdAt || '')
+    return clientGroups(proposals)
+      .map(({ all }) => all.filter(hasDesign).sort((a, b) => when(b).localeCompare(when(a))))
+      .filter(list => list.length)
+      .filter(list => !needle || list.some(p => `${p.client || ''} ${p.address || ''}`.toLowerCase().includes(needle)))
+      .filter(list => kind === 'all' || list.some(p => designParts(p.lines)[kind].length > 0))
+      .map(list => {
+        const top = list.find(p => !['Archived', 'Lost'].includes(p.status)) || list[0]
+        return { top, list: [top, ...list.filter(p => p !== top)] }
+      })
+      .sort((a, b) => when(b.top).localeCompare(when(a.top)))
   }, [proposals, q, kind])
 
 
@@ -75,30 +89,69 @@ export default function Designs() {
         <QuickPicks value={kind} onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'decks', label: 'Decks' }, { value: 'porches', label: 'Porches' }]} />
       </div>
 
-      {rows.length === 0 ? (
+      {stacks.length === 0 ? (
         <div className="border border-dashed border-gray-300 rounded-xl p-8 text-center text-sm text-gray-500">
           {q ? 'No designs match that search.' : 'No designs yet. Price a porch, deck or patio with a builder on a quote, and its 3D model and floor plan show up here.'}
         </div>
       ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {rows.map(p => (
-            <li key={p.id}>
-              <button type="button" onClick={() => window.open(editorUrl(p), '_blank', 'noopener')}
-                title="Open the design: floor plan and 3D in one place, saved on this proposal"
-                className="w-full text-left bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-[var(--brand-300)] hover:shadow-sm transition-all">
-                <span className="block h-36 bg-gray-50 border-b border-gray-200 p-2"><PlanThumb p={p} /></span>
-                <span className="block px-3 py-2.5">
-                  <span className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900 truncate">{p.client || 'Unnamed client'}</span>
-                    {p.status && <span className={`ml-auto shrink-0 text-[11px] font-semibold rounded px-1.5 py-0.5 ${STATUS_TONE[p.status] || 'bg-[var(--brand-50)] text-[var(--brand-700)]'}`}>{p.status}</span>}
-                  </span>
-                  <span className="block text-xs text-gray-500 truncate mt-0.5">{designSummary(p)}</span>
-                </span>
-              </button>
-            </li>
-          ))}
+        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6">
+          {stacks.map(({ top, list }) => {
+            const more = list.length - 1
+            const isOpen = open === top.id && more > 0
+            return (
+              <li key={top.id} className={isOpen ? 'col-span-full' : ''}>
+                {isOpen ? (
+                  <div className="border border-gray-200 rounded-xl bg-gray-50 p-3 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900 truncate">{top.client || 'Unnamed client'}</span>
+                      <span className="text-xs text-gray-500">{list.length} alternatives</span>
+                      <button type="button" onClick={() => setOpen(null)} className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-gray-600 hover:text-gray-900">
+                        Stack them <ChevronUp size={14} />
+                      </button>
+                    </div>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {list.map((p, i) => <li key={p.id}><DesignCard p={p} label={i === 0 ? 'Latest' : `Alternative ${i}`} /></li>)}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    {/* the cards underneath, peeking out like a stack */}
+                    {more > 1 && <span aria-hidden className="absolute inset-x-4 -bottom-3 h-6 rounded-b-xl border border-gray-200 bg-gray-100" />}
+                    {more > 0 && <span aria-hidden className="absolute inset-x-2 -bottom-1.5 h-6 rounded-b-xl border border-gray-200 bg-gray-50" />}
+                    <div className="relative">
+                      <DesignCard p={top} />
+                      {more > 0 && (
+                        <button type="button" onClick={() => setOpen(top.id)}
+                          className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/95 border border-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-700 shadow-sm hover:bg-white">
+                          +{more} alternative{more > 1 ? 's' : ''} <ChevronDown size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
+  )
+}
+
+// One drawing: its little plan, the client and what's on it. Opens the design editor.
+function DesignCard({ p, label }) {
+  return (
+    <button type="button" onClick={() => window.open(editorUrl(p), '_blank', 'noopener')}
+      title="Open the design: floor plan and 3D in one place, saved on this proposal"
+      className="w-full text-left bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-[var(--brand-300)] hover:shadow-sm transition-all">
+      <span className="block h-36 bg-gray-50 border-b border-gray-200 p-2"><PlanThumb p={p} /></span>
+      <span className="block px-3 py-2.5">
+        <span className="flex items-center gap-2">
+          <span className="font-semibold text-gray-900 truncate">{label || p.client || 'Unnamed client'}</span>
+          {p.status && <span className={`ml-auto shrink-0 text-[11px] font-semibold rounded px-1.5 py-0.5 ${STATUS_TONE[p.status] || 'bg-[var(--brand-50)] text-[var(--brand-700)]'}`}>{p.status}</span>}
+        </span>
+        <span className="block text-xs text-gray-500 truncate mt-0.5">{designSummary(p)}</span>
+      </span>
+    </button>
   )
 }
