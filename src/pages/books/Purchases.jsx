@@ -59,7 +59,10 @@ export function PurchaseModal({ po, presetJobId, onClose }) {
   const save = (status = f.status) => {
     const vendorName = f.vendorRef ? (vendorList.find(v => v.ref === f.vendorRef)?.name || f.vendorName) : f.vendorName.trim()
     const allocations = f.forJob ? (split ? f.allocations.map(a => ({ jobId: a.jobId, amount: Number(a.amount) || 0 })) : [{ jobId: f.allocations[0].jobId, amount }]) : []
-    const rec = { number: String(f.number).trim(), date: f.date, vendorRef: f.vendorRef, vendorName, type: f.type, items: f.items.trim(),
+    // (an automatic number is worked out again here: the PO list may have
+    // finished loading since the form opened)
+    const number = !po && autoNumber ? poFor(f.allocations, f.forJob) : String(f.number).trim()
+    const rec = { number, date: f.date, vendorRef: f.vendorRef, vendorName, type: f.type, items: f.items.trim(),
       amount, allocations, jobId: null, bucket: f.forJob ? null : f.bucket, status, notes: f.notes }
     if (po) updatePurchase(po.id, rec)
     else addPurchase({ ...rec, enteredBy: me?.displayName || me?.email || 'Office' })
@@ -137,6 +140,7 @@ const mailPo = (po, jobs, vendorList, branding) => {
 
 export default function Purchases() {
   const purchases = useStore(s => s.purchases)
+  const loadingPOs = useStore(s => s.purchasesLoading)
   const proposals = useStore(s => s.proposals)
   const branding = useStore(s => s.branding)
   const updatePurchase = useStore(s => s.updatePurchase)
@@ -209,7 +213,7 @@ export default function Purchases() {
         right={<><XlsButton onClick={exportCsv} />{pager}</>} />
       {shown.length > 0 && filterCount + (jobFilter != null ? 1 : 0) + (q ? 1 : 0) > 0 && <p className="text-sm text-gray-500">{shown.length.toLocaleString()} purchase{shown.length === 1 ? '' : 's'} · {money(total)}</p>}
 
-      {shown.length === 0 ? <Empty>{purchases.length ? 'No purchases match.' : 'No purchase orders yet.'}</Empty> : (
+      {shown.length === 0 ? <Empty>{purchases.length ? 'No purchases match.' : loadingPOs ? 'Loading purchase orders…' : 'No purchase orders yet.'}</Empty> : (
         <FitTable cols={[112, 86, '1.5fr', '1.3fr', 100, '1fr', '1.3fr', '1.1fr', '0.8fr', 104]} card={['status', 'plain', 'long', 'hide', 'amount', 'hide', 'title', 'hide', 'hide', 'act']} className="bg-white border border-gray-200 rounded-2xl shadow-sm">
           <table className="w-full text-[15px]">
             <thead className="border-b border-gray-200 text-left">

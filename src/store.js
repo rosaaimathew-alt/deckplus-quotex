@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdBlock } from './supabase'
+import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdBlock, loadDeferred } from './supabase'
 import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { notify, alertForTaskChange } from './lib/notify'
 import { ASSIGNABLE_ROLES, canDeleteTodo, personalTodos, todosIAssigned } from './lib/todos'
@@ -1709,6 +1709,11 @@ export function bootstrapOrg() {
     // header toggle switches it for this visit only.
     useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).some(t => !t.startsWith('sub_')), chatMissing: (missingTables || []).includes('sub_messages') })
     armAdapter(useStore, orgId, settings)
+    // Purchase orders load after the app is open (there are tens of thousands)
+    useStore.setState({ purchasesLoading: true })
+    loadDeferred(useStore, orgId)
+      .catch((e) => console.error('[quotex] could not load purchase orders', e))
+      .finally(() => useStore.setState({ purchasesLoading: false }))
     // A brand-new org gets the built-in email templates once; the adapter
     // writes them as rows because they arrive after arming. (Not for the paint
     // PM: they can't read templates, so an empty list doesn't mean a new org.)
