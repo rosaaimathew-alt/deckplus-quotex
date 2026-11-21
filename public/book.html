@@ -129,13 +129,25 @@
     .dow { font-size: .72rem; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--text); padding-bottom: 8px; }
     .date { position: relative; width: 44px; height: 44px; margin: 0 auto; border-radius: 50%; border: 0; background: none;
       color: var(--muted); font-size: 1rem; font-variant-numeric: tabular-nums; cursor: default; }
-    .date.open { background: var(--accent-soft); color: var(--accent); font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
-    .date.open:hover { background: color-mix(in srgb, var(--accent) 22%, #fff); }
-    .date[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+    .date.open { background: var(--accent); color: var(--accent-text); font-weight: 700; cursor: pointer; transition: background .15s, box-shadow .15s; }
+    .date.open:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
+    .date[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--accent); }
     .date.today::after { content: ""; position: absolute; left: 50%; bottom: 6px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
     .tz { margin: 22px auto 0; max-width: 420px; font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
     .tz svg { flex: none; }
 
+    /* Soonest openings: the next few times as one-tap buttons above the
+       calendar, so a visitor doesn't have to hunt for an open day first. */
+    .soonest { max-width: 560px; margin: 0 auto 22px; }
+    .soonest h3 { font-size: .95rem; font-weight: 600; margin: 0 0 10px; color: var(--heading); }
+    .soonlist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    @media (max-width: 559px) { .soonlist { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .soon { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 50%, #fff); border-radius: var(--radius);
+      background: var(--card); color: var(--accent); text-align: left; font: inherit; cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+    .soon small { color: var(--muted); font-size: .8rem; font-weight: 500; }
+    .soon strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+    .soon:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .soonmore { margin: 14px 0 0; font-size: .85rem; color: var(--muted); text-align: center; }
     .times { min-width: 0; overflow: hidden; }
     .times h3 { font-size: .95rem; font-weight: 500; margin: 6px 0 16px; color: var(--text); }
     .slotlist { display: grid; gap: 10px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
@@ -241,6 +253,11 @@
 
         <section id="pick" hidden>
           <h2>Select a Date &amp; Time</h2>
+          <div class="soonest" id="soonest" hidden>
+            <h3>Soonest openings</h3>
+            <div class="soonlist" id="soonList"></div>
+            <p class="soonmore">Or pick another day below</p>
+          </div>
           <div class="picker" id="picker">
             <div class="calcol">
               <div class="month">
@@ -586,6 +603,31 @@
       else if (COMPACT && !$('pick').style.minHeight && $('calendar').offsetParent) $('pick').style.minHeight = $('pick').offsetHeight + 'px'
       $('picker').classList.toggle('has-day', !!state.day)
       $('times').hidden = !state.day
+      // The next six times, one tap each, until a day is picked: each day's
+      // first time and one at least three hours later (morning and afternoon)
+      $('soonest').hidden = !!state.day
+      if (!state.day) {
+        const soon = []
+        for (const [k, list] of state.byDay) {
+          const later = list.find(d => d - list[0] >= 3 * 3600_000)
+          soon.push(...[list[0], later].filter(Boolean).map(d => [k, d]))
+          if (soon.length >= 6) break
+        }
+        $('soonList').replaceChildren(...soon.slice(0, 6).map(([k, d]) => {
+          const b = document.createElement('button')
+          b.type = 'button'; b.className = 'soon'
+          const day = document.createElement('small'); day.textContent = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+          const time = document.createElement('strong'); time.textContent = fmtTime(d)
+          b.append(day, time)
+          b.setAttribute('aria-label', `${fmtDay(d)}, ${fmtTime(d)}`)
+          b.onclick = () => {
+            state.day = k; state.start = d
+            track('day', `${k}|${state.byDay.get(k).length}`); track('time', `${d.toISOString()}|1`)
+            render(); goDetails()
+          }
+          return b
+        }))
+      }
       if (state.day) {
         $('dayLabel').textContent = fmtDay(keyToDate(state.day))
         $('slots').replaceChildren(...state.byDay.get(state.day).map(d => {
