@@ -154,7 +154,11 @@
     .times { max-width: 620px; margin: 0 auto; width: 100%; }
     .tz { max-width: 620px; margin-top: 12px; }
     .times h3 { margin: 0 0 10px !important; }
-    html .slotlist, html.compact .slotlist { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)) !important; max-height: none; overflow: visible; gap: 8px; padding: 0; }
+    html .slotlist, html.compact .slotlist { display: block; max-height: none; overflow: visible; padding: 0; }
+    .times { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
+    .times h3.dayhead { margin: 0 !important; font-weight: 600; }
+    #timeSel { min-height: 46px; font-weight: 600; color: var(--accent); }
+    @media (max-width: 479px) { .times { grid-template-columns: 1fr; gap: 6px; } }
     html .slot, html.compact .slot { height: 44px; font-size: .95rem; }
     .slot[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
     #details { max-width: 620px; margin: 24px auto 0; padding-top: 20px; border-top: 1px solid var(--line); }
@@ -616,13 +620,13 @@
       $('times').hidden = !state.day
       if (state.day) {
         $('dayLabel').textContent = fmtDay(keyToDate(state.day))
-        $('slots').replaceChildren(...state.byDay.get(state.day).map(d => {
-          const b = document.createElement('button')
-          b.type = 'button'; b.className = 'slot'; b.textContent = fmtTime(d)
-          b.setAttribute('aria-pressed', String(+d === +state.start))
-          b.onclick = () => { state.start = d; render(); track('time', d.toISOString()) }
-          return b
-        }))
+        // The day's times as one dropdown (a list of buttons made the calendar long)
+        const list = state.byDay.get(state.day)
+        const sel = document.createElement('select')
+        sel.id = 'timeSel'; sel.setAttribute('aria-label', 'Time')
+        sel.append(...list.map((d, n) => { const o = document.createElement('option'); o.value = n; o.textContent = fmtTime(d); o.selected = +d === +state.start; return o }))
+        sel.onchange = () => { state.start = list[+sel.value]; render(); track('time', state.start.toISOString()) }
+        $('slots').replaceChildren(sel)
       }
       $('pickedLine').textContent = state.start ? `${fmtDay(state.start)} at ${fmtTime(state.start)}${state.rep ? ` with ${state.rep.name}` : ''}` : ''
       resize()
