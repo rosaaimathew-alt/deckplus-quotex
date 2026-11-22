@@ -165,6 +165,32 @@
     #details h2 { font-size: 1.1rem; margin-bottom: 12px; }
     #details form { gap: 10px; }
     .pickedline { margin: 2px 0 0; font-size: .92rem; color: var(--heading); font-weight: 600; text-align: center; }
+
+    /* ── On a website (compact): everything fits in one small box, no scrolling
+       inside it. Websites give the calendar a fixed-height card, so the whole
+       booking (days, time, every field, the button) has to fit in ~520px. ── */
+    html.compact .main { padding: 2px 2px 4px; }
+    html.compact .chead { padding-bottom: 8px; margin-bottom: 10px; }
+    html.compact .chead strong { font-size: .95rem; }
+    html.compact .chead span { font-size: .8rem; }
+    html.compact .main h2, html.compact #details h2, html.compact .month, html.compact .tz,
+    html.compact .times h3.dayhead, html.compact .pickedline, html.compact .fine { display: none; }
+    html.compact .picker { gap: 8px; }
+    html.compact .grid.strip { gap: 4px; row-gap: 4px; }
+    html.compact .daycell { height: 44px; font-size: .95rem; }
+    html.compact .daycell small { font-size: .6rem; }
+    html.compact .times { grid-template-columns: 1fr; gap: 0; }
+    html.compact #details { margin-top: 8px; padding-top: 0; border-top: 0; }
+    html.compact #details form, html.compact .row2, html.compact .row3 { gap: 6px; }
+    html.compact .row3 { grid-template-columns: minmax(0, 1.4fr) minmax(0, .9fr) minmax(0, 1fr); }
+    html.compact .row3 > :first-child { grid-column: auto; }
+    html.compact input, html.compact select { min-height: 40px; padding: 8px 12px; font-size: .92rem; }
+    html.compact select:not([multiple]):not([size]) { padding-right: 30px; background-position: right 8px center !important; }
+    html.compact #timeSel { min-height: 40px; }
+    html.compact .btn { padding: 11px 20px; }
+    /* missing fields get a red outline and one short message (no per-field lines) */
+    html.compact .err { display: none; }
+    html.compact .msg { padding: 6px 10px; margin-bottom: 8px; font-size: .82rem; }
     .times { min-width: 0; overflow: hidden; }
     .times h3 { font-size: .95rem; font-weight: 500; margin: 6px 0 16px; color: var(--text); }
     .slotlist { display: grid; gap: 10px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
