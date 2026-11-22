@@ -31,8 +31,16 @@ const ZIP_RE = /^\d{5}(-\d{4})?$/
 const US_STATES = new Set(('AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV ' +
   'NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR').split(' '))
 
-// Every field is required except notes. Returns { lead } or { errors: { field: message } }.
+// The project types the booking form offers (public/book.html). The choice is
+// kept at the top of the booking's notes, so it shows in the emails and leads.
+const PROJECT_TYPES = ['New Deck', 'Deck Resurface', 'Patios & Hardscapes', 'Covered / Open Porch / Gazebo / Pavilion',
+  'Screened In Porch', 'New Eze-Breeze Porch', 'Sunroom', 'Porch Remodel']
+
+// Every field is required except notes (and the project type, which older
+// copies of the page don't send). Returns { lead } or { errors: { field: message } }.
 function validateLead(body) {
+  const project = clean(body.projectType, 60)
+  const notes = clean(body.notes, 2000)
   const digits = clean(body.phone, 40).replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '')
   const lead = {
     first_name: clean(body.firstName, 60),
@@ -43,7 +51,7 @@ function validateLead(body) {
     city:       clean(body.city, 80),
     state:      clean(body.state, 2).toUpperCase(),
     zip:        clean(body.zip, 10),
-    notes:      clean(body.notes, 2000),
+    notes:      [PROJECT_TYPES.includes(project) && `Project: ${project}`, notes].filter(Boolean).join('\n').slice(0, 2000),
   }
   const errors = {}
   if (!lead.first_name)               errors.firstName = 'Enter your first name.'
@@ -54,6 +62,7 @@ function validateLead(body) {
   if (!ZIP_RE.test(lead.zip))         errors.zip       = 'Enter a 5-digit ZIP code.'
   if (!lead.phone)                    errors.phone     = 'Enter a 10-digit phone number.'
   if (!EMAIL_RE.test(lead.email))     errors.email     = 'Enter a valid email address.'
+  if (project && !PROJECT_TYPES.includes(project)) errors.projectType = 'Choose your project.'
   return Object.keys(errors).length ? { errors } : { lead }
 }
 
@@ -390,7 +399,7 @@ function failedBookingAlert(body, err) {
     subject: `Booking failed: ${clean(b.firstName, 60)} ${clean(b.lastName, 60)} needs a call back`.trim(),
     html: `<div style="font-family:Arial,Helvetica,sans-serif;color:#1f2937">
 <p>Someone tried to book on the website calendar and it failed, so <b>no appointment was created</b>. Please call them back:</p>
-<table style="border-collapse:collapse">${row('Name', `${b.firstName || ''} ${b.lastName || ''}`.trim())}${row('Phone', b.phone)}${row('Email', b.email)}${row('Address', [b.street, b.city, b.state, b.zip].filter(Boolean).join(', '))}${row('Wanted', when)}${row('Notes', b.notes)}</table>
+<table style="border-collapse:collapse">${row('Name', `${b.firstName || ''} ${b.lastName || ''}`.trim())}${row('Phone', b.phone)}${row('Email', b.email)}${row('Address', [b.street, b.city, b.state, b.zip].filter(Boolean).join(', '))}${row('Wanted', when)}${row('Project', b.projectType)}${row('Notes', b.notes)}</table>
 <p style="color:#6b7280;font-size:12px">Error: ${esc(String(err?.message || err).slice(0, 300))}</p></div>`,
   }
 }
