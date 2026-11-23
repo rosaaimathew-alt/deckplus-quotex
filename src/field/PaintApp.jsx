@@ -39,6 +39,7 @@ import { PhotoDays } from '../components/TaskPhotos'
 import JobPhotosTab from '../components/JobPhotos'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { usePaintCrew } from './usePaintCrew'
+import TimeClock from '../sub/TimeClock'
 import { isJob, isJobClosed } from '../lib/attention'
 import { jobFinancials } from '../lib/finance'
 import {
@@ -198,6 +199,7 @@ export function PaintQueue() {
         <h1 className="text-2xl font-bold text-gray-900">Paint queue</h1>
         <p className="text-sm text-gray-500">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </div>
+      <TimeClock />
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4"><p className="text-3xl font-bold text-gray-900">{ready.length}</p><p className="text-sm text-gray-500">ready to start</p></Card>
         <Card className={`p-4 ${unscheduled ? 'border-amber-300' : ''}`}>
