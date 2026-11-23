@@ -54,7 +54,7 @@ function why(r, dayEnd, action) {
     case 'no_jobs': return tr("You're not on a paint job yet. Your paint PM puts you on jobs.")
     case 'not_mapped': return tr("Your job isn't on the map yet. Try again in a minute.")
     case 'off_site': return action === 'out'
-      ? fill(tr("You're {d} from the job. Clock out at the job site. If you don't, your day ends at {t}."), { d: distance(r.distance), t: dayEndText(dayEnd) })
+      ? fill(tr("You're {d} from the job. Clock out at a job site (this one or your next job). If you don't, your day ends at {t}."), { d: distance(r.distance), t: dayEndText(dayEnd) })
       : fill(tr("You're {d} from your nearest paint job{job}. Clock in when you get there."), { d: distance(r.distance), job: r.client ? ` (${r.client})` : '' })
     case 'not_clocked_in': return tr("You're not clocked in.")
     default: return tr('Something went wrong. Try again.')
