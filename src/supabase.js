@@ -384,13 +384,25 @@ try { _queue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') } catch { _qu
 function saveQueue() { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(_queue)) } catch {} }
 function enqueue(op) { _queue.push(op); saveQueue(); flush() }
 
+// The merging save isn't in this database yet: send the whole key instead
+let _mergeOk = null
+const isMissingFunction = (e) => e && (e.code === 'PGRST202' || /could not find the function|function .* does not exist/i.test(e.message || ''))
+
 async function runOp(op) {
   let error
   if (op.kind === 'upsert') {
     ({ error } = await supabase.from(op.table)
       .upsert({ id: op.id, org_id: op.orgId, data: op.data, deleted_at: null }, { onConflict: 'org_id,id' }))
   } else if (op.kind === 'patch') {
-    ({ error } = await supabase.rpc('patch_record', { tbl: op.table, rid: op.id, patch: op.patch }))
+    if (op.merge?.length && _mergeOk !== false) {
+      // Merge these keys one level down (supabase/merge_patch.sql), so two
+      // people changing different parts of one job both land.
+      ({ error } = await supabase.rpc('patch_record', { tbl: op.table, rid: op.id, patch: op.patch, merge_keys: op.merge }))
+      if (!error) { _mergeOk = true; return }
+      if (!isMissingFunction(error)) throw error
+      _mergeOk = false   // not in this database yet: send the whole key, as before
+    }
+    ({ error } = await supabase.rpc('patch_record', { tbl: op.table, rid: op.id, patch: op.full || op.patch }))
   } else if (op.kind === 'delete') {
     ({ error } = await supabase.rpc('delete_record', { tbl: op.table, rid: op.id }))
   } else if (op.kind === 'settings') {
@@ -445,6 +457,19 @@ function shallowPatch(oldRec, newRec) {
   return patch
 }
 
+// Keys holding many separate parts that different people change: a job's
+// jobData (checklist, dates, paint, touch-ups, inspections, payments). Only
+// the parts that changed are sent, and the database merges them in.
+const MERGE_KEYS = ['jobData']
+const isPlain = (v) => v && typeof v === 'object' && !Array.isArray(v)
+function mergePatch(oldRec, newRec, patch) {
+  const merge = MERGE_KEYS.filter(k => k in patch && isPlain(oldRec?.[k]) && isPlain(newRec?.[k]))
+  if (!merge.length) return null
+  const inner = { ...patch }
+  for (const k of merge) inner[k] = shallowPatch(oldRec[k], newRec[k])
+  return { patch: inner, merge, full: patch }
+}
+
 const mapAsRecords = (obj) => Object.entries(obj || {}).map(([id, rec]) => ({ ...rec, id }))
 
 function snapshot(key, records) {
@@ -465,7 +490,10 @@ function diffRecords(key, table, current) {
       enqueue({ kind: 'upsert', table, orgId: _orgId, id: idStr, data: rec })
     } else if (old !== rec) {
       const patch = shallowPatch(old, rec)
-      if (Object.keys(patch).length) enqueue({ kind: 'patch', table, id: idStr, patch })
+      if (Object.keys(patch).length) {
+        const m = mergePatch(old, rec, patch)
+        enqueue(m ? { kind: 'patch', table, id: idStr, patch: m.patch, merge: m.merge, full: m.full } : { kind: 'patch', table, id: idStr, patch })
+      }
     }
     snap.set(idStr, rec)
   }

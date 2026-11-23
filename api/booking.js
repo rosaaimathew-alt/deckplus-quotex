@@ -15,6 +15,7 @@ import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, build
 import { sendMail } from './_mailer.js'
 import { sendDueReport } from './_lead-report.js'
 import { dailyTimeClock } from './_timeclock.js'
+import { dailyHealth } from './_health.js'
 import { verifyStaff, staffRole } from './_auth.js'
 import { sendDueContractReminders } from './_contractReminders.js'
 
@@ -446,6 +447,10 @@ export default async function handler(req, res) {
       // and on Wednesday the week's hours to the office (api/_timeclock.js).
       const clock = await dailyTimeClock()
       if (clock.closed || clock.payroll.length) console.log('time clock:', JSON.stringify(clock))
+      // Then the app's health, to the owner when something needs a look
+      // (and every Monday) (api/_health.js).
+      const health = await dailyHealth()
+      if (health.sent.length) console.log('health email:', JSON.stringify(health))
       return await sendDueReport(res)
     }
     if (req.method === 'GET' && req.query?.check === 'alert') {
