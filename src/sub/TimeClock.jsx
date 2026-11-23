@@ -11,7 +11,7 @@
 // minutes, and whenever it's opened again. A phone only shares its location
 // while the app is open, so the office sees any stretch without one.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Clock, MapPin, LogIn, LogOut, Loader2 } from 'lucide-react'
+import { Clock, LogIn, LogOut, Loader2 } from 'lucide-react'
 import { useStore } from '../store'
 import { timeclockMe, timeclockIn, timeclockOut, timeclockPing, mapJobSites } from '../supabase'
 import { DEMO } from '../demo'
@@ -118,7 +118,8 @@ export default function TimeClock() {
     return () => { clearInterval(every); document.removeEventListener('visibilitychange', back) }
   }, [open, ping, load, st?.lastPing])
 
-  if (!isPainter || off) return null
+  // Nothing until it has loaded: no flash of an empty card on opening the app
+  if (!isPainter || off || !st) return null
 
   const punch = async (action) => {
     setBusy(action); setMsg(null)
@@ -152,13 +153,10 @@ export default function TimeClock() {
         {st && <span className="text-sm text-gray-600">{tr('This week')} <strong className="text-gray-900">{hm(st.week)}</strong></span>}
       </div>
 
-      {!st ? (
-        <p className="text-sm text-gray-500 flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> {tr('Loading…')}</p>
-      ) : open ? (
+      {open ? (
         <div>
           <p className="text-3xl font-bold text-gray-900 tabular-nums">{hm((Date.now() - new Date(open.in)) / 3_600_000)}</p>
           <p className="text-sm text-gray-700">{fill(tr('Clocked in at {t}'), { t: time(open.in) })}{open.client ? ` · ${open.client}` : ''}</p>
-          <p className="text-sm text-gray-500 flex items-center gap-1"><MapPin size={14} /> {st.lastPing ? fill(tr('Location checked {t}'), { t: time(st.lastPing) }) : tr('Location checked at clock in')}</p>
         </div>
       ) : (
         <p className="text-sm text-gray-700">{todayHours > 0 ? fill(tr('Today: {h} hours. Not clocked in now.'), { h: hm(todayHours) }) : tr('Not clocked in.')}</p>
