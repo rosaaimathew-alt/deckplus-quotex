@@ -79,8 +79,8 @@ function usePaintJobs() {
     .sort((a, b) => (a.p.client || '').localeCompare(b.p.client || '')), [proposals, subTasks])
 }
 
-// A painter on the job has started.
-const started = (j) => (j.painters || []).some(t => statusKey(t) !== 'booked')
+// A painter on the job has started, or the PM ticked Painting on the checklist.
+const started = (j) => !!j.done?.has('painting') || (j.painters || []).some(t => statusKey(t) !== 'booked')
 
 // Where a paint job stands: 'ready' (paint is the next step), 'active' (being
 // painted, or back for touch-ups), 'completed' (paint done), 'closed' (the job
