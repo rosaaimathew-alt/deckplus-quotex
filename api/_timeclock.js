@@ -51,7 +51,7 @@ async function mapJobs(sb, orgId, tasks, max) {
   if (!ids.length) return { mapped: 0, missing: 0 }
   const [{ data: props }, { data: sites }] = await Promise.all([
     sb.from('proposals').select('id, data').eq('org_id', orgId).in('id', ids),
-    sb.from('job_sites').select('proposal_id, address, lat').eq('org_id', orgId).in('proposal_id', ids),
+    sb.from('job_sites').select('proposal_id, address, lat, found_at').eq('org_id', orgId).in('proposal_id', ids),
   ])
   const have = new Map((sites || []).map(s => [s.proposal_id, s]))
   const todo = []
@@ -61,14 +61,11 @@ async function mapJobs(sb, orgId, tasks, max) {
     if (!address) continue
     const s = have.get(id)
     // New, the address changed, or not found last time (try again after a day)
-    if (!s || s.address !== address || s.lat == null) todo.push({ id, address, retry: s && s.address === address && s.lat == null })
+    const notFoundLately = s && s.address === address && s.lat == null && Date.now() - new Date(s.found_at) < 86_400_000
+    if ((!s || s.address !== address || s.lat == null) && !notFoundLately) todo.push({ id, address })
   }
   let mapped = 0
   for (const job of todo.slice(0, max)) {
-    if (job.retry) {
-      const { data: old } = await sb.from('job_sites').select('found_at').eq('org_id', orgId).eq('proposal_id', job.id).single()
-      if (old && Date.now() - new Date(old.found_at) < 86_400_000) continue
-    }
     const g = await geocode(job.address)
     await sb.from('job_sites').upsert({ org_id: orgId, proposal_id: job.id, address: job.address,
       lat: g?.lat ?? null, lng: g?.lng ?? null, source: g?.source ?? null, found_at: new Date().toISOString() })
@@ -81,13 +78,24 @@ export async function mapJobSites(userId) {
   const sb = db()
   const { data: m } = await sb.from('org_members').select('org_id, role').eq('user_id', userId).limit(1).maybeSingle()
   if (!m) return { mapped: 0 }
+  // The paint PM clocks in at any open job: map those
+  if (m.role === 'paint') return mapJobs(sb, m.org_id, await openJobs(sb, m.org_id), 6)
   let q = sb.from('sub_tasks').select('id, owner_id, crew_id, data').eq('org_id', m.org_id).is('deleted_at', null).eq('data->>paint', 'true')
   if (m.role === 'sub') q = q.or(`crew_id.eq.${userId},owner_id.eq.${userId}`)
-  else if (!['paint', 'office', 'admin', 'pm'].includes(m.role)) return { mapped: 0 }
+  else if (!['office', 'admin', 'pm'].includes(m.role)) return { mapped: 0 }
   else q = q.not('crew_id', 'is', null).gte('updated_at', new Date(Date.now() - 120 * 86_400_000).toISOString())
   const { data: tasks, error } = await q
   if (error) throw error
   return mapJobs(sb, m.org_id, tasks || [], 6)
+}
+
+// Every open job (won or brought over, not closed), in the shape mapJobs takes.
+async function openJobs(sb, orgId) {
+  const { data, error } = await sb.from('proposals').select('id, data->jobData->completedStages, data->jobData->invoicesOnly')
+    .eq('org_id', orgId).is('deleted_at', null).in('status', ['Won', 'Imported'])
+  if (error) throw error
+  return (data || []).filter(p => !p.invoicesOnly && !(p.completedStages || []).includes('closed'))
+    .map(p => ({ data: { proposalId: String(p.id) } }))
 }
 
 // ── The pay week, for the email ─────────────────────────────────────────────
@@ -159,6 +167,8 @@ export async function dailyTimeClock(now = new Date()) {
         const { data: tasks } = await sb.from('sub_tasks').select('id, data').eq('org_id', orgId).is('deleted_at', null).eq('data->>paint', 'true')
           .not('crew_id', 'is', null).gte('updated_at', new Date(now.getTime() - 120 * 86_400_000).toISOString())
         out.mapped += (await mapJobs(sb, orgId, tasks || [], 5)).mapped
+        // and the open jobs the paint PM can clock in at
+        out.mapped += (await mapJobs(sb, orgId, await openJobs(sb, orgId), 20)).mapped
       } catch (err) { console.error('time clock daily:', orgId, err.message) }
     }
 

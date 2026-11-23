@@ -61,6 +61,15 @@ function why(r, dayEnd, action) {
   }
 }
 
+// Put every job they can clock in at on the map, a few at a time (the paint
+// PM has every open job; the first time can take a couple of minutes).
+async function mapAll() {
+  for (let i = 0; i < 30; i++) {
+    const r = await mapJobSites()
+    if (!r?.missing) return
+  }
+}
+
 // demo: a fake clock that lets every punch through
 const demoClock = { open: null, today: [], week: 0, lastPing: null, dayEnd: '16:30', jobs: [{ client: 'Demo job', mapped: true }] }
 
@@ -68,7 +77,8 @@ export default function TimeClock() {
   useLang()
   const tasks = useStore(s => s.subTasks)
   const me = useStore(s => s.me)
-  const isPainter = (tasks || []).some(t => t && t.paint && (!me?.id || t.crewUserId === me.id || t.subUserId === me.id))
+  // A painter on paint jobs, or the paint PM (who clocks in at any open job)
+  const isPainter = me?.role === 'paint' || (tasks || []).some(t => t && t.paint && (!me?.id || t.crewUserId === me.id || t.subUserId === me.id))
   const [st, setSt] = useState(DEMO ? demoClock : null)
   const [busy, setBusy] = useState('')     // 'in' | 'out' while finding the location / saving
   const [msg, setMsg] = useState(null)     // { tone: 'bad' | 'ok', text }
@@ -90,7 +100,7 @@ export default function TimeClock() {
   useEffect(() => {
     if (!isPainter || DEMO) return
     load().then(s => {
-      if (s?.jobs?.some(j => !j.mapped) && !mapped.current) { mapped.current = true; mapJobSites().then(load) }
+      if (s?.jobs?.some(j => !j.mapped) && !mapped.current) { mapped.current = true; mapAll().then(load) }
     })
   }, [isPainter, load])
 
@@ -132,7 +142,8 @@ export default function TimeClock() {
         return
       }
       let r = await (action === 'in' ? timeclockIn(pos) : timeclockOut(pos))
-      if (!r?.ok && r?.reason === 'not_mapped') { await mapJobSites(); r = await timeclockIn(pos) }
+      // A job not on the map yet: map what's left, then try once more
+      if (!r?.ok && action === 'in' && (r?.reason === 'not_mapped' || (r?.reason === 'off_site' && r?.unmapped > 0))) { await mapAll(); r = await timeclockIn(pos) }
       if (!r?.ok) { setMsg({ tone: 'bad', text: why(r, st?.dayEnd, action) }); return }
       // Clocked in shows on the card itself; clocking out gets a line
       setMsg(action === 'out' ? { tone: 'ok', text: fill(tr('Clocked out at {t}. {h} hours on this job.'), { t: time(r.shift?.out), h: hm(r.shift?.hours) }) } : null)

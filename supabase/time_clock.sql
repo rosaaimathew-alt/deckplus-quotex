@@ -145,22 +145,32 @@ end $$;
 revoke all on function public.tc_close_stale(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.tc_close_stale(uuid, uuid) to service_role;   -- the daily cron
 
--- The painter's paint jobs, each with where it is and how far the phone is.
+-- The jobs someone can clock in at, each with where it is and how far the
+-- phone is: a painter's own paint jobs; for the paint PM, every open job.
 create or replace function public.tc_my_jobs(p_lat double precision default null, p_lng double precision default null)
 returns table (task_id text, proposal_id text, client text, address text, lat double precision, lng double precision, mapped boolean, dist_m double precision)
 language sql stable security definer set search_path = public as $$
   with mine as (
     select distinct on (t.data->>'proposalId') t.id, t.data->>'proposalId' as pid, t.data->>'client' as client, t.data->>'address' as address
     from public.sub_tasks t
-    where t.org_id = public.auth_org() and t.deleted_at is null
+    where public.auth_role() = 'sub' and t.org_id = public.auth_org() and t.deleted_at is null
       and coalesce((t.data->>'paint')::boolean, false)
       and (t.crew_id = auth.uid() or t.owner_id = auth.uid())
       and nullif(t.data->>'proposalId', '') is not null
     order by t.data->>'proposalId', t.updated_at desc
-  )
+  ), open_jobs as (
+    select null::text as id, p.id as pid, p.data->>'client' as client,
+           coalesce(nullif(p.data->>'address', ''), p.data->'contractDraft'->>'address') as address
+    from public.proposals p
+    where public.auth_role() = 'paint' and p.org_id = public.auth_org() and p.deleted_at is null
+      and p.status in ('Won', 'Imported')
+      -- invoicesOnly is a note ({ at, reason }) on records kept only for their invoices
+      and coalesce(p.data->'jobData'->'invoicesOnly', 'null'::jsonb) in ('null'::jsonb, 'false'::jsonb)
+      and not coalesce(p.data->'jobData'->'completedStages' ? 'closed', false)
+  ), jobs as (select * from mine union all select * from open_jobs)
   select m.id, m.pid, m.client, coalesce(js.address, m.address), js.lat, js.lng, js.lat is not null,
          public.tc_distance_m(p_lat, p_lng, js.lat, js.lng)
-  from mine m left join public.job_sites js on js.org_id = public.auth_org() and js.proposal_id = m.pid
+  from jobs m left join public.job_sites js on js.org_id = public.auth_org() and js.proposal_id = m.pid
 $$;
 revoke all on function public.tc_my_jobs(double precision, double precision) from public, anon, authenticated;
 
@@ -171,11 +181,11 @@ language sql stable as $$
     'hours', round((extract(epoch from (coalesce(s.clock_out_at, now()) - s.clock_in_at)) / 3600)::numeric, 2))
 $$;
 
--- Only a painter: a sub login on at least one paint job.
+-- Only a painter (a sub login on paint jobs) or the paint PM.
 create or replace function public.tc_need_painter() returns void
 language plpgsql stable security definer set search_path = public as $$
 begin
-  if public.auth_org() is null or public.auth_role() is distinct from 'sub' then
+  if public.auth_org() is null or public.auth_role() not in ('sub', 'paint') then
     raise exception 'Only painters use the time clock' using errcode = '42501';
   end if;
 end $$;
