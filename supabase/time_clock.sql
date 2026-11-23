@@ -15,8 +15,8 @@
 --   4:30        a shift still open at the end of its day is closed at 4:30 PM
 --               (tc_settings.day_end), marked auto_out
 --
--- Hours go to the office (Money › Time clock) by pay week: Wednesday through
--- Tuesday, emailed on Wednesday morning to tc_settings.payroll_to
+-- Hours go to the office (Money › Time clock) by pay week: Monday through
+-- Sunday, emailed on Monday morning to tc_settings.payroll_to
 -- (api/_timeclock.js, from the daily cron).
 --
 -- Where each job is: job_sites, one point per job, found from the job's
@@ -211,7 +211,7 @@ begin
                         where s.user_id = auth.uid() and (s.clock_in_at at time zone c.tz)::date = today), '[]'::jsonb),
     'week', coalesce((select round(sum(extract(epoch from (coalesce(s.clock_out_at, now()) - s.clock_in_at)) / 3600)::numeric, 2)
                       from public.time_shifts s where s.user_id = auth.uid()
-                        and (s.clock_in_at at time zone c.tz)::date >= today - ((extract(dow from today)::int - 3 + 7) % 7)), 0),
+                        and (s.clock_in_at at time zone c.tz)::date >= today - ((extract(dow from today)::int - 1 + 7) % 7)), 0),
     'jobs', coalesce((select jsonb_agg(jsonb_build_object('proposalId', j.proposal_id, 'client', j.client, 'address', j.address, 'mapped', j.mapped)) from public.tc_my_jobs() j), '[]'::jsonb),
     'radius', c.radius_m, 'dayEnd', to_char(c.day_end, 'HH24:MI'));
 end $$;
@@ -311,7 +311,7 @@ end $$;
 revoke all on function public.timeclock_out(double precision, double precision, double precision) from public, anon;
 grant execute on function public.timeclock_out(double precision, double precision, double precision) to authenticated;
 
--- ── The office: one pay week (Wednesday through Tuesday) ────────────────────
+-- ── The office: one pay week (Monday through Sunday) ────────────────────────
 -- p_start: any day in the week. Shifts, every location point, the job sites.
 create or replace function public.timeclock_week(p_start date default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -323,7 +323,7 @@ begin
   c := public.tc_cfg(my_org);
   perform public.tc_close_stale(my_org);
   d0 := coalesce(p_start, (now() at time zone c.tz)::date);
-  d0 := d0 - ((extract(dow from d0)::int - 3 + 7) % 7);   -- back to Wednesday
+  d0 := d0 - ((extract(dow from d0)::int - 1 + 7) % 7);   -- back to Monday
   d1 := d0 + 6;
   return jsonb_build_object('start', d0, 'end', d1, 'tz', c.tz, 'radius', c.radius_m, 'dayEnd', to_char(c.day_end, 'HH24:MI'),
     'payrollTo', case when public.auth_role() in ('office', 'admin') then to_jsonb(c.payroll_to) else '[]'::jsonb end,
@@ -345,7 +345,7 @@ end $$;
 revoke all on function public.timeclock_week(date) from public, anon;
 grant execute on function public.timeclock_week(date) to authenticated;
 
--- The office: who gets the hours every Wednesday.
+-- The office: who gets the hours every Monday.
 create or replace function public.timeclock_set_payroll_to(p_emails text[])
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare my_org uuid := public.auth_org(); clean text[];

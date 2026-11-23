@@ -9,8 +9,8 @@
  *                        type a job's location in.
  *   dailyTimeClock()     from the daily cron (/api/booking?report=1): close
  *                        shifts left open at 4:30 PM, map new jobs, and on
- *                        Wednesday email the pay week that just ended
- *                        (Wednesday through Tuesday) to tc_settings.payroll_to.
+ *                        Monday email the pay week that just ended
+ *                        (Monday through Sunday) to tc_settings.payroll_to.
  */
 import { db } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
@@ -172,7 +172,7 @@ export async function dailyTimeClock(now = new Date()) {
       } catch (err) { console.error('time clock daily:', orgId, err.message) }
     }
 
-    // Wednesday: the week that ended last night (Wednesday through Tuesday)
+    // Monday: the week that ended last night (Monday through Sunday)
     const today = todayET(now)
     if (weekStartOf(today) !== today) return out
     const start = addDaysStr(today, -7)

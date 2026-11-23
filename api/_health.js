@@ -68,8 +68,8 @@ async function orgHealth(sb, orgId, now) {
     if (autos >= 3) items.push({ level: 'look', text: `${autos} shifts yesterday ended at 4:30 because nobody clocked out at the job.` })
   }
   const { data: tc } = await sb.from('tc_settings').select('payroll_to, last_payroll_week').eq('org_id', orgId).maybeSingle()
-  // Wednesday: the week's hours should have gone out this morning
-  if (tc?.payroll_to?.length && new Date(`${todayET(now)}T12:00:00Z`).getUTCDay() === 3 && tc.last_payroll_week !== addDaysStr(todayET(now), -7)) {
+  // Monday: the week's hours should have gone out this morning
+  if (tc?.payroll_to?.length && new Date(`${todayET(now)}T12:00:00Z`).getUTCDay() === 1 && tc.last_payroll_week !== addDaysStr(todayET(now), -7)) {
     items.push({ level: 'fix', text: `This week's payroll hours email didn't go out to ${tc.payroll_to.join(', ')}.` })
   }
 

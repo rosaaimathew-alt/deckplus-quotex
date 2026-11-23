@@ -1,5 +1,5 @@
 // ── Painters' time clock: the arithmetic ─────────────────────────────────────
-// Shared by the office page (Money › Time clock) and the Wednesday email
+// Shared by the office page (Money › Time clock) and the Monday email
 // (api/_timeclock.js). The rules themselves (on site to clock in and out, the
 // 4:30 clock out) live in the database: supabase/time_clock.sql.
 //
@@ -9,7 +9,7 @@
 //     pings: [{ kind: 'in'|'ping'|'out'|'auto_out'|'out_refused', at, lat, lng, acc, dist, onSite }] }
 
 export const TZ = 'America/New_York'
-export const PAY_WEEK_START = 3          // Wednesday (Sunday = 0)
+export const PAY_WEEK_START = 1          // Monday (Sunday = 0): payroll is done Mondays
 export const PING_MINUTES = 30           // how often the app sends the location
 export const GAP_MINUTES = 45            // longer than this without one = a gap
 
@@ -24,7 +24,7 @@ export function todayET(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
 }
 
-// The Wednesday that starts the pay week a day falls in.
+// The Monday that starts the pay week a day falls in.
 export function weekStartOf(day) {
   const d = parse(day)
   const back = (d.getUTCDay() - PAY_WEEK_START + 7) % 7

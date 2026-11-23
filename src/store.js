@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdBlock, loadDeferred } from './supabase'
+import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdBlock, loadDeferred, fetchPmRules } from './supabase'
 import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { notify, alertForTaskChange } from './lib/notify'
+import { pmFor } from './lib/pmAssign'
 import { ASSIGNABLE_ROLES, canDeleteTodo, personalTodos, todosIAssigned } from './lib/todos'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
@@ -174,6 +175,14 @@ const inspectionSig = (p) => JSON.stringify([
   ...(p?.jobData?.officeInspections || []).map(o => `${o.id}:${o.result}:${o.date}`),
 ])
 const findJob = (get, id) => (get().proposals || []).find((x) => String(x.id) === String(id))
+// A signed job with no PM gets the one the owner's rule gives it (lib/pmAssign)
+function autoAssignPm(get, set, ids) {
+  const rules = get().pmRules
+  if (!rules) return
+  const want = new Map()
+  for (const id of ids) { const who = pmFor(findJob(get, id), rules); if (who) want.set(String(id), who) }
+  if (want.size) set((s) => ({ proposals: s.proposals.map((p) => (want.has(String(p.id)) && !p.pmId ? { ...p, pmId: want.get(String(p.id)) } : p)) }))
+}
 function tellPmIfInspectionsChanged(get, proposalId, before) {
   if (inspectionSig(findJob(get, proposalId)) !== before) notify('job_inspection', proposalId, 4000)
 }
@@ -885,7 +894,7 @@ export const useStore = create(
           ),
         })),
 
-      markContractSigned: (proposalId, signed) =>
+      markContractSigned: (proposalId, signed) => {
         set((s) => ({
           proposals: s.proposals.map((p) =>
             p.id === proposalId
@@ -899,14 +908,16 @@ export const useStore = create(
                 }
               : p
           ),
-        })),
+        }))
+        if (signed) autoAssignPm(get, set, [proposalId])   // signed by all parties: the job gets its PM
+      },
 
       // Bulk-mark contracts that were signed OUTSIDE the software (paper /
       // pre-existing deals imported into the app). Marks each given proposal's
       // contract as signed and tags it signedOffPlatform so it's clear these
       // weren't e-signed here. Gives them a contract number if missing so they
       // sit correctly in the Signed section.
-      markContractsSignedOffPlatform: (ids) =>
+      markContractsSignedOffPlatform: (ids) => {
         set((s) => {
           const idSet = new Set(ids)
           const now = new Date().toISOString()
@@ -926,7 +937,9 @@ export const useStore = create(
               }
             }),
           }
-        }),
+        })
+        autoAssignPm(get, set, ids)   // and each gets its PM
+      },
 
       // Auto-flag stale proposals: a 'Sent' proposal that has gone 90 days with
       // no newer iteration, no logged activity, and no status change becomes
@@ -987,6 +1000,7 @@ export const useStore = create(
         // A result the office recorded by hand reaches the sub of that trade
         if (changes && 'officeInspections' in changes) syncSubInspections(get, set, proposalId)
         if (insBefore != null) tellPmIfInspectionsChanged(get, proposalId, insBefore)   // the job's PM hears
+        if (changes && 'projectTypeOverrides' in changes) autoAssignPm(get, set, [proposalId])   // a signed job's work just got its type
       },
 
       // Schedule (or clear) a single job stage on the PM calendar.
@@ -1709,6 +1723,15 @@ export function bootstrapOrg() {
     // header toggle switches it for this visit only.
     useStore.setState({ ...cols, ...merged, orgId, me, members, role: appRoleOf(me.role), theme: merged.branding.theme, orgLoaded: true, booksMissing: (missingTables || []).some(t => !t.startsWith('sub_')), chatMissing: (missingTables || []).includes('sub_messages') })
     armAdapter(useStore, orgId, settings)
+    // The PM rule; the office's screen also gives any signed job still without a PM its PM
+    fetchPmRules(orgId).then((rules) => {
+      if (!rules || !Object.keys(rules).length) return
+      useStore.setState({ pmRules: rules })
+      if (me.role === 'office' || me.role === 'admin') {
+        const open = (useStore.getState().proposals || []).filter(p => ['Won', 'Imported'].includes(p.status) && !(p.jobData?.completedStages || []).includes('closed'))
+        autoAssignPm(useStore.getState, useStore.setState, open.map(p => p.id))
+      }
+    }).catch(() => { /* no rule: PMs are picked by hand */ })
     // Purchase orders load after the app is open (there are tens of thousands)
     useStore.setState({ purchasesLoading: true })
     loadDeferred(useStore, orgId)

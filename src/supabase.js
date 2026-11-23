@@ -333,6 +333,14 @@ async function loadOrgData(orgId) {
   return { members, settingsRow, collections }
 }
 
+// The owner's PM rule (supabase/pm_auto_assign.sql): { new_porch: userId, other: userId }
+export async function fetchPmRules(orgId) {
+  if (!supabase || !orgId) return null
+  const { data, error } = await supabase.from('pm_rules').select('kind, user_id').eq('org_id', orgId)
+  if (error) return null
+  return Object.fromEntries((data || []).map(r => [r.kind, r.user_id]))
+}
+
 export async function loadOrg() {
   const uid = currentUserId()
   if (!supabase || !uid) throw new Error('Not signed in')

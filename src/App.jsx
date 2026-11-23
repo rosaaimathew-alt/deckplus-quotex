@@ -38,11 +38,11 @@ function RoleHome() {
   const me = useStore(s => s.me)
   const homePages = useStore(s => s.homePages)
   const location = useLocation()
-  // The owner's view is the owner's alone (ownerUserId, the company owner's
-  // login): nobody else gets it, flips to it or previews it, whatever page
-  // they were given.
+  // The owner's view: the company owner's login (ownerUserId), and an admin
+  // the owner gave it to (Settings › Team › Today page: Owner). Nobody else
+  // gets it, flips to it or previews it, whatever page they were given.
   const ownerUserId = useStore(s => s.ownerUserId)
-  const isOwner = !!me?.id && String(me.id) === String(ownerUserId || '')
+  const isOwner = !!me?.id && (String(me.id) === String(ownerUserId || '') || (me.role === 'admin' && homePages?.[me.id] === 'owner'))
   const given = role === 'manager' ? (homePages?.[me?.id] || (me?.role === 'office' ? 'office' : '')) : ''
   const own = given === 'owner' && !isOwner ? (me?.role === 'office' ? 'office' : '') : given
   const asked = role === 'manager' ? new URLSearchParams(location.search).get('home') : null
