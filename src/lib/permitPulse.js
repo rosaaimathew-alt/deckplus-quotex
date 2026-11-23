@@ -5,7 +5,7 @@
 // at 8 AM and 1 PM (and right away for jobs never checked), or by "Check county now".
 import { useStore } from '../store'
 import { getStages } from '../pages/Jobs'
-import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty, closeIfFinaled } from './permitTracking'
+import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty, closeIfFinaled, currentPulseSlot, PULSE_HOURS } from './permitTracking'
 import { isJob } from './attention'
 import { countyOf, gradeRun, sendConnectionAlert, isBusyError } from './permitHealth'
 
@@ -78,11 +78,24 @@ export function permitPointer(p) {
 }
 
 // ids: only these jobs (e.g. one job's "Check now"); otherwise every tracked job.
-export async function runPermitPulse({ ids, onProgress } = {}) {
+// A job under way: the county has its permit, or a step on its checklist is
+// ticked. Jobs not started yet are only looked up in the morning check (to
+// catch a newly issued permit), so the county site isn't searched twice a
+// day for permits that don't exist yet.
+export const pulseActive = (p) => (p.countyPermit?.permits || []).length > 0 || (p.jobData?.completedStages || []).length > 0
+
+// scheduled: the 8 AM / 1 PM check. It skips jobs already read since the
+// check's own start time (so a check cut short and started again carries on
+// instead of starting over), and in the afternoon the jobs not started yet.
+export async function runPermitPulse({ ids, onProgress, scheduled = false } = {}) {
   const { proposals, setCountyPermit } = useStore.getState()
+  const slot = currentPulseSlot()
+  const morning = slot.getHours() === PULSE_HOURS[0]
+  const freshSince = (p) => p.countyPermit?.checkedAt && !p.countyPermit.siteError && new Date(p.countyPermit.checkedAt) >= slot
   const jobs = proposals
     .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
     .filter(p => !ids || ids.includes(p.id))
+    .filter(p => !scheduled || (!freshSince(p) && (morning || pulseActive(p) || !p.countyPermit)))
   let done = 0, failed = 0, lastError = null, interrupted = false, cooling = false
   // Per county: jobs whose county site was read, and jobs where it wasn't
   // (a busy answer is counted apart: it's the site pacing us, not an outage),
@@ -166,7 +179,9 @@ export async function runPermitPulse({ ids, onProgress } = {}) {
 export function uncheckedJobIds() {
   return useStore.getState().proposals
     .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
-    .filter(p => !p.countyPermit || p.countyPermit.siteError)
+    // never checked, or the county was busy last time (jobs not started yet
+    // wait for the next morning check instead of being retried all day)
+    .filter(p => !p.countyPermit || (p.countyPermit.siteError && pulseActive(p)))
     .map(p => p.id)
 }
 
@@ -204,7 +219,7 @@ export async function startPulse(by, { force = false } = {}) {
   running = true
   setPermitPulse({ ...(permitPulse || {}), startedAt: new Date().toISOString(), by })
   try {
-    const out = await runPermitPulse()
+    const out = await runPermitPulse({ scheduled: !force })
     const { stats, interrupted, ...last } = out
     // Cut short by our own connection: grade only the counties actually read,
     // and leave lastRunAt alone so the next screen finishes the check.
