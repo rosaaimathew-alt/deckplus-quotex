@@ -44,12 +44,13 @@ async function orgHealth(sb, orgId, now) {
   for (const [county, h] of Object.entries(pulse.health || {})) {
     if (h?.down) items.push({ level: 'fix', text: `${county} County site marked down since ${new Date(h.since || h.checkedAt).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}: ${h.lastError || 'no detail'}` })
   }
-  const { data: tracked } = await sb.from('proposals').select('id, status, countyPermit:data->countyPermit, stages:data->jobData->completedStages')
+  const { data: tracked } = await sb.from('proposals').select('id, status, pm_id, countyPermit:data->countyPermit, stages:data->jobData->completedStages')
     .eq('org_id', orgId).is('deleted_at', null).in('status', ['Won', 'Imported']).not('data->countyPermit', 'is', null)
   const open = (tracked || []).filter(p => !(p.stages || []).includes('closed'))
   const busy = open.filter(p => p.countyPermit?.siteError).length
   const stale = open.filter(p => p.countyPermit?.checkedAt && now - new Date(p.countyPermit.checkedAt) > 2 * DAY).length
-  facts.push(`${open.length} open jobs tracked with the county`)
+  const noPm = open.filter(p => !p.pm_id).length
+  facts.push(`${open.length} open jobs tracked with the county${noPm ? `, ${noPm} with no PM (their inspection alerts go to every PM)` : ''}`)
   if (busy >= 10) items.push({ level: 'look', text: `${busy} jobs got "county site busy" on their last check. They're retried automatically; if this stays high for days, the county is limiting us.` })
   if (stale >= 10) items.push({ level: 'look', text: `${stale} open jobs haven't been read from the county in 2 days.` })
 

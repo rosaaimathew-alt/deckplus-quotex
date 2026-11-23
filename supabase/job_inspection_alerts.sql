@@ -2,7 +2,7 @@
 -- Who hears about an inspection on a job (api/_notify.js, kind
 -- 'job_inspection'): the job's PM, when the office (or the county check run
 -- from the office's screen) records a result, or an inspection is scheduled
--- or moved. Not the PM's own changes. The caller sends only the job's id; the
+-- or moved (every PM, when the job has none yet). Not the PM's own changes. The caller sends only the job's id; the
 -- alert's wording is worked out from the job's own inspections, which this
 -- returns (trimmed to what the alert needs), never from the caller.
 create or replace function public.job_inspection_targets(p_id text) returns jsonb
@@ -16,8 +16,15 @@ begin
   select * into job from public.proposals where org_id = my_org and id::text = p_id and deleted_at is null;
   if not found then return null; end if;
   select * into pm from public.org_members where org_id = my_org and user_id = job.pm_id and role not in ('sub', 'paint');
-  if pm.user_id is not null and pm.user_id <> uid and coalesce(pm.email, '') <> '' then
-    who := jsonb_build_array(jsonb_build_object('name', pm.display_name, 'email', pm.email, 'phone', pm.phone));
+  if pm.user_id is not null then
+    if pm.user_id <> uid and coalesce(pm.email, '') <> '' then
+      who := jsonb_build_array(jsonb_build_object('name', pm.display_name, 'email', pm.email, 'phone', pm.phone));
+    end if;
+  else
+    -- No PM on the job yet: every PM hears it, so nothing goes unnoticed
+    select coalesce(jsonb_agg(jsonb_build_object('name', m.display_name, 'email', m.email, 'phone', m.phone)), '[]'::jsonb) into who
+      from public.org_members m
+     where m.org_id = my_org and m.role = 'pm' and m.user_id <> uid and coalesce(m.email, '') <> '';
   end if;
   return jsonb_build_object(
     'kind', 'job_inspection',

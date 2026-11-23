@@ -296,7 +296,7 @@ export function mailSenderFor(kind, info, people, orgId = null, popupOnly = new 
 // Each inspection is remembered by its permit, id and result (or scheduled
 // date) for 120 days, so the county check running again, or two people's
 // screens running it, never tells the PM the same thing twice. Old results
-// arriving late (more than 3 days old) and past dates are never news.
+// arriving late (more than a week old: the county can be too busy to answer for days) and past dates are never news.
 const insItems = (job) => {
   const out = []
   for (const p of [...(job?.permits || []), { record: 'office', completed: job?.office || [], upcoming: [] }]) {
@@ -307,7 +307,7 @@ const insItems = (job) => {
 }
 const insName = (c) => tidy(c.name, 60) || ({ FT: 'Footing', FR: 'Framing', FF: 'Floor framing', FI: 'Final', ER: 'Electrical rough', EF: 'Electrical final', SL: 'Slab' })[c.code] || 'Inspection'
 function newsOf(items, seen, today = new Date().toISOString().slice(0, 10)) {
-  const since = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10)
+  const since = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
   const news = { results: [], scheduled: [] }
   for (const it of items) {
     if (seen.has(it.key)) continue
