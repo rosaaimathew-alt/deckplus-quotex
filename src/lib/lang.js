@@ -116,7 +116,7 @@ const ES = {
   // time clock (painters)
   'Time clock': 'Reloj de entrada', 'This week': 'Esta semana', 'Loading…': 'Cargando…',
   'Clock in': 'Marcar entrada', 'Clock out': 'Marcar salida', 'Finding your location…': 'Buscando su ubicación…',
-  'Clocked in at {t}': 'Entrada a las {t}', 'Clocked in at {t}{job}.': 'Entrada a las {t}{job}.',
+  'Clocked in at {t}': 'Entrada a las {t}',
   'Clocked out at {t}. {h} hours on this job.': 'Salida a las {t}. {h} horas en este trabajo.',
   'Location checked {t}': 'Ubicación revisada a las {t}', 'Location checked at clock in': 'Ubicación revisada al marcar la entrada',
   'Today: {h} hours. Not clocked in now.': 'Hoy: {h} horas. Sin marcar entrada ahora.', 'Not clocked in.': 'Sin marcar entrada.',

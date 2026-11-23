@@ -31,14 +31,16 @@ function distance(m) {
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '')
 const dayEndText = (hhmm) => { const [h, m] = String(hhmm || '16:30').split(':').map(Number); return new Date(2000, 0, 1, h, m).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }
 
-// The phone's location, or a reason it couldn't be had.
-function locate() {
+// The phone's location, or a reason it couldn't be had. A punch always asks
+// for a fresh one (fresh = 0): a location from a minute ago could be from
+// before they walked up to the job.
+function locate(fresh = 0) {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve({ error: 'unsupported' })
     navigator.geolocation.getCurrentPosition(
       (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
       (e) => resolve({ error: e.code === 1 ? 'denied' : e.code === 3 ? 'timeout' : 'unavailable' }),
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 })
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: fresh })
   })
 }
 
@@ -95,7 +97,7 @@ export default function TimeClock() {
     if (!force && Date.now() - last < PING_MINUTES * 60_000) return
     pinging.current = true
     try {
-      const pos = await locate()
+      const pos = await locate(60_000)
       if (pos.error) return
       const r = await timeclockPing(pos)
       if (r?.ok) setSt(s => (s ? { ...s, lastPing: r.lastPing || new Date().toISOString() } : s))
@@ -125,9 +127,8 @@ export default function TimeClock() {
       let r = await (action === 'in' ? timeclockIn(pos) : timeclockOut(pos))
       if (!r?.ok && r?.reason === 'not_mapped') { await mapJobSites(); r = await timeclockIn(pos) }
       if (!r?.ok) { setMsg({ tone: 'bad', text: why(r, st?.dayEnd, action) }); return }
-      setMsg({ tone: 'ok', text: action === 'in'
-        ? fill(tr('Clocked in at {t}{job}.'), { t: time(r.shift?.in), job: r.shift?.client ? ` · ${r.shift.client}` : '' })
-        : fill(tr('Clocked out at {t}. {h} hours on this job.'), { t: time(r.shift?.out), h: hm(r.shift?.hours) }) })
+      // Clocked in shows on the card itself; clocking out gets a line
+      setMsg(action === 'out' ? { tone: 'ok', text: fill(tr('Clocked out at {t}. {h} hours on this job.'), { t: time(r.shift?.out), h: hm(r.shift?.hours) }) } : null)
       await load()
     } catch (err) {
       setMsg({ tone: 'bad', text: String(err?.message || '') || tr('Something went wrong. Try again.') })
