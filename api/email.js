@@ -15,6 +15,7 @@ import { saveMessage } from './_store.js'
 import { sendMail, isMailerConfigured, smtpUser } from './_mailer.js'
 import { sendNotification } from './_notify.js'
 import { pushPublicKey, pushToEmails } from './_push.js'
+import { mapJobSites } from './_timeclock.js'
 import { requireAuth, verifyToken } from './_auth.js'
 import { getKV } from './_kv.js'
 import { buildProposalEmail, buildContractEmail, ownSignLink, signatureOf, loadSignature, saveSignature } from './_proposalEmail.js'
@@ -185,6 +186,15 @@ export default async function handler(req, res) {
       })
       return res.status(200).json({ sent: out.pushed > 0, pushed: out.pushed, ...(out.errors.length ? { error: out.errors[0] } : {}) })
     } catch (err) { return res.status(200).json({ sent: false, error: String(err?.message || err).slice(0, 120) }) }
+  }
+  // Painters' time clock: put the signed-in person's paint jobs on the map
+  // from their addresses (api/_timeclock.js). Open to every login (painters
+  // too); a painter only ever maps their own jobs.
+  if (req.body?.action === 'job-sites') {
+    const header = req.headers?.authorization || ''
+    const me = await verifyToken(header.startsWith('Bearer ') ? header.slice(7) : (req.headers?.['x-qx-token'] || null))
+    if (!me?.sub) return res.status(401).json({ error: 'Unauthorized — please sign in again.' })
+    try { return res.status(200).json(await mapJobSites(me.sub)) } catch (err) { return res.status(200).json({ mapped: 0, error: String(err?.message || err).slice(0, 120) }) }
   }
   const staff = await requireAuth(req, res)
   if (!staff) return

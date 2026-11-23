@@ -14,6 +14,7 @@ import dotenv from 'dotenv'
 import { db, loadTurn, repBusy, computeSlots, repRules, createGoogleEvent, buildIcs, sendAsRep, googleBusyStrict, calendarMode, googleCalendarLink } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
 import { sendDueReport } from './_lead-report.js'
+import { dailyTimeClock } from './_timeclock.js'
 import { verifyStaff, staffRole } from './_auth.js'
 import { sendDueContractReminders } from './_contractReminders.js'
 
@@ -441,6 +442,10 @@ export default async function handler(req, res) {
       // (api/_contractReminders.js). It never throws, so the report still goes.
       const reminders = await sendDueContractReminders()
       if (reminders.due) console.log('contract reminders:', JSON.stringify(reminders))
+      // And the painters' time clock: 4:30 clock outs, new jobs on the map,
+      // and on Wednesday the week's hours to the office (api/_timeclock.js).
+      const clock = await dailyTimeClock()
+      if (clock.closed || clock.payroll.length) console.log('time clock:', JSON.stringify(clock))
       return await sendDueReport(res)
     }
     if (req.method === 'GET' && req.query?.check === 'alert') {

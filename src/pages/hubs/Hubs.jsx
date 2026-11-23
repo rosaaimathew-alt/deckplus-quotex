@@ -28,6 +28,7 @@ import Bills from '../books/Bills'
 import Purchases from '../books/Purchases'
 import Vendors from '../books/Vendors'
 import MoneyJobs from '../books/MoneyJobs'
+import TimeClock from '../books/TimeClock'
 import ChangeOrdersAll from '../books/ChangeOrdersAll'
 import { invoiceStatus, billStatus, jobIndex } from '../../lib/books'
 import { useJobCostOf } from '../../lib/jobCost'
@@ -145,6 +146,7 @@ export function MoneyHub() {
     purchases: () => <Purchases />,
     vendors:   () => <Vendors />,
     jobs:      () => <MoneyJobs />,
+    timeclock: () => <TimeClock />,
   }, counts)
   const booksMissing = useStore(s => s.booksMissing)
   return (
