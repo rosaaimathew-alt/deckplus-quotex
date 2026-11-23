@@ -75,9 +75,15 @@ export default function TimeClock() {
   const [, tick] = useState(0)
   const mapped = useRef(false)
 
+  // off: the time clock isn't in the database yet (supabase/time_clock.sql),
+  // so the card stays hidden instead of loading forever
+  const [off, setOff] = useState(false)
   const load = useCallback(async () => {
     if (DEMO) return null
-    try { const s = await timeclockMe(); setSt(s); return s } catch { return null }
+    try { const s = await timeclockMe(); setSt(s); return s } catch (err) {
+      if (/does not exist|schema cache|Could not find the function/i.test(String(err?.message))) setOff(true)
+      return null
+    }
   }, [])
 
   // Load, and get any of their jobs onto the map first if they aren't yet
@@ -112,7 +118,7 @@ export default function TimeClock() {
     return () => { clearInterval(every); document.removeEventListener('visibilitychange', back) }
   }, [open, ping, load, st?.lastPing])
 
-  if (!isPainter) return null
+  if (!isPainter || off) return null
 
   const punch = async (action) => {
     setBusy(action); setMsg(null)
@@ -168,7 +174,6 @@ export default function TimeClock() {
             : open ? <><LogOut size={20} /> {tr('Clock out')}</> : <><LogIn size={20} /> {tr('Clock in')}</>}
         </button>
       )}
-      {open && <p className="text-xs text-gray-500">{tr('Keep this app open while you work. It checks your location every 30 minutes.')}</p>}
       {!open && st && <p className="text-xs text-gray-500">{tr('You can only clock in and out at the job site.')}</p>}
     </section>
   )

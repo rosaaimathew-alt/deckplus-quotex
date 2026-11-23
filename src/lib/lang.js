@@ -121,7 +121,6 @@ const ES = {
   'Location checked {t}': 'Ubicación revisada a las {t}', 'Location checked at clock in': 'Ubicación revisada al marcar la entrada',
   'Today: {h} hours. Not clocked in now.': 'Hoy: {h} horas. Sin marcar entrada ahora.', 'Not clocked in.': 'Sin marcar entrada.',
   "You didn't clock out at the job, so your day ended at {t}.": 'No marcó la salida en el trabajo, así que su día terminó a las {t}.',
-  'Keep this app open while you work. It checks your location every 30 minutes.': 'Mantenga esta app abierta mientras trabaja. Revisa su ubicación cada 30 minutos.',
   'You can only clock in and out at the job site.': 'Solo puede marcar la entrada y la salida en el trabajo.',
   "Location is off for this app. Turn it on in your phone's settings (Location: While using the app), then try again.": 'La ubicación está apagada para esta app. Actívela en los ajustes del teléfono (Ubicación: Mientras se usa la app) y vuelva a intentar.',
   "This phone can't share its location.": 'Este teléfono no puede compartir su ubicación.',
