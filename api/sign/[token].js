@@ -6,6 +6,8 @@ import { getKV } from '../_kv.js'
 import { CONSENT_TEXT, docHashOf, requestContext, logEventSafe, otpRequired, otpStatus, otpSend, otpVerify, maskEmail, buildSignature, buildCompanySignature, verifyRecord } from '../_esign.js'
 import { sendWelcomeEmail } from '../_welcome.js'
 import { isMailerConfigured } from '../_mailer.js'
+import { db } from '../_round-robin.js'
+import { workKind } from '../../src/lib/pmAssign.js'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -16,6 +18,20 @@ const ROLES = ['client', 'builder', 'gc']
 // already fully signed is left alone), so nobody can open or sign a replaced
 // version. Contract numbers can be shared (every packet starts at
 // "<prefix>-0000"), so an earlier record only counts when it is for this job.
+// The job of a contract everyone has signed gets the PM the owner's rule
+// gives it (pm_rules), unless it already has one.
+async function assignPm(proposalId) {
+  if (proposalId == null) return
+  const sb = db()
+  const { data: row } = await sb.from('proposals').select('id, org_id, data').eq('id', proposalId).is('deleted_at', null).maybeSingle()
+  if (!row || row.data?.pmId) return
+  const kind = workKind(row.data)
+  if (!kind) return
+  const { data: rule } = await sb.from('pm_rules').select('user_id').eq('org_id', row.org_id).eq('kind', kind).maybeSingle()
+  if (!rule?.user_id) return
+  await sb.from('proposals').update({ data: { ...row.data, pmId: rule.user_id } }).eq('id', row.id).is('data->>pmId', null)
+}
+
 async function supersedeEarlier(kv, { proposalId, contractNum, recordId }) {
   if (proposalId == null) return []
   const idxKey = `signs-by-proposal:${proposalId}`
@@ -515,6 +531,8 @@ export default async function handler(req, res) {
         const host = req.headers['x-forwarded-host'] || req.headers.host || process.env.PUBLIC_HOST || 'localhost:5173'
         const origin = `${host.includes('localhost') ? 'http' : 'https'}://${host}`
         try { await sendWelcomeEmail(kv, { recordId, origin, ctx: built.ctx }) } catch (err) { console.error('Welcome email:', err.message) }
+        // Signed by all parties: the job goes to its PM by the kind of work (src/lib/pmAssign.js)
+        try { await assignPm(record.contractData?.proposalId) } catch (err) { console.error('PM assign:', err.message) }
       }
 
       let driveResult = null

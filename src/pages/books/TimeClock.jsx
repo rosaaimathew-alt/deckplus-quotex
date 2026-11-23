@@ -1,8 +1,8 @@
 // ── Money › Time clock ───────────────────────────────────────────────────────
-// The painters' hours for payroll, one pay week (Wednesday through Tuesday) at
+// The painters' hours for payroll, one pay week (Monday through Sunday) at
 // a time: hours by painter and day, every shift, and a map of where each one
 // clocked in, clocked out and was every 30 minutes in between. The same week
-// is emailed to the office every Wednesday morning (api/_timeclock.js).
+// is emailed to the office every Monday morning (api/_timeclock.js).
 //
 // What to look at is marked on the painter's line: a day that ended at 4:30
 // because they didn't clock out at the job, a stretch with no location (the
@@ -93,7 +93,7 @@ function PayrollTo({ emails, onSaved }) {
   const [err, setErr] = useState('')
   if (!edit) {
     return (
-      <p className="text-sm text-gray-600">Emailed Wednesdays to <strong className="text-gray-900">{emails.length ? emails.join(', ') : 'nobody yet'}</strong>{' '}
+      <p className="text-sm text-gray-600">Emailed Mondays to <strong className="text-gray-900">{emails.length ? emails.join(', ') : 'nobody yet'}</strong>{' '}
         <button className="text-[var(--brand-700)] font-semibold hover:underline" onClick={() => { setText(emails.join(', ')); setErr(''); setEdit(true) }}>Change</button></p>
     )
   }

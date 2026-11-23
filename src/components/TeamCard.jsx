@@ -322,8 +322,8 @@ function AccessPanel({ member, onClose }) {
         <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Today page</span>
         <select value={home} onChange={e => setHome(e.target.value)} aria-label={`Today page for ${name}`}
           className="h-8 px-2 rounded-lg border border-gray-300 bg-white text-sm">
-          {/* The owner's page is the owner's alone: offered only on the owner's own login */}
-          {HOME_PAGES.filter(([k]) => k !== 'owner' || String(member.id) === String(ownerUserId || '')).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          {/* The owner's page: offered on the owner's own login and on admins */}
+          {HOME_PAGES.filter(([k]) => k !== 'owner' || member.role === 'admin' || String(member.id) === String(ownerUserId || '')).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
         </select>
       </label>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

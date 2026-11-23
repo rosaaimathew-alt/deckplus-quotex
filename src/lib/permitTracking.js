@@ -135,6 +135,7 @@ export const INSPECTION_TYPES = [
   { code: 'ER', label: 'ER - Electrical Rough' },
   { code: 'FE', label: 'FE - Framing + Electrical' },
   { code: 'MI', label: 'MI - Mechanical' },
+  { code: 'EF', label: 'EF - Electrical Final' },
   { code: 'MF', label: 'MF - Mechanical Final' },
   { code: 'IN', label: 'Insulation' },
   { code: 'FI', label: 'FI - Final Inspection' },
