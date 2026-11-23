@@ -62,7 +62,9 @@ function usePaintJobs() {
   return useMemo(() => proposals
     .filter(p => isJob(p) && !clientPaints(p))
     .map(p => describeJob(p, null))
-    .filter(j => j.stages.some(s => s.key === 'paint'))
+    // Jobs with a paint step, and every closed job (most of the closed ones came
+    // over from Knowify with no checklist): warranty work can come up on any.
+    .filter(j => j.stages.some(s => s.key === 'paint') || isJobClosed(j.p))
     .map(j => {
       const jd = j.p.jobData || {}
       return {
@@ -272,8 +274,13 @@ export function PaintJobsList() {
   const [q, setQ] = useState('')
   const counts = Object.fromEntries(STATUS_TABS.map(([k]) => [k, all.filter(j => paintStatus(j) === k).length]))
   const needle = q.trim().toLowerCase()
-  const list = all.filter(j => paintStatus(j) === tab)
+  const matching = all.filter(j => paintStatus(j) === tab)
     .filter(j => !needle || `${j.p.client || ''} ${j.p.address || ''}`.toLowerCase().includes(needle))
+  // Closed: newest first, and the latest 100 until they search (there are
+  // over a thousand)
+  const closedOn = (j) => j.p.jobData?.closedAt || j.p.jobData?.stageDates?.closed || j.p.closedAt || j.p.statusChangedAt || ''
+  const sorted = tab === 'closed' ? [...matching].sort((a, b) => String(closedOn(b)).localeCompare(String(closedOn(a)))) : matching
+  const list = tab === 'closed' && !needle ? sorted.slice(0, 100) : sorted
   const line = (j) => {
     if (j.followUp) return j.followUp.kind === 'warranty' ? `Warranty work since ${shortDay(j.followUp.at)}` : `Back for touch-ups since ${shortDay(j.followUp.at)}`
     if (tab === 'completed') return 'Paint done'
@@ -297,6 +304,7 @@ export function PaintJobsList() {
       </label>
       <div className="space-y-2.5">
         {list.length === 0 && <p className="text-sm text-gray-500 px-1">No jobs here{needle ? ' match that' : ''}.</p>}
+        {list.length < sorted.length && <p className="text-sm text-gray-500 px-1">Newest 100 of {sorted.length.toLocaleString()}. Search to find any of them.</p>}
         {list.map(j => <PaintRow key={j.p.id} j={j} tone={j.followUp ? 'amber' : null} sub={line(j)} />)}
       </div>
     </div>

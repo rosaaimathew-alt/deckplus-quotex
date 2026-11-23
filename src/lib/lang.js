@@ -118,7 +118,6 @@ const ES = {
   'Clock in': 'Marcar entrada', 'Clock out': 'Marcar salida', 'Finding your location…': 'Buscando su ubicación…',
   'Clocked in at {t}': 'Entrada a las {t}',
   'Clocked out at {t}. {h} hours on this job.': 'Salida a las {t}. {h} horas en este trabajo.',
-  'Location checked {t}': 'Ubicación revisada a las {t}', 'Location checked at clock in': 'Ubicación revisada al marcar la entrada',
   'Today: {h} hours. Not clocked in now.': 'Hoy: {h} horas. Sin marcar entrada ahora.', 'Not clocked in.': 'Sin marcar entrada.',
   "You didn't clock out at the job, so your day ended at {t}.": 'No marcó la salida en el trabajo, así que su día terminó a las {t}.',
   'You can only clock in and out at the job site.': 'Solo puede marcar la entrada y la salida en el trabajo.',
