@@ -116,7 +116,7 @@ async function weekShifts(sb, orgId, start) {
   const name = new Map((members || []).map(x => [x.user_id, x.display_name]))
   return rows.map(r => ({
     id: r.id, userId: r.user_id, worker: name.get(r.user_id) || r.worker || 'Painter', proposalId: r.proposal_id, client: r.client, address: r.address,
-    day: todayET(new Date(r.clock_in_at)), in: r.clock_in_at, out: r.clock_out_at, autoOut: r.auto_out,
+    day: todayET(new Date(r.clock_in_at)), in: r.clock_in_at, out: r.clock_out_at, autoOut: r.auto_out, note: r.note,
     pings: (pings || []).filter(p => p.shift_id === r.id).map(p => ({ kind: p.kind, at: p.at, lat: p.lat, lng: p.lng, acc: p.acc, dist: p.dist_m, onSite: p.on_site })),
   }))
 }

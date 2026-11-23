@@ -127,7 +127,7 @@ const ES = {
   "Your phone's location isn't exact enough right now (about {d}). Step outside and try again.": 'La ubicación del teléfono no es lo bastante exacta ahora (unos {d}). Salga afuera y vuelva a intentar.',
   "You're not on a paint job yet. Your paint PM puts you on jobs.": 'Todavía no está en un trabajo de pintura. Su PM de pintura lo asigna a los trabajos.',
   "Your job isn't on the map yet. Try again in a minute.": 'Su trabajo todavía no está en el mapa. Vuelva a intentar en un minuto.',
-  "You're {d} from the job. Clock out at the job site. If you don't, your day ends at {t}.": 'Está a {d} del trabajo. Marque la salida en el trabajo. Si no, su día termina a las {t}.',
+  "You're {d} from the job. Clock out at a job site (this one or your next job). If you don't, your day ends at {t}.": 'Está a {d} del trabajo. Marque la salida en un trabajo (este o el siguiente). Si no, su día termina a las {t}.',
   "You're {d} from your nearest paint job{job}. Clock in when you get there.": 'Está a {d} de su trabajo de pintura más cercano{job}. Marque la entrada cuando llegue.',
   "You're not clocked in.": 'No ha marcado la entrada.', 'Something went wrong. Try again.': 'Algo salió mal. Vuelva a intentar.',
   'mile': 'milla', 'miles': 'millas', 'feet': 'pies',

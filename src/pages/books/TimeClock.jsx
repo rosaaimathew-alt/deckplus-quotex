@@ -228,6 +228,7 @@ export default function TimeClock() {
                     <p className="text-gray-800 tabular-nums">
                       {clockTime(s.in)} – {s.out ? clockTime(s.out) : 'now'} · <strong>{hm(s.hours)}</strong>
                       {s.autoOut && <span className="text-amber-700"> · didn't clock out at the job, ended at 4:30</span>}
+                      {s.note && <span className="text-gray-600"> · {s.note}</span>}
                     </p>
                     <p className="text-xs text-gray-500">{checks} location check{checks === 1 ? '' : 's'}{off.length ? <span className="text-red-600"> · {off.length} away from the job</span> : ''}
                       {g.length > 0 && <span className="text-amber-700"> · no location {g.map(x => `${clockTime(x.from)}–${clockTime(x.to)}`).join(', ')}</span>}</p>

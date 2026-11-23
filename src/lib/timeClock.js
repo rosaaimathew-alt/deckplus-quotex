@@ -95,7 +95,7 @@ export function payrollCsv(rows, start) {
   for (const w of rows) {
     for (const s of w.shifts) {
       lines.push([w.worker, s.day, s.client || '', s.address || '', clockTime(s.in), s.out ? clockTime(s.out) : 'still clocked in',
-        hoursBetween(s.in, s.out || new Date()).toFixed(2), s.autoOut ? 'Did not clock out at the job: ended at 4:30 PM' : ''])
+        hoursBetween(s.in, s.out || new Date()).toFixed(2), [s.autoOut ? 'Did not clock out at the job: ended at 4:30 PM' : '', s.note || ''].filter(Boolean).join(' · ')])
     }
   }
   lines.push([])
