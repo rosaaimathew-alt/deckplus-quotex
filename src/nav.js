@@ -10,7 +10,7 @@ import { useMemo } from 'react'
 import {
   House, Handshake, HardHat, ChartColumn, Package, List, Columns3, Ruler,
   ClipboardCheck, FileSignature, CalendarDays, TrendingUp, Wallet, Target,
-  Sparkles, Calculator, Users, Hammer, ShieldCheck, Landmark, FileText, Receipt, ShoppingCart, Truck, FilePen,
+  Sparkles, Calculator, Users, Hammer, ShieldCheck, Landmark, FileText, Receipt, ShoppingCart, Truck, FilePen, Clock,
 } from 'lucide-react'
 import { useStore } from './store'
 import { canAccessRoute } from './plans'
@@ -60,6 +60,9 @@ export const DESTINATIONS = [
       // Projects): revenue, cost and profit per job, then its summary, budget,
       // costs, price list and invoices / POs / bills.
       { key: 'jobs',      label: 'Jobs',      icon: Hammer, access: '/jobs', hint: "Each job's summary, budget, costs and price list", keywords: 'job budget cost costs summary price list profit margin revenue receipts' },
+      // The painters' hours for payroll (Wednesday through Tuesday), and where
+      // they clocked in and out. Office / admin only.
+      { key: 'timeclock', label: 'Time clock', icon: Clock, access: '/finance', hint: "Painters' hours for payroll, and where they clocked in and out", keywords: 'time clock hours payroll painters punch timesheet gps location map wednesday' },
     ] },
 
   { key: 'catalog', to: '/catalog', label: 'Catalog', icon: Package,

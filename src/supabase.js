@@ -81,6 +81,18 @@ export const subJobSheet = (taskId) => rpc('sub_job_sheet', { p_task_id: String(
 // Paint PM: their painters, and adding one (supabase/paint_crew.sql).
 export const paintCrew = () => rpc('paint_crew', {})
 export const createPaintCrewInvite = (email, name, phone) => rpc('create_paint_crew_invite', { p_email: email, p_name: name, p_phone: phone || null })
+// Painters' time clock (supabase/time_clock.sql). The database decides
+// whether the phone is at the job; these just pass the location along.
+export const timeclockMe   = () => rpc('timeclock_me', {})
+const at = (pos) => ({ p_lat: pos.lat, p_lng: pos.lng, p_acc: pos.acc })
+export const timeclockIn   = (pos) => rpc('timeclock_in', at(pos))
+export const timeclockOut  = (pos) => rpc('timeclock_out', at(pos))
+export const timeclockPing = (pos) => rpc('timeclock_ping', at(pos))
+export const timeclockWeek = (start) => rpc('timeclock_week', { p_start: start || null })
+export const timeclockSetPayrollTo = (emails) => rpc('timeclock_set_payroll_to', { p_emails: emails })
+// Put this person's paint jobs on the map from their addresses (api/_timeclock.js).
+export const mapJobSites = () => fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'job-sites' }) })
+  .then(r => r.json()).catch(() => ({ mapped: 0 }))
 export const myCrew = () => rpc('my_crew', {})
 export const createCrewInvite = (email, name) => rpc('create_crew_invite', { p_email: email, p_name: name })
 // Office: invite a sub (Money › Vendors) to the sub app (supabase/sub_role.sql).

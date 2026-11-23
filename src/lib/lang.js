@@ -113,6 +113,25 @@ const ES = {
   'Structure Complete': 'Estructura terminada', 'Stain / Seal': 'Tinte / sellado', 'Stain / Seal / Finish': 'Tinte / sellado / acabado', 'Posts & Footings': 'Postes y cimientos',
   'Beam & Rafter Install': 'Instalación de vigas y cabios', 'Foundation / Footings': 'Fundación / cimientos', 'Demo / Site Prep': 'Demolición / preparación del sitio',
   'English': 'English', 'Español': 'Español', 'Menu': 'Menú',
+  // time clock (painters)
+  'Time clock': 'Reloj de entrada', 'This week': 'Esta semana', 'Loading…': 'Cargando…',
+  'Clock in': 'Marcar entrada', 'Clock out': 'Marcar salida', 'Finding your location…': 'Buscando su ubicación…',
+  'Clocked in at {t}': 'Entrada a las {t}',
+  'Clocked out at {t}. {h} hours on this job.': 'Salida a las {t}. {h} horas en este trabajo.',
+  'Location checked {t}': 'Ubicación revisada a las {t}', 'Location checked at clock in': 'Ubicación revisada al marcar la entrada',
+  'Today: {h} hours. Not clocked in now.': 'Hoy: {h} horas. Sin marcar entrada ahora.', 'Not clocked in.': 'Sin marcar entrada.',
+  "You didn't clock out at the job, so your day ended at {t}.": 'No marcó la salida en el trabajo, así que su día terminó a las {t}.',
+  'You can only clock in and out at the job site.': 'Solo puede marcar la entrada y la salida en el trabajo.',
+  "Location is off for this app. Turn it on in your phone's settings (Location: While using the app), then try again.": 'La ubicación está apagada para esta app. Actívela en los ajustes del teléfono (Ubicación: Mientras se usa la app) y vuelva a intentar.',
+  "This phone can't share its location.": 'Este teléfono no puede compartir su ubicación.',
+  "Couldn't find your location. Step outside and try again.": 'No se encontró su ubicación. Salga afuera y vuelva a intentar.',
+  "Your phone's location isn't exact enough right now (about {d}). Step outside and try again.": 'La ubicación del teléfono no es lo bastante exacta ahora (unos {d}). Salga afuera y vuelva a intentar.',
+  "You're not on a paint job yet. Your paint PM puts you on jobs.": 'Todavía no está en un trabajo de pintura. Su PM de pintura lo asigna a los trabajos.',
+  "Your job isn't on the map yet. Try again in a minute.": 'Su trabajo todavía no está en el mapa. Vuelva a intentar en un minuto.',
+  "You're {d} from the job. Clock out at the job site. If you don't, your day ends at {t}.": 'Está a {d} del trabajo. Marque la salida en el trabajo. Si no, su día termina a las {t}.',
+  "You're {d} from your nearest paint job{job}. Clock in when you get there.": 'Está a {d} de su trabajo de pintura más cercano{job}. Marque la entrada cuando llegue.',
+  "You're not clocked in.": 'No ha marcado la entrada.', 'Something went wrong. Try again.': 'Algo salió mal. Vuelva a intentar.',
+  'mile': 'milla', 'miles': 'millas', 'feet': 'pies',
 }
 
 // The Spanish for an English phrase when Spanish is on; the English otherwise.
