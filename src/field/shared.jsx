@@ -63,7 +63,12 @@ export function describeJob(p, permitAccess) {
     nextInsp: tracked ? (officeNext || countyNext || null) : null,
     county: tracked ? jobCounty(p) : '',
     connected: tracked && countyConnected(p),
-    paintIndex: open.findIndex(s => s.key === 'paint'), // 0 = paint is next
+    // 0 = paint is next. Ticking Ready for Paint (or Painting) makes it next,
+    // whatever older boxes were left unticked; otherwise it's how many open
+    // steps come before painting starts.
+    paintIndex: done.has('paint') ? -1
+      : done.has('ready_paint') || done.has('painting') ? 0
+      : open.findIndex(s => s.key === 'painting' || s.key === 'paint'),
     paintDate: dates.paint || null,
   }
 }
