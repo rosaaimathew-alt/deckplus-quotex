@@ -407,13 +407,8 @@ function NoPermitToggle({ proposal, readOnly }) {
       {!readOnly && <button onClick={() => updateJobData(proposal.id, { noPermit: false })} className="text-sm font-medium text-[var(--brand-700)] hover:underline">Needs a permit after all</button>}
     </div>
   )
-  if (readOnly) return null
-  return (
-    <div className="flex justify-end -mb-2">
-      <button onClick={() => { if (window.confirm(`No permit needed for ${proposal.client || 'this job'}? It leaves the inspections board and its permit and inspection steps are hidden.`)) updateJobData(proposal.id, { noPermit: true }) }}
-        className="text-sm font-medium text-gray-500 hover:text-gray-800">No permit needed</button>
-    </div>
-  )
+  // Marking a job "no permit needed" is in the job's ••• menu (with a confirm), not here
+  return null
 }
 
 export default function PermitsTab({ proposal, stages, readOnly }) {

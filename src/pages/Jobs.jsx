@@ -1836,7 +1836,9 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const logCount      = (jobData.dailyLogs || []).length
   const docCount      = jobDocuments(proposal, money).length
   const costCount     = (allExpenses || []).filter(e => shareFor(e, e.amount, proposal.id)).length
-  const showPermits   = !!permitAccess && (permitTracked(proposal) || noPermit(proposal))
+  // also once its finals have passed or it's closed: the inspection history stays on the job
+  const permitHistory = !!(proposal.countyPermit?.permits?.length || jobData.officeInspections?.length)
+  const showPermits   = !!permitAccess && (permitTracked(proposal) || noPermit(proposal) || permitHistory)
   const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0, needsPick: false }
   const nextInsp      = showPermits ? jobData.nextInspection : null
 
@@ -1968,7 +1970,11 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                     <CheckCheck size={14} className="text-gray-400 shrink-0" /> Close out job
                   </button>}
                   {permitAccess === 'edit' && (
-                    <button onClick={() => { setMenuOpen(false); updateJobData(proposal.id, { noPermit: !noPermit(proposal) }) }}
+                    <button onClick={() => {
+                      setMenuOpen(false)
+                      const none = noPermit(proposal)
+                      if (none || window.confirm(`No permit needed for ${proposal.client || 'this job'}? It leaves the inspections board and its permit and inspection steps are hidden.`)) updateJobData(proposal.id, { noPermit: !none })
+                    }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                       <ShieldCheck size={14} className="text-gray-400 shrink-0" /> {noPermit(proposal) ? 'Needs a permit after all' : 'No permit needed'}
                     </button>
