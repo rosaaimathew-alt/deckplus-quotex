@@ -220,16 +220,21 @@ revoke all on function public.timeclock_me() from public, anon;
 grant execute on function public.timeclock_me() to authenticated;
 
 -- ── Clock in: at the nearest of their paint jobs, or not at all ─────────────
+-- The paint PM (role 'paint') clocks in wherever they are, even with no
+-- location: the shift goes on their nearest job (any job when the phone has no
+-- location) with a note when they weren't at one.
 create or replace function public.timeclock_in(p_lat double precision, p_lng double precision, p_acc double precision)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare my_org uuid := public.auth_org(); c public.tc_settings; j record; o public.time_shifts; s public.time_shifts; nm text; unmapped integer;
+  free boolean := public.auth_role() = 'paint'; away boolean;
 begin
   perform public.tc_need_painter();
   c := public.tc_cfg(my_org);
   if p_lat is null or p_lng is null or abs(p_lat) > 90 or abs(p_lng) > 180 then
-    return jsonb_build_object('ok', false, 'reason', 'no_location');
+    if not free then return jsonb_build_object('ok', false, 'reason', 'no_location'); end if;
+    p_lat := null; p_lng := null; p_acc := null;
   end if;
-  if p_acc is null or p_acc > c.max_acc_m then
+  if p_lat is not null and (p_acc is null or p_acc > c.max_acc_m) and not free then
     return jsonb_build_object('ok', false, 'reason', 'weak_gps', 'acc', round(p_acc));
   end if;
   perform public.tc_close_stale(my_org, auth.uid());
@@ -238,20 +243,26 @@ begin
 
   select * into j from public.tc_my_jobs(p_lat, p_lng) where mapped order by dist_m limit 1;
   select count(*) into unmapped from public.tc_my_jobs() where not mapped;
-  if j.proposal_id is null or j.dist_m - least(p_acc, 100) > c.radius_m then
+  away := j.proposal_id is null or j.dist_m is null or j.dist_m - least(coalesce(p_acc, 0), 100) > c.radius_m;
+  if away and not free then
     insert into public.time_pings (org_id, user_id, kind, lat, lng, acc, dist_m, on_site, proposal_id)
     values (my_org, auth.uid(), 'in_refused', p_lat, p_lng, p_acc, j.dist_m, false, j.proposal_id);
     return jsonb_build_object('ok', false, 'reason', case when j.proposal_id is null and unmapped > 0 then 'not_mapped'
                                                          when j.proposal_id is null then 'no_jobs' else 'off_site' end,
       'distance', round(j.dist_m), 'client', j.client, 'unmapped', unmapped);
   end if;
+  if j.proposal_id is null then
+    select * into j from public.tc_my_jobs() order by mapped desc limit 1;
+    if j.proposal_id is null then return jsonb_build_object('ok', false, 'reason', 'no_jobs'); end if;
+  end if;
 
   select display_name into nm from public.org_members where org_id = my_org and user_id = auth.uid();
-  insert into public.time_shifts (org_id, user_id, worker, proposal_id, task_id, client, address, in_lat, in_lng, in_acc, in_dist_m)
-  values (my_org, auth.uid(), nm, j.proposal_id, j.task_id, j.client, j.address, p_lat, p_lng, p_acc, j.dist_m)
+  insert into public.time_shifts (org_id, user_id, worker, proposal_id, task_id, client, address, in_lat, in_lng, in_acc, in_dist_m, note)
+  values (my_org, auth.uid(), nm, j.proposal_id, j.task_id, j.client, j.address, p_lat, p_lng, p_acc, j.dist_m,
+          case when away then 'Clocked in away from a job site' end)
   returning * into s;
   insert into public.time_pings (org_id, user_id, shift_id, kind, lat, lng, acc, dist_m, on_site, proposal_id)
-  values (my_org, auth.uid(), s.id, 'in', p_lat, p_lng, p_acc, j.dist_m, true, j.proposal_id);
+  values (my_org, auth.uid(), s.id, 'in', p_lat, p_lng, p_acc, j.dist_m, not away, j.proposal_id);
   return jsonb_build_object('ok', true, 'shift', public.tc_shift_json(s));
 end $$;
 revoke all on function public.timeclock_in(double precision, double precision, double precision) from public, anon;
@@ -282,25 +293,50 @@ revoke all on function public.timeclock_ping(double precision, double precision,
 grant execute on function public.timeclock_ping(double precision, double precision, double precision) to authenticated;
 
 -- ── Clock out: at a job site (the one they clocked in at, or the next one ───
--- they moved to the same day, so the drive between jobs stays on the clock)
+-- they moved to the same day, so the drive between jobs stays on the clock).
+-- The paint PM anywhere.
 create or replace function public.timeclock_out(p_lat double precision, p_lng double precision, p_acc double precision)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare my_org uuid := public.auth_org(); c public.tc_settings; o public.time_shifts; j record; d double precision;
+  free boolean := public.auth_role() = 'paint';   -- the paint PM clocks out wherever they are
 begin
   perform public.tc_need_painter();
   c := public.tc_cfg(my_org);
   perform public.tc_close_stale(my_org, auth.uid());
   select * into o from public.time_shifts where user_id = auth.uid() and clock_out_at is null limit 1;
   if o.id is null then return jsonb_build_object('ok', false, 'reason', 'not_clocked_in'); end if;
-  if p_lat is null or p_lng is null or abs(p_lat) > 90 or abs(p_lng) > 180 then return jsonb_build_object('ok', false, 'reason', 'no_location'); end if;
-  if p_acc is null or p_acc > c.max_acc_m then return jsonb_build_object('ok', false, 'reason', 'weak_gps', 'acc', round(p_acc)); end if;
-  select * into j from public.tc_my_jobs(p_lat, p_lng) where mapped and dist_m - least(p_acc, 100) <= c.radius_m
+  if p_lat is null or p_lng is null or abs(p_lat) > 90 or abs(p_lng) > 180 then
+    if not free then return jsonb_build_object('ok', false, 'reason', 'no_location'); end if;
+    p_lat := null; p_lng := null; p_acc := null;
+  end if;
+  if p_lat is not null and (p_acc is null or p_acc > c.max_acc_m) and not free then
+    return jsonb_build_object('ok', false, 'reason', 'weak_gps', 'acc', round(p_acc));
+  end if;
+  -- Near any of their jobs, or a job they clocked in at in the last day (so
+  -- finishing the task, or being taken off it, never strands them on the clock)
+  select * into j from (
+    select null::text as task_id, js.proposal_id, pr.data->>'client' as client, js.address, js.lat, js.lng, true as mapped,
+           public.tc_distance_m(p_lat, p_lng, js.lat, js.lng) as dist_m
+    from public.job_sites js left join public.proposals pr on pr.id = js.proposal_id
+    where js.org_id = my_org and js.proposal_id in (select s2.proposal_id from public.time_shifts s2
+                                                    where s2.user_id = auth.uid() and s2.clock_in_at > now() - interval '1 day')
+    union all
+    select * from public.tc_my_jobs(p_lat, p_lng)
+  ) x where mapped and dist_m - least(coalesce(p_acc, 0), 100) <= c.radius_m
     order by (proposal_id = o.proposal_id) desc, dist_m limit 1;
   if j.proposal_id is null then
     select public.tc_distance_m(p_lat, p_lng, js.lat, js.lng) into d from public.job_sites js where js.org_id = my_org and js.proposal_id = o.proposal_id;
+    if not free then
+      insert into public.time_pings (org_id, user_id, shift_id, kind, lat, lng, acc, dist_m, on_site, proposal_id)
+      values (my_org, auth.uid(), o.id, 'out_refused', p_lat, p_lng, p_acc, d, false, o.proposal_id);
+      return jsonb_build_object('ok', false, 'reason', 'off_site', 'distance', round(d), 'client', o.client, 'dayEnd', to_char(c.day_end, 'HH24:MI'));
+    end if;
+    update public.time_shifts set clock_out_at = now(), out_lat = p_lat, out_lng = p_lng, out_acc = p_acc, out_dist_m = d,
+           note = concat_ws(' · ', nullif(note, ''), 'Clocked out away from a job site')
+     where id = o.id returning * into o;
     insert into public.time_pings (org_id, user_id, shift_id, kind, lat, lng, acc, dist_m, on_site, proposal_id)
-    values (my_org, auth.uid(), o.id, 'out_refused', p_lat, p_lng, p_acc, d, false, o.proposal_id);
-    return jsonb_build_object('ok', false, 'reason', 'off_site', 'distance', round(d), 'client', o.client, 'dayEnd', to_char(c.day_end, 'HH24:MI'));
+    values (my_org, auth.uid(), o.id, 'out', p_lat, p_lng, p_acc, d, false, o.proposal_id);
+    return jsonb_build_object('ok', true, 'shift', public.tc_shift_json(o), 'outClient', o.client, 'movedJobs', false);
   end if;
   update public.time_shifts set clock_out_at = now(), out_lat = p_lat, out_lng = p_lng, out_acc = p_acc, out_dist_m = j.dist_m,
          note = case when j.proposal_id = o.proposal_id then note else concat_ws(' · ', nullif(note, ''), 'Clocked out at ' || coalesce(j.client, 'another job')) end

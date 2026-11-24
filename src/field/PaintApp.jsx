@@ -511,7 +511,15 @@ function PaintersOnJob({ proposal }) {
   const tasks = useStore(s => s.subTasks)
   const addSubTask = useStore(s => s.addSubTask)
   const deleteSubTask = useStore(s => s.deleteSubTask)
+  const updateSubTask = useStore(s => s.updateSubTask)
+  const setSubTaskStatus = useStore(s => s.setSubTaskStatus)
   const onJob = (tasks || []).filter(t => t && t.paint && String(t.proposalId) === String(proposal.id))
+  // A painter who finished goes back on the job (touch-ups): the same entry,
+  // photos and history kept, booked again from today
+  const bookAgain = (t) => {
+    setSubTaskStatus(t.id, 'booked')
+    updateSubTask(t.id, { startDate: todayStr(), endDate: null })
+  }
   const taskOf = (c) => onJob.find(t => t.crewUserId && t.crewUserId === c.userId)
   const toggle = (c) => {
     const t = taskOf(c)
@@ -548,6 +556,13 @@ function PaintersOnJob({ proposal }) {
                 <span className="flex-1 min-w-0 text-base font-medium text-gray-900 truncate">{c.name}</span>
                 {t && <span className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${STATUS_PILL[statusKey(t)]}`}>{statusLabel(t)}</span>}
               </button>
+              {t && statusKey(t) === 'done' && (
+                <div className="px-3 pb-2">
+                  <button onClick={() => bookAgain(t)} className="w-full h-11 rounded-xl border border-[var(--brand-600)] text-[var(--brand-700)] text-base font-semibold">
+                    Book {c.name.split(' ')[0]} again
+                  </button>
+                </div>
+              )}
               {t && (t.photos || []).length > 0 && <div className="px-3 pb-3"><PhotoDays task={t} big /></div>}
             </div>
           )
