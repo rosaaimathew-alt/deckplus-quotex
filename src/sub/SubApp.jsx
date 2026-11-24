@@ -39,6 +39,7 @@ import JobChat from '../components/JobChat'
 import { unreadCount } from '../lib/subChat'
 import PushCard from '../components/PushCard'
 import TimeClock from './TimeClock'
+import SubNotice from './SubNotice'
 
 // The one next step for each status, and what it moves the task to.
 const NEXT = {
@@ -90,6 +91,7 @@ function TaskList() {
         <p className="text-sm text-gray-500">{new Date().toLocaleDateString(lang === 'es' ? 'es-US' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </div>
 
+      <SubNotice />
       <TimeClock />
       <PushCard keep prompt />
       <WeekInvoiceCard />

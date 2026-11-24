@@ -16,6 +16,7 @@ import { sendMail, isMailerConfigured, smtpUser } from './_mailer.js'
 import { sendNotification } from './_notify.js'
 import { pushPublicKey, pushToEmails } from './_push.js'
 import { mapJobSites } from './_timeclock.js'
+import { runNotices } from './_notice.js'
 import { requireAuth, verifyToken } from './_auth.js'
 import { getKV } from './_kv.js'
 import { buildProposalEmail, buildContractEmail, ownSignLink, signatureOf, loadSignature, saveSignature } from './_proposalEmail.js'
@@ -196,6 +197,9 @@ export default async function handler(req, res) {
     if (!me?.sub) return res.status(401).json({ error: 'Unauthorized — please sign in again.' })
     try { return res.status(200).json(await mapJobSites(me.sub)) } catch (err) { return res.status(200).json({ mapped: 0, error: String(err?.message || err).slice(0, 120) }) }
   }
+  // Notices to every sub, sent by the database's scheduler with its run key
+  // (api/_notice.js, supabase/sub_notices.sql)
+  if (req.body?.action === 'notice-run') return runNotices(req, res)
   const staff = await requireAuth(req, res)
   if (!staff) return
   const { action, ...body } = req.body || {}
