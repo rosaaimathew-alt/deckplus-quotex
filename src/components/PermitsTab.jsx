@@ -5,6 +5,7 @@ import {
   countyByStage, countyPassed, countyLast, isFailResult, isPassResult, isPartialResult, jobCounty, jobJurisdiction, countyConnected, noPermit,
 } from '../lib/permitTracking'
 import { runPermitPulse } from '../lib/permitPulse'
+import { buildJobInspectionReportHtml } from '../lib/inspectionReport'
 import { DEMO } from '../demo'
 import { CheckCircle2, AlertTriangle, Clock, Plus, X, FileText, ShieldCheck, ExternalLink, RefreshCw, Loader, CalendarDays } from 'lucide-react'
 
@@ -242,9 +243,18 @@ function InspectionCard({ proposal, stage, readOnly, county = [] }) {
 // county has more than one permit at the address — the choice of which.
 function CountyPanel({ proposal, readOnly }) {
   const { updateJobData } = useStore()
+  const company = useStore(s => s.branding?.companyName)
   const cp = proposal.countyPermit
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // Everything on file, printable or saved as a PDF (for the office, or a homeowner who asks)
+  const report = () => {
+    const w = window.open('', '_blank')
+    if (!w) { setErr('Allow pop-ups for this site to open the report.'); return }
+    w.document.write(buildJobInspectionReportHtml(proposal, { company }))
+    w.document.close()
+    setTimeout(() => w.print(), 300)
+  }
   // The permit's page on the county site, or its number, when the address doesn't find it
   const saved = proposal.jobData?.countyLink || ''
   const [link, setLink] = useState(saved)
@@ -274,12 +284,17 @@ function CountyPanel({ proposal, readOnly }) {
           <span className="text-sm font-semibold text-gray-800">{jobJurisdiction(proposal) || jobCounty(proposal) || 'County'}{jobJurisdiction(proposal) ? '' : ' County'} permit</span>
           {cp?.checkedAt && <span className="text-xs text-gray-400">checked {fmtWhen(cp.checkedAt)}</span>}
         </div>
+        <div className="flex items-center gap-3">
+        <button onClick={report} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+          <FileText size={12} /> Inspection report
+        </button>
         {!readOnly && !DEMO && countyConnected(proposal) && (
           <button onClick={check} disabled={busy}
             className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50">
             {busy ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />} {busy ? 'Checking…' : 'Check county now'}
           </button>
         )}
+        </div>
       </div>
 
       {!countyConnected(proposal)
