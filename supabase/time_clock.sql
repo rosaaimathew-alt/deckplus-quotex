@@ -366,3 +366,44 @@ grant execute on function public.timeclock_set_payroll_to(text[]) to authenticat
 
 -- Deck Plus: the hours go to Ellen.
 -- insert into public.tc_settings (org_id, payroll_to) values ('<org id>', array['ellen@deck.plus']) on conflict (org_id) do nothing;
+
+-- ── The office corrects a shift (Money › Time clock › Fix) ─────────────────
+-- A painter tapped Clock out by mistake, or forgot to clock out: the office
+-- sets the shift's clock-in / clock-out times (that day, where the crews work)
+-- with a reason. The shift notes who corrected it and what it was before, so
+-- payroll sees it. p_out null keeps a shift that is still open running.
+create or replace function public.timeclock_fix(p_shift uuid, p_in text, p_out text, p_reason text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare my_org uuid := public.auth_org(); c public.tc_settings; s public.time_shifts; me public.org_members;
+  d date; t_in timestamptz; t_out timestamptz; was text;
+begin
+  if my_org is null or public.auth_role() not in ('office', 'admin') then
+    raise exception 'Only the office can correct a shift' using errcode = '42501';
+  end if;
+  if coalesce(trim(p_reason), '') = '' then raise exception 'Say why the shift is corrected'; end if;
+  select * into s from public.time_shifts where id = p_shift and org_id = my_org for update;
+  if not found then raise exception 'Shift not found'; end if;
+  c := public.tc_cfg(my_org);
+  select * into me from public.org_members where org_id = my_org and user_id = auth.uid();
+  d := (s.clock_in_at at time zone c.tz)::date;
+  t_in := (d + p_in::time) at time zone c.tz;
+  if nullif(trim(p_out), '') is null then
+    if s.clock_out_at is not null then raise exception 'Give the clock-out time'; end if;
+    t_out := null;
+  else
+    t_out := (d + p_out::time) at time zone c.tz;
+    if t_out <= t_in then raise exception 'Clock out has to be after clock in'; end if;
+  end if;
+  if exists (select 1 from public.time_shifts o where o.user_id = s.user_id and o.id <> s.id
+             and o.clock_in_at < coalesce(t_out, 'infinity') and coalesce(o.clock_out_at, now()) > t_in) then
+    raise exception 'That overlaps another shift of this painter';
+  end if;
+  was := to_char(s.clock_in_at at time zone c.tz, 'FMHH12:MI AM') || '–' ||
+         coalesce(to_char(s.clock_out_at at time zone c.tz, 'FMHH12:MI AM'), 'open');
+  update public.time_shifts set clock_in_at = t_in, clock_out_at = t_out, auto_out = false,
+    note = concat_ws(' · ', nullif(note, ''), format('Corrected by %s: was %s (%s)', coalesce(me.display_name, 'the office'), was, trim(p_reason)))
+  where id = s.id returning * into s;
+  return public.tc_shift_json(s);
+end $$;
+revoke all on function public.timeclock_fix(uuid, text, text, text) from public, anon;
+grant execute on function public.timeclock_fix(uuid, text, text, text) to authenticated;
