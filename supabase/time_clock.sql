@@ -167,7 +167,8 @@ language sql stable security definer set search_path = public as $$
       and p.status in ('Won', 'Imported')
       -- invoicesOnly is a note ({ at, reason }) on records kept only for their invoices
       and coalesce(p.data->'jobData'->'invoicesOnly', 'null'::jsonb) in ('null'::jsonb, 'false'::jsonb)
-      and not coalesce(p.data->'jobData'->'completedStages' ? 'closed', false)
+      -- open jobs, and closed ones back for warranty work (jobData.paint.followUp)
+      and (not coalesce(p.data->'jobData'->'completedStages' ? 'closed', false) or p.data->'jobData'->'paint'->'followUp'->>'kind' = 'warranty')
   ), jobs as (select * from mine union all select * from open_jobs)
   select m.id, m.pid, m.client, coalesce(js.address, m.address), js.lat, js.lng, js.lat is not null,
          public.tc_distance_m(p_lat, p_lng, js.lat, js.lng)
