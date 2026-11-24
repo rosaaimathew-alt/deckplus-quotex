@@ -9,12 +9,16 @@
  *                             not read in two days
  *   Time clock                shifts still open, days closed at 4:30,
  *                             refused clock ins and outs, the payroll email
+ *   Booking calendar          each rep's Google Calendar can be read, the
+ *                             booking page has someone up next with open
+ *                             times, yesterday's bookings reached the rep's
+ *                             calendar and the confirmation emails went
  *   Data                      how many proposals, purchase orders and
  *                             invoices there are, and the week's growth
  *
  * Never throws: the lead report that runs next must still go.
  */
-import { db } from './_round-robin.js'
+import { db, loadTurn, repBusy, computeSlots, googleBusyStrict } from './_round-robin.js'
 import { sendMail } from './_mailer.js'
 import { todayET, addDaysStr } from '../src/lib/timeClock.js'
 
@@ -85,6 +89,54 @@ async function orgHealth(sb, orgId, now) {
   return { items, facts, ownerUserId: s.ownerUserId }
 }
 
+// ── Booking calendar (the round robin on /book and the website) ─────────────
+// Checked once a day for the whole app; the result goes in each owner's email.
+const why = (err) => String(err?.response?.data?.error_description || err?.response?.data?.error?.message || err?.message || err).replace(/\.$/, '').slice(0, 160)
+export async function calendarHealth(now = new Date()) {
+  const items = [], facts = []
+  try {
+    const sb = db()
+    const { data: reps } = await sb.from('rr_reps').select('*').eq('active', true).order('position')
+    if (!reps?.length) return { items, facts }   // the booking calendar isn't in use
+    // 1. Each rep's Google Calendar: unreadable means double bookings
+    let readable = 0, noKey = false
+    for (const rep of reps) {
+      try {
+        const busy = await googleBusyStrict(rep, now.getTime(), now.getTime() + DAY)
+        if (busy === null) noKey = true; else readable++
+      } catch (err) {
+        items.push({ level: 'fix', text: `${rep.name}'s Google Calendar can't be read (${why(err)}). The booking page can't see their appointments, so customers could book over them.` })
+      }
+    }
+    if (noKey) items.push({ level: 'fix', text: 'The booking calendar has no Google key, so it can\'t read the reps\' calendars or add appointments to them.' })
+    // 2. The booking page: someone up next, with open times
+    let open = null, upNext = null
+    try {
+      const { rep, settings } = await loadTurn()
+      if (!rep) items.push({ level: 'fix', text: 'The booking page has no rep up next, so customers can\'t book an appointment.' })
+      else {
+        upNext = rep.name
+        open = computeSlots(rep, settings, await repBusy(rep, settings, now.getTime()), now.getTime()).length
+        if (!open) items.push({ level: 'fix', text: `The booking page shows no open times for ${rep.name} (up next) in the next ${settings.days_ahead} days, so customers can't book.` })
+      }
+    } catch (err) {
+      items.push({ level: 'fix', text: `The booking page isn't loading its times (${why(err)}).` })
+    }
+    // 3. Yesterday's bookings: on the rep's calendar, confirmation emails sent
+    const { data: booked } = await sb.from('rr_bookings').select('google_event_id, google_error, email_error')
+      .gte('created_at', new Date(now - DAY).toISOString())
+    const b = booked || []
+    const offCal = b.filter(x => !x.google_event_id).length
+    const noEmail = b.filter(x => x.email_error).length
+    if (offCal && !noKey) items.push({ level: 'look', text: `${offCal} appointment${offCal === 1 ? '' : 's'} booked in the last day didn't reach the rep's Google Calendar${b.find(x => x.google_error)?.google_error ? ` (${String(b.find(x => x.google_error).google_error).slice(0, 120)})` : ''}.` })
+    if (noEmail) items.push({ level: 'look', text: `${noEmail} booking${noEmail === 1 ? '' : 's'} in the last day had trouble sending the confirmation email (${String(b.find(x => x.email_error).email_error).slice(0, 120)}).` })
+    facts.push(`Booking calendar: ${readable} of ${reps.length} rep calendar${reps.length === 1 ? '' : 's'} readable${upNext ? `, ${upNext} up next with ${open} open time${open === 1 ? '' : 's'}` : ''}, ${b.length} booked in the last day`)
+  } catch (err) {
+    items.push({ level: 'fix', text: `The booking calendar check didn't run (${why(err)}).` })
+  }
+  return { items, facts }
+}
+
 export async function dailyHealth(now = new Date()) {
   const out = { sent: [] }
   try {
@@ -92,10 +144,13 @@ export async function dailyHealth(now = new Date()) {
     const today = todayET(now)
     const monday = new Date(`${today}T12:00:00Z`).getUTCDay() === 1
     const { data: orgs } = await sb.from('org_settings').select('org_id, ownerUserId:data->>ownerUserId')
+    const cal = await calendarHealth(now)
     for (const o of orgs || []) {
       if (!o.ownerUserId) continue
       try {
         const h = await orgHealth(sb, o.org_id, now)
+        h.items.push(...cal.items)
+        h.facts.splice(h.facts.length - 1, 0, ...cal.facts)   // before the record counts
         if (!h.items.length && !monday) continue
         // Once a day: claim the day before sending
         const key = `health:sent:${o.org_id}`
