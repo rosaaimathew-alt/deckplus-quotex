@@ -19,7 +19,7 @@
 // organization's totals are everything actually sold. They were never
 // estimated here, so they stay out of win rate and pipeline.
 import { clientGroups, latestIterations } from './proposalGroups'
-import { wonRevenueOf } from '../contractTotal'
+import { wonRevenueOf, approvedChangeOrderTotal } from '../contractTotal'
 
 export const OPEN_STATUSES = ['Sent', 'Followed Up', 'Negotiating']
 // A deal counts as won once the client commits: tagged Won or contract signed
@@ -34,7 +34,9 @@ export const isImportedSale = (p) => p?.status === 'Imported' && ['jobs report',
 // Any sale: won in the app, or sold in Knowify.
 export const isSale = (p) => p?.status === 'Won' || isImportedSale(p)
 export const saleDateOf = (p) => (isImportedSale(p) ? `${p.knowify.proposalDate}T12:00:00` : wonDateOf(p))
-export const saleValueOf = (p) => (isImportedSale(p) ? Number(p.knowify.contractValue) || 0 : wonRevenueOf(p))
+// A Knowify sale's value includes the change orders made in Knowify; ones
+// signed in the app afterwards (jobData.changeOrders) are added on top.
+export const saleValueOf = (p) => (isImportedSale(p) ? (Number(p.knowify.contractValue) || 0) + approvedChangeOrderTotal(p) : wonRevenueOf(p))
 
 // start / end: Dates, or null for all time. `sales`: imported sales to count
 // when `proposals` has had the imported jobs filtered out (Home, Sales).

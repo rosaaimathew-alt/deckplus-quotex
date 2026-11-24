@@ -121,10 +121,11 @@ const BOOK_CATEGORY = { materials: 'Materials', sub: 'Subcontractor', labor: 'La
 // and bills from Money. Use lib/jobCost.js's useJobCostOf() rather than
 // calling this directly, so every page counts the same costs.
 export function jobFinancials(proposal, expenses = [], legacyCosts = null, books = null) {
-  // A job sold in Knowify: its sold value already includes change orders
+  // A job sold in Knowify: its sold value includes the change orders made in
+  // Knowify; ones signed in the app since (credits too) still count here
   const imported = isImportedSale(proposal)
-  const contract = imported ? saleValueOf(proposal) : contractTotalOf(proposal)
-  const changeOrders = imported ? 0 : approvedChangeOrderTotal(proposal)
+  const changeOrders = approvedChangeOrderTotal(proposal)
+  const contract = imported ? saleValueOf(proposal) - changeOrders : contractTotalOf(proposal)
   const revenue = contract + changeOrders
   // a card charge shared by several jobs (a dump run for three) counts only this job's share
   const mine = expenses.map(e => ({ e, share: shareFor(e, e.amount, proposal.id) })).filter(x => x.share)
