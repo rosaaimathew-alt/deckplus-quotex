@@ -88,6 +88,7 @@ const ES = {
   'Invoices': 'Facturas', 'All invoices': 'Todas las facturas', 'Send an invoice': 'Enviar una factura',
   'Nothing left to invoice on your jobs this week.': 'No queda nada por facturar en sus trabajos esta semana.',
   'Agreed': 'Acordado', 'left to invoice': 'por facturar',
+  'Invoices are closed today for the holiday.': 'Hoy no se reciben facturas por el feriado.',
   'Invoices can be sent Monday through Wednesday.': 'Las facturas se pueden enviar de lunes a miércoles.',
   'The office has not set the amount for these jobs yet. You can invoice them once it does.': 'La oficina aún no ha puesto el monto de estos trabajos. Podrá facturarlos cuando lo haga.',
   'Next:': 'Próxima:', 'Send by Wednesday at midnight.': 'Envíela antes del miércoles a medianoche.',

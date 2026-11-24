@@ -130,7 +130,7 @@ begin
     raise exception '%a sent invoice can''t be changed', bad using errcode = '42501';
   end if;
   -- Subs send invoices Monday 12:00 AM through Wednesday 11:59 PM, Charlotte time.
-  if extract(isodow from (now() at time zone 'America/New_York')) > 3
+  if (extract(isodow from (now() at time zone 'America/New_York')) > 3 or public.invoice_day_closed(new.org_id))
      -- the office can open the window for one sub until a set time (subcontractors.data.invoiceOpenUntil)
      and not exists (select 1 from public.subcontractors sc where sc.org_id = new.org_id and sc.deleted_at is null
                      and sc.data->>'userId' = auth.uid()::text and coalesce(sc.data->>'invoiceOpenUntil', '') ~ '^\d{4}-\d{2}-\d{2}T'
@@ -271,3 +271,22 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public.my_invoice_open_until() from public, anon;
 grant execute on function public.my_invoice_open_until() to authenticated;
+
+-- 6. Days the office closed for a holiday ("invoices due a day early this week"):
+--    app_kv 'invoice:closed:<org id>' holds the dates ('2026-11-25'). On those
+--    days the database refuses a sub's invoice like any day outside Monday–Wednesday
+--    (the office can still open the window for one sub), and the sub's app says so.
+create or replace function public.invoice_day_closed(p_org uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.app_kv k, jsonb_array_elements_text(case when jsonb_typeof(k.value) = 'array' then k.value else '[]'::jsonb end) d
+                  where k.key = 'invoice:closed:' || p_org::text
+                    and d = to_char(now() at time zone 'America/New_York', 'YYYY-MM-DD'))
+$$;
+revoke all on function public.invoice_day_closed(uuid) from public, anon, authenticated;
+
+create or replace function public.my_invoice_closed_today() returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.auth_org() is not null and public.invoice_day_closed(public.auth_org())
+$$;
+revoke all on function public.my_invoice_closed_today() from public, anon;
+grant execute on function public.my_invoice_closed_today() to authenticated;

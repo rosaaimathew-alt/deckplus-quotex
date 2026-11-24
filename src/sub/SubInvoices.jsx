@@ -62,26 +62,37 @@ function StatusPill({ d }) {
 
 // Monday–Wednesday, or later when the office opened it for this sub until a set time
 // (my_invoice_open_until; the database checks the same, supabase/sub_draws.sql).
-let openUntilAsk = null
-function useWindowOpen() {
+// A day the office closed for a holiday (my_invoice_closed_today) is closed
+// unless the office opened it for this sub.
+let openUntilAsk = null, closedAsk = null
+function useWindow() {
   const [until, setUntil] = useState(null)
+  const [closedToday, setClosed] = useState(false)
   useEffect(() => {
     if (DEMO || !supabase) return
     if (!openUntilAsk) openUntilAsk = supabase.rpc('my_invoice_open_until').then(({ data }) => data || null, () => null)
+    if (!closedAsk) {
+      closedAsk = supabase.rpc('my_invoice_closed_today').then(({ data }) => data === true, () => false)
+      setTimeout(() => { closedAsk = null }, 60_000)
+    }
     let live = true
     openUntilAsk.then(u => { if (live) setUntil(u) })
+    closedAsk.then(c => { if (live) setClosed(c) })
     return () => { live = false }
   }, [])
-  return invoiceWindowOpen() || (!!until && new Date(until) > new Date())
+  const opened = !!until && new Date(until) > new Date()
+  return { open: (invoiceWindowOpen() && !closedToday) || opened, closedToday }
 }
+const useWindowOpen = () => useWindow().open
 
-// Outside Monday–Wednesday: when they can send next, instead of the button.
+// Outside Monday–Wednesday (or on a holiday): when they can send next, instead of the button.
 function WindowClosed() {
+  const { closedToday } = useWindow()
   const next = new Date(`${nextInvoiceMonday()}T12:00:00`)
     .toLocaleDateString(getLang() === 'es' ? 'es-US' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   return (
     <div className="rounded-xl bg-amber-50 px-4 py-3 text-base text-amber-900">
-      <p className="font-semibold">{tr('Invoices can be sent Monday through Wednesday.')}</p>
+      <p className="font-semibold">{tr(closedToday ? 'Invoices are closed today for the holiday.' : 'Invoices can be sent Monday through Wednesday.')}</p>
       <p>{tr('Next:')} {next}</p>
     </div>
   )
