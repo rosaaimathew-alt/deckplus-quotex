@@ -78,6 +78,41 @@ export function allPermits(proposal) {
   }]
 }
 
+// ── The inspection history is never lost ──────────────────────────────────
+// A new reading of the county site replaces countyPermit. An inspection the
+// county no longer lists stays on its permit (keepHistory), and a permit that
+// drops out of the reading (another permit picked, the job's address or permit
+// number corrected) moves to jobData.permitHistory, where the job's inspection
+// report still shows it.
+const insKey = (i) => String(i?.id || `${i?.code}|${i?.date}|${i?.result}`)
+const byDate = (a, b) => String(a.date || '').localeCompare(String(b.date || ''))
+export function keepHistory(next, prev) {
+  const prevPermits = prev?.permits || []
+  if (!next || !prevPermits.length) return { reading: next, dropped: [] }
+  const old = new Map(prevPermits.map(p => [p.record, p]))
+  const permits = (next.permits || []).map(p => {
+    const o = old.get(p.record)
+    if (!o) return p
+    const have = new Set((p.completed || []).map(insKey))
+    const lost = (o.completed || []).filter(i => !have.has(insKey(i)))
+    return lost.length ? { ...p, completed: [...(p.completed || []), ...lost].sort(byDate) } : p
+  })
+  const kept = new Set(permits.map(p => p.record))
+  const dropped = prevPermits.filter(p => !kept.has(p.record) && (p.completed || []).length)
+  return { reading: next.permits ? { ...next, permits } : next, dropped }
+}
+// permits merged into the job's history, by permit number
+export function addToHistory(history = [], permits = [], at = new Date().toISOString()) {
+  const out = [...history]
+  for (const p of permits) {
+    const i = out.findIndex(h => h.record === p.record)
+    if (i < 0) { out.push({ ...p, upcoming: [], archivedAt: at }); continue }
+    const have = new Set((out[i].completed || []).map(insKey))
+    out[i] = { ...out[i], ...p, upcoming: [], archivedAt: at, completed: [...(out[i].completed || []), ...(p.completed || []).filter(x => !have.has(insKey(x)))].sort(byDate) }
+  }
+  return out
+}
+
 export const PERMIT_KEYS = ['zoning', 'building']
 export const isInspectionKey = (key) => key.endsWith('_insp')
 

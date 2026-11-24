@@ -8,7 +8,7 @@ import { isJob } from '../lib/attention'
 import { startPulse, runPermitPulse } from '../lib/permitPulse'
 import { locateAddress } from '../lib/permitFees'
 import {
-  usePermitAccess, permitTracked, BOARD_COLUMNS, boardCells, countyFinaled, inspectionLabel, INSPECTION_TYPES,
+  usePermitAccess, permitTracked, BOARD_COLUMNS, boardCells, countyFinaled, inspectionLabel, INSPECTION_TYPES, addToHistory,
   jobCounty, jobJurisdiction, countyConnected, CONNECTED_COUNTIES, closeIfFinaled,
 } from '../lib/permitTracking'
 import { X, RefreshCw, Loader, ExternalLink, ChevronDown, ChevronRight, AlertTriangle, ShieldCheck, Printer, Plus, Trash2, Pencil } from 'lucide-react'
@@ -158,7 +158,8 @@ function EditJobForm({ proposal, onClose }) {
       imported: { ...im, permit: f.permit.trim().toUpperCase(), county: f.county, jurisdiction: f.jurisdiction, pm: f.pm.trim(), jobType: f.jobType.trim() },
       ...(moved ? { countyPermit: null } : {}),
     })
-    if (moved) updateJobData(proposal.id, { countyPick: null })
+    // the old reading's inspections stay in the job's history
+    if (moved) updateJobData(proposal.id, { countyPick: null, ...(proposal.countyPermit?.permits?.length ? { permitHistory: addToHistory(proposal.jobData?.permitHistory, proposal.countyPermit.permits) } : {}) })
     onClose()
     if (moved && !DEMO) runPermitPulse({ ids: [proposal.id] }).catch(() => {})
   }

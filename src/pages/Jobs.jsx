@@ -1837,7 +1837,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const docCount      = jobDocuments(proposal, money).length
   const costCount     = (allExpenses || []).filter(e => shareFor(e, e.amount, proposal.id)).length
   // also once its finals have passed or it's closed: the inspection history stays on the job
-  const permitHistory = !!(proposal.countyPermit?.permits?.length || jobData.officeInspections?.length)
+  const permitHistory = !!(proposal.countyPermit?.permits?.length || jobData.officeInspections?.length || jobData.permitHistory?.length)
   const showPermits   = !!permitAccess && (permitTracked(proposal) || noPermit(proposal) || permitHistory)
   const permitFlags   = showPermits ? permitAlerts(proposal, stages) : { failed: 0, expiring: 0, needsPick: false }
   const nextInsp      = showPermits ? jobData.nextInspection : null

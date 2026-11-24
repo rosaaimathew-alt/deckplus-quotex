@@ -5,7 +5,7 @@
 // at 8 AM and 1 PM (and right away for jobs never checked), or by "Check county now".
 import { useStore } from '../store'
 import { getStages } from '../pages/Jobs'
-import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty, closeIfFinaled, currentPulseSlot, PULSE_HOURS } from './permitTracking'
+import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty, closeIfFinaled, currentPulseSlot, PULSE_HOURS, keepHistory, addToHistory } from './permitTracking'
 import { isJob } from './attention'
 import { countyOf, gradeRun, sendConnectionAlert, isBusyError } from './permitHealth'
 
@@ -155,9 +155,15 @@ export async function runPermitPulse({ ids, onProgress, scheduled = false } = {}
       // Keep the last good reading if this check failed, with the error on top.
       const prev = useStore.getState().proposals.find(x => x.id === p.id)?.countyPermit
       // (siteError stays on it so the 10-minute tick tries it again.)
-      const next = r.error && !r.needsPick && prev?.permits?.length
+      const reading = r.error && !r.needsPick && prev?.permits?.length
         ? { ...prev, error: r.error, siteError: !!r.siteError, checkedAt: r.checkedAt }
         : withNotes(r, prev)
+      // nothing the app has read is ever thrown away
+      const { reading: next, dropped } = keepHistory(reading, prev)
+      if (dropped.length) {
+        const job = useStore.getState().proposals.find(x => x.id === p.id)
+        useStore.getState().updateJobData(p.id, { permitHistory: addToHistory(job?.jobData?.permitHistory, dropped) })
+      }
       const stageKeys = (getStages(p) || []).map(s => s.key)
       setCountyPermit(p.id, next, r.permits ? countyPassedStages({ countyPermit: next }, stageKeys) : [])
       // Every final passed: off the board, ready for the office's close-out

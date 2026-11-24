@@ -2,7 +2,7 @@
 // A printable page for the weekly job-progress meeting: every ongoing
 // Mecklenburg job, grouped by PM, with where each inspection stands, what
 // happened in the past 7 days, what's next, and only the latest note on file.
-import { BOARD_COLUMNS, boardCells, inspectionLabel, allPermits, jobCounty } from './permitTracking'
+import { BOARD_COLUMNS, boardCells, inspectionLabel, allPermits, jobCounty, jobJurisdiction } from './permitTracking'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -164,5 +164,81 @@ export function buildWeeklyReportHtml({ jobs, company = '', now = new Date() }) 
   </table>
   <div class="legend">✓ passed · ◐ partial pass · ✗ failed / inaccessible (latest result) · ◷ scheduled at the county · – cancelled.
     ${cols.map(c => `${esc(c.label)} ${esc(c.title.toLowerCase())}`).join(' · ')}.</div>
+</body></html>`
+}
+
+// ── One job's inspection report (the job's Permits tab › Inspection report) ──
+// Everything on file for a job, for the office or a homeowner who asks: each
+// permit the county has (and earlier ones kept in jobData.permitHistory), every
+// inspection with its date, result and inspector and all the inspectors'
+// notes, what's scheduled, and results the office recorded by hand.
+const resultClass = (r) => (/^pass/i.test(r || '') ? 'ok' : /fail|not pass|disapprov|reject|correction/i.test(r || '') ? 'bad' : '')
+const noteHtml = (n) => `<div class="note1"><span class="meta">${esc(n.at || '')}${n.by ? ` · ${esc(n.by)}` : ''}</span><br>${esc(n.text || '')}</div>`
+
+function permitSection(p, { earlier = false } = {}) {
+  const done = [...(p.completed || [])].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+  const up = (p.upcoming || []).filter(u => u?.date || u?.code)
+  const title = p.role === 'office' ? 'Results recorded by the office' : `Permit ${esc(p.record || '')}`
+  return `<section>
+  <h2>${title}${earlier ? ' <span class="tag">earlier permit</span>' : ''}</h2>
+  ${p.role === 'office' ? '' : `<p class="sub">${[p.type, p.status, p.description].filter(Boolean).map(esc).join(' · ')}</p>`}
+  ${done.length ? `<table>
+    <thead><tr><th style="width:12%">Date</th><th style="width:24%">Inspection</th><th style="width:12%">Result</th><th style="width:16%">Inspector</th><th>Notes</th></tr></thead>
+    <tbody>${done.map(i => `<tr>
+      <td>${i.date ? long(i.date) : ''}${i.time ? `<div class="sub">${esc(i.time)}</div>` : ''}</td>
+      <td>${esc([i.code, i.name].filter(Boolean).join(' - '))}</td>
+      <td class="${resultClass(i.result)}"><b>${esc(i.result || '')}</b></td>
+      <td>${esc(i.inspector || '')}</td>
+      <td>${(i.notes || []).length ? i.notes.map(noteHtml).join('') : (i.note ? esc(i.note) : '<span class="muted">—</span>')}</td>
+    </tr>`).join('')}</tbody></table>` : '<p class="muted">No inspections on this permit yet.</p>'}
+  ${up.length ? `<p class="sched"><b>Scheduled:</b> ${up.map(u => `${esc([u.code, u.name].filter(Boolean).join(' - '))}${u.date ? ` on ${long(u.date)}` : ''}`).join('; ')}</p>` : ''}
+</section>`
+}
+
+export function buildJobInspectionReportHtml(proposal, { company = '', now = new Date() } = {}) {
+  const permits = allPermits(proposal)
+  const earlier = proposal.jobData?.permitHistory || []
+  // results the office ticked on the job's steps, before the county was connected
+  const steps = Object.entries(proposal.jobData?.inspections || {})
+    .flatMap(([key, rec]) => (rec?.attempts || []).map(a => ({ key, ...a })))
+    .filter(a => a.date || a.result)
+  const manual = proposal.jobData?.nextInspection
+  const where = jobCounty(proposal)
+  const sections = [
+    ...permits.map(p => permitSection(p)),
+    ...earlier.map(p => permitSection(p, { earlier: true })),
+  ]
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>Inspection report · ${esc(proposal.client || '')}</title>
+<style>
+  @page { size: letter; margin: 0.5in; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font: 12px/1.4 -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111; margin: 0; padding: 20px; }
+  .head { border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  h1 { font-size: 20px; margin: 0; } h2 { font-size: 14px; margin: 16px 0 2px; }
+  .sub { color: #666; font-size: 11px; margin: 0 0 6px; } .muted { color: #999; } .meta { color: #666; font-size: 10px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #555; border-bottom: 1px solid #999; padding: 4px; }
+  td { border-bottom: 1px solid #ddd; padding: 6px 4px; vertical-align: top; overflow-wrap: anywhere; }
+  tr { page-break-inside: avoid; } section { page-break-inside: auto; }
+  .ok { color: #15803d; } .bad { color: #b91c1c; }
+  .note1 + .note1 { margin-top: 4px; }
+  .tag { font-size: 10px; font-weight: 600; color: #555; border: 1px solid #bbb; border-radius: 3px; padding: 0 4px; vertical-align: middle; }
+  .sched { margin: 6px 0 0; }
+  .foot { margin-top: 18px; color: #777; font-size: 10px; }
+</style></head><body>
+<div class="head">
+  <div><h1>Inspection report</h1>
+    <div><b>${esc(proposal.client || '')}</b>${proposal.address ? ` · ${esc(proposal.address)}` : ''}</div>
+    ${where ? `<div class="sub">${esc(jobJurisdiction(proposal) || `${where} County`)}</div>` : ''}</div>
+  <div class="sub" style="text-align:right">${esc(company)}<br>As of ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+</div>
+${sections.length ? sections.join('') : '<p class="muted">No permit or inspection on file for this job.</p>'}
+${steps.length ? `<section><h2>Recorded on the job's steps</h2><table>
+  <thead><tr><th style="width:12%">Date</th><th style="width:24%">Step</th><th style="width:12%">Result</th><th style="width:16%">Inspector</th><th>Notes</th></tr></thead>
+  <tbody>${steps.map(a => `<tr><td>${a.date ? long(a.date) : ''}</td><td>${esc(a.key.replace(/_insp$/, '').replace(/_/g, ' '))}</td><td class="${resultClass(a.result)}"><b>${esc(a.result || '')}</b></td><td>${esc(a.inspector || '')}</td><td>${esc(a.notes || '')}</td></tr>`).join('')}</tbody></table></section>` : ''}
+${manual?.code ? `<p class="sched"><b>Next inspection (office):</b> ${esc(inspectionLabel(manual.code))}${manual.date ? ` on ${long(manual.date)}` : ''}</p>` : ''}
+<p class="foot">From the county's permit site as last read ${proposal.countyPermit?.checkedAt ? `on ${new Date(proposal.countyPermit.checkedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}, and the office's own records.</p>
 </body></html>`
 }
