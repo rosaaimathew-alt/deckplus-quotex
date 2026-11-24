@@ -9,6 +9,7 @@ import { threadOf, markChatSeen, chatTime, unreadCount } from '../lib/subChat'
 import { tasksForJob, subNameOf } from '../lib/subTasks'
 import { uploadChatPhoto } from '../lib/taskPhotos'
 import { Thumb } from './TaskPhotos'
+import ZoomImage from './ZoomImage'
 import { tr } from '../lib/lang'
 
 // side: 'pm' (Deck Plus staff) or 'sub' (the sub's manager).  big: phone-sized controls.
@@ -108,8 +109,8 @@ export default function JobChat({ proposalId, subId, subUserId, client = '', sid
         </button>
       </form>
       {open && (
-        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-3" onClick={() => setOpen(null)}>
-          <img src={open} alt="" className="max-w-full max-h-full object-contain" />
+        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-3" role="dialog" aria-label="Photo">
+          <ZoomImage key={open} src={open} onTap={() => setOpen(null)} />
           <button type="button" onClick={() => setOpen(null)} className="absolute top-4 right-4 h-11 w-11 rounded-full bg-white/15 text-white flex items-center justify-center" aria-label="Close"><X size={22} /></button>
         </div>
       )}

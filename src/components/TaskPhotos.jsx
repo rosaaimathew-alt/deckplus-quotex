@@ -5,6 +5,7 @@ import { useRef, useState } from 'react'
 import { tr } from '../lib/lang'
 import { Camera, X, Loader2 } from 'lucide-react'
 import { useStore } from '../store'
+import ZoomImage from './ZoomImage'
 import { photosByDay, uploadTaskPhoto, usePhotoUrl } from '../lib/taskPhotos'; import { notify } from '../lib/notify'
 
 const dayName = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -34,8 +35,8 @@ export function PhotoDays({ task, big = false, maxDays = 30 }) {
         </div>
       ))}
       {open && (
-        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-3" onClick={() => setOpen(null)}>
-          <img src={open} alt="" className="max-w-full max-h-full object-contain" />
+        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-3" role="dialog" aria-label="Photo">
+          <ZoomImage key={open} src={open} onTap={() => setOpen(null)} />
           <button type="button" onClick={() => setOpen(null)} className="absolute top-4 right-4 h-11 w-11 rounded-full bg-white/15 text-white flex items-center justify-center" aria-label="Close"><X size={22} /></button>
         </div>
       )}
