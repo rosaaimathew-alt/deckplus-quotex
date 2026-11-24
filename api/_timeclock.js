@@ -91,10 +91,11 @@ export async function mapJobSites(userId) {
 
 // Every open job (won or brought over, not closed), in the shape mapJobs takes.
 async function openJobs(sb, orgId) {
-  const { data, error } = await sb.from('proposals').select('id, data->jobData->completedStages, data->jobData->invoicesOnly')
+  const { data, error } = await sb.from('proposals').select('id, data->jobData->completedStages, data->jobData->invoicesOnly, followUp:data->jobData->paint->followUp')
     .eq('org_id', orgId).is('deleted_at', null).in('status', ['Won', 'Imported'])
   if (error) throw error
-  return (data || []).filter(p => !p.invoicesOnly && !(p.completedStages || []).includes('closed'))
+  // open jobs, and closed ones back for warranty work
+  return (data || []).filter(p => !p.invoicesOnly && (!(p.completedStages || []).includes('closed') || p.followUp?.kind === 'warranty'))
     .map(p => ({ data: { proposalId: String(p.id) } }))
 }
 
