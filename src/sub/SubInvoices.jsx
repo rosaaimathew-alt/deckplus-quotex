@@ -8,6 +8,8 @@
 // trade sends one invoice per job (lib/subDraws drawsAllowed). The office
 // approves it or sends it back with a reason.
 import { useEffect, useMemo, useRef, useState } from 'react'
+import SubNotice from './SubNotice'
+import { useSubNotices } from './useSubNotices'
 import { tr, getLang } from '../lib/lang'
 import { useNavigate } from 'react-router-dom'
 import { FileText, Send, Paperclip, X, Check } from 'lucide-react'
@@ -88,6 +90,7 @@ function WindowClosed() {
 function SendButton() {
   const navigate = useNavigate()
   const windowOpen = useWindowOpen()
+  const notices = useSubNotices()   // a notice from the office (a holiday deadline) replaces the usual line
   if (!windowOpen) return <WindowClosed />
   return (
     <div className="space-y-1.5">
@@ -95,7 +98,7 @@ function SendButton() {
         className="w-full h-14 rounded-xl bg-[var(--brand-600)] text-white text-base font-bold flex items-center justify-center gap-2">
         <Send size={20} /> {tr('Send an invoice')}
       </button>
-      <p className="text-sm text-gray-500 text-center">{tr('Send by Wednesday at midnight.')}</p>
+      {!notices.length && <p className="text-sm text-gray-500 text-center">{tr('Send by Wednesday at midnight.')}</p>}
     </div>
   )
 }
@@ -136,6 +139,7 @@ export function InvoicesScreen() {
     <div className="space-y-4">
       <BackButton />
       <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
+      <SubNotice />
       {invoiceable(tasks, terms, draws, free).length > 0 && <SendButton />}
       <WaitingOnAmount jobs={waiting(tasks, terms, free)} />
       {list.length === 0 && <p className="text-sm text-gray-500 px-1">No invoices sent yet.</p>}
