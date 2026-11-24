@@ -135,7 +135,9 @@ export default function TimeClock() {
   const punch = async (action) => {
     setBusy(action); setMsg(null)
     try {
-      const pos = await locate()
+      let pos = await locate()
+      // The paint PM clocks in and out wherever they are, with or without a location
+      if (pos.error && me?.role === 'paint') pos = { lat: null, lng: null, acc: null }
       if (pos.error) { setMsg({ tone: 'bad', text: why(pos, st?.dayEnd, action) }); return }
       if (DEMO) {
         const now = new Date().toISOString()
