@@ -8,6 +8,7 @@ import { useStore } from '../store'
 import { deleteJobFile, jobPhotos, uploadJobFile, usePhotoUrl } from '../lib/taskPhotos'
 import { subNameOf } from '../lib/subTasks'
 import { PhotoDays } from './TaskPhotos'
+import ZoomImage from './ZoomImage'
 import { btnPrimary } from '../pages/books/ui'
 
 const dayOf = (iso) => {
@@ -50,15 +51,18 @@ export function PhotoViewer({ docs, index, onIndex, onClose, onRemove }) {
   const round = 'h-11 w-11 rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25'
   const stop = (fn) => (e) => { e.stopPropagation(); fn() }
   return (
-    <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-3" onClick={onClose} role="dialog" aria-label="Photo">
-      {url ? <img src={url} alt={doc.name || ''} className="max-w-full max-h-full object-contain" /> : <Loader size={28} className="animate-spin text-white/70" />}
+    <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-3" role="dialog" aria-label="Photo">
+      {url
+        ? <ZoomImage key={url} src={url} alt={doc.name || ''} onTap={onClose}
+            onSwipe={(d) => { const i = index + d; if (i >= 0 && i < docs.length) onIndex(i) }} />
+        : <Loader size={28} className="animate-spin text-white/70" />}
       <div className="absolute top-4 right-4 flex items-center gap-2">
         {onRemove && <button type="button" onClick={stop(() => onRemove(doc))} className={round} aria-label="Delete photo"><Trash2 size={18} /></button>}
         <button type="button" onClick={stop(onClose)} className={round} aria-label="Close"><X size={22} /></button>
       </div>
       {index > 0 && <button type="button" onClick={stop(() => onIndex(index - 1))} className={`${round} absolute left-3 top-1/2 -translate-y-1/2`} aria-label="Previous photo"><ChevronLeft size={24} /></button>}
       {index < docs.length - 1 && <button type="button" onClick={stop(() => onIndex(index + 1))} className={`${round} absolute right-3 top-1/2 -translate-y-1/2`} aria-label="Next photo"><ChevronRight size={24} /></button>}
-      <p className="absolute bottom-4 inset-x-0 text-center text-xs text-white/70">{index + 1} of {docs.length}{doc.by ? ` · ${doc.by}` : ''}</p>
+      <p className="absolute bottom-4 inset-x-0 text-center text-xs text-white/70 pointer-events-none">{index + 1} of {docs.length}{doc.by ? ` · ${doc.by}` : ''}</p>
     </div>
   )
 }
