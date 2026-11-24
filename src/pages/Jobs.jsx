@@ -207,14 +207,23 @@ const STAGE_TEMPLATES = {
 // the ceiling and before painting; a gas one also needs the mechanical gas
 // line inspected at the framing inspection. Keys the old porch-over-deck
 // list used are kept, so steps already checked stay checked.
-function porchOnDeckStages(text) {
+// It starts with the approvals (HOA, zoning, building permit), so a newly sold
+// porch waits in Permitting like any other build. Jobs that were already under
+// way before the approvals were added carry jobData.noApprovalSteps.
+function porchOnDeckStages(text, proposal) {
   const enclosure = /eze[- ]?breeze/i.test(text) ? 'Eze-Breeze'
     : /screen/i.test(text) ? 'Screen'
     : 'Screen or Eze-Breeze'
   const lvp = /\bLVP\b|luxury vinyl|vinyl plank/i.test(text)
   const fireplace = /fire ?place/i.test(text)
   const gas = fireplace && /\bgas\b|propane|ventless|vent[- ]free|natural gas|\bLP\b/i.test(text)
+  const approvals = proposal?.jobData?.noApprovalSteps ? [] : [
+    { key: 'hoa',                 label: 'HOA Approval' },
+    { key: 'zoning',              label: 'Zoning Permit' },
+    { key: 'building',            label: 'Building Permit' },
+  ]
   return [
+    ...approvals,
     { key: 'demo_footings',       label: 'Demo / Footings' },
     { key: 'footing_insp',        label: 'Footing Inspection' },
     { key: 'materials',           label: 'Material Delivery' },
@@ -289,7 +298,7 @@ function stagesForType(type, proposal) {
   if (type === 'Deck (New)')                    return STAGE_TEMPLATES.deck_new
   if (type === 'Ground Level Porch')            return STAGE_TEMPLATES.porch_ground
   if (type === 'Ground Level Porch + Windows')  return STAGE_TEMPLATES.porch_ground_windows
-  if (type === 'Porch Over Deck' || type === 'Porch Over Deck + Windows') return porchOnDeckStages(jobScopeText(proposal))
+  if (type === 'Porch Over Deck' || type === 'Porch Over Deck + Windows') return porchOnDeckStages(jobScopeText(proposal), proposal)
   if (type === 'Pergola')                       return STAGE_TEMPLATES.pergola
   if (type === 'Gazebo')                        return STAGE_TEMPLATES.gazebo
   if (type === 'Hardscape / Patio')             return STAGE_TEMPLATES.hardscape
@@ -369,7 +378,7 @@ function standardStages(proposal) {
   // A screen porch, sunroom or Eze-Breeze built on a deck: the office's progression
   const enclosed = types.some(t => ['Screened Porch', 'Sunroom', 'Eze-Breeze Porch'].includes(t)) || /eze[- ]?breeze|screen ?eze|screen porch|sunroom/i.test(text)
   const onGround = /ground level|on (a |the )?(concrete )?slab/i.test(text)
-  if (enclosed && !onGround && !types.includes('Porch Conversion')) return porchOnDeckStages(text)
+  if (enclosed && !onGround && !types.includes('Porch Conversion')) return porchOnDeckStages(text, proposal)
 
   const isDeckType  = types.some(t => ['Deck', 'Deck (New)', 'Deck (Resurface / Rebuild)'].includes(t))
   const isPorchType = types.some(t => ['Screened Porch', 'Open Porch', 'Ground Level Porch', 'Porch Over Deck'].includes(t))
