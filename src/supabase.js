@@ -90,6 +90,8 @@ export const timeclockOut  = (pos) => rpc('timeclock_out', at(pos))
 export const timeclockPing = (pos) => rpc('timeclock_ping', at(pos))
 export const timeclockWeek = (start) => rpc('timeclock_week', { p_start: start || null })
 export const timeclockSetPayrollTo = (emails) => rpc('timeclock_set_payroll_to', { p_emails: emails })
+// The office corrects a shift: times 'HH:MM' on the shift's own day, out '' keeps an open shift open
+export const timeclockFix = (shiftId, inTime, outTime, reason) => rpc('timeclock_fix', { p_shift: shiftId, p_in: inTime, p_out: outTime || '', p_reason: reason })
 // Put this person's paint jobs on the map from their addresses (api/_timeclock.js).
 export const mapJobSites = () => fetch('/api/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'job-sites' }) })
   .then(r => r.json()).catch(() => ({ mapped: 0 }))

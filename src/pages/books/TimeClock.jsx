@@ -11,9 +11,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react'
 import StatCard from '../../components/StatCard'
-import { timeclockWeek, timeclockSetPayrollTo, mapJobSites } from '../../supabase'
+import { timeclockWeek, timeclockSetPayrollTo, timeclockFix, mapJobSites } from '../../supabase'
 import { DEMO } from '../../demo'
-import { todayET, weekStartOf, addDaysStr, weekDays, dayName, clockTime, hm, summarize, payrollCsv, gapsOf, offSitePings } from '../../lib/timeClock'
+import { TZ, todayET, weekStartOf, addDaysStr, weekDays, dayName, clockTime, hm, summarize, payrollCsv, gapsOf, offSitePings } from '../../lib/timeClock'
 import { PageHead, Toolbar, btnHead, inputCls } from './ui'
 
 const feet = (m) => (m == null ? '' : m >= 161 ? `${(m / 1609.34).toFixed(1)} mi` : `${Math.round(m * 3.281)} ft`)
@@ -110,10 +110,44 @@ function PayrollTo({ emails, onSaved }) {
   )
 }
 
+// 24-hour "HH:MM" where the crews work, for a time input
+const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : '')
+
+// The office corrects a shift: a painter tapped Clock out by mistake, or forgot
+// to clock out. The shift keeps a note of who changed it, from what, and why.
+function FixShift({ shift, onDone, onCancel }) {
+  const [inT, setIn] = useState(hhmm(shift.in))
+  const [outT, setOut] = useState(hhmm(shift.out))
+  const [why, setWhy] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const save = async () => {
+    setBusy(true); setErr('')
+    try { await timeclockFix(shift.id, inT, outT, why.trim()); onDone() } catch (e) { setErr(e.message) } finally { setBusy(false) }
+  }
+  return (
+    <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs text-gray-600">Clock in<input type="time" value={inT} onChange={e => setIn(e.target.value)} className={`${inputCls} block mt-0.5 w-32`} /></label>
+        <label className="text-xs text-gray-600">Clock out<input type="time" value={outT} onChange={e => setOut(e.target.value)} className={`${inputCls} block mt-0.5 w-32`} /></label>
+      </div>
+      <input value={why} onChange={e => setWhy(e.target.value)} placeholder="Why (e.g. clocked out by mistake)" aria-label="Why" className={`${inputCls} w-full`} />
+      {!shift.out && <p className="text-xs text-gray-500">Leave Clock out empty to keep the shift running.</p>}
+      {err && <p className="text-xs text-red-700">{err}</p>}
+      <div className="flex gap-2">
+        <button onClick={save} disabled={busy || !inT || !why.trim()} className="px-3 py-1.5 rounded-lg bg-[var(--brand-600)] text-white text-sm font-semibold disabled:opacity-40">{busy ? 'Saving…' : 'Save'}</button>
+        <button onClick={onCancel} className="px-3 py-1.5 text-sm text-gray-600">Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 export default function TimeClock() {
   const [params, setParams] = useSearchParams()
   const start = weekStartOf(/^\d{4}-\d{2}-\d{2}$/.test(params.get('week') || '') ? params.get('week') : todayET())
   const [res, setRes] = useState({ key: null })   // { key: the week it is for, data | error }
+  const [reload, setReload] = useState(0)   // bumped after a shift is corrected
+  const [fixing, setFixing] = useState(null)   // the shift being corrected
   const [who, setWho] = useState(null)   // a painter's userId: the map and shifts show only theirs
   const [day, setDay] = useState('')
 
@@ -124,7 +158,7 @@ export default function TimeClock() {
     const load = DEMO ? Promise.resolve({ start, shifts: [], sites: [], refused: [], payrollTo: [], radius: 300 }) : timeclockWeek(start)
     load.then(d => { if (live) setRes({ key: start, data: d }) }).catch(e => { if (live) setRes({ key: start, error: e.message }) })
     return () => { live = false }
-  }, [start])
+  }, [start, reload])
   const data = res.key === start ? res.data : null
   const error = res.key === start ? res.error || '' : ''
   // Get the paint jobs with painters on them onto the map ahead of time
@@ -223,7 +257,8 @@ export default function TimeClock() {
                 const g = gapsOf(s), off = offSitePings(s), checks = s.pings.filter(p => p.kind === 'ping').length
                 return (
                   <div key={s.id} className="px-4 py-3 text-sm">
-                    <p className="font-semibold text-gray-900">{s.worker} · {dayName(s.day)}</p>
+                    <p className="font-semibold text-gray-900 flex items-center gap-2"><span className="flex-1 min-w-0">{s.worker} · {dayName(s.day)}</span>
+                      {fixing !== s.id && <button onClick={() => setFixing(s.id)} className="text-xs font-medium text-[var(--brand-700)] hover:underline">Fix</button>}</p>
                     <p className="text-gray-600 truncate">{s.client}{s.address ? ` · ${s.address}` : ''}</p>
                     <p className="text-gray-800 tabular-nums">
                       {clockTime(s.in)} – {s.out ? clockTime(s.out) : 'now'} · <strong>{hm(s.hours)}</strong>
@@ -232,6 +267,7 @@ export default function TimeClock() {
                     </p>
                     <p className="text-xs text-gray-500">{checks} location check{checks === 1 ? '' : 's'}{off.length ? <span className="text-red-600"> · {off.length} away from the job</span> : ''}
                       {g.length > 0 && <span className="text-amber-700"> · no location {g.map(x => `${clockTime(x.from)}–${clockTime(x.to)}`).join(', ')}</span>}</p>
+                    {fixing === s.id && <FixShift shift={s} onCancel={() => setFixing(null)} onDone={() => { setFixing(null); setReload(n => n + 1) }} />}
                   </div>
                 )
               })}

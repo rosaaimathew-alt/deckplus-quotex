@@ -82,6 +82,7 @@ export default function TimeClock() {
   const [st, setSt] = useState(DEMO ? demoClock : null)
   const [busy, setBusy] = useState('')     // 'in' | 'out' while finding the location / saving
   const [msg, setMsg] = useState(null)     // { tone: 'bad' | 'ok', text }
+  const [confirmOut, setConfirmOut] = useState(false)   // Clock out asks first: one stray tap shouldn't end the day
   const [, tick] = useState(0)
   const mapped = useRef(false)
 
@@ -176,8 +177,16 @@ export default function TimeClock() {
 
       {msg && <p role="status" className={`text-sm rounded-xl px-3 py-2 ${msg.tone === 'bad' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-white text-green-800 border border-green-200'}`}>{msg.text}</p>}
 
-      {st && (
-        <button onClick={() => punch(open ? 'out' : 'in')} disabled={!!busy}
+      {st && open && confirmOut && !busy ? (
+        <div className="rounded-xl border border-gray-300 bg-white p-3 space-y-2">
+          <p className="text-base font-semibold text-gray-900">{tr('Clock out now?')}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setConfirmOut(false)} className="min-h-[52px] rounded-xl border border-gray-300 bg-white text-base font-semibold text-gray-800 active:bg-gray-50">{tr('Keep working')}</button>
+            <button onClick={() => { setConfirmOut(false); punch('out') }} className="min-h-[52px] rounded-xl bg-gray-900 text-white text-base font-bold active:bg-black">{tr('Yes, clock out')}</button>
+          </div>
+        </div>
+      ) : st && (
+        <button onClick={() => (open ? setConfirmOut(true) : punch('in'))} disabled={!!busy}
           className={`w-full min-h-[56px] rounded-xl text-lg font-bold flex items-center justify-center gap-2 disabled:opacity-70 ${open ? 'bg-gray-900 text-white active:bg-black' : 'bg-[var(--brand-600)] text-white active:bg-[var(--brand-700)]'}`}>
           {busy ? <><Loader2 size={20} className="animate-spin" /> {tr('Finding your location…')}</>
             : open ? <><LogOut size={20} /> {tr('Clock out')}</> : <><LogIn size={20} /> {tr('Clock in')}</>}
