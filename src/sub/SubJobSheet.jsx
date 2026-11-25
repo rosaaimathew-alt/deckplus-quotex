@@ -94,7 +94,7 @@ export function JobSheet({ task }) {
     // the job's own text (types, quote lines, summary, permits) when the database sends it
     ...(typeof sheet.checklistText === 'string' ? { checklistText: sheet.checklistText } : {}),
     // the job types the PM picked and the order they put the steps in
-    jobData: { projectTypeOverride: sheet.projectTypeOverride || undefined, projectTypeOverrides: sheet.projectTypeOverrides || undefined, stageOrder: sheet.stageOrder || undefined },
+    jobData: { projectTypeOverride: sheet.projectTypeOverride || undefined, projectTypeOverrides: sheet.projectTypeOverrides || undefined, stageOrder: sheet.stageOrder || undefined, checklistEdits: sheet.checklistEdits || undefined, noApprovalSteps: sheet.noApprovalSteps || undefined },
     contractDraft: { projectTypes: sheet.projectTypes || [], scopeBullets: sheet.hasWindows ? ['window'] : [] },
   }) : null
   const done = new Set(sheet?.completedStages || [])

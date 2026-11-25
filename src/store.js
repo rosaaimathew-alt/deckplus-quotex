@@ -1580,6 +1580,15 @@ export const useStore = create(
               : c
           ),
         })),
+      // A checklist item's wording, corrected (an empty one keeps the old text)
+      editChecklistItem: (id, itemId, text) =>
+        set((s) => ({
+          checklists: s.checklists.map((c) =>
+            c.id === id && String(text || '').trim()
+              ? { ...c, items: (c.items || []).map((it) => (it.id === itemId ? { ...it, text: String(text).trim() } : it)), updatedAt: new Date().toISOString() }
+              : c
+          ),
+        })),
       deleteChecklistItem: (id, itemId) =>
         set((s) => ({
           checklists: s.checklists.map((c) =>

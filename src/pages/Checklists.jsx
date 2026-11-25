@@ -12,6 +12,7 @@ export default function Checklists() {
   const addChecklistItem    = useStore(s => s.addChecklistItem)
   const toggleChecklistItem = useStore(s => s.toggleChecklistItem)
   const deleteChecklistItem = useStore(s => s.deleteChecklistItem)
+  const editChecklistItem   = useStore(s => s.editChecklistItem)
 
   const [newTitle, setNewTitle] = useState('')
   const me = currentUserEmail()
@@ -60,6 +61,7 @@ export default function Checklists() {
               onAddItem={t => addChecklistItem(list.id, t)}
               onToggle={itemId => toggleChecklistItem(list.id, itemId, me)}
               onDeleteItem={itemId => deleteChecklistItem(list.id, itemId)}
+              onEditItem={(itemId, t) => editChecklistItem(list.id, itemId, t)}
             />
           ))}
         </div>
@@ -68,13 +70,18 @@ export default function Checklists() {
   )
 }
 
-function ChecklistCard({ list, me, onRename, onDelete, onAddItem, onToggle, onDeleteItem }) {
+function ChecklistCard({ list, me, onRename, onDelete, onAddItem, onToggle, onDeleteItem, onEditItem }) {
   const items = list.items || []
   const done  = items.filter(i => i.done).length
   const pct   = items.length ? Math.round(done / items.length * 100) : 0
   const [itemText, setItemText] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState(list.title)
+  const [editing, setEditing] = useState(null)   // { id, text }: the item being reworded
+  const saveItem = () => {
+    if (editing && editing.text.trim()) onEditItem(editing.id, editing.text)
+    setEditing(null)
+  }
 
   const add = () => {
     const t = itemText.trim()
@@ -125,7 +132,14 @@ function ChecklistCard({ list, me, onRename, onDelete, onAddItem, onToggle, onDe
                 : <Square size={18} className="text-gray-300 hover:text-gray-400" />}
             </button>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm ${it.done ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{it.text}</p>
+              {editing?.id === it.id ? (
+                <input autoFocus value={editing.text} onChange={e => setEditing({ id: it.id, text: e.target.value })}
+                  onBlur={saveItem} onKeyDown={e => { if (e.key === 'Enter') saveItem(); if (e.key === 'Escape') setEditing(null) }}
+                  aria-label="Item" className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+              ) : (
+                <button type="button" onClick={() => setEditing({ id: it.id, text: it.text })} title="Edit"
+                  className={`block w-full text-left text-sm hover:text-[var(--brand-700)] ${it.done ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{it.text}</button>
+              )}
               {it.done && it.doneBy && (
                 <p className="text-[11px] text-gray-400">
                   ✓ by {shortEmail(it.doneBy)}{it.doneBy === me ? ' (you)' : ''}{it.doneAt ? ` · ${new Date(it.doneAt).toLocaleDateString()}` : ''}
