@@ -30,8 +30,10 @@ const clean = (s, max) => String(s ?? '').trim().slice(0, max)
 const EMAIL_RE = /^[^\s@",()\\]+@[^\s@",()\\]+\.[^\s@",()\\]+$/   // no quotes/commas/parens: the value goes into a PostgREST filter
 const STREET_RE = /^\d+[A-Za-z]?(-\d+)?\s+\S.*$/          // "123 Main St", "12B Oak Ave", "10-12 Elm Rd"
 const ZIP_RE = /^\d{5}(-\d{4})?$/
-const US_STATES = new Set(('AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV ' +
-  'NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR').split(' '))
+// Deck Plus only works in North and South Carolina: a booking anywhere else
+// (a stray lead from Florida) is refused, and the ZIP has to be in the state
+// (NC ZIPs start 270–289, SC 290–299).
+const SERVED_STATES = { NC: /^2[78]\d{3}/, SC: /^29\d{3}/ }
 
 // The project types the booking form offers (public/book.html). The choice is
 // kept at the top of the booking's notes, so it shows in the emails and leads.
@@ -60,8 +62,9 @@ function validateLead(body) {
   if (!lead.last_name)                errors.lastName  = 'Enter your last name.'
   if (!STREET_RE.test(lead.street))   errors.street    = 'Enter your street number and street name.'
   if (!lead.city)                     errors.city      = 'Enter your city.'
-  if (!US_STATES.has(lead.state))     errors.state     = 'Choose your state.'
+  if (!SERVED_STATES[lead.state])    errors.state     = 'We serve North and South Carolina.'
   if (!ZIP_RE.test(lead.zip))         errors.zip       = 'Enter a 5-digit ZIP code.'
+  else if (SERVED_STATES[lead.state] && !SERVED_STATES[lead.state].test(lead.zip)) errors.zip = `That ZIP code isn't in ${lead.state === 'NC' ? 'North' : 'South'} Carolina.`
   if (!lead.phone)                    errors.phone     = 'Enter a 10-digit phone number.'
   if (!EMAIL_RE.test(lead.email))     errors.email     = 'Enter a valid email address.'
   if (project && !PROJECT_TYPES.includes(project)) errors.projectType = 'Choose your project.'
