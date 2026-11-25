@@ -352,6 +352,7 @@ function arrangeStages(list, order) {
 //   labels  { key: 'New wording' }   a step renamed
 //   added   [{ key, label }]          a step of their own (goes in before Job Closed)
 //   removed [key]                     a step taken off (Job Closed always stays)
+//   custom  true                      built from blank: no standard steps at all
 function applyChecklistEdits(list, edits) {
   if (!list || !edits || typeof edits !== 'object') return list
   const labels = edits.labels && typeof edits.labels === 'object' ? edits.labels : {}
@@ -366,7 +367,10 @@ function applyChecklistEdits(list, edits) {
 }
 
 export function getStages(proposal) {
-  const list = arrangeStages(applyChecklistEdits(standardStages(proposal), proposal.jobData?.checklistEdits), proposal.jobData?.stageOrder)
+  // A checklist the PM built from blank (checklistEdits.custom): only their own steps, then Job Closed
+  const custom = !!proposal.jobData?.checklistEdits?.custom
+  const base = custom ? [{ key: 'closed', label: 'Job Closed' }] : standardStages(proposal)
+  const list = arrangeStages(applyChecklistEdits(base, proposal.jobData?.checklistEdits), proposal.jobData?.stageOrder)
   // "No permit needed": no permit or inspection steps to wait on
   return list && noPermit(proposal) ? list.filter(s => !PERMIT_KEYS.includes(s.key) && !isInspectionKey(s.key)) : list
 }
@@ -1933,7 +1937,15 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
     saveEdits({ added: [...(edits.added || []), { key: `my_${n}`, label: text }] })
     setNewStep('')
   }
-  const edited = (jobData.stageOrder || []).length > 0 || Object.keys(edits.labels || {}).length > 0 || (edits.added || []).length > 0 || (edits.removed || []).length > 0
+  const custom = !!edits.custom
+  const startBlank = () => {
+    if (!window.confirm('Clear the standard steps and build this job\'s checklist yourself? Job Closed stays.')) return
+    saveEdits({ custom: true, removed: [], labels: {} })
+    updateJobData(proposal.id, { stageOrder: null })
+    setArranging(true)
+  }
+  const buildOwn = () => { saveEdits({ custom: true }); setArranging(true) }
+  const edited = custom || (jobData.stageOrder || []).length > 0 || Object.keys(edits.labels || {}).length > 0 || (edits.added || []).length > 0 || (edits.removed || []).length > 0
   const removedSteps = (edits.removed || []).map(k => ({ key: k, label: baseLabel(k) })).filter(x => x.label)
   const moveStage = (i, by) => {
     const keys = stages.map(st => st.key)
@@ -2125,8 +2137,12 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                   <button type="button" onClick={() => setPickingTypes(v => !v)} aria-expanded={typesOpen} className="text-xs text-[var(--brand-700)] hover:underline">{typesOpen ? 'Done' : 'Change'}</button>
                   {pickedTypes.length > 0 && <button type="button" onClick={() => setJobTypes([])} className="text-xs text-gray-400 hover:text-red-500">reset</button>}
                   <div className="flex-1" />
-                  {!noType && stages.length > 1 && (
+                  {custom && <span className="text-xs text-gray-500">Custom checklist</span>}
+                  {!noType && (
                     <button type="button" onClick={() => setArranging(v => !v)} aria-pressed={arranging} className="text-xs text-[var(--brand-700)] hover:underline">{arranging ? 'Done' : 'Edit checklist'}</button>
+                  )}
+                  {arranging && !custom && (
+                    <button type="button" onClick={startBlank} className="text-xs text-gray-500 hover:text-[var(--brand-700)]">Start from blank</button>
                   )}
                   {arranging && edited && (
                     <button type="button" onClick={() => { if (window.confirm('Put this checklist back to the standard steps and order?')) updateJobData(proposal.id, { stageOrder: null, checklistEdits: null }) }}
@@ -2147,7 +2163,7 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
 
                 {noType ? (
                   <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-3 border border-amber-200">
-                    Pick the job type above to load its stage checklist.
+                    Pick the job type above to load its stage checklist, or <button type="button" onClick={buildOwn} className="font-semibold underline">build your own</button>.
                   </p>
                 ) : (
                 // One column, top to bottom, in the order the work happens
