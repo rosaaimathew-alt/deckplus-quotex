@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Users, Copy, X, KeyRound, CheckCircle2, UserMinus, SlidersHorizontal } from 'lucide-react'
 import { useStore } from '../store'
-import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword, setMemberRole, setMemberPermissions, setMemberPhone, setSubInvoiceFree } from '../supabase'
+import { createInvite, listInvites, revokeInvite, changePassword, removeMember, resetMemberPassword, setMemberRole, setMemberPermissions, setMemberPhone, setSubInvoiceFree, setRepRunsJobs } from '../supabase'
 import { NO_AMOUNT, invoiceFree } from '../lib/subDraws'
+import { RUNS_OWN_JOBS, runsOwnJobs } from '../lib/pmAssign'
 import { permissionGroups, departmentAllows } from '../permissions'
 import { DEMO } from '../demo'
 
@@ -91,6 +92,19 @@ export function TeamCard() {
     put(next); setFreeBusy(m.id)
     try {
       const r = await setSubInvoiceFree(m.id, on)
+      if (r?.permissions) put(r.permissions)
+    } catch (e) { put(before); window.alert(e.message) }
+    setFreeBusy('')
+  }
+  // Office: a salesperson who also manages the jobs they sell (lib/pmAssign)
+  const setRunsOwn = async (m, on) => {
+    const put = (permissions) => useStore.setState(s => ({ members: (s.members || []).map(x => x.id === m.id ? { ...x, permissions } : x) }))
+    const before = m.permissions || {}
+    const next = { ...before }
+    if (on) next[RUNS_OWN_JOBS] = true; else delete next[RUNS_OWN_JOBS]
+    put(next); setFreeBusy(m.id)
+    try {
+      const r = await setRepRunsJobs(m.id, on)
       if (r?.permissions) put(r.permissions)
     } catch (e) { put(before); window.alert(e.message) }
     setFreeBusy('')
@@ -244,6 +258,15 @@ export function TeamCard() {
                   <input type="checkbox" checked={invoiceFree(m)} disabled={freeBusy === m.id} onChange={e => setFree(m, e.target.checked)}
                     aria-label={`Invoice without an agreed amount: ${m.displayName || m.email}`} />
                   Invoice without an agreed amount
+                </label>
+              )}
+              {/* A salesperson who also runs the jobs they sell (repairs) */}
+              {m.role === 'rep' && (isAdmin || me?.role === 'office') && !DEMO && (
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 shrink-0 cursor-pointer"
+                  title="They become the PM on the jobs they sell and can book subs, chat with them and follow inspections on those jobs only.">
+                  <input type="checkbox" checked={runsOwnJobs(m)} disabled={freeBusy === m.id} onChange={e => setRunsOwn(m, e.target.checked)}
+                    aria-label={`Manages their own jobs: ${m.displayName || m.email}`} />
+                  Manages their own jobs
                 </label>
               )}
               {canAccess(m) && (

@@ -136,7 +136,8 @@ begin
   select * into t from public.sub_tasks where org_id = my_org and id = p_id and deleted_at is null;
   if not found then return null; end if;
   is_paint := coalesce((t.data->>'paint')::boolean, false);
-  staff := r in ('pm', 'office', 'admin') or (r = 'paint' and is_paint);
+  -- (a salesperson who manages their own jobs, on those jobs: supabase/rep_runs_jobs.sql)
+  staff := r in ('pm', 'office', 'admin') or (r = 'paint' and is_paint) or (r = 'rep' and public.rep_runs_job(t.data->>'proposalId'));
 
   if p_kind in ('booked', 'changed', 'inspection', 'inspection_result') and not staff then return null; end if;
   -- ("is not distinct from": a booking with nobody on it has no crew_id, and a plain = would be unknown, not false)

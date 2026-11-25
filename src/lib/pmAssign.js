@@ -31,9 +31,16 @@ export function workKind(p) {
 // Signed: the contract is signed, or the job came over from Knowify sold
 export const jobSigned = (p) => !!p?.contractDraft?.signed || p?.status === 'Imported'
 
-// The PM the rule gives a job, or null (already has one, not signed, kind unknown)
-export function pmFor(p, rules) {
+// A salesperson who manages the jobs they sell (Settings › Team, "Manages
+// their own jobs"; supabase/rep_runs_jobs.sql)
+export const RUNS_OWN_JOBS = 'pm.ownJobs'
+export const runsOwnJobs = (member) => member?.permissions?.[RUNS_OWN_JOBS] === true
+
+// The PM the rule gives a job, or null (already has one, not signed, kind unknown).
+// runsOwn: ids of salespeople who manage the jobs they sell; their jobs go to them.
+export function pmFor(p, rules, runsOwn = null) {
   if (!p || p.pmId || !jobSigned(p)) return null
+  if (p.ownerId && runsOwn?.has(p.ownerId)) return p.ownerId
   const kind = workKind(p)
   return (kind && rules?.[kind]) || null
 }

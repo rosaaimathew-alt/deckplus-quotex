@@ -23,8 +23,16 @@ const ROLES = ['client', 'builder', 'gc']
 async function assignPm(proposalId) {
   if (proposalId == null) return
   const sb = db()
-  const { data: row } = await sb.from('proposals').select('id, org_id, data').eq('id', proposalId).is('deleted_at', null).maybeSingle()
+  const { data: row } = await sb.from('proposals').select('id, org_id, owner_id, data').eq('id', proposalId).is('deleted_at', null).maybeSingle()
   if (!row || row.data?.pmId) return
+  // A salesperson who manages the jobs they sell (supabase/rep_runs_jobs.sql) gets their own
+  if (row.owner_id) {
+    const { data: seller } = await sb.from('org_members').select('role, permissions').eq('org_id', row.org_id).eq('user_id', row.owner_id).maybeSingle()
+    if (seller?.role === 'rep' && seller.permissions?.['pm.ownJobs'] === true) {
+      await sb.from('proposals').update({ data: { ...row.data, pmId: row.owner_id } }).eq('id', row.id).is('data->>pmId', null)
+      return
+    }
+  }
   const kind = workKind(row.data)
   if (!kind) return
   const { data: rule } = await sb.from('pm_rules').select('user_id').eq('org_id', row.org_id).eq('kind', kind).maybeSingle()

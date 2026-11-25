@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabase, currentUserId, loadOrg, armAdapter, disarmAdapter, reserveIdBlock, loadDeferred, fetchPmRules } from './supabase'
 import { DEMO, DEMO_STORE_KEY, buildDemoSeed } from './demo'
 import { notify, alertForTaskChange } from './lib/notify'
-import { pmFor } from './lib/pmAssign'
+import { pmFor, runsOwnJobs } from './lib/pmAssign'
 import { ASSIGNABLE_ROLES, canDeleteTodo, personalTodos, todosIAssigned } from './lib/todos'
 import { HISTORICAL_JOBS, HISTORICAL_APPTS } from './historicalData'
 import { PORCH_BUILD_DEFAULTS, PORCH_BUILD_SCOPE_DEFAULTS } from './porchBuild'
@@ -179,8 +179,10 @@ const findJob = (get, id) => (get().proposals || []).find((x) => String(x.id) ==
 function autoAssignPm(get, set, ids) {
   const rules = get().pmRules
   if (!rules) return
+  // a salesperson who manages the jobs they sell gets their own (lib/pmAssign)
+  const runsOwn = new Set((get().members || []).filter(runsOwnJobs).map(m => m.id))
   const want = new Map()
-  for (const id of ids) { const who = pmFor(findJob(get, id), rules); if (who) want.set(String(id), who) }
+  for (const id of ids) { const who = pmFor(findJob(get, id), rules, runsOwn); if (who) want.set(String(id), who) }
   if (want.size) set((s) => ({ proposals: s.proposals.map((p) => (want.has(String(p.id)) && !p.pmId ? { ...p, pmId: want.get(String(p.id)) } : p)) }))
 }
 function tellPmIfInspectionsChanged(get, proposalId, before) {
