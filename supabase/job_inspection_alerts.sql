@@ -11,7 +11,8 @@ declare
   my_org uuid := public.auth_org(); r text := public.auth_role(); uid uuid := auth.uid();
   me public.org_members; pm public.org_members; job public.proposals; who jsonb := '[]'::jsonb;
 begin
-  if my_org is null or uid is null or r is null or r not in ('pm', 'office', 'admin') then return null; end if;
+  -- (a salesperson who manages their own jobs counts on those jobs: supabase/rep_runs_jobs.sql)
+  if my_org is null or uid is null or r is null or (r not in ('pm', 'office', 'admin') and not public.rep_runs_job(p_id)) then return null; end if;
   select * into me from public.org_members where org_id = my_org and user_id = uid;
   select * into job from public.proposals where org_id = my_org and id::text = p_id and deleted_at is null;
   if not found then return null; end if;

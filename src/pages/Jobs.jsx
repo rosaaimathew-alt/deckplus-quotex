@@ -20,6 +20,7 @@ import { booksIndex, jobMoneyFromIndex, money0 } from '../lib/books'
 import { useJobCostOf } from '../lib/jobCost'
 import { JobSummary, JobTransactions, JobDocuments, jobDocuments } from './books/JobBooks'; import { shareFor } from '../lib/split'
 import { QuickPicks, MenuChip, SearchLine } from '../components/FilterBar'
+import { runsOwnJobs } from '../lib/pmAssign'
 import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, CalendarDays,
   FileSignature, ClipboardList, MapPin, DollarSign, X, Plus,
@@ -1826,7 +1827,8 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const setProposalPm = useStore(s => s.setProposalPm)
   const members = useStore(s => s.members)
   const canAssignPm = useStore(s => s.role === 'manager')
-  const pmOptions = (members || []).filter(m => m.role === 'pm' || m.id === proposal.pmId)
+  // PMs, plus the salesperson who sold this job when they manage their own jobs (lib/pmAssign)
+  const pmOptions = (members || []).filter(m => m.role === 'pm' || m.id === proposal.pmId || (runsOwnJobs(m) && m.id === proposal.ownerId))
   const pmName = (members || []).find(m => m.id === proposal.pmId)
   const pmLabel = pmName ? (pmName.displayName || pmName.email || '').split(' ')[0] : ''
   const { tabsOf } = useNav()
@@ -1875,7 +1877,9 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const saveNote = () => { updateJobData(proposal.id, { notes: noteText }); setEditingNote(false) }
 
   // Subs booked on this job: PMs and the office (reps can't read sub tasks).
-  const showSubs   = useStore(s => s.role !== 'sales')
+  // A salesperson who manages the jobs they sell does, on this one, what its PM does
+  const runsThisJob = useStore(s => s.role === 'sales' && runsOwnJobs(s.me) && !!s.me?.id && proposal.ownerId === s.me.id && proposal.pmId === s.me.id)
+  const showSubs   = useStore(s => s.role !== 'sales') || runsThisJob
   const jobTasks   = (useStore(s => s.subTasks) || []).filter(t => t && String(t.proposalId) === String(proposal.id))
   const photoCount = jobPhotoCount(proposal, showSubs ? jobTasks : [])
 
