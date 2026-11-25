@@ -61,6 +61,10 @@ begin
     -- several job types on one job, and the PM's own order of the steps (Jobs › Stages)
     'projectTypeOverrides', case when jsonb_typeof(jd->'projectTypeOverrides') = 'array' then jd->'projectTypeOverrides' else '[]'::jsonb end,
     'stageOrder', case when jsonb_typeof(jd->'stageOrder') = 'array' then jd->'stageOrder' else '[]'::jsonb end,
+    -- the PM's own edits to the checklist (renamed / added / removed steps), and a
+    -- porch job sold before the approval steps were added (Jobs › getStages)
+    'checklistEdits', case when jsonb_typeof(jd->'checklistEdits') = 'object' then jd->'checklistEdits' else null end,
+    'noApprovalSteps', coalesce((jd->>'noApprovalSteps')::boolean, false),
     'projectTypes', coalesce(d->'projectTypes', '[]'::jsonb),
     'hasWindows', (coalesce(d->'scopeBullets', '[]'::jsonb)::text || coalesce(d->'scopeLines', '[]'::jsonb)::text) ~* 'window|glass|enclos',
     -- What the job includes, as text, so the sub's checklist is the office's

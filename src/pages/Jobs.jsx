@@ -348,8 +348,25 @@ function arrangeStages(list, order) {
   return out
 }
 
+// The PM's own changes to one job's checklist (jobData.checklistEdits):
+//   labels  { key: 'New wording' }   a step renamed
+//   added   [{ key, label }]          a step of their own (goes in before Job Closed)
+//   removed [key]                     a step taken off (Job Closed always stays)
+function applyChecklistEdits(list, edits) {
+  if (!list || !edits || typeof edits !== 'object') return list
+  const labels = edits.labels && typeof edits.labels === 'object' ? edits.labels : {}
+  const removed = new Set((Array.isArray(edits.removed) ? edits.removed : []).filter(k => k !== 'closed'))
+  const added = (Array.isArray(edits.added) ? edits.added : [])
+    .filter(a => a && a.key && String(a.label || '').trim() && !removed.has(a.key) && !list.some(s => s.key === a.key))
+    .map(a => ({ key: a.key, label: String(a.label).trim() }))
+  const out = list.filter(s => !removed.has(s.key))
+  const ci = out.findIndex(s => s.key === 'closed')
+  if (ci >= 0) out.splice(ci, 0, ...added); else out.push(...added)
+  return out.map(s => (String(labels[s.key] || '').trim() ? { ...s, label: String(labels[s.key]).trim() } : s))
+}
+
 export function getStages(proposal) {
-  const list = arrangeStages(standardStages(proposal), proposal.jobData?.stageOrder)
+  const list = arrangeStages(applyChecklistEdits(standardStages(proposal), proposal.jobData?.checklistEdits), proposal.jobData?.stageOrder)
   // "No permit needed": no permit or inspection steps to wait on
   return list && noPermit(proposal) ? list.filter(s => !PERMIT_KEYS.includes(s.key) && !isInspectionKey(s.key)) : list
 }
@@ -1887,6 +1904,37 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
   const [arranging, setArranging] = useState(false)
   const typesOpen = pickingTypes || noType
   const setJobTypes = (list) => updateJobData(proposal.id, { projectTypeOverrides: list, projectTypeOverride: list[0] || null })
+  // Editing the checklist: rename, add or take off a step (applyChecklistEdits)
+  const edits = jobData.checklistEdits && typeof jobData.checklistEdits === 'object' ? jobData.checklistEdits : {}
+  const saveEdits = (next) => updateJobData(proposal.id, { checklistEdits: { labels: {}, added: [], removed: [], ...edits, ...next } })
+  const baseLabel = (key) => (standardStages(proposal) || []).find(st => st.key === key)?.label
+  const renameStage = (key, label) => {
+    const text = String(label || '').trim()
+    if (!text) return
+    if ((edits.added || []).some(a => a.key === key)) { saveEdits({ added: edits.added.map(a => (a.key === key ? { ...a, label: text } : a)) }); return }
+    const labels = { ...(edits.labels || {}) }
+    if (text === baseLabel(key)) delete labels[key]; else labels[key] = text
+    saveEdits({ labels })
+  }
+  const removeStage = (key) => {
+    if (key === 'closed') return
+    if ((edits.added || []).some(a => a.key === key)) { saveEdits({ added: edits.added.filter(a => a.key !== key) }); return }
+    saveEdits({ removed: [...new Set([...(edits.removed || []), key])] })
+  }
+  const restoreStage = (key) => saveEdits({ removed: (edits.removed || []).filter(k => k !== key) })
+  const [newStep, setNewStep] = useState('')
+  const addStage = () => {
+    const text = newStep.trim()
+    if (!text) return
+    // a key of its own, never one this job already has (a taken-off step's included)
+    const taken = new Set([...(stages || []).map(st => st.key), ...(edits.removed || []), ...(edits.added || []).map(a => a.key)])
+    let n = (edits.added || []).length + 1
+    while (taken.has(`my_${n}`)) n++
+    saveEdits({ added: [...(edits.added || []), { key: `my_${n}`, label: text }] })
+    setNewStep('')
+  }
+  const edited = (jobData.stageOrder || []).length > 0 || Object.keys(edits.labels || {}).length > 0 || (edits.added || []).length > 0 || (edits.removed || []).length > 0
+  const removedSteps = (edits.removed || []).map(k => ({ key: k, label: baseLabel(k) })).filter(x => x.label)
   const moveStage = (i, by) => {
     const keys = stages.map(st => st.key)
     const j = i + by
@@ -2078,10 +2126,11 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                   {pickedTypes.length > 0 && <button type="button" onClick={() => setJobTypes([])} className="text-xs text-gray-400 hover:text-red-500">reset</button>}
                   <div className="flex-1" />
                   {!noType && stages.length > 1 && (
-                    <button type="button" onClick={() => setArranging(v => !v)} aria-pressed={arranging} className="text-xs text-[var(--brand-700)] hover:underline">{arranging ? 'Done' : 'Reorder'}</button>
+                    <button type="button" onClick={() => setArranging(v => !v)} aria-pressed={arranging} className="text-xs text-[var(--brand-700)] hover:underline">{arranging ? 'Done' : 'Edit checklist'}</button>
                   )}
-                  {arranging && (jobData.stageOrder || []).length > 0 && (
-                    <button type="button" onClick={() => updateJobData(proposal.id, { stageOrder: null })} className="text-xs text-gray-400 hover:text-red-500">Standard order</button>
+                  {arranging && edited && (
+                    <button type="button" onClick={() => { if (window.confirm('Put this checklist back to the standard steps and order?')) updateJobData(proposal.id, { stageOrder: null, checklistEdits: null }) }}
+                      className="text-xs text-gray-400 hover:text-red-500">Reset</button>
                   )}
                 </div>
                 {typesOpen && (
@@ -2124,11 +2173,17 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                         {arranging ? (
                           // Arranging: the arrows move the step; ticking is off so a slip doesn't check one
                           <div className={row}>
-                            {inner}
+                            <span className="w-5 text-right text-xs tabular-nums text-gray-400 shrink-0">{i + 1}</span>
+                            <input key={stage.label} defaultValue={stage.label} aria-label={`Step ${i + 1}`}
+                              onBlur={e => { if (e.target.value.trim() !== stage.label) renameStage(stage.key, e.target.value) }}
+                              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                              className="flex-1 min-w-0 bg-white border border-gray-200 rounded-md px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300" />
                             <button type="button" onClick={() => moveStage(i, -1)} disabled={i === 0 || stage.key === 'closed'} aria-label={`Move ${stage.label} up`}
                               className="h-7 w-7 rounded-md border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:border-gray-300 disabled:opacity-30"><ChevronUp size={15} /></button>
                             <button type="button" onClick={() => moveStage(i, 1)} disabled={i === stages.length - 1 || stages[i + 1]?.key === 'closed'} aria-label={`Move ${stage.label} down`}
                               className="h-7 w-7 rounded-md border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:border-gray-300 disabled:opacity-30"><ChevronDown size={15} /></button>
+                            <button type="button" onClick={() => removeStage(stage.key)} disabled={stage.key === 'closed'} aria-label={`Take ${stage.label} off the checklist`}
+                              className="h-7 w-7 rounded-md border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-red-600 hover:border-red-200 disabled:opacity-30"><X size={15} /></button>
                           </div>
                         ) : (
                           stage.key === 'closed'
@@ -2142,6 +2197,22 @@ function JobCard({ proposal, jobMoney = null, focus = false }) {
                     )
                   })}
                 </ol>
+                )}
+                {arranging && !noType && (
+                  <div className="max-w-xl space-y-2">
+                    <div className="flex gap-2">
+                      <input value={newStep} onChange={e => setNewStep(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addStage() }}
+                        placeholder="Add a step" aria-label="Add a step"
+                        className="flex-1 min-w-0 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                      <button type="button" onClick={addStage} disabled={!newStep.trim()}
+                        className="px-3 py-2 rounded-lg bg-[var(--brand-600)] text-white text-sm font-medium disabled:opacity-40 flex items-center gap-1"><Plus size={14} /> Add</button>
+                    </div>
+                    {removedSteps.length > 0 && (
+                      <p className="text-xs text-gray-500">Taken off: {removedSteps.map((x, k) => (
+                        <span key={x.key}>{k > 0 && ', '}{x.label} <button type="button" onClick={() => restoreStage(x.key)} className="text-[var(--brand-700)] hover:underline">put back</button></span>
+                      ))}</p>
+                    )}
+                  </div>
                 )}
                 {/* Notes */}
                 <div className="pt-2 border-t border-gray-100">
