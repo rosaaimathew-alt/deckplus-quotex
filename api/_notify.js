@@ -27,6 +27,10 @@
  *   job_inspection (id = the job)   → the Deck Plus PM on the job: an inspection got a result, or was
  *                                    scheduled or moved (supabase/job_inspection_alerts.sql). Only
  *                                    what's new since the last alert about that job is told.
+ *
+ * The server's own county check (api/_permit-tick.js) sends inspection_result,
+ * job_inspection and job_ready the same way, with notifyFromServer: nobody is
+ * signed in there, so serverTargets works out who to tell from the same rows.
  */
 import { verifyToken, asUser, staffMembership } from './_auth.js'
 import { sendMail } from './_mailer.js'
@@ -344,14 +348,24 @@ export async function sendNotification(req, res, body) {
     : await asUser(token).rpc('notify_targets', { p_kind: kind, p_id: id })
   if (error) return res.status(500).json({ sent: false, error: 'Could not look up who to tell.' })
   if (!info) return res.status(404).json({ sent: false, reason: 'Nothing to tell anyone about.' })
+  // From the PM's own mailbox when they have one connected (mailSenderFor)
+  const orgIdOf = async () => (await staffMembership(token, user).catch(() => null))?.org_id || null
+  const out = await deliverAlert({ kind, id, info, host: req.headers?.host, orgIdOf })
+  res.status(out.status).json(out.body)
+}
+
+// Tell the people `info` names (from job_inspection_targets / notify_targets,
+// or serverTargets): what's new only, not twice in a minute, a pop-up first,
+// else an email and a text. → { status, body }
+export async function deliverAlert({ kind, id, info, host, orgIdOf = async () => null }) {
   const people = (info.recipients || []).filter(p => p && p.email)
-  if (!people.length) return res.status(200).json({ sent: false, reason: 'Nobody to tell yet.' })
+  if (!people.length) return { status: 200, body: { sent: false, reason: 'Nobody to tell yet.' } }
   // Inspections: only what the PM hasn't been told about this job yet
   if (kind === 'job_inspection') {
     try { info.news = await inspectionNews(await getKV(), id, info.job) } catch { info.news = inspectionNews.fresh(info.job) }
   }
   const msg = messageFor(info)
-  if (!msg) return res.status(200).json({ sent: false, reason: 'Nothing to say.' })
+  if (!msg) return { status: 200, body: { sent: false, reason: 'Nothing to say.' } }
 
   // Not twice in a minute (a date typed digit by digit, a double tap).
   // Chat: per conversation and direction, not per message
@@ -360,26 +374,26 @@ export async function sendNotification(req, res, body) {
   // Ready to start: once per job (a permit unticked and ticked again doesn't repeat it)
   if (kind === 'job_ready') try {
     const kv = await getKV(), key = `notify:jobready:${id}`
-    if (await kv.get(key)) return res.status(200).json({ sent: false, reason: 'Already told.' })
+    if (await kv.get(key)) return { status: 200, body: { sent: false, reason: 'Already told.' } }
     await kv.set(key, { at: Date.now() }, { ex: 365 * 86400 })
   } catch { /* storage hiccup: better a repeat than no alert */ }
   if (kind !== 'job_inspection' && kind !== 'job_ready') try {
     const kv = await getKV()
-    if (await kv.get(quietKey)) return res.status(200).json({ sent: false, reason: 'Already sent a moment ago.' })
+    if (await kv.get(quietKey)) return { status: 200, body: { sent: false, reason: 'Already sent a moment ago.' } }
     await kv.set(quietKey, { at: Date.now() }, { ex: kind === 'message' ? CHAT_QUIET_SECONDS : kind === 'photos' ? PHOTO_QUIET_SECONDS : QUIET_SECONDS })
   } catch { /* storage hiccup: better a repeat than no alert */ }
 
-  const host = req.headers?.host || 'www.deckplus.app'
+  host = host || 'www.deckplus.app'
   const origin = `${host.includes('localhost') ? 'http' : 'https'}://${host}`
   const link = `${origin}${msg.path}`
   const logoUrl = `${origin}/deckplus-logo.png`
   const sender = info.sender || {}
   // From the PM's own mailbox when they have one connected, else the company
   // mailbox with the PM's name on it; replies go to the PM either way.
-  const member = await staffMembership(token, user).catch(() => null)
+  const orgId = await orgIdOf()
   // People with "Alert emails" off get pop-ups only (Settings › Team › Access)
   const popupOnly = new Set(await alertEmailsOff([...people.map(p => p.email), sender.email]))
-  const mailSender = mailSenderFor(kind, info, people, member?.org_id || null, popupOnly)
+  const mailSender = mailSenderFor(kind, info, people, orgId, popupOnly)
 
   let emailed = 0, texted = 0, pushed = 0
   const errors = []
@@ -410,5 +424,81 @@ export async function sendNotification(req, res, body) {
     }
   }
   if (errors.length) console.error('notify:', kind, id, errors.join(' | '))
-  res.status(200).json({ sent: emailed + texted + pushed > 0, emailed, texted, pushed, ...(errors.length && !emailed ? { error: errors[0] } : {}) })
+  return { status: 200, body: { sent: emailed + texted + pushed > 0, emailed, texted, pushed, ...(errors.length && !emailed ? { error: errors[0] } : {}) } }
+}
+
+// ── The same alerts from the server's county check ───────────────────────────
+// api/_permit-tick.js runs with nobody signed in, so it can't ask
+// job_inspection_targets / notify_targets (they answer for the caller). This
+// is the same answer, worked out from the same rows with the server's
+// database client, as the office would get it, with no one person sending it:
+// the PM (or, for a sub, the booking's PM) is told, from the company mailbox
+// unless the booking's PM is the sender. Keep it in step with
+// supabase/job_inspection_alerts.sql and supabase/notify.sql.
+export const SERVER_KINDS = ['job_inspection', 'job_ready', 'inspection_result']
+const txt = (v) => (v == null ? null : typeof v === 'string' ? v : JSON.stringify(v))   // like ->> in SQL
+const arr = (v) => (Array.isArray(v) ? v : [])
+const member = async (sb, orgId, userId) => {
+  if (!userId) return null
+  const { data } = await sb.from('org_members').select('user_id, role, display_name, email, phone').eq('org_id', orgId).eq('user_id', userId).maybeSingle()
+  return data || null
+}
+export async function serverTargets(sb, orgId, kind, id) {
+  if (kind === 'job_inspection' || kind === 'job_ready') {
+    const { data: job } = await sb.from('proposals').select('id, pm_id, data').eq('org_id', orgId).eq('id', id).is('deleted_at', null).maybeSingle()
+    if (!job) return null
+    const pm = await member(sb, orgId, job.pm_id)
+    const who = pm && !['sub', 'paint'].includes(pm.role) && pm.email ? [{ name: pm.display_name, email: pm.email, phone: pm.phone }] : []
+    const d = job.data || {}
+    const pick = (o, keys) => Object.fromEntries(keys.map(k => [k, txt(o?.[k])]))
+    return {
+      kind: 'job_inspection',   // as job_inspection_targets answers, for both kinds
+      by: {}, sender: {}, senderIsStaff: true,
+      job: {
+        id: job.id, client: txt(d.client), address: txt(d.address),
+        permits: arr(d.countyPermit?.permits).map(pp => ({
+          record: txt(pp?.record),
+          upcoming: arr(pp?.upcoming).map(u => pick(u, ['id', 'code', 'name', 'date'])),
+          completed: arr(pp?.completed).map(c => pick(c, ['id', 'code', 'name', 'date', 'result'])),
+        })),
+        office: arr(d.jobData?.officeInspections).map(o => pick(o, ['id', 'code', 'name', 'date', 'result'])),
+      },
+      recipients: who,
+    }
+  }
+  if (kind === 'inspection_result') {
+    const { data: t } = await sb.from('sub_tasks').select('id, owner_id, pm_id, crew_id, data').eq('org_id', orgId).eq('id', id).is('deleted_at', null).maybeSingle()
+    if (!t) return null
+    const d = t.data || {}
+    const isPaint = txt(d.paint) === 'true'
+    const { data: s } = d.subId == null ? { data: null }
+      : await sb.from('subcontractors').select('id, data').eq('org_id', orgId).eq('id', txt(d.subId)).is('deleted_at', null).maybeSingle()
+    const [pm, owner, tech] = [await member(sb, orgId, t.pm_id), await member(sb, orgId, t.owner_id), await member(sb, orgId, t.crew_id)]
+    const crew = arr(s?.data?.crew).find(x => t.crew_id && txt(x?.userId) === String(t.crew_id)) || null
+    const who = []
+    if (!isPaint && owner?.email) who.push({ name: owner.display_name, email: owner.email, phone: txt(s?.data?.phone) })
+    if (tech?.email) who.push({ name: tech.display_name ?? txt(crew?.name), email: tech.email, phone: txt(crew?.phone) })
+    return {
+      kind,
+      by: {},
+      // in the PM's name, as for every alert to a sub about their booking
+      sender: pm ? { id: pm.user_id, name: pm.display_name, email: pm.email, phone: pm.phone } : {},
+      senderIsStaff: true,
+      newPhotos: 0,
+      task: {
+        id: t.id, proposalId: txt(d.proposalId), title: txt(d.title), client: txt(d.client), address: txt(d.address),
+        startDate: txt(d.startDate), endDate: txt(d.endDate), inspectionDate: txt(d.inspectionDate),
+        changeNote: txt(d.changeNote), assignment: txt(d.assignment), stage: d.stage ?? null, crewName: txt(d.crewName),
+        subName: txt(s?.data?.name) ?? txt(d.subName), paint: isPaint, inspections: arr(d.inspections),
+      },
+      recipients: who,
+    }
+  }
+  return null
+}
+export async function notifyFromServer(sb, { orgId, kind, id, host }) {
+  if (!SERVER_KINDS.includes(kind) || id == null) return { sent: false, reason: 'Unknown alert.' }
+  const info = await serverTargets(sb, orgId, kind, String(id))
+  if (!info) return { sent: false, reason: 'Nothing to tell anyone about.' }
+  return (await deliverAlert({ kind, id: String(id), info, host, orgIdOf: async () => orgId })).body
 }

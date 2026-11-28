@@ -3,40 +3,16 @@
 // batches, and saves what the county site says on each job (countyPermit),
 // checking off the stages the county has passed. Run by components/PermitPulse
 // at 8 AM and 1 PM (and right away for jobs never checked), or by "Check county now".
+// The server runs the same check on a schedule (api/_permit-tick.js, with the
+// same rules: lib/pulseCore.js), so it happens even with no screen open; this
+// run then finds nothing left to do.
 import { useStore } from '../store'
-import { getStages } from '../pages/Jobs'
-import { permitTracked, countyPassedStages, pulseDue, countyConnected, jobCounty, closeIfFinaled, currentPulseSlot, PULSE_HOURS, keepHistory, addToHistory } from './permitTracking'
-import { isJob } from './attention'
-import { countyOf, gradeRun, sendConnectionAlert, isBusyError } from './permitHealth'
+import { pulseDue, closeIfFinaled, currentPulseSlot, PULSE_HOURS, addToHistory } from './permitTracking'
+import { gradeRun, sendConnectionAlert, isBusyError } from './permitHealth'
+import { BATCH, COOL_DOWN_MS, MAX_COOL_DOWNS, PACE_MS, STALE_START_MS, FILL_LOCK_MS, pulseJobs, uncheckedJobs, pulseRequest, nextReading, passedStagesOf, countyTotals, tally as tallyInto } from './pulseCore'
 
-// Jobs per request: one parallel round on the server, well inside its 60 s
-const BATCH = 3
-// After a batch the county site called busy, wait this long before the next
-// (at most this many times in one run, so a blocked site can't stall the check).
-const COOL_DOWN_MS = 25000
-const MAX_COOL_DOWNS = 8
-// Between batches: the county limit counts page loads per minute, and the check
-// is in no hurry (80 jobs take about five minutes this way).
-const PACE_MS = 5000
-
-// Notes we already have, by inspection id, so the server only opens the
-// "View Details" page of inspections it hasn't read before.
-function knownNotes(prev) {
-  const out = {}
-  for (const p of prev?.permits || []) for (const i of p.completed || []) if (Array.isArray(i.notes)) out[i.id] = i.notes
-  return out
-}
-
-function withNotes(result, prev) {
-  const known = knownNotes(prev)
-  return {
-    ...result,
-    permits: (result.permits || []).map(p => ({
-      ...p,
-      completed: (p.completed || []).map(i => (Array.isArray(i.notes) || !known[i.id] ? i : { ...i, notes: known[i.id] })),
-    })),
-  }
-}
+// The rules both runs share (lib/pulseCore.js), still offered from here
+export { permitPointer, pulseActive } from './pulseCore'
 
 // A fetch that throws (instead of answering) means this browser lost the
 // connection: the phone locked, the app was switched away from, or the wifi
@@ -63,27 +39,6 @@ async function postBatch(body) {
   }
 }
 
-// What the office set on the job to point at its permit (Permits tab): the
-// permit's page on the county site ("Permit link or number"), else a number
-// typed there or on one of the job's permit cards. Sent with the job so the
-// county lookup opens that permit even when the address search finds nothing.
-export function permitPointer(p) {
-  const isNumber = (n) => /^(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,29}$/.test(n)
-  const set = String(p?.jobData?.countyLink || '').trim()
-  if (/^https?:\/\//i.test(set)) return { link: set.replace(/^http:/i, 'https:') }
-  if (isNumber(set.toUpperCase())) return { typed: set.toUpperCase() }
-  // A number on a permit card is only a hint: used when the address finds nothing
-  const hint = Object.values(p?.jobData?.permits || {}).map(x => String(x?.number || '').trim().toUpperCase()).find(isNumber)
-  return hint ? { hint } : {}
-}
-
-// ids: only these jobs (e.g. one job's "Check now"); otherwise every tracked job.
-// A job under way: the county has its permit, or a step on its checklist is
-// ticked. Jobs not started yet are only looked up in the morning check (to
-// catch a newly issued permit), so the county site isn't searched twice a
-// day for permits that don't exist yet.
-export const pulseActive = (p) => (p.countyPermit?.permits || []).length > 0 || (p.jobData?.completedStages || []).length > 0
-
 // scheduled: the 8 AM / 1 PM check. It skips jobs already read since the
 // check's own start time (so a check cut short and started again carries on
 // instead of starting over), and in the afternoon the jobs not started yet.
@@ -91,25 +46,14 @@ export async function runPermitPulse({ ids, onProgress, scheduled = false } = {}
   const { proposals, setCountyPermit } = useStore.getState()
   const slot = currentPulseSlot()
   const morning = slot.getHours() === PULSE_HOURS[0]
-  const freshSince = (p) => p.countyPermit?.checkedAt && !p.countyPermit.siteError && new Date(p.countyPermit.checkedAt) >= slot
-  const jobs = proposals
-    .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
-    .filter(p => !ids || ids.includes(p.id))
-    .filter(p => !scheduled || (!freshSince(p) && (morning || pulseActive(p) || !p.countyPermit)))
+  const jobs = pulseJobs(proposals, { ids, scheduled, slot, morning })
   let done = 0, failed = 0, lastError = null, interrupted = false, cooling = false
   // Per county: jobs whose county site was read, and jobs where it wasn't
   // (a busy answer is counted apart: it's the site pacing us, not an outage),
   // against every tracked job in that county, not just the ones in this run.
   const stats = {}
-  const countyJobs = {}
-  for (const p of proposals) if (isJob(p) && permitTracked(p) && countyConnected(p)) countyJobs[countyOf(p)] = (countyJobs[countyOf(p)] || 0) + 1
-  const tally = (p, ok, error) => {
-    const county = countyOf(p)
-    const c = (stats[county] ||= { ok: 0, failed: 0, busy: 0, total: countyJobs[county] || 0, lastError: '' })
-    if (ok) c.ok++
-    else if (isBusyError(error)) c.busy++
-    else { c.failed++; c.lastError = error || c.lastError }
-  }
+  const countyJobs = countyTotals(proposals)
+  const tally = (p, ok, error) => tallyInto(stats, countyJobs, p, ok, error)
   let coolDowns = 0
   for (let i = 0; i < jobs.length; i += BATCH) {
     const batch = jobs.slice(i, i + BATCH)
@@ -121,19 +65,7 @@ export async function runPermitPulse({ ids, onProgress, scheduled = false } = {}
       else if (i > 0) await sleep(PACE_MS)   // an unhurried pace between batches
       cooling = false
       await whenVisible()
-      const res = await postBatch(JSON.stringify({
-          jobs: batch.map(p => ({
-            id: p.id,
-            address: p.address,
-            client: p.client,
-            county: jobCounty(p),
-            jurisdiction: p.imported?.jurisdiction || '',
-            pick: p.jobData?.countyPick || null,
-            record: (String(p.imported?.permit || '').toUpperCase().match(/\b[A-Z]{1,5}-?(?:[A-Z]{2,5}-)?\d{2,4}-\d{3,7}\b/) || [])[0] || '',
-            ...permitPointer(p),
-            knownNotes: Object.keys(knownNotes(p.countyPermit)),
-          })),
-        }))
+      const res = await postBatch(JSON.stringify({ jobs: batch.map(pulseRequest) }))
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error || `The permit check failed (${res.status})`)
       results = body.results || {}
@@ -152,20 +84,15 @@ export async function runPermitPulse({ ids, onProgress, scheduled = false } = {}
       if (!r) { failed++; tally(p, false, 'No answer for this job'); continue }
       if (r.siteError && isBusyError(r.error)) cooling = true
       tally(p, !r.siteError, r.error)
-      // Keep the last good reading if this check failed, with the error on top.
+      // The new reading (the last good one kept if this check failed), and
+      // the permits that dropped out of it: nothing read is ever thrown away
       const prev = useStore.getState().proposals.find(x => x.id === p.id)?.countyPermit
-      // (siteError stays on it so the 10-minute tick tries it again.)
-      const reading = r.error && !r.needsPick && prev?.permits?.length
-        ? { ...prev, error: r.error, siteError: !!r.siteError, checkedAt: r.checkedAt }
-        : withNotes(r, prev)
-      // nothing the app has read is ever thrown away
-      const { reading: next, dropped } = keepHistory(reading, prev)
+      const { reading: next, dropped } = nextReading(r, prev)
       if (dropped.length) {
         const job = useStore.getState().proposals.find(x => x.id === p.id)
         useStore.getState().updateJobData(p.id, { permitHistory: addToHistory(job?.jobData?.permitHistory, dropped) })
       }
-      const stageKeys = (getStages(p) || []).map(s => s.key)
-      setCountyPermit(p.id, next, r.permits ? countyPassedStages({ countyPermit: next }, stageKeys) : [])
+      setCountyPermit(p.id, next, passedStagesOf(p, r, next))
       // Every final passed: off the board, ready for the office's close-out
       if (r.permits?.length && !r.error) closeIfFinaled(p.id, useStore.getState)
       done++
@@ -178,24 +105,18 @@ export async function runPermitPulse({ ids, onProgress, scheduled = false } = {}
   return { done, failed, total: jobs.length, stats, interrupted }
 }
 
-// Tracked jobs the county site has never been read for (e.g. just imported),
-// or whose last read failed on the site's end (slow or down) — tried again on
-// the next 10-minute tick instead of the next 8 AM / 1 PM, so one slow answer
-// (and the county alert it raised) clears as soon as the site answers again.
+// Tracked jobs never read, or busy last time (lib/pulseCore.js uncheckedJobs):
+// tried again on the next 10-minute tick.
 export function uncheckedJobIds() {
-  return useStore.getState().proposals
-    .filter(p => isJob(p) && permitTracked(p) && countyConnected(p))
-    // never checked, or the county was busy last time (jobs not started yet
-    // wait for the next morning check instead of being retried all day)
-    .filter(p => !p.countyPermit || (p.countyPermit.siteError && pulseActive(p)))
-    .map(p => p.id)
+  return uncheckedJobs(useStore.getState().proposals).map(p => p.id)
 }
 
 // The scheduled run (and "Check county now", with force). The run is marked
-// as started in the shared settings first, so two office
-// screens open at the same time don't both run it.
-const STALE_START_MS = 15 * 60 * 1000
-const FILL_LOCK_MS = 8 * 60 * 1000
+// as started in the shared settings first, so two office screens open at the
+// same time don't both run it, and none starts while the server's scheduled
+// check (api/_permit-tick.js) has it under way: the server keeps startedAt
+// (and fillStartedAt for its retries) fresh while it works. This screen's run
+// is the fallback for when the server's hasn't happened.
 let running = false
 
 export async function startPulse(by, { force = false } = {}) {

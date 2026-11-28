@@ -7,7 +7,8 @@
 // The results are copied onto the sub's booking (task.inspections) when the
 // county check or the office records them, because a sub's login can't read
 // the job itself.
-import { allPermits, tradeKind, inspectionLabel, isPassResult, isFailResult } from './permitTracking'
+// (Plain rules: the server's county check stamps the bookings with this too.)
+import { allPermits, tradeKind, inspectionLabel, isPassResult, isFailResult } from './permitRules.js'
 
 export function tradeGroup(trade) {
   const t = String(trade || '').toLowerCase()

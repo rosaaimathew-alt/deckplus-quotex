@@ -11,6 +11,7 @@ import { appRoleOf } from './roles'
 import { clientGroups } from './lib/proposalGroups'
 import { newSubTaskId } from './lib/subTasks'
 import { stampInspections } from './lib/subInspections'
+import { inspectionSig, APPROVAL_STEPS } from './lib/permitRules'
 import { newMessageId } from './lib/subChat'
 import { newDrawId } from './lib/subDraws'
 
@@ -167,13 +168,9 @@ export const ACTIVITY_TYPES = ['Call', 'Follow-up', 'Meeting', 'Email', 'Objecti
 // Copies a job's inspection results onto its subs' bookings, each sub getting
 // only their own trade's (lib/subInspections), and alerts the sub about a new
 // pass / fail from the last three days.
-// A job's inspections as the PM hears about them (api/_notify.js, job_inspection):
-// each one's result, or its scheduled date. A change → the job's PM is told
-// what's new (the server works out what that is, and never repeats itself).
-const inspectionSig = (p) => JSON.stringify([
-  ...(p?.countyPermit?.permits || []).flatMap(x => [...(x.upcoming || []).map(u => `${x.record}:${u.id}:${u.date}`), ...(x.completed || []).map(c => `${x.record}:${c.id}:${c.result}`)]),
-  ...(p?.jobData?.officeInspections || []).map(o => `${o.id}:${o.result}:${o.date}`),
-])
+// A job's inspections as the PM hears about them: inspectionSig (lib/permitRules.js).
+// A change → the job's PM is told what's new (the server works out what that
+// is, and never repeats itself). The server's county check does the same.
 const findJob = (get, id) => (get().proposals || []).find((x) => String(x.id) === String(id))
 // A signed job with no PM gets the one the owner's rule gives it (lib/pmAssign)
 function autoAssignPm(get, set, ids) {
@@ -190,13 +187,10 @@ function tellPmIfInspectionsChanged(get, proposalId, before) {
 }
 // A permit approved (HOA, zoning, building permit) that leaves the job with no approval
 // still open: the job is ready to start, and its PM hears it (api/_notify.js, job_ready;
-// once per job). jobPhase is loaded when needed: it reads the Jobs page's step lists.
-const APPROVAL_STEPS = ['hoa', 'zoning', 'building']
+// once per job). jobPhase is loaded when needed. APPROVAL_STEPS: lib/permitRules.js.
 function tellPmIfReady(get, proposalId, before) {
-  import('./lib/jobPhase').then(({ jobPhaseOf }) => {
-    const after = findJob(get, proposalId)
-    if (!before || !after) return
-    if (jobPhaseOf(before) === 'permitting' && jobPhaseOf(after) === 'ready') notify('job_ready', proposalId, 3000)
+  import('./lib/jobPhase').then(({ becameReady }) => {
+    if (becameReady(before, findJob(get, proposalId))) notify('job_ready', proposalId, 3000)
   }).catch(() => {})
 }
 function syncSubInspections(get, set, proposalId, alert = true) {
