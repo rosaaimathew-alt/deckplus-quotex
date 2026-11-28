@@ -183,8 +183,8 @@ export async function otpSend(kv, { token, email, emailOnFile, companyName, docL
     text: `Your verification code to sign ${docLabel} is ${code}.\n\nIt expires in 10 minutes. If you did not request this, ignore this email.`,
     html: `<p>Your verification code to sign <strong>${escapeHtml(docLabel)}</strong> is:</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p><p>It expires in 10 minutes. If you did not request this, you can ignore this email.</p>`,
     fromName: company,
-    // From the rep who sent the document when they've connected a mailbox.
-    sender: { email: senderEmail || null },
+    // From the person who sent the document, never someone else's inbox
+    sender: { email: senderEmail || null, own: true },
   })
   if (sent?.error) return { status: 502, body: { error: `Could not send the code: ${sent.error}` } }
   const matchesFile = !!emailOnFile && to === String(emailOnFile).trim().toLowerCase()

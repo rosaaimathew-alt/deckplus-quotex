@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import dotenv from 'dotenv'
 import { saveMessage } from './_store.js'
-import { sendMail, isMailerConfigured, smtpUser } from './_mailer.js'
+import { sendMail, isMailerConfigured, smtpUser, OWN_MAILBOX_MISSING } from './_mailer.js'
 import { sendNotification } from './_notify.js'
 import { pushPublicKey, pushToEmails } from './_push.js'
 import { mapJobSites } from './_timeclock.js'
@@ -214,10 +214,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ signature, saved: true })
   }
 
-  // Emails go out from the signed-in person's own connected mailbox when they have one.
-  const mailSender = { userId: staff.sub, email: staff.email }
+  // Emails a person sends go out only from their own connected mailbox (or one
+  // the office marked for company emails), never from someone else's inbox.
+  const mailSender = { userId: staff.sub, email: staff.email, own: true }
   if (!(await isMailerConfigured(mailSender))) {
-    return res.status(500).json({ error: 'No email account connected. Connect your mailbox in Settings › Email Account.' })
+    return res.status(400).json({ error: OWN_MAILBOX_MISSING })
   }
 
   // ── The link to sign a contract (Contracts › Send to Client) ──────────────
