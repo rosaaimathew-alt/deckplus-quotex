@@ -46,8 +46,8 @@ export function reminderEmail(item, { signature = null, site = SITE } = {}) {
   return {
     to: item.to, ...mail,
     fromName: (sig.name || 'Deck Plus').replace(/["<>]/g, ''),
-    // from the mailbox of the person who made the contract; the company's if they have none
-    sender: item.makerId || item.makerEmail ? { userId: item.makerId || undefined, email: item.makerEmail || undefined } : {},
+    // from the mailbox of the person who made the contract, never someone else's
+    sender: { userId: item.makerId || undefined, email: item.makerEmail || undefined, own: true },
   }
 }
 

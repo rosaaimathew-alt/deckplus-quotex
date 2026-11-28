@@ -10,7 +10,14 @@
  *   5. a mailbox set on the server: SMTP_HOST / SMTP_PORT / SMTP_USER /
  *      SMTP_PASS, or GMAIL_USER + GMAIL_APP_PASSWORD
  * If one mailbox refuses to send, the next one is tried.
+ *
+ * Something a person sends (sender.own: a contract, quote, reminder, signing
+ * code) goes out only from that person's own mailbox, or from a mailbox the
+ * office marked for company emails. It never borrows someone else's inbox:
+ * without one of their own the send stops with OWN_MAILBOX_MISSING.
  */
+export const OWN_MAILBOX_MISSING = 'Set up your email in Settings › Email Account to send this. Emails you send go out from your own address.'
+
 import nodemailer from 'nodemailer'
 import { getGmailOAuthCredentials, getConnectedEmail } from './_google-drive.js'
 import { mailboxForUser, mailboxForEmail, companyMailbox, transportForRow } from './_mailboxes.js'
@@ -53,6 +60,12 @@ async function candidates(sender = {}) {
   }
   if (sender.userId) addRow(await safe(() => mailboxForUser(sender.userId)), 'your mailbox')
   if (sender.email)  addRow(await safe(() => mailboxForEmail(sender.email)), 'the sender\'s mailbox')
+  if (sender.own) {
+    // Only a mailbox the office marked for company emails, never a person's own
+    const company = await safe(() => companyMailbox(sender.orgId || null))
+    if (company?.company_default) addRow(company, 'the company mailbox')
+    return out
+  }
   addRow(await safe(() => companyMailbox(sender.orgId || null)), 'the company mailbox')
   out.push({ label: 'the connected Google account', load: async () => {
     const creds = await safe(() => getGmailOAuthCredentials())
@@ -83,11 +96,16 @@ export async function sendMail({ to, bcc, subject, html, text, attachments, from
       if (!firstError) firstError = `Sending from ${m.email} failed: ${err.message}`
     }
   }
-  return { error: firstError || 'No email account connected. Connect your mailbox in Settings › Email Account.' }
+  return { error: firstError || (sender?.own ? OWN_MAILBOX_MISSING : 'No email account connected. Connect your mailbox in Settings › Email Account.') }
 }
 
 // True if any mailbox could send for this sender (or for the company).
 export async function isMailerConfigured(sender = {}) {
+  if (sender.own) {
+    if (sender.userId && await safe(() => mailboxForUser(sender.userId))) return true
+    if (sender.email && await safe(() => mailboxForEmail(sender.email))) return true
+    return !!(await safe(() => companyMailbox(sender.orgId || null)))?.company_default
+  }
   if (smtpUser()) return true
   if (sender.userId && await safe(() => mailboxForUser(sender.userId))) return true
   if (await safe(() => companyMailbox(sender.orgId || null))) return true
