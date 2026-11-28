@@ -19,7 +19,7 @@
 // admin only when a county is STILL down on the next check — one busy morning
 // clears itself on the 10-minute re-check and emails nobody — and again when
 // it comes back after such an email. Never on every check.
-import { locateAddress } from './permitFees'
+import { locateAddress } from './permitFees.js'
 
 const DOWN_SHARE = 0.3
 const DOWN_MIN_FAILED = 2

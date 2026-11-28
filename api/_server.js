@@ -37,6 +37,7 @@ app.post('/api/ai-chat',       (req, res) => aiChatHandler(req, res))
 app.get('/api/booking',        (req, res) => bookingHandler(req, res))
 app.post('/api/booking',       (req, res) => bookingHandler(req, res))
 app.post('/api/permit-pulse',  (req, res) => permitPulseHandler(req, res))
+app.get('/api/permit-pulse',   (req, res) => permitPulseHandler(req, res))   // ?tick=1: the scheduled county check
 
 // ── Auth ─────────────────────────────────────────────────────────────────
 app.post('/api/auth/login', (req, res) => {
