@@ -43,7 +43,7 @@ async function orgHealth(sb, orgId, now) {
   if (pulse.lastRunAt) {
     const hours = Math.round((now - new Date(pulse.lastRunAt)) / 3_600_000)
     facts.push(`County inspection check last finished ${hours < 1 ? 'within the hour' : `${hours} hour${hours === 1 ? '' : 's'} ago`}`)
-    if (hours > 30) items.push({ level: 'fix', text: `The county inspection check hasn't finished in ${hours} hours (it runs while an office screen is open).` })
+    if (hours > 30) items.push({ level: 'fix', text: `The county inspection check hasn't finished in ${hours} hours (it runs on its own at 8 AM and 1 PM: look at the "County inspection check" runs on GitHub).` })
   }
   for (const [county, h] of Object.entries(pulse.health || {})) {
     if (h?.down) items.push({ level: 'fix', text: `${county} County site marked down since ${new Date(h.since || h.checkedAt).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}: ${h.lastError || 'no detail'}` })

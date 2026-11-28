@@ -15,6 +15,14 @@
  * Alongside the building permit it reads the trade permits (electrical,
  * mechanical, plumbing) filed for the same project, since rough and final
  * electrical inspections are recorded on those.
+ *
+ *   GET /api/permit-pulse?tick=1  → { due, done, failed, remaining, … }
+ *
+ * The scheduled check (api/_permit-tick.js, called by
+ * .github/workflows/county-check.yml): reads the jobs that are due at the 8 AM
+ * and 1 PM slots and the retries, a few batches per call, so the check never
+ * waits for an office screen to be open. No login, and it takes no input: it
+ * only ever does the work that is due, at the same pace as a screen.
  */
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
@@ -23,6 +31,7 @@ import { requireAuth, staffRole } from './_auth.js'
 import { sendPermitAlert } from './_permit-alert.js'
 import { EVOLVE_SITES, searchAddress as evolveSearch, permitDetails as evolveDetails } from './_evolve.js'
 import { SITES, searchByAddress, searchByRecord, fetchPermit, fetchInspectionNotes, recordUrl, capIdsFromUrl, RECORD_RE, setPatience } from './_accela.js'
+import { permitTick } from './_permit-tick.js'
 
 dotenv.config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../.env') })
 
@@ -286,6 +295,8 @@ async function inBatches(items, size, fn) {
 }
 
 export default async function handler(req, res) {
+  // The scheduled check: no login, no input (see api/_permit-tick.js)
+  if (req.method === 'GET' && req.query?.tick) return permitTick(req, res, { readCounty: (jobs, deadline) => checkJobs(cleanJobs(jobs), deadline) })
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
   // County connection alert emails ride along on this function
   const raw = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
@@ -296,8 +307,14 @@ export default async function handler(req, res) {
   const role = await staffRole(token, staff)
   if (role !== 'office' && role !== 'admin') return res.status(403).json({ error: 'Only the office can run the permit check.' })
 
-  const body = raw
-  const jobs = (Array.isArray(body.jobs) ? body.jobs : []).slice(0, MAX_JOBS).map(j => ({
+  const results = await checkJobs(cleanJobs(raw.jobs), Date.now() + 40000)   // leave room inside the 60 s limit
+  res.status(200).json({ results })
+}
+
+// The jobs as sent (POST { jobs }, or lib/pulseCore.js pulseRequest on the
+// server), checked and trimmed: at most MAX_JOBS, nothing but what the lookup needs.
+export function cleanJobs(list) {
+  return (Array.isArray(list) ? list : []).slice(0, MAX_JOBS).map(j => ({
     id: String(j?.id ?? ''),
     address: String(j?.address || '').slice(0, 200),
     client: String(j?.client || '').slice(0, 120),
@@ -311,10 +328,14 @@ export default async function handler(req, res) {
     hint: RECORD_RE.test(String(j?.hint || '').trim().toUpperCase()) ? String(j.hint).trim().toUpperCase() : '',
     knownNotes: Array.isArray(j?.knownNotes) ? j.knownNotes.slice(0, 500) : [],
   })).filter(j => j.id)
+}
 
+// Read each job off its county site, three at a time; a busy site is waited
+// out until `deadline` (ms), and inspector notes are read until then too.
+// → { [id]: { permits, candidates, needsPick, error, siteError, checkedAt } }
+export async function checkJobs(jobs, deadline) {
   const results = {}
-  const deadline = Date.now() + 40000   // leave room inside the 60 s limit
-  setPatience(deadline)                 // a busy county site is waited out until then
+  setPatience(deadline)
   await inBatches(jobs.map(j => ({ ...j, deadline })), 3, async (job) => {
     const checkedAt = new Date().toISOString()
     try {
@@ -326,5 +347,5 @@ export default async function handler(req, res) {
       results[job.id] = { error: `Couldn't read the county site: ${e.message}`, siteError: true, checkedAt }
     }
   })
-  res.status(200).json({ results })
+  return results
 }

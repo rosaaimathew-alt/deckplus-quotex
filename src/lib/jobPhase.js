@@ -1,8 +1,10 @@
 // ── Where a sold job is ──────────────────────────────────────────────────────
 // Projects › Jobs (its All / Permitting / Ready to start / Active / Closed
-// filter) and the owner's Today page both ask this, so they always agree.
-import { getStages } from '../pages/Jobs'
-import { PERMIT_KEYS } from './permitTracking'
+// filter) and the owner's Today page both ask this, so they always agree, and
+// so does the server's county check (api/_permit-tick.js), which tells the PM
+// when a job becomes ready to start.
+import { getStages } from './jobStages.js'
+import { PERMIT_KEYS } from './permitRules.js'
 
 // Steps that come before building starts
 const PRE_BUILD = new Set(['hoa', 'zoning', 'building', 'precon', 'start', 'materials', 'measurements'])
@@ -25,4 +27,7 @@ export function jobPhaseOf(p, subStarted = new Set(), today = new Date().toISOSt
   if (building) return 'active'
   return stages.some(s => APPROVALS.includes(s.key) && !cs.includes(s.key)) ? 'permitting' : 'ready'
 }
+// The job was waiting on an approval and no longer is: its PM hears it's ready
+// to start (api/_notify.js, job_ready). before / after: the job either side of the change.
+export const becameReady = (before, after) => !!before && !!after && jobPhaseOf(before) === 'permitting' && jobPhaseOf(after) === 'ready'
 export const subStartedIds = (subTasks) => new Set((subTasks || []).filter(t => t && ['started', 'near', 'done'].includes(t.status)).map(t => String(t.proposalId)))

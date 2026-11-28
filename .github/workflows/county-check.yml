@@ -1,0 +1,83 @@
+# County inspection check, on a schedule. The app reads every tracked job's
+# permit off the county site at 8 AM and 1 PM (and retries the never-read and
+# busy ones in between). That used to happen only while an office screen was
+# open, so over a long weekend nothing was read. This calls the server's own
+# check (GET /api/permit-pulse?tick=1, api/_permit-tick.js) until it says
+# nothing is left: each call reads a few batches at the county's pace and
+# answers { due, done, remaining }. Calling it when nothing is due is harmless,
+# so the schedule covers both EDT and EST. If a call fails twice in a row it
+# opens a GitHub issue titled "ALERT: county inspection check ..." — GitHub
+# emails the owner and pushes to the GitHub mobile app — and closes it again
+# once the check runs fine. No secrets needed.
+name: County inspection check
+
+on:
+  schedule:
+    - cron: '2 12,13 * * *'      # the 8 AM check: 8:02 AM EDT / 8:02 AM EST
+    - cron: '2 17,18 * * *'      # the 1 PM check: 1:02 PM EDT / 1:02 PM EST
+    - cron: '22,42 12-21 * * *'  # retries through the working day (and a late slot)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: county-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SITE: https://www.deckplus.app
+    steps:
+      - name: Run the check until nothing is left (at most 12 minutes)
+        id: check
+        run: |
+          set +e
+          end=$((SECONDS + 720)); fails=0; ok=false
+          while :; do
+            code=$(curl -sS -L --max-time 75 -o out.json -w '%{http_code}' "$SITE/api/permit-pulse?tick=1")
+            echo "$(date -u '+%H:%M:%S') HTTP $code $(cat out.json 2>/dev/null)" | tee -a log.txt
+            if [ "$code" != "200" ]; then
+              fails=$((fails + 1))
+              if [ $fails -ge 2 ]; then break; fi
+              sleep 30; continue
+            fi
+            # a 200 that isn't the check's answer counts as a failure too
+            if ! remaining=$(jq -r 'if type == "object" and has("remaining") then (.remaining | tostring) else error("not the check") end' out.json 2>/dev/null); then
+              fails=$((fails + 1))
+              if [ $fails -ge 2 ]; then break; fi
+              sleep 30; continue
+            fi
+            fails=0
+            if [ "$remaining" = "0" ]; then ok=true; break; fi
+            if [ $SECONDS -ge $end ]; then echo "Stopping after 12 minutes with ${remaining} left; the next run carries on" | tee -a log.txt; ok=true; break; fi
+            sleep "$(jq -r '.wait // 2' out.json)"
+          done
+          echo "failed=$([ "$ok" = true ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+      - name: Raise or update the alert
+        if: steps.check.outputs.failed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          body="$(printf 'The county inspection check on the server failed at %s UTC, so inspection results on the board may stop updating unless an office screen is open.\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s' "$(date -u '+%Y-%m-%d %H:%M')" "$(tail -n 20 log.txt)" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          open=$(gh issue list --state open --search 'in:title "ALERT: county inspection check"' --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "ALERT: county inspection check failing — inspection results not updating" --body "$body"
+          fi
+          exit 1
+      - name: Close the alert once healthy
+        if: steps.check.outputs.failed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for n in $(gh issue list --state open --search 'in:title "ALERT: county inspection check"' --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Recovered: the county check runs fine again ($(date -u '+%Y-%m-%d %H:%M') UTC)."
+          done
