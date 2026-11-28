@@ -48,9 +48,10 @@ async function orgHealth(sb, orgId, now) {
   for (const [county, h] of Object.entries(pulse.health || {})) {
     if (h?.down) items.push({ level: 'fix', text: `${county} County site marked down since ${new Date(h.since || h.checkedAt).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}: ${h.lastError || 'no detail'}` })
   }
-  const { data: tracked } = await sb.from('proposals').select('id, status, pm_id, countyPermit:data->countyPermit, stages:data->jobData->completedStages')
+  const { data: tracked } = await sb.from('proposals').select('id, status, pm_id, countyPermit:data->countyPermit, stages:data->jobData->completedStages, finals:data->jobData->finalsPassed, noPermit:data->jobData->noPermit')
     .eq('org_id', orgId).is('deleted_at', null).in('status', ['Won', 'Imported']).not('data->countyPermit', 'is', null)
-  const open = (tracked || []).filter(p => !(p.stages || []).includes('closed'))
+  // the jobs the check still reads: not closed, finals not all passed, permit needed
+  const open = (tracked || []).filter(p => !(p.stages || []).includes('closed') && !p.finals && p.noPermit !== true)
   const busy = open.filter(p => p.countyPermit?.siteError).length
   const stale = open.filter(p => p.countyPermit?.checkedAt && now - new Date(p.countyPermit.checkedAt) > 2 * DAY).length
   const noPm = open.filter(p => !p.pm_id).length
