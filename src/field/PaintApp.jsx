@@ -40,6 +40,7 @@ import JobPhotosTab from '../components/JobPhotos'
 import { missingTodaysPhotos } from '../lib/taskPhotos'
 import { usePaintCrew } from './usePaintCrew'
 import TimeClock from '../sub/TimeClock'
+import CrewHours from './CrewHours'
 import SubNotice from '../sub/SubNotice'
 import { isJob, isJobClosed } from '../lib/attention'
 import { jobFinancials } from '../lib/finance'
@@ -584,6 +585,7 @@ function PaintersOnJob({ proposal }) {
 // password, then see the jobs they're put on in the sub app on their phone.
 export function PaintCrew() {
   const crew = usePaintCrew()
+  const [view, setView] = useState('hours')   // the crew's hours this week, or the painters on the app
   const [f, setF] = useState({ name: '', email: '', phone: '' })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -605,6 +607,15 @@ export function PaintCrew() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-gray-900">Crew</h1>
+      <div className="flex border-b border-gray-200" role="tablist" aria-label="Crew">
+        {[['hours', 'Hours'], ['painters', 'Painters']].map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)}
+            className={`flex-1 px-1 h-11 text-sm font-semibold border-b-2 -mb-px ${view === k ? 'border-[var(--brand-600)] text-[var(--brand-700)]' : 'border-transparent text-gray-500'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === 'hours' ? <CrewHours /> : (<>
       <Card className="divide-y divide-gray-100 overflow-hidden">
         {crew.crew.length === 0 && <p className="px-4 py-3 text-sm text-gray-500">{crew.loaded ? 'No painters yet.' : 'Loading…'}</p>}
         {crew.crew.map(c => (
@@ -631,6 +642,7 @@ export function PaintCrew() {
           {msg && <p className={`text-sm break-all ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.text}{msg.link ? <><br />{msg.link}</> : null}</p>}
         </form>
       </Card>
+      </>)}
     </div>
   )
 }
